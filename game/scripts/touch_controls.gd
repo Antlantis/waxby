@@ -10,8 +10,9 @@ extends CanvasLayer
 ##
 ## The lit thumb pad (build 1): down and up count from where the thumb
 ## landed (SLIDE, less where the glass below is shorter: slide_need), a
-## slide within SNAP degrees of straight down or up lets go of left and
-## right (slide_dirs: 8 ways from one thumb), and each switches on with a
+## quick slide within SNAP degrees of straight down or up lets go of left and
+## right (slide_dirs: 8 ways from one thumb; a thumb creeping down over a
+## long run keeps running: _quick), and each switches on with a
 ## tick under the thumb (haptics allowing). While a move touch is down,
 ## chevrons mark where its down and up begin, lit while held; with none, a
 ## small up/down tick sits in the gap between the arrows (slide_hint).
@@ -41,7 +42,8 @@ const SCALES := [0.9, 1.0, 1.1]
 const SLIDE := 26.0               # px the left thumb slides down (down) or up (up) from where it landed
 const SLIDE_ROOM := 6.0           # down never asks for more than the glass below the landing point, less this...
 const SLIDE_MIN := 8.0            # ...nor for less than this, however low the thumb lands
-const SNAP := 25.0                # degrees: a slide this near straight down or up holds no left or right
+const SNAP := 25.0                # degrees: a slide this near straight down or up holds no left or right...
+const SNAP_TIME := 0.3            # ...when it went from half the slide to all of it within this (s): a slow creep keeps them
 const BUZZ_MS := 8                # the tick under the thumb as down or up switches on
 
 var hud: Node = null              # the HUD for pickup-card taps (else the parent World's)
@@ -217,22 +219,47 @@ static func slide_need(start_y: float, bottom: float) -> float:
 	return clampf(bottom - start_y - SLIDE_ROOM, SLIDE_MIN, SLIDE)
 
 
-static func slide_dirs(start: Vector2, pos: Vector2, mid: float, bottom: float) -> Dictionary:
+static func slide_dirs(start: Vector2, pos: Vector2, mid: float, bottom: float, snap := true) -> Dictionary:
 	## What one move touch holds: left or right by where the thumb is against
 	## the arrows' midpoint (6 px either side holds neither), down or up by
 	## how far it has slid from where it landed (slide_need below, SLIDE
 	## above). A slide within SNAP degrees of straight down or up lets go of
-	## left and right; a slanted one keeps the diagonal.
+	## left and right (snap: a quick one, _quick); a slanted one keeps the
+	## diagonal.
 	var out := {"left": pos.x < mid - 6.0, "right": pos.x > mid + 6.0, "down": false, "up": false}
 	var d := pos - start
 	if d.y > slide_need(start.y, bottom):
 		out["down"] = true
 	elif -d.y > SLIDE:
 		out["up"] = true
-	if (out["down"] or out["up"]) and absf(d.x) <= absf(d.y) * tan(deg_to_rad(SNAP)):
+	if snap and (out["down"] or out["up"]) and absf(d.x) <= absf(d.y) * tan(deg_to_rad(SNAP)):
 		out["left"] = false
 		out["right"] = false
 	return out
+
+
+func _quick(t: Dictionary, bottom: float) -> bool:
+	## Whether a move touch's slide down or up was a deliberate one, so SNAP
+	## may let go of left and right: it went from half the slide to all of
+	## it within SNAP_TIME. A thumb creeping down (or up) over a long run
+	## holds down as well, and keeps running: it never stops him dead, nor
+	## drops him through the ledge or off the cog he's on (hold to drop is
+	## pure down). Decided as down or up switches on and kept while it
+	## holds; back near where it landed, it starts over.
+	var d: Vector2 = t["pos"] - t["start"]
+	var need := slide_need(float(t["start"].y), bottom)
+	if d.y <= need * 0.5 and -d.y <= SLIDE * 0.5:
+		t.erase("half_t")
+		t.erase("quick")
+		return true
+	if not t.has("half_t"):
+		t["half_t"] = _t
+	if d.y > need or -d.y > SLIDE:
+		if not t.has("quick"):
+			t["quick"] = _t - float(t["half_t"]) <= SNAP_TIME
+		return bool(t["quick"])
+	t.erase("quick")
+	return true
 
 
 func _glass_bottom() -> float:
@@ -247,7 +274,7 @@ func _refresh() -> void:
 	for t in _touches.values():
 		match t["role"]:
 			"move":
-				var held := slide_dirs(t["start"], t["pos"], mid, bottom)
+				var held := slide_dirs(t["start"], t["pos"], mid, bottom, _quick(t, bottom))
 				for d in held:
 					if held[d]:
 						want[d] = true

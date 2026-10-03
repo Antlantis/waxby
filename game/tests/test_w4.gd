@@ -42,7 +42,7 @@ extends SceneTree
 ## here to the arena door, since its bell only comes with the Tinker); each
 ## feature's first-time bark plays once as it's taught, never mid-jump (and,
 ## in a small level, BARK_LEAD tiles before a feature no sign teaches, never
-## in a mode).
+## in a mode); a choice card closing puts the carillon back on the tick.
 ##
 ##     godot --headless --path game --script res://tests/test_w4.gd
 
@@ -114,6 +114,7 @@ func _initialize() -> void:
 	await _test_clock()
 	await _test_boss_pivot()
 	await _test_bark_lead()
+	await _test_choice_sync()
 	_test_level_checks()
 	await _test_arc_check()
 	var have := []
@@ -759,6 +760,34 @@ func _test_bark_lead() -> void:
 	var keys: Array = hud3.said.map(func(b): return b[0])
 	_check(keys == ["first_belt", "first_ice"], "both due at once: the belt just ahead first, then the ice behind him (%s)" % [keys])
 	await _done(w3)
+
+
+func _test_choice_sync() -> void:
+	## A choice card (the Altar Rites, a boss's boon) holds the World, so the
+	## feature clock stands still under it while the carillon plays on: as
+	## it closes, the tick-locked track is put back on the clock
+	## (sync_music: Sfx.seek_music(ftime)), as the pause menu's close does.
+	var sfx = root.get_node_or_null("Sfx")
+	if sfx == null or not FileAccess.file_exists("res://levels/4-1.txt"):
+		print("  skipped: the choice card's music sync (no Sfx, or no 4-1)")
+		return
+	var w := _world(_load("4-1"))
+	await process_frame
+	w.headless = false
+	var kept: String = sfx._music_track
+	sfx._music_track = "carillon"
+	w.ftime = 12.345
+	sfx._anchor = []
+	_check(w.offer_choice([{"name": "A"}, {"name": "B"}], {"heading": "t", "later": "Later"}) and w.paused, "a choice card holds the World")
+	w.choice.choose(-1)
+	var at: Array = sfx._anchor
+	_check(not w.paused and at.size() == 3 and str(at[0]) == "carillon" and is_equal_approx(float(at[1]), 12.345),
+			"as it closes the carillon is put back on the feature clock: seek_music(ftime) (%s)" % [at])
+	sfx._music_track = kept
+	sfx._anchor = []
+	w.paused = true
+	w.headless = true
+	await _done(w)
 
 
 # ---------------------------------------------------------------- the levels

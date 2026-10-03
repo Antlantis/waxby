@@ -310,7 +310,7 @@ LEVELS.append({
     'dread': 'Mister Mandrake|rootling|Twinned,Sporebound',
     'story_start': 'beat_3_1',
     'hints': ['Jump into a vine to catch it',
-              'Hold jump to climb. Hold down to slide',
+              'Slide your thumb up to climb, down to slide',
               'Hold a way and jump to leap off',
               'Here lies Brother Pim. He kept the soup warm.',
               'Knock glowfruit down to light the way',

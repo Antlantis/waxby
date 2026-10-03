@@ -1112,7 +1112,7 @@ const BARKS := {
 	"first_douse": ["taper:worried", "Wet wick! Your light's low for a moment. Dry off."],
 	"low_flame":   ["taper:worried", "Your flame's low! Drink from your flask, or find an altar."],
 	"special_empty_founder": ["taper:warm", "Cold bell, sprout. Hit foes to build Heat, then slam it."],   # founder.special_pressed, short of Heat
-	"skill_point": ["taper:warm", "You've grown, sprout. Open the Sheet from the pause menu to spend it."],
+	"skill_point": ["taper:warm", "You've grown, sprout. The next altar will offer it, or the Sheet."],
 	"tollgrave_angry": ["tollgrave:hushed", "Ring? No. NO. HUSH!", "every"],                    # boss phase 2
 	"snuffer_angry":   ["snuffer:wrath", "Why won't it go out?", "every"],                     # boss phase 2
 	"snuffer_dark":    ["taper:worried", "He's put out every light! Only yours is left. Stay whole!", "every"],

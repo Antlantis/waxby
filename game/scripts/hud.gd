@@ -855,6 +855,13 @@ func top_card_showing() -> bool:
 	return title_showing() or not _lvl.is_empty()
 
 
+func slot_blocked() -> bool:
+	## The message slot draws nothing now: a title card (showing or waiting
+	## its turn) or the level-up card is up (_draw_slot). A sign's linger
+	## waits it out (world._read_signs).
+	return not _title.is_empty() or not _lvl.is_empty()
+
+
 func boss_alpha() -> float:
 	## How much of the boss bar shows (tests): none while it steps aside,
 	## see-through while he's behind it.
@@ -1775,7 +1782,7 @@ func _draw_top() -> void:
 
 func _draw_slot(ci: Control) -> void:
 	## The one message slot: a message if there is one, else a sign's hint.
-	if not _title.is_empty() or not _lvl.is_empty():
+	if slot_blocked():
 		return
 	var boss_on := not _boss.is_empty()
 	if not _msg.is_empty():

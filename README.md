@@ -17,10 +17,12 @@ ring them again.
 - **Levels and loot:** XP to level 30, skill points, gear with affixes and
   Legendaries, a relic codex with a belt of 2 to 4 slots, and the Chandler's
   shop. A lit altar with a skill point waiting offers three skills (the Altar
-  Rites). A boss's first kill on a difficulty lets you choose his prize: his
-  signature Legendary or one or two others you don't hold (the Boss Boons).
-  Dusk kills drop half as often and never a Common; a Legendary taken is worn
-  over a piece that isn't one, and announced.
+  Rites; again while points are left), then a relic found with the belt full
+  against the weakest worn one. A boss's first kill on a difficulty lets you
+  choose his prize: his signature Legendary or one or two others you don't
+  hold (the Boss Boons). Dusk kills drop half as often and never a Common; a
+  Legendary taken is worn over a piece that isn't one, and announced, and a
+  worn one is never swapped out by itself for a piece that isn't one.
 - **Four worlds of four levels** so far (v3 builds toward six), each ending
   in a boss:
   - World 1, the Sunken Cathedral: the Nave, the Crypt Stair, the Burning
@@ -89,9 +91,11 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
   scripts/hud.gd  touch_controls.gd  title_screen.gd  map_screen.gd  hero_screen.gd (+ *_panel.gd)
   scripts/chandler_screen.gd  keeper_screen.gd  pause_menu.gd  results_screen.gd  settings.gd
   scripts/choice_card.gd  the one choice card over a paused game: up to three cards and a button
-                          (the Descent's Glimmers, the Altar Rites, a boss's boon); rites.gd the
-                          Altar Rites: a lit altar with a skill point waiting offers three skills
-                          to learn there; the Boss Boons (world.gd open_boon, Items.boon_legends):
+                          (the Descent's Glimmers, the Altar Rites, a relic, a boss's boon);
+                          rites.gd the Altar Rites: a lit altar with a skill point waiting offers
+                          three skills to learn there (again while points are left), then a relic
+                          found with the belt full against the weakest worn one (world.gd
+                          open_relic); the Boss Boons (world.gd open_boon, Items.boon_legends):
                           a boss's first kill offers his signature Legendary and others to choose
   scripts/glow.gd         everything bright, drawn above the dark
   shaders/darkness.gdshader  the dark: multiplies the screen, warm in hard bands near lights
@@ -180,12 +184,14 @@ flask above them; attack, jump and the Special under the right thumb; pause top
 right. The left thumb also slides down and up, counted from where it landed
 (26 px, less when it lands low on the glass): faint chevrons mark both while
 the thumb is down, light while held, and the phone ticks as one switches on; a
-steep slide (within 25 degrees of straight down or up) lets go of left and
-right. Down held 0.15 s on a ledge drops through it (or slide down and press
-jump, at once; down on solid floor does nothing, and a down held on from a
-vine or the air waits to be let go); up climbs a vine without the leap a fresh
-jump with an arrow held makes (slant it toward a floor at the top to haul
-onto it). A one-time card teaches each, on the first ledge and the first vine.
+quick steep slide (within 25 degrees of straight down or up, from half the
+slide to all of it in 0.3 s) lets go of left and right, while a thumb creeping
+down over a long run keeps running. Down held 0.15 s on a ledge drops through
+it (or slide down and press jump, at once; down on solid floor does nothing,
+and a down held on from a vine or the air waits to be let go); up climbs a
+vine without the leap a fresh jump with an arrow held makes (slant it toward a
+floor at the top to haul onto it). A one-time card teaches each, on the first
+ledge and the first vine.
 The camera holds Waxby's feet just over the highest thumb buttons (the Special
 and the flask, at any button size), so nothing on his floor is behind them; it
 leans up (at most back to the line it

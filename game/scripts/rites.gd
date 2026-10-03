@@ -2,8 +2,9 @@ extends RefCounted
 ## The Altar Rites: a skill point spent the moment it's earned. With one
 ## waiting, a lit altar in a story level stops play and offers up to three
 ## skills on the choice card (world.open_rites, choice_card.gd), with Later
-## (the point keeps: the next altar asks again, and the Sheet has it); the
-## results screen's "skill points to spend" line opens the same card.
+## (the point keeps: the next altar asks again, and the Sheet has it); a pick
+## with points left brings the next three. The results screen's "skill
+## points to spend" line opens the same card.
 ##
 ## What's offered, of the nodes Classes.can_buy allows now (no numbers
 ## change: these are the tree's own nodes, at the tree's own gates):

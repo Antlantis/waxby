@@ -1997,6 +1997,30 @@ func _test_sign_reading() -> void:
 	var w2 := await _world(rows, "hints: First board|Second board\n")
 	_check(w2.signs.size() == 2 and w2.signs[0]["node"].glinting() and w2.signs[1]["node"].glinting(), "the next visit's boards glint again")
 	await _done(w2)
+	# A level's first sign, a few tiles from the start, under its 2.8 s title
+	# card: held right from the first frame, its text still reads SIGN_LINGER
+	# s once the card is gone (the linger waits while the slot can't draw).
+	var w3 := await _world(_rows(60, {Vector2i(7, 12): "@"}), "hints: Wax-ice is slick\n")
+	var hud3 = load("res://scripts/hud.gd").new()
+	hud3.world = w3
+	hud3.story = null
+	hud3._story_checked = true
+	w3.hud = hud3
+	w3.add_child(hud3)
+	await process_frame
+	hud3.title_card("t", "t")
+	var drawn := 0.0
+	var titled := 0.0
+	for i in int(6.0 / DT):
+		_step(w3, 1, {"right": true})
+		hud3._process(DT)
+		if hud3.slot_blocked():
+			titled += DT
+		elif hud3._hint == "Wax-ice is slick" and hud3._hint_alpha > 0.0 and hud3._msg.is_empty():
+			drawn += DT
+	_check(titled >= 2.5 and w3.player.position.x > w3.signs[0]["pos"].x + 200.0, "(the title card held the slot %.1f s, and he ran on past the sign)" % titled)
+	_check(drawn >= 1.9, "the first sign's text still shows %.1f s after the title card (it ran out under it before)" % drawn)
+	await _done(w3)
 
 
 func _test_hang_heights() -> void:

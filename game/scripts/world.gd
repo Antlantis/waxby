@@ -294,6 +294,8 @@ var _opened: Array = []         # the reliquaries opened ([x, y])
 var choice: Control = null      # choice_card.gd over the level (made the first time one is offered)
 var _rites_altar := -1          # the altar whose Rites wait to open (-1: none)
 var _rites_wait := 0.0          # s they've waited on a title card going
+var _rites_snuffed := -1        # the altar whose waiting Rites a snuff cut off: they wait again when he relights there
+var _relic_wait: Array = []     # relics found this visit with the belt full: the next lit altar offers each (open_relic)
 # The Boss Boons: a boss's first kill offers his prize on the same card
 # (open_boon), once his fall has settled (_tick_boon).
 var _boon := {}                 # {at, who, t, wait}: a boss's boon waiting to open ({}: none)
@@ -2467,6 +2469,8 @@ func _collect(p: Dictionary) -> void:
 			var id: String = p["relic"]
 			var on: bool = Game.grant_relic(id)
 			relics_found.append(id)
+			if not on and not _relic_wait.has(id):
+				_relic_wait.append(id)   # (the next lit altar offers it: open_relic)
 			apply_hero()
 			var r: Dictionary = Relics.get_relic(id)
 			_sfx("relic_" + r["rarity"])
@@ -2510,11 +2514,14 @@ func _take_item(it: Dictionary) -> String:
 	## embers: a Common with auto-salvage, or anything no better than what's
 	## worn when the satchel is full) or "full" (no room: it stays put).
 	## A Legendary counts as better over a worn piece that isn't one (its
-	## power is nothing in the chips: _legend_over), and has its moment.
+	## power is nothing in the chips: _legend_over), and has its moment; a
+	## worn Legendary is never swapped out by a piece that isn't one, however
+	## its chips read (_legend_kept): that goes to the satchel, its card
+	## offering to wear it.
 	var h: Dictionary = Game.hero()
 	var chips := Hero.compare(h, it["slot"], it, h.get("belt", []), diff)
 	var better: bool = chips["dmg"] >= 0.0 and chips["life"] >= 0.0 and (chips["dmg"] > 0.0 or chips["life"] > 0.0)
-	better = better or _legend_over(h, it)
+	better = (better and not _legend_kept(h, it)) or _legend_over(h, it)
 	var where := ""
 	if better and bool(Game.setting("auto_equip")):
 		Game.equip(it)
@@ -2553,6 +2560,15 @@ func _legend_over(h: Dictionary, it: Dictionary) -> bool:
 	if worn is Dictionary and str(worn.get("rarity", "")) == "legendary":
 		return false
 	return Game.melt_on_equip(it).is_empty()
+
+
+func _legend_kept(h: Dictionary, it: Dictionary) -> bool:
+	## A piece that isn't a Legendary, for a slot that wears one: never worn
+	## over it by itself (the Legendary's power is nothing in the chips).
+	if str(it.get("legend", "")) != "":
+		return false
+	var worn = h.get("equip", {}).get(str(it.get("slot", "")))
+	return worn is Dictionary and str(worn.get("rarity", "")) == "legendary"
 
 
 func _legend_moment(it: Dictionary, where: String) -> void:
@@ -2711,8 +2727,10 @@ var _sign_left := -100.0        # ...and the _t he was last by it
 func _read_signs() -> void:
 	## The sign Wick stands by puts its text in the HUD's slot, and the last
 	## one keeps it there SIGN_LINGER s after he walks on, so a sign reads on
-	## the run. A board he has stood by stops glinting (sign_view.gd, this
-	## visit only).
+	## the run. While a title card or the level-up card keeps the slot from
+	## drawing (hud.slot_blocked: a level's first sign is under its title),
+	## the linger waits, so its SIGN_LINGER s start once the slot is free. A
+	## board he has stood by stops glinting (sign_view.gd, this visit only).
 	var near := ""
 	for s in signs:
 		if absf(player.position.x - s["pos"].x) < SIGN_REACH and absf(player.position.y - s["pos"].y) < 60.0:
@@ -2725,6 +2743,8 @@ func _read_signs() -> void:
 		_sign_left = _t
 	elif _sign_text != "" and _t - _sign_left < SIGN_LINGER:
 		near = _sign_text
+		if hud and hud.has_method("slot_blocked") and hud.slot_blocked():
+			_sign_left = _t
 	if hud:
 		hud.show_hint(near)
 
@@ -2821,9 +2841,10 @@ func foes_near(r := RITES_CLEAR) -> bool:
 
 
 func _altar_rites(a: Dictionary) -> void:
-	## An altar lit with a skill point waiting: its Rites wait for a tick
-	## that may open them (_tick_rites; the next one, if the area is clear).
-	if rites_block() == "":
+	## An altar lit with a skill point waiting, or a relic found with the
+	## belt full: its Rites (and then the relic) wait for a tick that may
+	## open them (_tick_rites; the next one, if the area is clear).
+	if rites_block() == "" or relic_block() == "":
 		_rites_altar = altars.find(a)
 		_rites_wait = 0.0
 
@@ -2833,17 +2854,19 @@ func _tick_rites(dt: float) -> void:
 	## near and the top band clear: a title card is cut short (at most 0.5 s,
 	## as the Descent's landing does), the level-up card has its 2.2 s. Gone
 	## past RITES_LEASH from the altar first (or the point spent), the next
-	## altar asks instead. A choice up holds the World (as the Descent holds
-	## it under its Glimmers), and a story beat that took the World this
-	## very tick goes first.
+	## altar asks instead. Snuffed first, they wait again when he relights
+	## at that altar (_rites_snuffed). A choice up holds the World (as the
+	## Descent holds it under its Glimmers), and a story beat that took the
+	## World this very tick goes first.
 	if choice != null and choice.is_open():
 		paused = true
 		return
 	if paused:
 		return
 	var a: Dictionary = altars[_rites_altar] if _rites_altar < altars.size() else {}
-	if a.is_empty() or rites_block() != "" or state != "play" or not player.alive \
+	if a.is_empty() or (rites_block() != "" and relic_block() != "") or state != "play" or not player.alive \
 			or player.position.distance_to(a["pos"]) > RITES_LEASH:
+		_rites_snuffed = _rites_altar if state == "dead" or not player.alive else -1
 		_rites_altar = -1
 		return
 	if not player.on_floor or hitstop > 0.0 or time_stopped() or foes_near():
@@ -2856,7 +2879,8 @@ func _tick_rites(dt: float) -> void:
 	if hud.has_method("top_card_showing") and hud.top_card_showing() and not hud.title_showing():
 		return   # (the level-up card, or a title card waiting behind it)
 	_rites_altar = -1
-	open_rites()
+	if not open_rites():
+		open_relic()
 
 
 func open_rites() -> bool:
@@ -2868,19 +2892,125 @@ func open_rites() -> bool:
 
 
 func _rite_picked(cards: Array, i: int) -> void:
+	## A skill picked: learned at once. The first of a big tier (a capstone,
+	## a Deep or Mastery node) grows the flame (Hero.FLAME_TIER), and that
+	## has its own beat: a flare at the flame and "Your flame grows". While
+	## points and skills are left the cards come again with the next three
+	## (as the results screen's do); Later ends it. Then a relic found with
+	## the belt full has its turn (open_relic).
 	if i < 0 or i >= cards.size():
+		open_relic()
 		return
 	var id := str(cards[i].get("id", ""))
+	var flame0 := float(player.stats.get("flame_scale", 1.0))
 	if not Game.buy_skill(id):
 		return
 	apply_hero()
+	var grew := float(player.stats.get("flame_scale", 1.0)) > flame0 + 0.001
 	_sfx("glimmer")
 	_haptic(30)
 	if glow:
 		glow.burst(player.center(), 28, Color("ffd84a"), 200.0, 0.8, -60.0, 2.6)
 		glow.pillar(player.position)
+		if grew:
+			glow.burst(rig.flame_point(), 24, Color("fff4cf"), 140.0, 0.9, -120.0, 3.0)
 	if hud:
 		hud.toast(str(cards[i].get("name", "")), Rites.learned(Game.hero(), id))
+		if grew:
+			hud.toast("Your flame grows", "A new tier of your tree")
+	if int(Game.hero().get("points", 0)) > 0 and not Rites.picks(Game.hero()).is_empty():
+		open_rites()
+	else:
+		open_relic()
+
+
+func relic_block() -> String:
+	## Why a lit altar can't offer a relic found with the belt full ("" = it
+	## can): a player's story level (player_block, as for the Rites) and one
+	## found this visit that's still off the belt.
+	var why := player_block()
+	if why != "":
+		return why
+	var belt: Array = Game.hero().get("belt", [])
+	if _relic_wait.all(func(id): return belt.has(id)):
+		return "none waiting"
+	return ""
+
+
+func open_relic() -> bool:
+	## A relic found with the belt full, at the next lit altar: it on one
+	## card and the weakest worn one (by rarity, then the first belted) on
+	## the other, and no button: a tap wears the new one in its place (the
+	## old one back in the codex, as any lit altar can change it) or keeps
+	## the belt. With a slot free by now (a level gained) it simply goes on.
+	## Then the next one waiting. False when nothing was asked.
+	if relic_block() != "":
+		return false
+	var belt: Array = Game.hero().get("belt", [])
+	var id := ""
+	while id == "" and not _relic_wait.is_empty():
+		var r := str(_relic_wait.pop_front())
+		if not belt.has(r):
+			id = r
+	if id == "":
+		return false
+	if Game.grant_relic(id):
+		_relic_on(id, "")
+		open_relic()
+		return true
+	var weak := _weakest_relic(belt)
+	var cards := [_relic_card(id, "new · wear it"), _relic_card(weak, "worn · keep it")]
+	cards[0]["new"] = true
+	return offer_choice(cards, {"heading": "Your belt is full", "later": "", "pick": func(i): _relic_picked(id, weak, i)})
+
+
+static func _weakest_relic(belt: Array) -> String:
+	## The worn relic of the lowest rarity (Relics.RARITY_ORDER), the first
+	## belted of those.
+	var out := ""
+	var low := 99
+	for r in belt:
+		var k := Relics.RARITY_ORDER.find(str(Relics.get_relic(str(r)).get("rarity", "common")))
+		if k < low:
+			low = k
+			out = str(r)
+	return out
+
+
+func _relic_card(id: String, sub: String) -> Dictionary:
+	## A relic as a choice card: its name, what it does, its rarity's colour.
+	var r: Dictionary = Relics.get_relic(id)
+	var rarity := str(r.get("rarity", "common"))
+	return {"id": id, "name": str(r.get("name", id)), "text": str(r.get("text", "")), "glyph": "charm",
+			"col": UI.rarity_color(rarity), "sub": "%s · %s" % [Relics.RARITY_NAME.get(rarity, ""), sub]}
+
+
+func _relic_picked(id: String, weak: String, i: int) -> void:
+	## The new relic tapped (0): on the belt in the weak one's place. The worn
+	## one: the belt stays. Then the next relic waiting, if any.
+	if i == 0:
+		var belt: Array = (Game.hero().get("belt", []) as Array).duplicate()
+		var k := belt.find(weak)
+		if k >= 0:
+			belt[k] = id
+			Game.set_belt(belt)
+			_relic_on(id, weak)
+	open_relic()
+
+
+func _relic_on(id: String, off: String) -> void:
+	## A relic just put on the belt at an altar: felt at once (apply_hero),
+	## its fanfare, a burst, and a toast naming what went back to the codex.
+	apply_hero()
+	var r: Dictionary = Relics.get_relic(id)
+	var rarity := str(r.get("rarity", "common"))
+	_sfx("relic_" + rarity)
+	_haptic(30)
+	if glow:
+		glow.burst(player.center(), 24, glow.RARITY.get(rarity, Color.WHITE), 180.0, 0.8, -40.0, 2.8)
+	if hud:
+		var sub := "On your belt" if off == "" else "On your belt · %s back in the codex" % str(Relics.get_relic(off).get("name", off))
+		hud.toast(str(r.get("name", id)), sub)
 
 
 func offer_choice(offers: Array, opts: Dictionary) -> bool:
@@ -2888,9 +3018,11 @@ func offer_choice(offers: Array, opts: Dictionary) -> bool:
 	## opts as its open(): heading, later, pick, pair). pick(i) is called once
 	## the card is down and play is back (i = -1: the button). The touch
 	## controls let go of every press they held and take no touch while it's
-	## up, so nothing held runs on after it. Never on a headless World; the
-	## caller says when a player is there to ask (rites_block). False when
-	## nothing was asked.
+	## up, so nothing held runs on after it, and a tick-locked track is put
+	## back on the feature clock as after the pause (sync_music: the clock
+	## stood still under the card, the music didn't). Never on a headless
+	## World; the caller says when a player is there to ask (rites_block).
+	## False when nothing was asked.
 	if headless or offers.is_empty() or (choice != null and choice.is_open()):
 		return false
 	if choice == null:
@@ -2908,6 +3040,7 @@ func offer_choice(offers: Array, opts: Dictionary) -> bool:
 		choice.close()
 		_hold_touch(false)
 		paused = false
+		sync_music()
 		if then.is_valid():
 			then.call(i)
 	choice.open(offers, o)
@@ -2928,12 +3061,16 @@ func _hold_touch(on: bool) -> void:
 
 func boon_block() -> String:
 	## Why a boss's first kill can't offer his boon ("" = it can): a player
-	## at the controls of a story level (player_block, as for the Rites) and
-	## a choice to make (boon_ids: two at least). Else his prize drops as it
+	## at the controls of a story level (player_block, as for the Rites), the
+	## screen not under the Hush finale's black (it stays black to the
+	## level's end: his prize drops and the finale gathers it to him), and a
+	## choice to make (boon_ids: two at least). Else his prize drops as it
 	## always did (_boss_prize). Later kills drop as they always did.
 	var why := player_block()
 	if why != "":
 		return why
+	if finale_black > 0.0:
+		return "finale"
 	if boon_ids(RandomNumberGenerator.new()).size() < 2:
 		return "no choice"
 	return ""
@@ -3196,6 +3333,7 @@ func _ring(b: Dictionary) -> void:
 	_drop_suspend()
 	player.frozen = true
 	rig.mood = "happy"
+	_gather_boss_embers()
 	_bank()
 	var first: bool = allows("record") and not Game.level_record(level_id)["cleared"]
 	# A secret level's first clear pays its own 45 x E(A) (spec §7, contract).
@@ -3236,6 +3374,8 @@ func _update_clear(dt: float) -> void:
 		if _has_sfx():
 			Sfx.play("clear")
 	if clear_time > 3.4 and clear_time - dt <= 3.4:
+		if embers_carried > 0:
+			_bank()   # (embers taken after the bell: a boss's, gathered to him)
 		_log(true)
 		finished.emit(result())
 
@@ -3522,11 +3662,31 @@ func _pay_boss_embers(b: Node2D, at: Vector2) -> void:
 	## before its ember loop. Only with his drops (boss_defeated's loot
 	## branch): a rush boss is paid by its mode (the Waxworks' embers and
 	## seals, the Descent's echo drops) and a feel lab keeps nothing.
+	## Still loose when the bell rings (rung at once, or at his feet as the
+	## Saint's is), they're gathered to Waxby (_gather_boss_embers).
 	var n := int(b.get("embers")) if b != null and b.get("embers") != null else 0
 	for i in n:
 		var p := _add_pickup("ember", at)
 		p["loose"] = true
+		p["boss"] = true
 		p["vel"] = Vector2(randf_range(-170, 170), randf_range(-480, -240))
+
+
+func _gather_boss_embers() -> void:
+	## The bell rang with a boss's embers still loose (only play picks them
+	## up): each pops out of Waxby and is his a moment later, one after
+	## another (as the Hush finale gathers his drops). Taken after the bell,
+	## they bank with the level's end (_update_clear).
+	var k := 0
+	for p in pickups:
+		if p["taken"] or p["kind"] != "ember" or not p.get("boss", false) or p.get("pop", false):
+			continue
+		p["pop"] = true
+		p["loose"] = false
+		p["age"] = -0.012 * k
+		p["pos"] = player.center()
+		p["vel"] = Vector2(randf_range(-30.0, 30.0), -160.0)
+		k += 1
 
 
 func _lidlurk_prize(at: Vector2) -> void:
@@ -4017,6 +4177,9 @@ func _update_dead(dt: float) -> void:
 		if _has_sfx():
 			_reset_audio(get_node_or_null("/root/Sfx"), false)
 		sync_music()
+		if _rites_snuffed >= 0 and _rites_snuffed < altars.size() and altars[_rites_snuffed]["pos"] == checkpoint:
+			_altar_rites(altars[_rites_snuffed])   # (the Rites the snuff cut off, at the altar he relights at)
+		_rites_snuffed = -1
 		cam = cam_on(player.position)
 		_cam_y_target = cam.y
 		_sfx("relight")
@@ -4610,10 +4773,10 @@ const TICK_LOCKED_MUSIC := ["carillon"]   # the tracks rendered on the W4 tick (
 
 func sync_music() -> void:
 	## A ticking level (a tick: header, W4) realigns its music to the feature
-	## clock: at the start, after a pause and after a snuff, but only a
-	## tick-locked track (the carillon; the Tinker's and the secret track
-	## aren't on the tick, so they never jump). Cosmetic only: gameplay never
-	## waits on audio.
+	## clock: at the start, after a pause or a choice card (offer_choice) and
+	## after a snuff, but only a tick-locked track (the carillon; the
+	## Tinker's and the secret track aren't on the tick, so they never jump).
+	## Cosmetic only: gameplay never waits on audio.
 	if _has_sfx() and (level.headers.has("tick") or world_n == 4) and Sfx.has_method("seek_music") \
 			and Sfx.has_method("music_playing") and TICK_LOCKED_MUSIC.has(str(Sfx.music_playing())):
 		Sfx.seek_music(ftime)

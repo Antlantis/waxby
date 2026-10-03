@@ -3,9 +3,10 @@ extends Control
 ## and one button under them. The Descent's landing offers its Glimmers on
 ## it (mode_hud.glimmer_card: two cards, "Walk on · +20 embers"), a lit altar
 ## in a story level its Altar Rites (world.offer_choice, rites.gd: up to three
-## skills, "Later"), the results screen the same Rites, and a boss's first
-## kill his boon (world.open_boon: two or three Legendaries, and no button: a
-## prize is taken, not put off).
+## skills, "Later") and then a relic found with the belt full (world.open_relic:
+## it and the weakest worn one, no button), the results screen the same Rites,
+## and a boss's first kill his boon (world.open_boon: two or three
+## Legendaries, and no button: a prize is taken, not put off).
 ##
 ## An offer is a card: {name, text, glyph, sub, new} (and col, the glyph's
 ## colour, EMBER by default; any other keys are the caller's). new puts a gold

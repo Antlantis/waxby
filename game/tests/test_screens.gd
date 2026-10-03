@@ -204,6 +204,8 @@ func _initialize() -> void:
 	_no_errors("points_pip")
 	await _test_altar_rites()
 	_no_errors("altar_rites")
+	await _test_rites_more()
+	_no_errors("rites_more")
 	await _test_tier_barks()
 	_no_errors("tier_barks")
 	await _test_touch_specials()
@@ -1764,6 +1766,27 @@ func _test_thumb_pad() -> void:
 	_check(touch.is_down("down") and touch.buzzes == b1, "haptics off: down, without the tick")
 	touch._end(2)
 	game.set_setting("haptics", true)
+	# A thumb creeping down over a long run keeps running (only a quick slide
+	# lets go of left and right): 30 px straight down over 2 s on the right
+	# arrow holds right and down; the same 30 px in 0.05 s is pure down.
+	var ra: Vector2 = L["right"]
+	touch._begin(3, ra)
+	for i in 120:
+		touch._process(1.0 / 60.0)
+		touch._touches[3]["pos"] = ra + Vector2(0, 30.0 * (i + 1) / 120.0)
+		touch._refresh()
+	_check(touch.is_down("right") and touch.is_down("down"), "a slow 30 px creep down through a 2 s right hold keeps right held")
+	touch._end(3)
+	touch._begin(4, ra)
+	for i in 3:
+		touch._process(1.0 / 60.0)
+		touch._touches[4]["pos"] = ra + Vector2(0, 10.0 * (i + 1))
+		touch._refresh()
+	_check(touch.is_down("down") and not touch.is_down("right"), "a quick 30 px slide down from the right arrow is pure down")
+	touch._touches[4]["pos"] = ra + Vector2(0, 5)
+	touch._refresh()
+	_check(touch.is_down("right") and not touch.is_down("down"), "back near where it landed: right again")
+	touch._end(4)
 	# The idle tick (no move touch), lit by a key's down.
 	Input.action_press("down")
 	touch._view.queue_redraw()
@@ -3096,7 +3119,10 @@ func _test_altar_rites() -> void:
 	w.choice.choose(0)
 	var seen_toast := _toasted(w, name)
 	_check(int(game.hero()["skills"].get(id, 0)) == r0 + 1 and int(game.hero()["points"]) == pts0 - 1, "a pick learns it (%s %d -> %d)" % [id, r0, int(game.hero()["skills"].get(id, 0))])
-	_check(not w.paused and not w.choice.is_open() and w.touch.is_processing_input(), "and play is back, the buttons live")
+	_check(w.paused and w.choice.is_open() and w.choice.heading == load("res://scripts/rites.gd").heading(game.hero()) and not w.touch.is_processing_input(),
+			"%d points left: the cards come again (%s)" % [pts0 - 1, w.choice.heading])
+	w.choice.choose(-1)
+	_check(not w.paused and not w.choice.is_open() and w.touch.is_processing_input(), "Later: play is back, the buttons live")
 	_check(seen_toast, "a toast names the skill (%s)" % name)
 	w.paused = true
 	_check(w.open_rites(), "the next time, the card again")
@@ -3111,6 +3137,76 @@ func _test_altar_rites() -> void:
 	_check(not w.foes_near(), "400 px off it isn't")
 	game.hero()["points"] = 0
 	_check(not w.open_rites() and not w.choice.is_open(), "no point waiting: no card")
+	w.queue_free()
+	await _frames(2)
+
+
+func _test_rites_more() -> void:
+	## The Altar Rites on a World played as a player's is (a display, no
+	## pad): two points give two picks at one altar (the cards come again
+	## while points are left); the first node of a big tier grows the flame
+	## and says so ("Your flame grows"); Rites a snuff cut off wait again when
+	## he relights at that altar.
+	_where = "rites more"
+	_fresh_hero(8)
+	var lv = LevelData.load_file("res://levels/1-1.txt")
+	for k in ["start", "boss"]:
+		if str(lv.story.get(k, "")) != "":
+			game.mark_seen(str(lv.story[k]))
+	var w = WorldScript.new()
+	w.setup(lv, false)
+	root.add_child(w)
+	await _frames(1)
+	w.paused = true
+	w.no_display = false
+	for e in w.enemies:
+		e.active = false
+	_check(w.rites_block() == "", "a player's World: the Rites may open (%s)" % w.rites_block())
+	var h: Dictionary = game.hero()
+	# Five points in the first branch, so its capstone (L8) can be learned.
+	var cls := str(h["cls"])
+	var spent := 0
+	h["points"] = 20
+	for m in Classes.tree(cls):
+		while spent < 5 and int(m["branch"]) == 0 and int(m["tier"]) < 3 \
+				and Classes.can_buy(cls, str(m["id"]), h["skills"], int(h["level"]), int(h["points"])) == "":
+			if not game.buy_skill(str(m["id"])):
+				break
+			spent += 1
+	h["points"] = 2
+	w.apply_hero()
+	var f0 := float(w.player.stats.get("flame_scale", 1.0))
+	_check(w.open_rites() and w.choice.is_open() and w.choice.heading.contains("2 points"), "two points: the card (%s)" % w.choice.heading)
+	var first := str(w.choice.offers[0]["id"])
+	var tier := int(Classes.find_node(str(h["cls"]), first).get("tier", 0))
+	w.choice.choose(0)
+	var f1 := float(w.player.stats.get("flame_scale", 1.0))
+	_check(tier == 3 and f1 > f0 + 0.01 and _toasted(w, "Your flame grows"),
+			"L8's capstone first: the flame grows (%.2f -> %.2f) and a toast says so" % [f0, f1])
+	_check(int(h["points"]) == 1 and w.choice.is_open() and w.paused and w.choice.heading == "Choose a skill",
+			"one point left: the cards come again at the same altar (%s)" % w.choice.heading)
+	w.choice.choose(0)
+	_check(int(h["points"]) == 0 and not w.choice.is_open() and not w.paused, "the second pick spends it, and play goes on")
+	# Snuffed with the Rites waiting: they wait again at the altar he relights at.
+	h["points"] = 1
+	var a: Dictionary = w.altars[0]
+	w.checkpoint = a["pos"]
+	w.player.reset_at(a["pos"])
+	w.paused = false
+	w._altar_rites(a)
+	_check(w._rites_altar == 0, "a lit altar with a point waiting: its Rites wait")
+	w.player.alive = false
+	w._on_snuffed()
+	w.tick(DT)
+	_check(w.state == "dead" and w._rites_altar < 0 and not w.choice.is_open(), "snuffed first: they're cut off")
+	var t := 0.0
+	while t < 3.5 and not w.choice.is_open():
+		w.tick(DT)
+		t += DT
+	w.paused = true
+	_check(w.state == "play" and w.choice.is_open() and w.choice.offers.size() > 0, "relit at that altar, they open again (%.1f s after the snuff)" % t)
+	w.choice.choose(-1)
+	w.paused = true
 	w.queue_free()
 	await _frames(2)
 

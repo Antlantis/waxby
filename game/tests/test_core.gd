@@ -86,6 +86,7 @@ func _initialize() -> void:
 	await _test_wave1_wiring()
 	await _test_loot_build1()
 	await _test_boss_boons()
+	await _test_relic_altar()
 	_test_relics_and_save()
 	print("test_core: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -3076,6 +3077,29 @@ func _test_loot_build1() -> void:
 			_check(prize == str(row[1]), "%s: his first kill gives his signature piece (%s)" % [row[0], prize])
 		bw.queue_free()
 		await process_frame
+	# Rung before they're picked up (at once, or at his feet as the Saint's
+	# is), his embers are gathered to him and bank with the level's end.
+	var gw := _world_as("1-4", "knight")
+	await process_frame
+	gw.set_physics_process(false)
+	var gb: Node2D = gw.boss
+	var purse0: int = game.embers()
+	gw.boss_defeated(gb, gb.center())
+	var his: Array = gw.pickups.filter(func(p): return p["kind"] == "ember" and bool(p.get("boss", false)))
+	var ended := [false]
+	gw.finished.connect(func(_r): ended[0] = true)
+	gw.add_bell(gw.player.position)
+	for i in int(5.0 / DT):
+		gw.tick(DT)
+		if ended[0]:
+			break
+	var left: int = his.filter(func(p): return not p["taken"]).size()
+	_check(gw.state == "clear" and ended[0] and his.size() == int(gb.embers) and left == 0,
+			"the bell rung with his %d embers loose: every one gathered to him (%d left)" % [his.size(), left])
+	_check(game.embers() - purse0 >= int(gb.embers) * gw.ember_worth() and gw.embers_carried == 0,
+			"and banked as the level ends (+%d, %d at least)" % [game.embers() - purse0, int(gb.embers) * gw.ember_worth()])
+	gw.queue_free()
+	await process_frame
 	# The vault's Lidlurk.
 	var w := _world_as("1-1", "knight")
 	await process_frame
@@ -3141,6 +3165,14 @@ func _test_loot_build1() -> void:
 	game.equip(Items.make("weapon", "knight", 30, "legendary", rng, "tollbreaker"))
 	var weak := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
 	_check(w._take_item(weak) == "satchel" and worn.call("weapon") != str(weak["uid"]), "over a Legendary the chips decide: a weaker one goes to the satchel")
+	# A worn Legendary is never swapped out by itself for a piece that isn't one.
+	var low := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
+	game.equip(low)
+	var big := Items.make("weapon", "knight", 30, "rare", rng)
+	var cb := Hero.compare(h, "weapon", big, h.get("belt", []), "dusk")
+	_check(float(cb["dmg"]) > 0.0 and float(cb["life"]) >= 0.0, "(a Rare 29 levels up reads better on the chips: %+.0f%% DMG, %+.0f%% LIFE)" % [float(cb["dmg"]), float(cb["life"])])
+	_check(w._take_item(big) == "satchel" and worn.call("weapon") == str(low["uid"]) and in_satchel.call(big),
+			"a Rare better on the chips waits in the satchel: the worn Legendary stays on")
 	game.equip(strong)
 	game.set_setting("auto_equip", false)
 	var off := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
@@ -3206,6 +3238,62 @@ func _test_loot_build1() -> void:
 	await process_frame
 
 
+# ---------------------------------------------------------------- build 1: a relic at the altar
+
+func _test_relic_altar() -> void:
+	## A relic found with the belt full (Game.grant_relic belts only into a
+	## free slot) waits for the next lit altar, where a player's World offers
+	## it against the weakest worn one (open_relic: two cards, no button,
+	## after any Rites): the new one tapped goes on in its place, the worn
+	## one keeps the belt. Never headless or for the bot (relic_block).
+	var w := _world_as("1-1", "knight", ["tallow_heart", "phoenix_wick"])
+	await process_frame
+	w.set_physics_process(false)
+	var h: Dictionary = game.hero()
+	var found := func(id: String) -> void:
+		var r: Dictionary = Relics.get_relic(id)
+		w._collect({"kind": "relic", "relic": id, "rarity": r["rarity"], "pos": w.player.center(), "vel": Vector2.ZERO,
+				"t": 0.0, "taken": false, "loose": false, "age": 0.0})
+	_check((h["belt"] as Array).size() == game.belt_slots(), "(the hero's belt is full: %s)" % [h["belt"]])
+	found.call("rook_feather")
+	_check(game.has_relic("rook_feather") and not (h["belt"] as Array).has("rook_feather") and w._relic_wait == ["rook_feather"],
+			"found with the belt full: in the codex, off the belt, waiting for an altar")
+	_check(w.relic_block() == "headless", "headless: no card (%s)" % w.relic_block())
+	var hud := _as_player(w)
+	w.autoplay = true
+	_check(w.relic_block() == "autoplay", "nor for the bot (%s)" % w.relic_block())
+	w.autoplay = false
+	_check(w.relic_block() == "" and w.rites_block() == "no points", "a player's World: the next altar may offer it (%s)" % w.relic_block())
+	for e in w.enemies:
+		e.active = false
+	var a: Dictionary = w.altars[0]
+	a["lit"] = true
+	w.player.reset_at(a["pos"])
+	w._altar_rites(a)
+	_check(w._rites_altar == 0, "an altar lit with a relic waiting (and no point): it waits to ask")
+	for i in 30:
+		w.tick(DT)
+		if w.choice != null and w.choice.is_open():
+			break
+	var ids: Array = w.choice.offers.map(func(o): return str(o["id"])) if w.choice != null else []
+	_check(w.choice != null and w.choice.is_open() and w.paused and ids == ["rook_feather", "tallow_heart"] and w.choice.button_rect() == Rect2(),
+			"it asks: the new relic against the weakest worn one, and no button (%s)" % [ids])
+	w.choice.choose(0)
+	_check(h["belt"] == ["rook_feather", "phoenix_wick"] and not w.paused and not w.choice.is_open() and w._relic_wait.is_empty(),
+			"the new one tapped: on the belt in its place (%s)" % [h["belt"]])
+	_check(bool(w.player.double_jump), "and felt at once (the Rook Feather's jump)")
+	found.call("wind_wick")
+	_check(w.open_relic() and w.choice.is_open() and str(w.choice.offers[1]["id"]) == "rook_feather", "the next: against the Blessed now the weakest")
+	w.choice.choose(1)
+	_check(h["belt"] == ["rook_feather", "phoenix_wick"] and not w.choice.is_open() and w._relic_wait.is_empty(), "the worn one tapped: the belt stays")
+	_check(not w.open_relic(), "nothing waiting: nothing asked")
+	w.headless = true
+	w.hud = null
+	hud.free()
+	w.queue_free()
+	await process_frame
+
+
 # ---------------------------------------------------------------- build 1: the Boss Boons
 
 const STUB_BOON_HUD := """extends CanvasLayer
@@ -3231,6 +3319,8 @@ func title_showing() -> bool:
 	return false
 func top_card_showing() -> bool:
 	return busy
+func relic_found(id: String) -> void:
+	said.append(["relic_found", id])
 """
 
 
@@ -3333,6 +3423,9 @@ func _test_boss_boons() -> void:
 		w.test_pad = null
 		w.no_display = false
 	_check(whys == {"autoplay": "autoplay", "route": "route", "scripted": "scripted", "headless": "headless"}, "never under the bot, on a route, a scripted pad or headless (%s)" % [whys])
+	w.finale_black = 1.0
+	_check(w.boon_block() == "finale", "nor under the Hush finale's black, to the level's end: his prize drops, gathered to him (%s)" % w.boon_block())
+	w.finale_black = 0.0
 	for id in Items.world_legends(1) + ["dawnsliver", "gutterlight", "ossuary_coat", "thornsole", "cinderstep", "first_dawn"]:
 		(h["satchel"] as Array).append(Items.make(str(Items.LEGENDS[id]["slot"]), "knight", 4, "legendary", RandomNumberGenerator.new(), id))
 	_check(w.boon_block() == "no choice", "every other one held: no choice, so it drops (%s)" % w.boon_block())
