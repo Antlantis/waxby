@@ -189,13 +189,13 @@ const SCENES_W1 := {
 			{"do": "fig", "fig": "far", "alpha": 0.0, "t": 1.0}, {"do": "wait", "t": 0.7},
 		]},
 		{"in": "fade", "beats": [
-			["taper:worried", "That shape... No. It can't be."],
+			["taper:worried", "That shape... No. Old eyes, that's all."],
 		]},
 	]},
 
 	"beat_1_3": {"overlay": true, "barks": ["beat_1_3_a", "beat_1_3_b"], "shots": [{"beats": [
-		["taper:warm", "The choir loft. When the Hush came, a thousand candles fell here."],
-		["taper:sad", "I sent one other Wick down, long ago. Hollin. He never came back."],
+		["taper:warm", "The choir loft. When the bells stopped, a thousand candles fell here."],
+		["taper:sad", "I sent a Wick down once before. Hollin. He never came back."],
 		["wick", "@beat_1_3"],
 	]}]},
 
@@ -259,7 +259,7 @@ const SCENES_W2 := {
 			["waxley:grin", "My old guild hall's down there. Mountains of stock! I'm coming with you."],
 			["wick", "@world_2"],
 			{"do": "cam", "to": [0.66, 0.6, 1.0], "t": 4.5},
-			["narrator", "A thousand years of candles had melted and run down here. All of it wax."],
+			["narrator", "A thousand years of candles had melted and run down here, into hills of wax."],
 			["narrator", "And at the very bottom, small and tired, burned the Undercandle."],
 			{"do": "card", "sub": "World 2", "title": "The Tallow Deep"},
 		]},
@@ -280,13 +280,13 @@ const SCENES_W2 := {
 
 	# The moths play over the live level.
 	"beat_2_3": {"overlay": true, "barks": ["beat_2_3_a", "beat_2_3_b"], "shots": [{"motes": "moths", "beats": [
-		["snuffer:cold", "Aren't you tired of being afraid it'll go out? Put it down. It's so quiet."],
+		["snuffer:cold", "Aren't you tired? Always afraid it'll go out. Put it down. It's so quiet."],
 		["wick:fierce", "@beat_2_3"],
 		["snuffer:wrath", "Then come down and have it taken.", {"shout": true}],
 	]}]},
 
 	"beat_2_4": {"overlay": true, "shots": [{"beats": [
-		["taper:warm", "The Undercandle. I haven't seen it since I was your size."],
+		["taper:warm", "The Undercandle. I was a novice the last time I saw it."],
 		["taper:worried", "It's so small now."],
 	]}]},
 
@@ -295,7 +295,7 @@ const SCENES_W2 := {
 		 "cam": [[0.5, 0.3, 1.0], [0.6, 0.62, 1.25]], "time": 7.0, "beats": [
 			{"do": "wait", "t": 1.2},
 			["taper:sad", "Hollin. It's me. It's Mother. Come home."],
-			["snuffer:cold", "There's no one in here, Mother. There hasn't been for years."],
+			["snuffer:cold", "There's no one in here, Mother. Not for forty winters."],
 			["wick:fierce", "@boss_2"],
 			{"do": "shake", "amt": 8.0},
 			{"do": "boss_card", "name": "The Snuffer", "title": "The Hollow Wick", "portrait": "snuffer:wrath"},
@@ -378,10 +378,10 @@ const SCENES_W2 := {
 		{"panel": "undercandle", "in": "fade", "music": "story", "figs": {"hollin": "hollin_warm"}, "actor": "actor_near",
 		 "lights_off": ["under_flame", "reed1", "reed2", "reed3", "reed4"],
 		 "cam": [[0.5, 0.78, 1.3], [0.5, 0.8, 1.38]], "time": 6.0, "beats": [
-			["hollin:worried", "Mother's flame came from it. It won't last long now. I'll go up to her."],
+			["hollin:worried", "Without it, Mother's ember won't last long. I'll go up to her."],
 			["hollin:relit", "We share a flame now. I'll hear you through the smoke, like she does."],
 			["wick", "@the_pull"],
-			["hollin:relit", "Go down, Wick. Bring it back. I'll keep her lit till you do."],
+			["hollin:relit", "Then go, Wick. I'll keep her lit. You keep yours."],
 		]},
 	]},
 }
@@ -390,7 +390,7 @@ const SCENES_W3 := {
 	"world_3": {"music": "story", "shots": [
 		{"panel": "orchard_vista", "in": "fade", "figs": {"waxley": "waxley_pack", "cone": "cone_broken"},
 		 "actor": "edge", "cam": [[0.18, 0.55, 1.14], [0.22, 0.55, 1.1]], "time": 6.0, "beats": [
-			["narrator", "Under the Undercandle, the Vigil buried its dead, and planted a tree on each."],
+			["narrator", "Beneath the Undercandle lay the Vigil's dead, and on every grave grew a tree."],
 			["waxley:grin", "I kept the cone, by the way. Salvage! Somebody will buy it."],
 			["wick", "@world_3"],
 			{"do": "cam", "to": [0.62, 0.62, 1.0], "t": 4.5},   # along the scorch, down through the roots
@@ -412,12 +412,12 @@ const SCENES_W3 := {
 	# 3-3 The Sporewood: her voice, over the live level, in drifting spores.
 	"beat_3_3": {"overlay": true, "barks": ["beat_3_3_a", "beat_3_3_b"], "shots": [{"motes": "spores", "beats": [
 		["rootmother:keeping", "Another sprout in my garden. Stay, little one. Everyone stays."],
-		["taper:faint", "Sprout? Only one person ever called us that... Oh. Mother Yarrow."],
+		["taper:faint", "Sprout? I learned that word from... Oh. Mother Yarrow."],
 	]}]},
 
 	# 3-4 The Heartwood (the rule hint: spec §6.5.2)
 	"beat_3_4": {"overlay": true, "shots": [{"beats": [
-		["taper:faint", "The Heartwood. Her grave's at the middle. She's holding it all shut."],
+		["taper:faint", "The Heartwood. Her grave's in the middle. She's holding the way shut."],
 		["hollin:worried", "Her heart runs through the roots. Hit it where it blooms."],
 	]}]},
 
@@ -456,13 +456,13 @@ const SCENES_W3 := {
 		 "motes": "fireflies", "cam": [[0.46, 0.63, 1.16], [0.45, 0.63, 1.2]], "time": 12.0, "beats": [
 			# Held on the two of them while she says goodbye; then up to the lights.
 			["yarrow:gentle", "Holding on isn't keeping, sprouts. Let them go. Let me go too."],
-			["yarrow:gentle", "My roots will open the way down. Take my old Wicks with you."],
+			["yarrow:gentle", "My roots will open the way down. Take my little ones with you."],
 			["yarrow:merry", "Here. My old flask. It always had one more drink in it than you'd think."],
 			# (the fades start with the rise: every cue here runs at once)
 			{"do": "fig", "fig": "spirit", "alpha": 0.0, "move": [0, -80], "t": 2.0},
 			{"do": "fig", "fig": "boss", "alpha": 0.0, "t": 2.5},
 			{"do": "cam", "to": [0.5, 0.36, 1.0], "t": 3.2}, {"do": "wait", "t": 1.2},
-			["narrator", "Every little light in the orchard rose, and followed the Wick down.", {"at": "top"}],   # (the camera has him low)
+			["narrator", "Every light she had kept rose, and followed the Wick down.", {"at": "top"}],   # (the camera has him low)
 		]},
 	]},
 }
@@ -508,7 +508,7 @@ const SCENES_W4 := {
 		 "cam": [[0.5, 0.5, 1.0], [0.56, 0.45, 1.25]], "time": 6.0, "beats": [
 			{"do": "sfx", "name": "clock_strike", "pitch": 0.5}, {"do": "shake", "amt": 3.0}, {"do": "wait", "t": 0.6},
 			{"do": "ignite", "light": "boss.eyes"},
-			["tinker:ticking", "One minute to midnight. Hold it here, and the bells never stop."],
+			["tinker:ticking", "One minute to midnight. Hold it here, and I'm never late."],
 			["wick:fierce", "@boss_4"],
 			["tinker:wrath", "DON'T. TOUCH. THE HANDS.", {"shout": true}],
 			{"do": "shake", "amt": 8.0},
@@ -526,7 +526,7 @@ const SCENES_W4 := {
 			{"do": "wait", "t": 0.8},
 			{"do": "sfx", "name": "clock_strike"}, {"do": "ignite", "light": "tickwell.watch"}, {"do": "wait", "t": 0.8},
 			["tickwell:dazed", "Midnight? It's midnight. It's already tomorrow."],
-			["tickwell:dazed", "Forty winters? It was one minute. I only wanted it not to be my fault."],
+			["tickwell:dazed", "Forty winters? It was one minute. I just didn't want it to be my fault."],
 			["hollin:worried", "It wasn't your fault, Master Tickwell. It was mine."],
 			["tickwell:kind", "Then we'll both ring the next one. That's all anyone can do."],
 			["wick", "@tickwell"],
@@ -536,7 +536,7 @@ const SCENES_W4 := {
 		 "figs": {"tickwell": "tickwell", "waxley_bench": "waxley_pack", "bench": "cone_broken"}, "actor": "actor_bench",
 		 "cam": [[0.6, 0.56, 1.14], [0.61, 0.56, 1.16]], "time": 4.0, "beats": [
 			{"do": "light", "light": "bench_lamp", "r": 1.0, "t": 0.4},
-			["waxley:shifty", "Speaking of bells. Could you do anything with this? Slightly used."],
+			["waxley:shifty", "A craftsman! Could you do anything with this? Slightly used."],
 			{"do": "cam", "to": [0.7, 0.6, 1.5], "t": 2.2},   # in on Tickwell at his bench (the panel's right edge holds it there)
 			["tickwell:kind", "A snuffer? Hm. Turn it upside down, and it's a bell."],
 			{"do": "ignite", "light": "forge"},
@@ -544,7 +544,7 @@ const SCENES_W4 := {
 			{"do": "sfx", "name": "anvil", "pitch": 1.12}, {"do": "wait", "t": 0.35},
 			{"do": "sfx", "name": "anvil", "pitch": 1.26}, {"do": "burst", "at": "bench", "n": 24, "color": "ffb05a"},
 			{"do": "pose", "fig": "bench", "frame": "cone_bell"}, {"do": "wait", "t": 0.5},
-			["tickwell:kind", "There. Give it to the boy. A bell for Hollin."],
+			["tickwell:kind", "There. A bell for Hollin. For the next one."],
 			{"do": "sfx", "name": "lull"}, {"do": "wait", "t": 2.4},
 			["narrator", "And the upside-down bells rang into the dark for the first time in forty years."],
 		]},
@@ -621,7 +621,7 @@ const SCENES_W5 := {
 			["tessel:sad", "I found the Hush. It wasn't a monster. Just a dark that never saw a light."],
 			["tessel:sad", "I couldn't beat it. So I sang to it, and it slept."],
 			["tessel:sad", "It isn't cruel, little keeper. It's cold. No one ever gave it anything."],
-			["hollin:worried", "...I know. I lived inside it. It's so cold in there."],
+			["hollin:worried", "...I know. I lived inside it."],
 		]},
 		# The stair.
 		{"panel": "glass_throne", "in": "fade", "figs": {"saint": "tessel_lit"}, "actor": "actor",
@@ -735,7 +735,7 @@ const SCENES_W6 := {
 		 "cam": [[0.3, 0.5, 1.05], [0.33, 0.52, 1.08]], "time": 5.0, "beats": [
 			{"do": "chain", "lights": ["lost.w1", "lost.w2", "lost.w3", "lost.w4", "lost.w5", "lost.w6"], "gap": 0.3},
 			{"do": "wait", "t": 1.0},
-			["taper:proud", "And the Lost Wicks. All six of them came home."],
+			["taper:proud", "And the Lost Wicks, all six. No Wick goes down alone. I said so."],
 		]},
 		# 3. Every light, back into his. From his, the stolen flame catches.
 		{"panel": "hushdeep_heart", "in": "fade", "music": "lullaby",
@@ -759,7 +759,7 @@ const SCENES_W6 := {
 		 "fig_alpha": {"eye": 0.8}, "actor": "actor_give",
 		 "lights_on": ["stair1", "stair2", "stair3", "stair4", "stair5", "stair6", "wick.wick"], "motes": "fireflies",
 		 "cam": [[0.62, 0.55, 1.0], [0.78, 0.5, 1.12]], "time": 9.0, "beats": [
-			["hollin:grin", "I used to put out bells. Let me ring one."],
+			["hollin:grin", "I used to put out bells. Let me ring mine."],
 			{"do": "sfx", "name": "lull"}, {"do": "wait", "t": 2.4},
 			{"do": "light", "light": "eye.pupil", "r": 1.0, "t": 1.0},   # the flame, reflected in its eye
 			["hush", "...oh.", {"at": "top"}],
@@ -785,7 +785,7 @@ const SCENES_W6 := {
 			["taper:proud", "Look at my flame! I haven't been this tall since I was your size."],
 			["tollgrave:kind", "Did you hear my bell, little light? I rang it all the way down!"],
 			["tickwell:kind", "Seven o'clock exactly. And breakfast is late. Typical."],
-			["waxley:shifty", "About all those free candles. Small misunderstanding. Invoice to follow."],
+			["waxley:shifty", "Those free candles? Small misunderstanding. Invoice to follow."],
 		]},
 		# Close on the two of them. The only time anyone says his name.
 		{"panel": "homecoming", "in": "cut",
@@ -841,7 +841,7 @@ const SCENES_MODES := {
 	# Endless Descent (after the ending). Hollin hosts: the Hush's dreams.
 	"descent_open": {"overlay": true, "shots": [{"beats": [
 		["hollin:grin", "It's asleep, Wick. But it dreams of everything it ever swallowed."],
-		["hollin:worried", "I had those dreams for forty years. Go as deep as you dare. Then come back."],
+		["hollin:worried", "I dreamed them for forty winters. Go as deep as you dare. Then come back."],
 	]}]},
 	# While Taper rests (REST_SUBS): a calling made on the map.
 	"new_calling_hollin": {"overlay": true, "shots": [{"beats": [
@@ -861,8 +861,8 @@ const CLASS_LINES := {
 		"knight": "A Candleknight. Straight back, soft heart. Good.",
 		"founder": "A Bellfounder. The bells will like you. Try not to break any more.",
 		"witch": "A Taperwitch. Please don't set my chapel on fire.",
-		"runner": "A Sootrunner. Hand back my spoons first, dear.",
-		"sexton": "A Sexton. You'll tend the dead down there. Be kind to them.",
+		"runner": "A Sootrunner. Hand back my spoons first.",
+		"sexton": "A Sexton. Be kind to the dead down there. And wipe your boots after.",
 		"_": "The {calling}. Ha! I should have guessed."},
 	"oath": {
 		"knight": "I'll keep it lit, Mother. On my honor. And my helmet.",
@@ -878,10 +878,10 @@ const CLASS_LINES := {
 		"sexton": "Your mustache is wax. May I have the drips? For the graves."},
 	"beat_1_1": {
 		"knight": ["fierce", "Sorry, choir! This is for your own good!"],
-		"founder": "Gently. Right. I'll use the soft end of the maul.",
+		"founder": "Gently? I'll use the soft end of the maul.",
 		"witch": "Gently. Right. Sure.",
 		"runner": "Soft feet. I'm good at soft feet.",
-		"sexton": "Hush now, brothers. I'll tuck you back in afterward."},
+		"sexton": "Easy now, brothers. I'll tuck you back in afterward."},
 	"beat_1_2": {
 		"knight": ["hurt", "Mother? Who was that?"],
 		"founder": ["fierce", "He blew them out like birthday candles. I'll flatten him."],
@@ -907,7 +907,7 @@ const CLASS_LINES := {
 		"runner": ["happy", "Don't worry. I took your spare embers as payment."],
 		"sexton": "Only a little. Rest now. You've rung long enough."},
 	"world_2": {
-		"knight": "It's dangerous down there, good sir!",
+		"knight": "Then stay close, good sir. I'll guard you. And your stock.",
 		"founder": "Did the guild hall have a kitchen?",
 		"witch": "Fine. You carry the snacks.",
 		"runner": ["happy", "Mountains of stock, you said? Unguarded?"],
@@ -919,7 +919,7 @@ const CLASS_LINES := {
 		"runner": "Sinking floors. My favorite kind of getaway.",
 		"sexton": ["happy", "Living drips! Can I keep one? Just a small one?"]},
 	"beat_2_2": {
-		"knight": "Then he was a knight of the Vigil. Like me.",
+		"knight": "So small, and he still went down. A true knight of the Vigil.",
 		"founder": ["hurt", "Dented all over, I bet. I could hammer it out for him."],
 		"witch": ["fierce", "Littler than me? Who let him go alone?"],
 		"runner": ["hurt", "I'll find it. I'll carry it. Someone should."],
@@ -931,14 +931,14 @@ const CLASS_LINES := {
 		"runner": "You don't get to take it. I'm the thief here.",
 		"sexton": "I've sat with the quiet. It's lonely. Come back up."},
 	"boss_2": {
-		"knight": "Then I'll knock until someone answers.",
+		"knight": "No one? Then who said that, good sir?",
 		"founder": "Then I'll ring that cone till someone answers.",
 		"witch": "Let's see what's under that hat.",
 		"runner": "Nice cone. I'm stealing it.",
 		"sexton": "There's always someone in there. I'll dig him out."},
 	"share": {
 		"knight": "A flame shared is never lost. Take mine.",
-		"founder": ["fierce", "Hold still. I'm gentle. Mostly."],
+		"founder": "Can't be lit? I light cold forges every morning. Come here.",
 		"witch": ["fierce", "Watch me."],
 		"runner": ["normal", "Here. First thing I've ever given away."],
 		"sexton": "Hold still. It's easier than it looks."},
@@ -969,7 +969,7 @@ const CLASS_LINES := {
 	# ---- v3 (the story draft §3.7). In W3, W4 and W5 one calling each is
 	# written to shine: the Sexton among the graves, the Bellfounder at the
 	# reforging, the Taperwitch against the cold saint.
-	"the_pull": {   # Hollin: "Go down, Wick. Bring it back."
+	"the_pull": {   # Hollin: "We share a flame now. I'll hear you through the smoke..."
 		"knight": "Keep her warm, Hollin. I'll bring it home, on my honor.",
 		"founder": "Then I'll go down and dig it back up. With my maul, if I must.",
 		"witch": ["fierce", "It stole our candle? Oh, it's going to regret that."],
@@ -984,7 +984,7 @@ const CLASS_LINES := {
 	"beat_3_2": {   # "I stole it from her."
 		"knight": "Then I'll carry her word too, Mother. And wear it well.",
 		"founder": "Sprout. It suits me. I'm still growing.",
-		"witch": "You stole it? Mother Taper. I'm shocked. Proud, but shocked.",
+		"witch": "A secondhand nickname? Rude. I'm keeping it.",
 		"runner": ["happy", "You stole it? Mother. I've never loved you more."],
 		"sexton": "Then she's still here a little. In the word."},
 	"beat_3_3": {   # "Stay, little one. Everyone stays." (a bark)
@@ -997,7 +997,7 @@ const CLASS_LINES := {
 		"knight": "Mother Yarrow! Let them rest, in the name of the Vigil!",
 		"founder": "Let go, Mother. I'm heavier than I look.",
 		"witch": "Roots, huh? I've got a trick for roots. It's called fire.",
-		"runner": "Everybody stays? Watch me leave.",
+		"runner": "Nobody ever held on to me. You won't be the first.",
 		"sexton": "They're tired, Mother. Let me tuck them in."},
 	"yarrow": {     # after "So old! And still so short."
 		"knight": "Your garden kept them safe, Mother. Now it can rest.",
@@ -1006,10 +1006,10 @@ const CLASS_LINES := {
 		"runner": ["happy", "I didn't take any bones. Well. One. It was loose."],
 		"sexton": "They'll sleep well now. I tucked in every one."},
 	"world_4": {    # Hollin: "I stopped them first... I'm sorry, Wick."
-		"knight": "You're sorry, Hollin. That's the first step. The next one's down.",
-		"founder": "Upside-down bells! Who cast these? I have so many questions.",
-		"witch": "It's freezing. Good thing I'm a walking fireplace.",
-		"runner": "Upside down. So falling is climbing. I can work with that.",
+		"knight": "Sorry's the first step, Hollin. The rest all go down.",
+		"founder": "Then we'll ring them again. Upside-down bells! Who cast these?",
+		"witch": "Then I'll melt them loose. Good thing I'm a walking fireplace.",
+		"runner": "Everybody's stolen something, Hollin. Yours was just quieter.",
 		"sexton": "You're forgiven, Hollin. It was the quiet talking, not you."},
 	"beat_4_3": {   # Taper's confession (a bark)
 		"knight": "You didn't send me alone, Mother. You're in my smoke.",
@@ -1019,24 +1019,24 @@ const CLASS_LINES := {
 		"sexton": "He isn't alone now. And neither are you."},
 	"boss_4": {
 		"knight": "Master Tickwell! Time marches on, sir. And so do I.",
-		"founder": "I've rung a thousand bells. Let me ring the next one.",
-		"witch": "Nothing ends? Everything ends. Watch.",
-		"runner": "I'll just be borrowing that minute, thanks.",
+		"founder": "Hold it? You don't hold a bell, sir. You let it ring.",
+		"witch": "One minute? I only need one. Watch.",
+		"runner": "A whole minute nobody's using? Finders keepers.",
 		"sexton": "Even a minute needs to rest. Let this one go."},
 	"tickwell": {   # "Then we'll both ring the next one."
-		"knight": "Quite all right, sir. We're only forty years late.",
+		"knight": "Well said, sir. And this time, we'll be early.",
 		"founder": ["happy", "The next one's mine, sir. I'm a Bellfounder."],
-		"witch": "Next bell's mine. I'll ring it loud.",
+		"witch": "Ring it loud, you two. I'll do the glowing.",
 		"runner": ["happy", "Nice watch. Just saying. Very nice watch."],
 		"sexton": "Forty years in one minute. You must be so tired. Sit."},
 	"world_5": {    # Taper rests her voice
-		"knight": "Rest, Mother. I'll carry us the rest of the way.",
+		"knight": "Worry not, Mother. I'll carry us from here.",
 		"founder": "Sleep, Mother. I'll be quiet. I'll try to be quiet.",
 		"witch": "Rest, Mother. I'll keep the smoke warm for you.",
 		"runner": "Rest. I'll nick you something shiny from up here.",
 		"sexton": "Sleep, Mother. I'll sit with you when I'm back."},
 	"beat_5_2": {   # "Doesn't it embarrass you?"
-		"knight": "My flame smokes because it burns, madam. Yours doesn't.",
+		"knight": "Never, madam. I'd sooner be small and smoky than cold.",
 		"founder": "Smoke means it's working. Ask any foundry.",
 		"witch": ["fierce", "Embarrass me? I'm the prettiest fire you'll ever see."],
 		"runner": "Small's good. Small fits through windows.",
@@ -1055,12 +1055,12 @@ const CLASS_LINES := {
 		"sexton": "There you are. Warm again."},
 	"world_6": {    # "yours is the only flame. Keep it loud."
 		"knight": "Then let it be the loudest flame there ever was.",
-		"founder": "Quiet? I brought a maul. It won't stay quiet long.",
+		"founder": "Loud? Easy. I've been told to keep it down my whole life.",
 		"witch": "The only flame? Perfect. No competition.",
 		"runner": "The only light in the dark. So everything knows where I am.",
 		"sexton": "So still. Like a grave no one visits. I'll visit."},
 	"beat_6_2": {   # "why is yours different?" The game's question, in five answers.
-		"knight": "Because it isn't mine alone. It never was.",
+		"knight": "Because I promised Mother I'd keep it lit.",
 		"founder": "Because I keep it fed. Same as a forge.",
 		"witch": "Because every time it goes out, somebody lights it again.",
 		"runner": "Because it's shared. You'd know, if anyone ever shared with you.",
@@ -1074,7 +1074,7 @@ const CLASS_LINES := {
 	"give": {       # the moment before the hold
 		"knight": "I promised to keep it lit. I never promised to keep it.",
 		"founder": "Here. Everything in the forge. Take it.",
-		"witch": ["fierce", "You want my fire? Fine. It's a gift. You don't get to take it."],
+		"witch": ["fierce", "You don't get to take my fire. I'm giving it."],
 		"runner": "Second thing I've ever given away. Don't tell anyone.",
 		"sexton": "Don't be scared. It only goes dark for a little while."},
 	"relit": {      # everyone's light, back into his
@@ -1082,7 +1082,7 @@ const CLASS_LINES := {
 		"founder": ["happy", "Everyone came! Did anyone bring supper?"],
 		"witch": ["happy", "Told you. Somebody always lights it again."],
 		"runner": ["happy", "You all came? For me? ...It's the smoke. I'm not crying."],
-		"sexton": ["happy", "Everyone came. Even the old ones. Look at them all."]},
+		"sexton": ["happy", "Even the old ones came. Look at them all. Nobody's lost."]},
 	"homecoming": { # "Well done, Waxby."
 		"knight": ["happy", "Thank you, Mother. The Vigil stands."],
 		"founder": ["happy", "Thank you. Is it supper now? It feels like supper."],
@@ -1090,9 +1090,9 @@ const CLASS_LINES := {
 		"runner": ["happy", "You know my name? ...Nobody ever uses my name."],
 		"sexton": ["happy", "My name. I'll keep it somewhere safe."]},
 	"waxworks_won": {  # Waxley, when a calling beats one of his casts (the draft's trial_won)
-		"knight": "A Candleknight on my podium! Here. Polish it yourself.",
+		"knight": "A Candleknight on my podium! Here's your prize. Polish it yourself.",
 		"founder": "You broke my best cast. That's coming out of your prize.",
-		"witch": "Fastest fire I ever saw. Please stop smoking on my stock.",
+		"witch": "Fastest fire I ever saw. Now stop melting my stock.",
 		"runner": "Too fast. Suspiciously fast. I'm checking my pockets.",
 		"sexton": "You beat my cast, then swept up the drips. Unsettling."},
 }
@@ -1101,22 +1101,22 @@ const CLASS_LINES := {
 # entry is "every". The comment names where each one fires.
 const BARKS := {
 	"first_altar": ["taper:warm", "Feel that? Altars mend a flame. And they keep your place."],    # world._light_altar
-	"first_relic": ["taper:warm", "Relics remember the saints who held them. Brighter beam, older saint."],
+	"first_relic": ["taper:warm", "A relic! It remembers its saint. The brighter, the stronger."],
 	"first_sigil": ["taper:warm", "A saint's sigil! Three hide in every hall."],
-	"first_item":  ["taper:warm", "Loot! Upgrades go straight on you. The rest waits in your satchel."],
+	"first_item":  ["taper:warm", "Better gear goes on you, sprout. The rest waits in your satchel."],
 	"first_elite": ["taper:worried", "That one glows. The Hush is thicker in it. Careful."],
 	"first_dread": ["taper:stern", "A named one. Old and nasty. Worth it, if you win."],
 	"first_hurt":  ["taper:worried", "Every hurt shrinks your flame, sprout. That flame is your life."],   # world._on_hurt
 	"first_snuff": ["taper:warm", "Up you get, sprout. A flame that falls can rise."],               # world._update_dead
 	"first_pool":  ["taper:warm", "Your embers spilled where you fell. Go and get them back."],
-	"first_douse": ["taper:worried", "Wet wick! Your light's low for a moment. Dry off."],
+	"first_douse": ["taper:worried", "Wet wick! Your light's low till it dries."],
 	"low_flame":   ["taper:worried", "Your flame's low! Drink from your flask, or find an altar."],
 	"special_empty_founder": ["taper:warm", "Cold bell, sprout. Hit foes to build Heat, then slam it."],   # founder.special_pressed, short of Heat
-	"skill_point": ["taper:warm", "You've grown, sprout. Open the Sheet from the pause menu to spend it."],
+	"skill_point": ["taper:warm", "You've grown, sprout. Pause and spend your new point on the Sheet."],
 	"tollgrave_angry": ["tollgrave:hushed", "Ring? No. NO. HUSH!", "every"],                    # boss phase 2
 	"snuffer_angry":   ["snuffer:wrath", "Why won't it go out?", "every"],                     # boss phase 2
-	"snuffer_dark":    ["taper:worried", "He's put out every light! Only yours is left. Stay whole!", "every"],
-	"nightfall":   ["taper:stern", "The Hush sleeps, sprout, but it dreams. Darker dreams. Walk them with me?"],   # main: the first level past Dusk
+	"snuffer_dark":    ["taper:worried", "Only your light shows him now, sprout! Keep it bright!", "every"],
+	"nightfall":   ["taper:stern", "The Hush sleeps, sprout. Its halls don't. Mind your flame."],   # main: the first level past Dusk
 	"level_up":    ["wick:happy", "@level_up", "every"],                                         # L5, 10, 15...
 	# A level-up that opens a tier says so instead (world._level_up: the
 	# capstones at 8, the Deep nodes at 16, Mastery at 24; each a hero's once).
@@ -1129,14 +1129,14 @@ const BARKS := {
 	"beat_1_2_a":  ["wick", "@beat_1_2"],
 	"beat_1_2_b":  ["taper:stern", "Keep moving, sprout. Bats below, and archers. Mind your head."],
 	"beat_1_3_a":  ["taper:warm", "Thornbacks ahead. Spikes on top. Don't jump on them. Hit them."],
-	"beat_1_3_b":  ["taper:stern", "It's burned here ever since. Fire isn't the enemy. Forgotten fire is."],
+	"beat_1_3_b":  ["taper:stern", "Fire isn't the enemy, sprout. Forgotten fire is."],
 	"beat_2_2_a":  ["taper:stern", "Empty helmets are what the Hush likes to wear. Remember that."],
 	"beat_2_3_a":  ["taper:sad", "That voice. Oh, Hollin. My poor boy."],
 	"beat_2_3_b":  ["taper:stern", "And mind the moths. They drink light. Swat them off your flame."],
-	"boss_2_a":    ["taper:stern", "He's hollow, sprout. Only light gives him a body. Keep the braziers lit."],
+	"boss_2_a":    ["taper:stern", "He's hollow. Only light gives him a body. Keep the braziers lit."],
 	# ---- World 3
 	"beat_3_1_a": ["taper:faint", "Sprout? My voice is thin down there. Hollin's with me. He'll help."],
-	"beat_3_1_b": ["hollin:grin", "Hello! It's me, in your smoke. Mother says I talk too much. I don't."],
+	"beat_3_1_b": ["hollin:grin", "Me again! Mother says I talk too much. I don't."],
 	"beat_3_3_a": ["wick", "@beat_3_3"],
 	"beat_3_3_b": ["hollin:worried", "Whatever took her is holding on tight. Don't let it hold you."],
 	"boss_3_a":   ["taper:faint", "Follow her heart, sprout. It blooms where she can't guard it."],     # the rule hint
@@ -1168,7 +1168,7 @@ const BARKS := {
 	"saint_p3":   ["hollin:worried", "Her glass is going dark. Keep your flame lit, Wick!", "every"],   # boss_phase
 	"first_wind":      ["hollin:grin", "Wind! Jump with it and it carries you. Against it... don't."],   # glass.gd
 	"first_glass":     ["hollin:worried", "That glass cracked! Don't stand on it long."],
-	"first_dawnglass": ["hollin:worried", "That glass only holds in lamplight. A lamp's, not ours."],
+	"first_dawnglass": ["hollin:worried", "That glass only holds in a lamp's light. Your flame won't do!"],
 	# ---- World 6 (from 6-3 on, Hollin is quiet: only the Hush speaks)
 	"beat_6_1_a": ["hollin:worried", "So quiet I can hear your flame. Altars are few down there. Go gently."],
 	"beat_6_1_b": ["hush:open", "who are you, little light?"],
@@ -1180,7 +1180,7 @@ const BARKS := {
 	"first_grasp":     ["hollin:worried", "Ripples mean hands. Wait on the stone till they sink."],
 	"first_hush_zone": ["hollin:worried", "The quiet here drinks light and sound. Don't linger in it."],
 	"first_candle":    ["hollin:grin", "Old Vigil candles! Light them. They stay lit for you."],
-	"first_deepdark":  ["hollin:worried", "The dark drinks light faster here. Stay near anything that glows."],
+	"first_deepdark":  ["hollin:worried", "Deeper quiet here. Stay near anything that glows."],
 	# The tide is 6-3's alone, after Hollin has gone quiet (beat_6_3): the Hush
 	# teaches it, gloating (spec §6.5.7 gave it to Hollin; he isn't there).
 	"first_tide":      ["hush:open", "run, little light. ring your little bells. they only hold me a moment."],
@@ -1194,12 +1194,12 @@ const BARKS := {
 	"hush_remembers": ["hush:open", "i remember where you hurt me, little light.", "every"],
 	# ---- Secret levels and the Lost Wicks (secrets.gd)
 	"first_secret":    ["taper:warm", "A hidden way! Old Wicks made these. Something waits at the end."],
-	"first_lost_wick": ["taper:sad", "A Lost Wick. One of ours who never came home. Light it for them."],
+	"first_lost_wick": ["taper:sad", "A Lost Wick. One of ours who never came home. You lit their way."],
 	"first_secret_hollin":    ["hollin:grin", "A hidden way! Mother says old Wicks made these. Let's see."],   # REST_SUBS
-	"first_lost_wick_hollin": ["hollin:worried", "A Lost Wick. Like I nearly was. Light it for them, Wick."], # REST_SUBS
+	"first_lost_wick_hollin": ["hollin:worried", "A Lost Wick. Like I nearly was. You lit their way home, Wick."], # REST_SUBS
 	"first_secret_hush":      ["hush:open", "a hidden way. someone went down it before you. she never came up."],   # HUSH_SUBS (6-S after 6-3)
-	"first_lost_wick_hush":   ["hush:open", "one of yours. i had her light long ago. light it, if you like."],      # HUSH_SUBS
-	"lost_wick_1": ["lamplighter", "I lit the roof lamps every dusk for sixty years. Take my light down with you."],
+	"first_lost_wick_hush":   ["hush:open", "one of yours. i had her light long ago. now she has it back."],      # HUSH_SUBS
+	"lost_wick_1": ["lamplighter", "Sixty years I lit the roof lamps. Take my light down with you."],
 	"lost_wick_2": ["oldchandler", "Tell young Waxley he still owes me for a gross of tapers. Ha! Go on."],
 	"lost_wick_3": ["gardenboy", "I planted the very first tree. Tell Mother Yarrow it grew."],
 	"lost_wick_4": ["rook", "Rooks raised me. I never learned stairs. You won't need them either."],
@@ -1230,7 +1230,7 @@ const BARKS := {
 	"reserve_stocked": ["waxley:shifty", "Don't ask where I got it. Really. Don't."],
 	# ---- A new calling (Taper's word, or Hollin's while she rests: REST_SUBS)
 	"new_keeper":        ["taper:proud", "@taper_react", "every"],
-	"new_keeper_hollin": ["hollin:grin", "A new {calling}! Mother's resting, so: welcome! I'm Hollin.", "every"],
+	"new_keeper_hollin": ["hollin:grin", "A new {calling}! Mother's resting, so you get me. Welcome!", "every"],
 }
 
 # The results screen's line under the level name. Taper's show her faint
@@ -1243,7 +1243,7 @@ const AFTER := {
 	"1-4": ["taper:proud", "Four bells, and old Tollgrave home. I'm proud of you."],
 	"2-1": ["taper:warm", "Two lamps lit in Lanternfold now. The baker cried."],
 	"2-2": ["taper:sad", "Keep his helmet safe for me, sprout."],
-	"2-3": ["taper:worried", "He's close. I can feel how cold it is."],
+	"2-3": ["taper:worried", "He's close. I can feel how cold he is."],
 	"2-4": ["taper:proud", "Every bell. Every lamp. Go on, sprout. Rest."],
 	"3-1": ["taper:faint", "A bell under the roots. I felt it, sprout. My ember felt it."],
 	"3-2": ["taper:faint", "Two bells. Mother Yarrow's trees are listening."],
@@ -1253,16 +1253,16 @@ const AFTER := {
 	"4-2": ["hollin:worried", "Every clock up here stopped too. The whole chapel's holding its breath."],
 	"4-3": ["taper:faint", "Hollin's holding my hand, sprout. Tell no one. He'll get proud."],
 	"4-4": ["tickwell:kind", "Right on time. Well. Forty years late. But right on time."],
-	"5-1": ["hollin:grin", "Mother's resting. I'm talking for both of us. You're welcome."],
+	"5-1": ["hollin:grin", "One bell! Mother would say something wise. Something about flames."],
 	"5-2": ["hollin:worried", "I can hear that wind through your smoke. Hold on tight."],
-	"5-3": ["hollin:worried", "Those windows are her story. I never knew the saint was so small."],
-	"5-4": ["hollin:relit", "A saint with a candle behind her. Mother would love that."],
-	"6-1": ["hollin:worried", "It's so quiet down there. I can hear you breathing."],
+	"5-3": ["hollin:worried", "She was afraid, and went anyway. I never knew the saint was so small."],
+	"5-4": ["hollin:relit", "She sang it to sleep. I wish I'd known a song."],
+	"6-1": ["hollin:worried", "That one reached all the way up, Wick. Mother's ember jumped."],
 	"6-2": ["hollin:worried", "It can't swallow the bells you ring. Keep ringing, Wick."],
 	"6-3": ["hush:open", "you rang another. why?"],
 	"6-4": ["hollin:grin", "It's asleep. Really asleep. Listen. You can hear it breathing."],
 	# The secret levels (spec §6.5.10): the Lost Wicks come home.
-	"1-S": ["taper:warm", "The Lamplighter! Every dusk, the roof lamps. Now he can rest, sprout."],
+	"1-S": ["taper:warm", "The Lamplighter! Sixty years on that roof. He's home now, sprout."],
 	"2-S": ["waxley:shifty", "My old master? He said that? ...He's right. I'll pay him. Eventually."],
 	"3-S": ["taper:faint", "Mother Yarrow's first boy. She'd be so pleased."],
 	"4-S": ["hollin:grin", "Brother Rook! Tickwell says he rang the carillon upside down. Twice."],
@@ -1287,8 +1287,8 @@ const HUSH_SUBS := {"first_secret": "first_secret_hush", "first_lost_wick": "fir
 # While Mother Taper rests her voice (world_5 until the finale), Hollin says
 # the secret levels' lines that would be hers.
 const AFTER_RESTING := {
-	"1-S": ["hollin:grin", "The Lamplighter! Mother says he lit the roof lamps every dusk. Now he rests."],
-	"3-S": ["hollin:grin", "Mother Yarrow's first boy! Mother will be so pleased when she wakes."],
+	"1-S": ["hollin:grin", "The Lamplighter! Sixty years on that roof, and he's home now."],
+	"3-S": ["hollin:grin", "The Gardener's Boy! His tree grew. I'll tell Mother when she wakes."],
 }
 
 # The Vigil Trials' medal lines (spec §6.5.9): Mother Taper's, and Hollin's
