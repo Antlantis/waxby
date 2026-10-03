@@ -23,8 +23,10 @@ extends RefCounted
 ##       ["wick", "@slot"] (CLASS_LINES[slot][calling]) | {"do": cue, ...}
 ##       (a cue may carry "if": flag: it runs only when the flag is set)
 ## "{calling}" in a text becomes the calling's name, "{hero}" the hero's own
-## name (said aloud once, in homecoming). The hero's speaker id is "wick" (a
-## keeper who wears the flame is a Wick); his name plate says Waxby.
+## name. The hero's speaker id is "wick": Wick is a title (any keeper who
+## carries the flame is one), kept where the role is the point ("No Wick goes
+## down alone again"); his name plate shows his name. Hollin says it in his
+## warmest lines to him; Mother Taper only once, in homecoming (she says sprout).
 ## A panel light may carry "off": true (dark until a cue lights it), "color"
 ## (its tint) and "hush": true (a light that eats light).
 ##
@@ -475,7 +477,7 @@ const SCENES_W4 := {
 			{"do": "cam", "to": [0.5, 0.74, 1.0], "t": 5.0},   # down the hanging tower
 			["narrator", "Below the orchard hung Evenbell's secret: a bell tower built upside down."],
 			["hollin:worried", "Its bells rang down, for the Hush. When they rang, it slept."],
-			["hollin:worried", "I stopped them first, forty winters ago. I'm sorry, Wick."],
+			["hollin:worried", "I stopped them first, forty winters ago. I'm sorry, {hero}."],
 			["wick", "@world_4"],
 			{"do": "card", "sub": "World 4", "title": "The Frozen Carillon"},
 		]},
@@ -661,7 +663,7 @@ const SCENES_W6 := {
 
 	# 6-3 The Long Quiet: Hollin goes to fetch everyone (unsaid). Waxby is alone from here.
 	"beat_6_3": {"overlay": true, "shots": [{"beats": [
-		["hollin:worried", "Wick, I have to go quiet a while. Something to do. Don't be scared."],
+		["hollin:worried", "{hero}, I have to go quiet a while. Something to do. Don't be scared."],
 		["hush", "alone again, little light."],
 	]}]},
 
@@ -744,7 +746,7 @@ const SCENES_W6 := {
 		 "fig_alpha": {"eye": 0.8}, "actor": "actor_give", "actor_lit": false,
 		 "lights_on": ["stair1", "stair2", "stair3", "stair4", "stair5", "stair6"], "motes": "fireflies",
 		 "cam": [[0.42, 0.58, 1.0], [0.55, 0.64, 1.16]], "time": 7.0, "beats": [
-			["hollin:relit", "A flame shared is never lost, Wick. You taught me that."],
+			["hollin:relit", "A flame shared is never lost, {hero}. You taught me that."],
 			{"do": "burst", "at": "actor", "n": 48, "color": "ffd84a"}, {"do": "ignite", "light": "actor"},
 			{"do": "mood", "mood": "happy"}, {"do": "haptic", "ms": 60},
 			["wick", "@relit"],
@@ -787,7 +789,7 @@ const SCENES_W6 := {
 			["tickwell:kind", "Seven o'clock exactly. And breakfast is late. Typical."],
 			["waxley:shifty", "Those free candles? Small misunderstanding. Invoice to follow."],
 		]},
-		# Close on the two of them. The only time anyone says his name.
+		# Close on the two of them. The only time Mother Taper says his name.
 		{"panel": "homecoming", "in": "cut",
 		 "figs": {"tollgrave": "tollgrave_stand", "taper": "taper_stand", "hollin": "hollin_warm",
 				  "waxley": "waxley_pack", "tickwell": "tickwell"},
@@ -840,7 +842,7 @@ const SCENES_MODES := {
 	]}]},
 	# Endless Descent (after the ending). Hollin hosts: the Hush's dreams.
 	"descent_open": {"overlay": true, "shots": [{"beats": [
-		["hollin:grin", "It's asleep, Wick. But it dreams of everything it ever swallowed."],
+		["hollin:grin", "It's asleep, {hero}. But it dreams of everything it ever swallowed."],
 		["hollin:worried", "I dreamed them for forty winters. Go as deep as you dare. Then come back."],
 	]}]},
 	# While Taper rests (REST_SUBS): a calling made on the map.
@@ -1005,7 +1007,7 @@ const CLASS_LINES := {
 		"witch": "I burned some of your roots. Sorry. They started it.",
 		"runner": ["happy", "I didn't take any bones. Well. One. It was loose."],
 		"sexton": "They'll sleep well now. I tucked in every one."},
-	"world_4": {    # Hollin: "I stopped them first... I'm sorry, Wick."
+	"world_4": {    # Hollin: "I stopped them first... I'm sorry, {hero}."
 		"knight": "Sorry's the first step, Hollin. The rest all go down.",
 		"founder": "Then we'll ring them again. Upside-down bells! Who cast these?",
 		"witch": "Then I'll melt them loose. Good thing I'm a walking fireplace.",
@@ -1083,7 +1085,7 @@ const CLASS_LINES := {
 		"witch": ["happy", "Told you. Somebody always lights it again."],
 		"runner": ["happy", "You all came? For me? ...It's the smoke. I'm not crying."],
 		"sexton": ["happy", "Even the old ones came. Look at them all. Nobody's lost."]},
-	"homecoming": { # "Well done, Waxby."
+	"homecoming": { # "Well done, {hero}." (Mother Taper's first time)
 		"knight": ["happy", "Thank you, Mother. The Vigil stands."],
 		"founder": ["happy", "Thank you. Is it supper now? It feels like supper."],
 		"witch": ["happy", "You said my name! Say it again. Louder."],
@@ -1214,7 +1216,7 @@ const BARKS := {
 	"secret_hint_5": ["hollin:grin", "A lamp with nothing to light? Light it anyway.", "every"],
 	"secret_hint_6": ["hollin:worried", "That one isn't drowned. Listen. It's still ringing.", "every"],
 	# Hers, in Hollin's voice, for a player back in 1-3 or 3-3 while she rests.
-	"secret_hint_1_hollin": ["hollin:grin", "Is that moonlight? We're under a hill, Wick!", "every"],
+	"secret_hint_1_hollin": ["hollin:grin", "Is that moonlight? We're under a hill, {hero}!", "every"],
 	"secret_hint_3_hollin": ["hollin:worried", "Spores don't fall up. Something up there is breathing.", "every"],
 	# ---- The modes (modes/*.gd)
 	"descent_5":  ["hollin:grin", "Five rooms down. It's dreaming of the cathedral. I know this bit."],
@@ -1258,7 +1260,7 @@ const AFTER := {
 	"5-2": ["hollin:worried", "I can hear that wind through your smoke. Hold on tight."],
 	"5-3": ["hollin:worried", "She was afraid, and went anyway. I never knew the saint was so small."],
 	"5-4": ["hollin:relit", "She sang it to sleep. I wish I'd known a song."],
-	"6-1": ["hollin:worried", "That one reached all the way up, Wick. Mother's ember jumped."],
+	"6-1": ["hollin:worried", "That one reached all the way up, {hero}. Mother's ember jumped."],
 	"6-2": ["hollin:worried", "It can't swallow the bells you ring. Keep ringing, Wick."],
 	"6-3": ["hush:open", "you rang another. why?"],
 	"6-4": ["hollin:grin", "It's asleep. Really asleep. Listen. You can hear it breathing."],
