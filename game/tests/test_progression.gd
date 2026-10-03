@@ -114,6 +114,7 @@ func _initialize() -> void:
 	_test_respec_and_vigil()
 	_test_belt()
 	_test_skill_gates()
+	_test_altar_rites()
 	_test_new_calling()
 	_test_satchel_full()
 	_test_salvage_weaker()
@@ -2773,6 +2774,81 @@ func _test_skill_gates() -> void:
 	game.buy_skill("k_crescent")
 	_check(game.buy_skill("k_dawn"), "after an Unmaking the other capstone can be picked")
 	_check(game.hero_stats()["flags"].get("dawn", false) and not game.hero_stats()["flags"].has("unbroken"), "the capstone's flag reaches the stats")
+
+
+func _test_altar_rites() -> void:
+	## The Altar Rites' offer (rites.gd): only nodes Classes.can_buy allows
+	## now, three at most, at most one plain +x% card, a tier just opened
+	## first (NEW), a behaviour before a number; nothing with no point
+	## waiting. And the flame grows 8% for each big tier owned (a capstone,
+	## a Deep node, a Mastery node: +24% at most), its look and nothing else.
+	var Rites = load("res://scripts/rites.gd")
+	var was_deep: bool = Classes.deep
+	Classes.set_deep(true)   # (the game's tree; a test above may have left v2's)
+	_fresh()
+	_check(Rites.picks(game.hero()).is_empty() and Rites.offers(game.hero()).is_empty(), "no point waiting: nothing offered")
+	game.add_xp(Progression.total_to(2))   # L2, 1 point
+	var first: Array = Rites.picks(game.hero())
+	_check(first.size() == 2 and first[0] == "k_devout" and str(Classes.find_node("knight", first[1])["stat"]) != "",
+			"L2: the behaviour (Devout Guard) first, then one +x%% card, and no second (%s)" % [first])
+	# Every calling at every level, its points unspent or spent down one
+	# branch: every card legal, three at most, one +x% at most.
+	var bad := []
+	for cls in Classes.ids():
+		for lvl in range(2, 31):
+			for spent in [false, true]:
+				var h := Hero.blank(cls, lvl)
+				h["points"] = lvl - 1
+				if spent:
+					for n in Classes.tree(cls):
+						if int(n["branch"]) == 0:
+							for i in int(n["max"]):
+								if Classes.can_buy(cls, n["id"], h["skills"], lvl, int(h["points"])) == "":
+									h["skills"][n["id"]] = int(h["skills"].get(n["id"], 0)) + 1
+									h["points"] = int(h["points"]) - 1
+				var ids: Array = Rites.picks(h)
+				var stats := 0
+				for id in ids:
+					var n := Classes.find_node(cls, id)
+					if Classes.can_buy(cls, id, h["skills"], lvl, int(h["points"])) != "":
+						bad.append("%s L%d %s: not buyable" % [cls, lvl, id])
+					if str(n["stat"]) != "":
+						stats += 1
+				if ids.size() > 3 or stats > 1 or (not spent and ids.is_empty()):
+					bad.append("%s L%d %s: %s" % [cls, lvl, "spent" if spent else "fresh", ids])
+	_check(bad.is_empty(), "every offer legal, at most 3, at most one +x%%, never none with points unspent (%s)" % [bad.slice(0, 4)])
+	# L8 with five points in a branch: the capstone first, marked NEW.
+	var k := Hero.blank("knight", 8)
+	k["skills"] = {"k_tempered": 2, "k_devout": 2, "k_mirror": 1}
+	k["points"] = 2
+	var cards: Array = Rites.offers(k)
+	_check(not cards.is_empty() and cards[0]["id"] == "k_unbroken" and bool(cards[0]["new"]) and cards[0]["glyph"] == "sun"
+			and str(cards[0]["sub"]) == "Capstone · rank 1 of 1", "L8: the capstone that just opened comes first, NEW (%s)" % [cards[0] if not cards.is_empty() else {}])
+	_check(str(cards[0]["text"]) == Classes.node_text(Classes.find_node("knight", "k_unbroken"), 1), "its card says what it does")
+	# L16, the capstone owned: the Deep node that just opened.
+	k["level"] = 16
+	k["skills"] = {"k_tempered": 2, "k_devout": 2, "k_mirror": 3, "k_unbroken": 1}
+	_check(Rites.picks(k)[0] == "k_bastion", "L16: the Deep node first (%s)" % [Rites.picks(k)])
+	# The flame: x1.08 a big tier owned, never more than x1.24; light untouched.
+	var base := Hero.blank("knight", 30)
+	var f0: float = Hero.stats(base)["flame_scale"]
+	var s1 := base.duplicate(true)
+	s1["skills"] = {"k_tempered": 2, "k_devout": 2, "k_mirror": 1, "k_unbroken": 1}
+	var s0 := base.duplicate(true)
+	s0["skills"] = {"k_tempered": 2, "k_devout": 2, "k_mirror": 1}
+	var s3 := base.duplicate(true)
+	s3["skills"] = {"k_tempered": 2, "k_devout": 2, "k_mirror": 3, "k_unbroken": 1, "k_bastion": 3, "k_sanctuary": 1, "k_keen": 2, "k_honed": 2, "k_crescent": 1, "k_dawn": 1}
+	var st0: Dictionary = Hero.stats(s0)
+	var st1: Dictionary = Hero.stats(s1)
+	_check(is_equal_approx(f0, 1.0) and is_equal_approx(float(st0["flame_scale"]), 1.0), "no big tier: the calling's own flame (%.2f)" % f0)
+	_check(is_equal_approx(float(st1["flame_scale"]), 1.08), "a capstone: x1.08 (%.2f)" % st1["flame_scale"])
+	_check(is_equal_approx(float(Hero.stats(s3)["flame_scale"]), 1.24), "a capstone (two), a Deep and a Mastery node: x1.24, no more (%.2f)" % Hero.stats(s3)["flame_scale"])
+	var fs := Hero.blank("founder", 30)
+	fs["skills"] = {"f_bellows": 2, "f_stoked": 2, "f_slag": 1, "f_crucible": 1}
+	_check(is_equal_approx(float(Hero.stats(fs)["flame_scale"]), 1.25 * 1.08), "on the calling's own size (the Bellfounder's 1.25 x 1.08)")
+	_check(is_equal_approx(Combat.light_radius(1.0, st1, "dusk"), Combat.light_radius(1.0, st0, "dusk")) and float(st1["max_hp"]) == float(st0["max_hp"])
+			and is_equal_approx(float(st1["basic"]), float(st0["basic"])), "the light, life and damage don't move with it")
+	Classes.set_deep(was_deep)
 
 
 # ---------------------------------------------------------------- belt

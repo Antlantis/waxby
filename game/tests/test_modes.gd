@@ -80,6 +80,7 @@ func _initialize() -> void:
 	await _test_descent_world()
 	await _test_descent_rules()
 	await _test_glimmers()
+	await _test_glimmer_card()
 	await _test_landing_once()
 	await _test_pause_fallback()
 	await _test_rush_files()
@@ -857,6 +858,65 @@ func _landing_relic(m: Object, w: Node) -> Vector2i:
 		if (cell as Vector2i).x <= int(m.built["landing_x1"]) and str(w.blocks[cell]["contents"]) == "relic":
 			return cell
 	return Vector2i(-1, -1)
+
+
+func _test_glimmer_card() -> void:
+	## The landing's Glimmers on the game's one choice card (choice_card.gd,
+	## two up): at the Descent's own places, each card its Glimmer and its
+	## count, Walk on its embers; a tap takes it and lets the World go.
+	_fresh()
+	var m = _descent("knight", "dusk", 2, 23)
+	var w := _mode_world(m, m.level_data())
+	await process_frame
+	var hud = load("res://scripts/modes/mode_hud.gd").new()
+	hud.set("mode", m)
+	hud.set("world", w)
+	m.hud = hud
+	w.add_child(hud)
+	await process_frame
+	w.player.reset_at(_landing_altar(m, w)["pos"])
+	_ticks(w, 4)
+	_check(m.offers.size() == 2, "the landing offers two Glimmers")
+	var gid: String = m.offers[0]
+	w.paused = true   # (as _open_glimmers does)
+	hud.glimmer_card(m.offers)
+	await process_frame
+	var c = hud.choice
+	_check(hud.card == "glimmer" and c != null and c.is_open() and c.pair and c.offers.size() == 2, "on the choice card, two up")
+	var s := UI.safe_rect(root.get_viewport())
+	var top: float = hud.glimmer_heading_y() + 12.0
+	var cx := s.get_center().x
+	var want := [Rect2(cx - 232.0, top, 220.0, 140.0), Rect2(cx + 12.0, top, 220.0, 140.0)]
+	_check(c.rects() == want and hud.glimmer_rects() == want, "at the Descent's own places: 220 x 140, 24 apart (%s)" % [c.rects()])
+	_check(str(c.offers[0]["name"]) == str(Data.GLIMMERS[gid]["name"]) and str(c.offers[0]["text"]) == str(Data.GLIMMERS[gid]["text"])
+			and str(c.offers[0]["sub"]) == "1 of %d" % int(Data.GLIMMERS[gid]["max"]), "a card names its Glimmer, what it gives and its count (%s)" % [c.offers[0]])
+	_check(c.later == "Walk on · +%d embers" % Data.WALK_ON and c.heading == "A Glimmer for the run", "Walk on pays its embers (%s)" % c.later)
+	c.choose(0)
+	_check(m.glimmer(gid) == 1 and m.offers.is_empty() and hud.card == "" and not c.is_open() and not w.paused,
+			"a card tapped takes its Glimmer, closes the card and lets the World go")
+	hud.queue_free()
+	w.queue_free()
+	await process_frame
+	# Walk on, through the card's button.
+	_fresh()
+	m = _descent("knight", "dusk", 2, 23)
+	w = _mode_world(m, m.level_data())
+	await process_frame
+	hud = load("res://scripts/modes/mode_hud.gd").new()
+	hud.set("mode", m)
+	hud.set("world", w)
+	m.hud = hud
+	w.add_child(hud)
+	await process_frame
+	w.player.reset_at(_landing_altar(m, w)["pos"])
+	_ticks(w, 4)
+	hud.glimmer_card(m.offers)
+	var e0: int = game.embers()
+	hud.choice.choose(-1)
+	_check(game.embers() - e0 == Data.WALK_ON and m.offers.is_empty() and not hud.choice.is_open(), "Walk on pays %d embers and closes it" % Data.WALK_ON)
+	hud.queue_free()
+	w.queue_free()
+	await process_frame
 
 
 func _test_landing_once() -> void:

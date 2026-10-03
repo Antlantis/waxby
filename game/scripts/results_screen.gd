@@ -12,6 +12,9 @@ extends Control
 ## level 40 the XP fills toward the next Candlemark ("Level 40 ✦3"); a level
 ## holding a secret way out not found yet wears a silver spark by its name.
 ## Mother Yarrow's Second Draught shows as a pill.
+## The "skill points to spend" line under the XP is a button: it opens the
+## Altar Rites' choice card (rites.gd, choice_card.gd) over the screen, a
+## skill learned with each pick until Later or the points run out.
 
 signal next
 signal replay
@@ -22,6 +25,8 @@ const Relics := preload("res://scripts/relics.gd")
 const Items := preload("res://scripts/items.gd")
 const Progression := preload("res://scripts/progression.gd")
 const Combat := preload("res://scripts/combat.gd")
+const Rites := preload("res://scripts/rites.gd")
+const ChoiceCard := preload("res://scripts/choice_card.gd")
 
 const XP_START := 1.3             # when the XP bar starts filling
 const XP_TIME := 1.6
@@ -48,6 +53,9 @@ var _marks_from := 0              # Candlemarks before the level (v3)
 var _mark_flash := 0.0
 var _marks_seen := 0
 var lost_rect := Rect2()          # where the Lost Wick's card drew (tests)
+var spend_rect := Rect2()         # the "skill points to spend" pill when last drawn ({} while it isn't)
+var choice: Control = null        # choice_card.gd: the Rites over the screen (made the first time)
+var _spend: Button                # an invisible button over the pill
 const LOST_WICKS := {1: "The Lamplighter", 2: "The Old Chandler", 3: "The Gardener's Boy", 4: "Brother Rook",
 		5: "Sister Solder", 6: "The Iron Abbess"}
 
@@ -64,6 +72,14 @@ func _ready() -> void:
 		b.modulate.a = 0.0
 		add_child(b)
 		_btns.append(b)
+	_spend = Button.new()
+	_spend.flat = true
+	_spend.focus_mode = Control.FOCUS_NONE
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		_spend.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	_spend.visible = false
+	_spend.pressed.connect(func(): open_rites())
+	add_child(_spend)
 	# The XP: from where the hero stood before the level to now.
 	_xp_to = int(Game.hero().get("xp", 0))
 	_xp_from = maxi(_xp_to - int(result.get("xp", 0)), 0)
@@ -184,7 +200,36 @@ func _process(dt: float) -> void:
 		b.position = Vector2(x, s.end.y - b.size.y - 2.0)
 		x += b.size.x + 12.0
 		b.modulate.a = clampf((_t - XP_START - XP_TIME * 0.5 - i * 0.1) * 4.0, 0.0, 1.0)
+	# The points pill's button: a thumb tall over it while it shows.
+	_spend.visible = spend_rect.has_area() and (choice == null or not choice.is_open())
+	if _spend.visible:
+		_spend.position = Vector2(spend_rect.position.x, spend_rect.get_center().y - UI.TAP_H * 0.5)
+		_spend.size = Vector2(spend_rect.size.x, UI.TAP_H)
 	queue_redraw()
+
+
+func open_rites() -> bool:
+	## The Rites' cards over the screen: up to three skills Waxby can learn
+	## now, or Later. Each pick learns one; while points and skills are left
+	## the cards come again with the next three.
+	var cards := Rites.offers(Game.hero())
+	if cards.is_empty():
+		return false
+	if choice == null:
+		choice = ChoiceCard.new()
+		add_child(choice)
+	choice.open(cards, {"heading": Rites.heading(Game.hero()), "later": "Later", "pick": func(i): _rite_picked(cards, i)})
+	return true
+
+
+func _rite_picked(cards: Array, i: int) -> void:
+	choice.close()
+	if i < 0 or i >= cards.size():
+		return
+	if Game.buy_skill(str(cards[i].get("id", ""))):
+		_sfx("glimmer")
+		if int(Game.hero().get("points", 0)) > 0:
+			open_rites()
 
 
 func _sfx(name: String, pitch := 1.0) -> void:
@@ -422,12 +467,22 @@ func _draw_xp(x: float, y: float, w: float) -> void:
 	draw_rect(Rect2(bar.position + Vector2(0, 1), Vector2(bar.size.x * frac, 3.0)), Color(1, 1, 1, 0.35 * a))
 	if _level_flash > 0.0:
 		draw_rect(bar.grow(3.0 + 4.0 * (1.0 - _level_flash)), Color(1.0, 0.85, 0.4, 0.5 * _level_flash), false, 1.5)
+	spend_rect = Rect2()
 	if int(result.get("levels", 0)) > 0 and _t > XP_START + XP_TIME:
 		var pts := int(Game.hero().get("points", 0))
-		if pts > 0:
+		if pts > 0 and not Rites.picks(Game.hero()).is_empty():
+			# A gold pill: "+ 2 skill points to spend  CHOOSE", a button
+			# (_spend) that opens the Rites' cards.
 			var ap := clampf((_t - XP_START - XP_TIME) * 3.0, 0.0, 1.0)
-			UI.glyph(self, "plus", Vector2(x + 7.0, y + 38.0), 13.0, Color(UI.GOLD, ap))
-			UI.text(self, Vector2(x + 18.0, y + 43.0), "%d skill point%s to spend in the Sheet" % [pts, "" if pts == 1 else "s"], 13, Color(UI.GOLD, ap), HORIZONTAL_ALIGNMENT_LEFT, w - 18.0, "body", 700)
+			var say := "%d skill point%s to spend" % [pts, "" if pts == 1 else "s"]
+			var sw := UI.text_width(say, 13, "body", 700)
+			var gw := UI.text_width("CHOOSE", 10, "body", 800)
+			var r := Rect2(x, y + 28.0, minf(w, 22.0 + sw + 12.0 + gw + 12.0), 22.0)
+			UI.panel(self, r, Color(UI.GOLD, 0.85 * ap), Color(UI.PANEL, 0.9 * ap), 11.0)
+			UI.glyph(self, "plus", Vector2(r.position.x + 12.0, r.get_center().y), 12.0, Color(UI.GOLD, ap))
+			UI.text(self, Vector2(r.position.x + 22.0, r.position.y + 16.0), say, 13, Color(UI.GOLD, ap), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 22.0, "body", 700)
+			UI.text(self, Vector2(r.end.x - gw - 12.0, r.position.y + 15.0), "CHOOSE", 10, Color(UI.CREAM, ap), HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 800)
+			spend_rect = r
 
 
 func _draw_loot(x: float, y: float, w: float, bottom: float) -> void:

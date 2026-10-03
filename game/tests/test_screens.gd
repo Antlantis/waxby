@@ -59,6 +59,7 @@ var Items
 var Classes
 var Progression
 var Combat
+var StatsPanel
 var game: Node
 var _passed := 0
 var _failed := 0
@@ -118,6 +119,7 @@ func _initialize() -> void:
 	Classes = load("res://scripts/classes.gd")
 	Progression = load("res://scripts/progression.gd")
 	Combat = load("res://scripts/combat.gd")
+	StatsPanel = load("res://scripts/stats_panel.gd")
 	game = root.get_node("Game")
 	game.save_path = "user://test_screens_save.json"
 	game.settings_path = "user://test_screens_settings.json"
@@ -139,6 +141,8 @@ func _initialize() -> void:
 			_no_errors("screen_layouts")
 			await _test_v3_layouts()
 			_no_errors("v3_layouts")
+			await _test_choice_layout()
+			_no_errors("choice_layout")
 	await _set_view(Vector2i(847, 390), true)
 	await _test_message_slot()
 	_no_errors("message_slot")
@@ -194,6 +198,12 @@ func _initialize() -> void:
 	_no_errors("power_card")
 	await _test_level_up_card()
 	_no_errors("level_up_card")
+	await _test_points_pip()
+	_no_errors("points_pip")
+	await _test_altar_rites()
+	_no_errors("altar_rites")
+	await _test_tier_barks()
+	_no_errors("tier_barks")
 	await _test_touch_specials()
 	_no_errors("touch_specials")
 	await _test_chandler()
@@ -2432,9 +2442,27 @@ func _test_pause() -> void:
 	pm.open_sheet()
 	await _frames(2)
 	_check(pm._sheet != null and not pm._sheet.belt_editable, "the Sheet opens from pause, the belt locked away from an altar")
+	_check(int(game.hero()["points"]) > 0 and pm._sheet.tab == "skills", "with a skill point waiting, on Skills (%s)" % pm._sheet.tab)
 	pm._sheet.back.emit()
 	await _frames(1)
 	_check(pm.page == "main" and pm._sheet == null, "Back returns to the pause sheet")
+	var pts := int(game.hero()["points"])
+	game.hero()["points"] = 0
+	pm.open_sheet()
+	await _frames(2)
+	_check(pm._sheet.tab == "stats", "with none, on Stats (%s)" % pm._sheet.tab)
+	pm._sheet.back.emit()
+	await _frames(1)
+	game.hero()["points"] = pts
+	# The map's Sheet (main.show_sheet) the same way.
+	var mn = load("res://scripts/main.gd").new()
+	mn.show_sheet()
+	_check(mn.get("current") != null and str(mn.current.tab) == "skills", "the map's Sheet opens on Skills while points wait")
+	game.hero()["points"] = 0
+	mn.show_sheet()
+	_check(str(mn.current.tab) == "stats", "and on Stats with none")
+	game.hero()["points"] = pts
+	mn.free()
 	if w.altars.size() > 0:
 		w.altars[0]["lit"] = true
 		w.player.position = w.altars[0]["pos"]
@@ -2474,6 +2502,19 @@ func _test_results() -> void:
 	_check(levels_seen == Progression.level_of(from + gained) - Progression.level_of(from), "a fanfare for each level gained (%d)" % levels_seen)
 	await _frames(3)
 	_buttons_ok(r, "results")
+	# The points to spend: a pill that's a button, opening the Rites' cards.
+	var pts := int(game.hero()["points"])
+	_check(pts > 0 and r.spend_rect.has_area() and r._spend.visible and r._spend.get_global_rect().encloses(r.spend_rect),
+			"%d points to spend: a pill, a thumb-tall button over it (%s)" % [pts, r.spend_rect])
+	_check(r.open_rites() and r.choice.is_open() and r.choice.offers.size() > 0 and r.choice.offers.size() <= 3, "it opens the skills on the choice card (%d)" % (r.choice.offers.size() if r.choice else 0))
+	var id := str(r.choice.offers[0]["id"])
+	var rk := int(game.hero()["skills"].get(id, 0))
+	r.choice.choose(0)
+	_check(int(game.hero()["points"]) == pts - 1 and int(game.hero()["skills"].get(id, 0)) == rk + 1, "a pick learns it (%s)" % id)
+	_check(r.choice.is_open() == (pts - 1 > 0), "and with points left the cards come again")
+	if r.choice.is_open():
+		r.choice.choose(-1)
+	_check(not r.choice.is_open() and int(game.hero()["points"]) == pts - 1, "Later closes them, the rest kept")
 	r.queue_free()
 	await _frames(2)
 
@@ -2848,9 +2889,226 @@ func _test_level_up_card() -> void:
 	hud._lvl = {}
 	hud._xp_level = 8
 	hud.level_up(10)
-	_check(str(hud._lvl["line"]).begins_with("+2 skill points"), "two levels at once: two points (\"%s\")" % hud._lvl["line"])
+	_check(str(hud._lvl["line"]).contains("+2 skill points"), "two levels at once: two points (\"%s\")" % hud._lvl["line"])
+	# What the levels gave, in numbers: Combat's 1.09 and 1.10 a level.
+	_check(str(hud._lvl["line"]).begins_with("+19% damage · +21% life · +2 skill points"), "and their damage and life, together (\"%s\")" % hud._lvl["line"])
+	hud._lvl = {}
+	hud._xp_level = 5
+	hud.level_up(6)
+	_check(str(hud._lvl["line"]) == "+9% damage · +10% life · +1 skill point", "one level: \"+9%% damage · +10%% life · +1 skill point\" (\"%s\")" % hud._lvl["line"])
+	# Under it, what opened (gold) or the next unlock and its level (the
+	# game's deep tree: a layout test above may have left v2's).
+	var was_deep: bool = Classes.deep
+	Classes.set_deep(true)
+	hud._lvl = {}
+	hud._xp_level = 5
+	hud.level_up(6)
+	var nx: Dictionary = hud._lvl["next"]
+	_check(bool(nx.get("now", false)) and str(nx.get("text", "")) == "Now open: Aegis rank 3", "L6 opens the Special's rank 3 (\"%s\")" % nx.get("text", ""))
+	for c in [[7, 8, true, "Now open: the capstones (Tier 3)"], [15, 16, true, "Now open: the Deep nodes (Tier 4)"],
+			[23, 24, true, "Now open: the Mastery nodes (Tier 5)"], [6, 7, false, "Next at level 8: the capstones (Tier 3)"],
+			[7, 9, true, "Now open: the capstones (Tier 3)"], [3, 4, false, "Next at level 5: a relic belt slot (3)"]]:
+		hud._lvl = {}
+		hud._xp_level = c[0]
+		hud.level_up(c[1])
+		nx = hud._lvl["next"]
+		_check(bool(nx.get("now", false)) == c[2] and str(nx.get("text", "")) == c[3], "L%d -> L%d: \"%s\" (\"%s\")" % [c[0], c[1], c[3], nx.get("text", "")])
+	_check(StatsPanel.next_unlock("knight", 4) == "Level 5: a relic belt slot (3)." and StatsPanel.next_unlock("knight", 7) == "Level 8: the capstones (Tier 3).",
+			"stats_panel.next_unlock is the Stats tab's Next line, for any calling and level")
+	Classes.set_deep(was_deep)
+	# The longest first line (two levels, a belt slot) fits its width at
+	# the smallest size the card draws it, and the card stays in its band.
+	hud._lvl = {}
+	hud._xp_level = 3
+	hud.level_up(5)
+	var longest := str(hud._lvl["line"])
+	_check(longest.contains("a new belt slot") and UI.text_width(longest, UI.fit_size(longest, HudScript.LEVEL_LINE_W, 13, 10, "body", 700), "body", 700) <= HudScript.LEVEL_LINE_W,
+			"\"%s\" fits the card's %d px" % [longest, HudScript.LEVEL_LINE_W])
 	w.queue_free()
 	await _frames(2)
+
+
+func _test_points_pip() -> void:
+	## A skill point waiting: a gold "+" on the level badge's shoulder, inside
+	## the safe area and the left block's wash, gone once it's spent.
+	_where = "points pip"
+	_fresh_hero(3)
+	var w := _stub_world()
+	root.add_child(w)
+	var hud = HudScript.new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	await _frames(2)
+	_check(hud.points_waiting() == int(game.hero()["points"]) and hud.points_waiting() > 0, "points waiting show on the badge (%d)" % hud.points_waiting())
+	var pr: Rect2 = hud.points_pip_rect()
+	_inside(pr, "the badge's +")
+	_check((hud.backing_rects()["left"] as Rect2).encloses(pr), "on the left block's wash")
+	for key in ["life", "res", "embers"]:
+		_apart(pr, hud.layout()[key], "the badge's + and %s" % key)
+	var h: Dictionary = game.hero()
+	h["points"] = 0
+	await _frames(2)
+	_check(hud.points_waiting() == 0, "none left: no +")
+	w.queue_free()
+	await _frames(2)
+
+
+func _test_altar_rites() -> void:
+	## The Altar Rites (rites.gd): an altar lit with a skill point waiting
+	## pauses the level and offers up to three skills on the choice card.
+	## Never headless, under the --autoplay bot, on a golden route (its
+	## recording or replay) or a scripted pad: rites_block says why, and a
+	## lit altar leaves nothing waiting. The card itself (open_rites) on a
+	## real World: a pick learns the skill (the toast names it), Later keeps
+	## the point, and the touch controls hold nothing and take no touch
+	## while it's up.
+	_where = "altar rites"
+	_fresh_hero(5)
+	var pts0 := int(game.hero()["points"])
+	var lv = LevelData.load_file("res://levels/1-1.txt")
+	for k in ["start", "boss"]:
+		if str(lv.story.get(k, "")) != "":
+			game.mark_seen(str(lv.story[k]))
+	# A headless World (every test's, the golden routes'): lit, nothing waits.
+	var w = WorldScript.new()
+	w.setup(lv, true)
+	root.add_child(w)
+	await _frames(1)
+	w.paused = true
+	var hud = HudScript.new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	await _frames(1)
+	_check(pts0 > 0, "the hero has %d points waiting" % pts0)
+	_check(w.rites_block() == "headless", "headless: no Rites (%s)" % w.rites_block())
+	w._light_altar(w.altars[0])
+	for i in 30:
+		w.tick(DT)
+	_check(w._rites_altar < 0 and w.choice == null and int(game.hero()["points"]) >= pts0, "an altar lit headless leaves nothing waiting, and no card")
+	w.autoplay = true
+	_check(w.rites_block() == "autoplay", "nor under the bot (%s)" % w.rites_block())
+	w.queue_free()
+	await _frames(2)
+	# A World with its HUD and buttons (not headless), as a player's is.
+	w = WorldScript.new()
+	w.setup(lv, false)
+	root.add_child(w)
+	await _frames(1)
+	w.paused = true
+	var whys := {}
+	w.autoplay = true
+	whys["autoplay"] = w.rites_block()
+	w.autoplay = false
+	w.no_monsters = true
+	whys["route"] = w.rites_block()
+	w.no_monsters = false
+	w.on_pad = func(_p): pass
+	whys["recording"] = w.rites_block()
+	w.on_pad = Callable()
+	w.test_pad = {}
+	whys["scripted"] = w.rites_block()
+	w.test_pad = null
+	whys["headless"] = w.rites_block()
+	_check(whys == {"autoplay": "autoplay", "route": "route", "recording": "route", "scripted": "scripted", "headless": "headless"},
+			"never under the bot, on a golden route or its recording, a scripted pad, or with no display (%s)" % [whys])
+	w._light_altar(w.altars[0])
+	_check(w._rites_altar < 0, "so a lit altar leaves nothing waiting here either")
+	# The card, asked for: up to three skills, on top of the paused level.
+	var cards: Array = load("res://scripts/rites.gd").offers(game.hero())
+	_check(w.open_rites() and w.paused and w.choice != null and w.choice.is_open(), "open_rites pauses the level under the card")
+	_check(w.choice.offers.size() == mini(cards.size(), 3) and w.choice.offers.size() > 0 and not w.choice.pair, "with up to three skills (%d)" % w.choice.offers.size())
+	_check(not w.touch.is_processing_input() and not w.touch.is_down("right"), "the touch controls let go and wait")
+	var id := str(w.choice.offers[0]["id"])
+	var r0 := int(game.hero()["skills"].get(id, 0))
+	var name := str(w.choice.offers[0]["name"])
+	w.choice.choose(0)
+	var seen_toast := _toasted(w, name)
+	_check(int(game.hero()["skills"].get(id, 0)) == r0 + 1 and int(game.hero()["points"]) == pts0 - 1, "a pick learns it (%s %d -> %d)" % [id, r0, int(game.hero()["skills"].get(id, 0))])
+	_check(not w.paused and not w.choice.is_open() and w.touch.is_processing_input(), "and play is back, the buttons live")
+	_check(seen_toast, "a toast names the skill (%s)" % name)
+	w.paused = true
+	_check(w.open_rites(), "the next time, the card again")
+	w.choice.choose(-1)
+	_check(int(game.hero()["points"]) == pts0 - 1 and not w.paused and not w.choice.is_open(), "Later keeps the point and lets play go on")
+	w.paused = true
+	# A monster awake near holds them back (they open once the area clears).
+	var e: Node2D = w.spawn_enemy("skeleton", w.player.position + Vector2(80, 0))
+	e.active = true
+	_check(w.foes_near(), "a monster awake 80 px off is near")
+	e.position = w.player.position + Vector2(400, 0)
+	_check(not w.foes_near(), "400 px off it isn't")
+	game.hero()["points"] = 0
+	_check(not w.open_rites() and not w.choice.is_open(), "no point waiting: no card")
+	w.queue_free()
+	await _frames(2)
+
+
+func _test_tier_barks() -> void:
+	## A level-up that opens a tier barks its own line (story.gd level_up_8,
+	## _16, _24), several levels at once too; any other, level_up's.
+	_where = "tier barks"
+	var lv = LevelData.load_file("res://levels/1-1.txt")
+	for c in [[5, 8, "level_up_8"], [7, 9, "level_up_8"], [15, 16, "level_up_16"], [23, 24, "level_up_24"], [8, 9, "level_up"], [9, 15, "level_up"]]:
+		_fresh_hero(c[0])
+		var w = WorldScript.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await _frames(1)
+		w.paused = true
+		var hud = HudScript.new()
+		hud.world = w
+		w.hud = hud
+		w.add_child(hud)
+		await _frames(1)
+		w.gain_xp(Progression.total_to(int(c[1])) - int(game.hero()["xp"]), w.player.position)
+		var heard: Array = hud._bark_last.keys().filter(func(k): return str(k).begins_with("level_up"))
+		_check(int(game.hero()["level"]) == int(c[1]) and heard == [c[2]], "L%d -> L%d barks %s (%s)" % [c[0], c[1], c[2], heard])
+		w.queue_free()
+		await _frames(2)
+
+
+func _toasted(w: Node, title: String) -> bool:
+	## The World's HUD holds a toast with this title (showing or waiting).
+	var h = w.get("hud")
+	if h == null:
+		return false
+	for m in h._msgs + [h._msg]:
+		if str(m.get("kind", "")) == "toast" and str(m.get("title", "")) == title:
+			return true
+	return false
+
+
+func _test_choice_layout() -> void:
+	## The choice card at every size: three cards (632 px) and the button
+	## under them inside the safe area and clear of each other; the pair two
+	## up, as the Descent's Glimmers always were.
+	var cc = load("res://scripts/choice_card.gd").new()
+	root.add_child(cc)
+	await _frames(1)
+	var cards := []
+	for i in 3:
+		cards.append({"name": "Mirrored Glass", "text": "Perfect Guard throws shots back for 100% basic.", "glyph": "shield", "sub": "Tier 2 · rank 1 of 3", "new": i == 0})
+	cc.open(cards, {"heading": "Choose a skill", "later": "Later"})
+	await _frames(2)
+	var rs: Array = cc.rects()
+	_check(rs.size() == 3 and (rs[0] as Rect2).size == Vector2(200, 150), "three cards of 200 x 150 (%s)" % [rs])
+	var b: Rect2 = cc.button_rect()
+	for i in rs.size():
+		_inside(rs[i], "choice card %d" % i)
+		_apart(rs[i], b, "choice card %d and Later" % i)
+		for j in range(i + 1, rs.size()):
+			_apart(rs[i], rs[j], "choice cards %d and %d" % [i, j])
+	_inside(b, "Later")
+	_check(b.size.y >= UI.TAP_H - 0.5, "Later is a thumb tall (%.0f)" % b.size.y)
+	cc.open(cards.slice(0, 1), {"pair": true, "later": "Walk on"})
+	rs = cc.rects()
+	var s: Rect2 = UI.safe_override
+	_check(rs.size() == 2 and (rs[0] as Rect2).size == Vector2(220, 140) and is_equal_approx((rs[1] as Rect2).position.x - (rs[0] as Rect2).end.x, 24.0)
+			and is_equal_approx((rs[0] as Rect2).end.x + 12.0, s.get_center().x), "the pair keeps its two 220 x 140 slots, 24 apart, centred (%s)" % [rs])
+	cc.queue_free()
+	await _frames(1)
 
 
 func _test_touch_specials() -> void:

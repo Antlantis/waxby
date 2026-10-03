@@ -3,7 +3,9 @@ extends CanvasLayer
 ## HUD has no mode_pill of its own, SC's, it is drawn here in the sigils'
 ## corner, widened to 150 x 26), and the cards, over the HUD and the touch
 ## buttons:
-##   glimmer_card(offers)   the landing's two Glimmers (the World is paused)
+##   glimmer_card(offers)   the landing's two Glimmers (the World is paused),
+##                          on the game's one choice card (choice_card.gd,
+##                          its two-up "pair" layout)
 ##   finish_card(finish)    a trial's time, medal, best and next target
 ##   rematch_card(outcome)  a Waxworks win: time, drips, seal, rewards
 ##   deep_keeps(then)       "The Deep keeps you", 2 s, then(): the run ended
@@ -15,6 +17,7 @@ const TriBatch := preload("res://scripts/tri_batch.gd")
 const Data := preload("res://scripts/modes/descent_data.gd")
 const TrialData := preload("res://scripts/modes/trial_data.gd")
 const Cosmetics := preload("res://scripts/modes/cosmetics.gd")
+const ChoiceCard := preload("res://scripts/choice_card.gd")
 
 var mode: Object = null
 var world: Node = null
@@ -31,6 +34,7 @@ var _t := 0.0
 var _card_t := 0.0
 var _then: Callable
 var _tb := TriBatch.new()
+var choice: Control = null        # choice_card.gd: the Glimmers' cards (made the first time)
 
 
 func _ready() -> void:
@@ -94,6 +98,8 @@ func pill_rect() -> Rect2:
 func close_card() -> void:
 	card = ""
 	_data = {}
+	if choice != null:
+		choice.close()
 	for b in _buttons:
 		if is_instance_valid(b):
 			b.queue_free()
@@ -134,12 +140,28 @@ func _flat_button(r: Rect2, cb: Callable) -> Button:
 
 
 func glimmer_card(offers: Array) -> void:
+	## The landing's Glimmers (ids) on the choice card, two up: each its
+	## glyph, name, what it gives and "n of max"; "Walk on" for embers.
 	_open("glimmer", {"offers": offers})
-	for i in offers.size():
-		var k := i
-		_flat_button(glimmer_rects()[i], func(): _pick(k))
+	var cards: Array = []
+	for gid in offers:
+		cards.append(glimmer_offer(str(gid)))
 	var e := Data.WALK_ON * int(_embers_mult())
-	_button("Walk on · +%d embers" % e, false, func(): _pick(-1), 15, Vector2(200, 40))
+	if choice == null:
+		choice = ChoiceCard.new()
+		choice.world = world
+		_view.add_child(choice)
+	choice.open(cards, {"heading": "A Glimmer for the run", "later": "Walk on · +%d embers" % e, "pick": func(i): _pick(i), "pair": true})
+
+
+func glimmer_offer(gid: String) -> Dictionary:
+	## A Glimmer as a choice card: {id, name, text, glyph, sub "n of max"}.
+	var gd: Dictionary = Data.GLIMMERS.get(gid, {})
+	var have := 0
+	if mode != null and mode.has_method("glimmer"):
+		have = int(mode.glimmer(gid))
+	return {"id": gid, "name": str(gd.get("name", gid)), "text": str(gd.get("text", "")), "glyph": str(gd.get("glyph", "star")),
+			"sub": "%d of %d" % [have + 1, int(gd.get("max", 1))]}
 
 
 func _embers_mult() -> int:
@@ -156,11 +178,9 @@ func _pick(i: int) -> void:
 
 func glimmer_rects() -> Array:
 	## Two 220 x 140 cards, 24 px apart, centred across, under the HUD's top
-	## band (where a title card or the level-up card shows) and its heading.
-	var s := _safe()
-	var top := glimmer_heading_y() + 12.0
-	var c := s.get_center()
-	return [Rect2(c.x - 12.0 - 220.0, top, 220.0, 140.0), Rect2(c.x + 12.0, top, 220.0, 140.0)]
+	## band (where a title card or the level-up card shows) and its heading:
+	## the choice card's pair.
+	return ChoiceCard.layout(_safe(), glimmer_heading_y() + 12.0, 2, true)
 
 
 func glimmer_heading_y() -> float:
@@ -250,8 +270,6 @@ func _layout_buttons() -> void:
 	total += 12.0 * (row.size() - 1)
 	var x := r.get_center().x - total * 0.5
 	var y := r.end.y - 58.0
-	if card == "glimmer":
-		y = glimmer_rects()[0].end.y + 6.0
 	for b in row:
 		(b as Button).position = Vector2(x, y + (50.0 - (b as Button).size.y) * 0.5)
 		x += (b as Button).size.x + 12.0
@@ -264,8 +282,7 @@ func _draw_view() -> void:
 	if not pill.is_empty() and not (h != null and h.has_method("mode_pill")):
 		_draw_pill()   # under a card's shade too, so the sigil tray never shows
 	match card:
-		"glimmer":
-			_draw_glimmers()
+		# ("glimmer": the choice card over this draws itself.)
 		"finish":
 			_draw_finish()
 		"rematch":
@@ -311,28 +328,6 @@ func _draw_pill() -> void:
 
 func _shade(a := 0.72) -> void:
 	_view.draw_rect(Rect2(Vector2.ZERO, _view.size), Color(0.03, 0.02, 0.05, a))
-
-
-func _draw_glimmers() -> void:
-	_shade(0.7)
-	var s := _safe()
-	UI.text(_view, Vector2(s.position.x, glimmer_heading_y()), "A Glimmer for the run", 22, UI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, s.size.x, "title", 700, 4)
-	var offers: Array = _data.get("offers", [])
-	var rs := glimmer_rects()
-	for i in mini(offers.size(), 2):
-		var gid: String = offers[i]
-		var gd: Dictionary = Data.GLIMMERS.get(gid, {})
-		var r: Rect2 = rs[i]
-		var pop := clampf(_card_t / 0.2, 0.0, 1.0)
-		var rr := r.grow(-6.0 * (1.0 - pop))
-		UI.panel(_view, rr, UI.GOLD, Color("241a33"), 14.0)
-		var have := 0
-		if mode != null and mode.has_method("glimmer"):
-			have = int(mode.glimmer(gid))
-		UI.glyph(_view, str(gd.get("glyph", "star")), rr.position + Vector2(rr.size.x * 0.5, 36.0), 32.0, UI.EMBER)
-		UI.text(_view, rr.position + Vector2(0, 78.0), str(gd.get("name", gid)), 19, UI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, rr.size.x, "title", 700)
-		UI.text(_view, rr.position + Vector2(0, 101.0), str(gd.get("text", "")), 14, UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, rr.size.x)
-		UI.text(_view, rr.position + Vector2(0, 124.0), "%d of %d" % [have + 1, int(gd.get("max", 1))], 12, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, rr.size.x)
 
 
 func _draw_finish() -> void:

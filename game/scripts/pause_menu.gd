@@ -227,9 +227,13 @@ func near_lit_altar() -> bool:
 
 
 func open_sheet() -> void:
-	## The Sheet over the paused level; changes go straight onto Waxby.
+	## The Sheet over the paused level; changes go straight onto Waxby. It
+	## opens on Skills while a skill point waits.
 	show_page("sheet")
 	_sheet = SheetScript.new()
+	var g := _game()
+	if g != null and int(g.hero().get("points", 0)) > 0:
+		_sheet.tab = "skills"
 	_sheet.over_level = true
 	_sheet.belt_editable = near_lit_altar()
 	_sheet.back.connect(func(): show_page("main"))

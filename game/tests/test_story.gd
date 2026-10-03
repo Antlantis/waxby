@@ -598,8 +598,18 @@ func _test_barks() -> void:
 				"take_bark('%s') shows twice (the HUD gates with take_bark, not bark_once)" % k)
 	for k in ["first_altar", "first_relic", "first_sigil", "first_item", "first_elite", "first_dread", "first_snuff",
 			"first_pool", "first_douse", "low_flame", "skill_point", "tollgrave_angry", "snuffer_angry", "snuffer_dark",
-			"nightfall", "level_up", "first_hurt"]:
+			"nightfall", "level_up", "first_hurt", "level_up_8", "level_up_16", "level_up_24"]:
 		_check(Story.BARKS.has(k), "the '%s' bark world.gd and the HUD fire exists" % k)
+	# A level-up that opens a tier has its own line for each calling, in the
+	# bark's own format, heard every time it comes (once a hero, at 8, 16, 24).
+	for t in [8, 16, 24]:
+		var key := "level_up_%d" % t
+		_check(Story.bark_every(key) and Story.BARKS[key][0] == Story.BARKS["level_up"][0] and Story.BARKS[key][1] == "@" + key,
+				"%s is the hero's, every time, from @%s" % [key, key])
+		for cls in Classes.ids():
+			var tl := Story.bark_line(key, cls)
+			_check(str(tl.get("text", "")) != "" and str(tl["text"]) != str(Story.bark_line("level_up", cls)["text"]) and str(tl["text"]).length() <= Story.MAX_LINE,
+					"%s for %s says something of its own, in %d (%s)" % [key, cls, Story.MAX_LINE, tl.get("text", "")])
 	for lv in ["1-1", "1-2", "1-3", "1-4", "2-1", "2-2", "2-3", "2-4"]:
 		_check(not Story.after_line(lv, "runner").is_empty(), "the after-line for %s" % lv)
 	_check(Story.after_line("9-9", "runner").is_empty(), "no after-line for a level that isn't one")

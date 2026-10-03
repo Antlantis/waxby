@@ -948,6 +948,24 @@ const CLASS_LINES := {
 		"witch": "Hotter. Good.",
 		"runner": "Quicker hands. Useful.",
 		"sexton": "The wisps are brighter. Look at them."},
+	"level_up_8": {    # the capstones open
+		"knight": "A capstone, at last! I'll choose mine at the next altar.",
+		"founder": "Capstones! Something big to cast. Next altar, I pick.",
+		"witch": "Capstones open. Next altar, I'm taking the loud one.",
+		"runner": "Capstones. Next altar, I take the best one. Quietly.",
+		"sexton": "A capstone stirs in the flame. The next altar will hear me choose."},
+	"level_up_16": {   # the Deep nodes open
+		"knight": "The Deep lessons of the Vigil. Teach me, next altar.",
+		"founder": "Deeper skills. Time to cast heavier. Next altar, then.",
+		"witch": "Deep magic, finally. The next altar's going to be fun.",
+		"runner": "Deeper tricks. I knew they were hiding more.",
+		"sexton": "The deep roots open. I'll learn what the old dead knew."},
+	"level_up_24": {   # Mastery opens
+		"knight": "Mastery! Every lesson of the Vigil, in my hands.",
+		"founder": "Mastery. Now I'm a real bellfounder.",
+		"witch": "Mastery! Nothing's too hot for me now.",
+		"runner": "Mastery. Best thief in the deep. Officially.",
+		"sexton": "Mastery. The wisps sing louder for me now."},
 	# ---- v3 (the story draft §3.7). In W3, W4 and W5 one calling each is
 	# written to shine: the Sexton among the graves, the Bellfounder at the
 	# reforging, the Taperwitch against the cold saint.
@@ -1100,6 +1118,11 @@ const BARKS := {
 	"snuffer_dark":    ["taper:worried", "He's put out every light! Only yours is left. Stay whole!", "every"],
 	"nightfall":   ["taper:stern", "The Hush sleeps, sprout, but it dreams. Darker dreams. Walk them with me?"],   # main: the first level past Dusk
 	"level_up":    ["wick:happy", "@level_up", "every"],                                         # L5, 10, 15...
+	# A level-up that opens a tier says so instead (world._level_up: the
+	# capstones at 8, the Deep nodes at 16, Mastery at 24; each a hero's once).
+	"level_up_8":  ["wick:happy", "@level_up_8", "every"],
+	"level_up_16": ["wick:happy", "@level_up_16", "every"],
+	"level_up_24": ["wick:happy", "@level_up_24", "every"],
 	# The rest of the level beats, played after (or instead of) their overlay.
 	"beat_1_1_a":  ["taper:warm", "Hear me, sprout? Those skeletons were our choir. Stomp them. Gently."],
 	"beat_1_1_b":  ["wick", "@beat_1_1"],
