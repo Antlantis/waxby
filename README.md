@@ -163,11 +163,20 @@ tools/
 
 ## Controls
 
-On the phone: left and right under the left thumb (slide between them, slide
-down to drop through a ledge); attack, jump, Special and the flask under the
-right thumb; pause top right. The camera holds Waxby's feet just over the
-highest thumb buttons (the Special and the flask, at any button size), so
-nothing on his floor is behind them; it leans up (at most back to the line it
+On the phone: left and right under the left thumb (slide between them), the
+flask above them; attack, jump and the Special under the right thumb; pause top
+right. The left thumb also slides down and up, counted from where it landed
+(26 px, less when it lands low on the glass): faint chevrons mark both while
+the thumb is down, light while held, and the phone ticks as one switches on; a
+steep slide (within 25 degrees of straight down or up) lets go of left and
+right. Down held 0.15 s on a ledge drops through it (or slide down and press
+jump, at once; down on solid floor does nothing, and a down held on from a
+vine or the air waits to be let go); up climbs a vine without the leap a fresh
+jump with an arrow held makes (slant it toward a floor at the top to haul
+onto it). A one-time card teaches each, on the first ledge and the first vine.
+The camera holds Waxby's feet just over the highest thumb buttons (the Special
+and the flask, at any button size), so nothing on his floor is behind them; it
+leans up (at most back to the line it
 held before) to show a drip spout, a Dripkin, a Bonebow, a Flit's roost with
 its wind-up, or a Gutterwing nest hanging just over the top of the view. A
 Bonebow looses, a Flit winds up and a nest breeds only in plain sight (not off
@@ -175,8 +184,16 @@ the glass, behind a button or the HUD's corners). Where Waxby is under the
 HUD's corner blocks (a level's first and last tiles, where the camera stops at
 the edge), a jump takes the camera up with him sooner, so his flame never goes
 behind them; the boss bar, a title or level-up card or a message he jumps up
-behind goes see-through. `tools/shot_floor.gd` measures and shoots all of it. On a Mac: arrows or A/D to move, Space/Z/W to
-jump, X/J to attack, C/L/E for the Special, Q/Tab for the flask, Esc to pause.
+behind goes see-through. `tools/shot_floor.gd` measures and shoots all of it.
+
+On a Mac: arrows or A/D to move (Down or S held on a ledge drops through it;
+the Up arrow climbs a vine), Space/Z/W to jump, X/J to attack, C/L/E for the
+Special, Q/Tab for the flask, R/Enter to take a pickup, Esc to pause. A game
+controller (MFi, Xbox, PlayStation) plays the levels: the d-pad or the left
+stick to move (the same four ways), A to jump, X to attack, Y for the Special,
+the left shoulder for the flask, the right one to take a pickup, Menu to pause.
+On the map it picks a level (left and right) and plays it (A); the pause
+menu's buttons and the other screens are still taps.
 
 ## Saves
 
