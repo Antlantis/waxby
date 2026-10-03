@@ -56,6 +56,12 @@ OVERLAY_GLYPHS = set('.()[];')
 MIRROR = {'<': '>', '>': '<', 'O': 'Q', 'Q': 'O'}
 MIRROR_OVERLAY = {'(': ')', ')': '(', '[': ']', ']': '['}
 
+# The sign budget (check_sign_budget): 1-1 at most 4 signs, every other
+# level at most 3, so the count can't creep back. Off until the sign-cut
+# commit turns it on: most of today's levels have 5-11 (the cuts and the
+# rewritten lines wait for the author's review), and on, write() fails them.
+SIGN_BUDGET = False
+
 # Where written headers go when an entry doesn't give its own order.
 HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'boss', 'boss_music', 'dread', 'warden',
                 'secret', 'secret_prize', 'tick', 'story_start', 'story_boss', 'story_end', 'par', 'rush',
@@ -231,8 +237,18 @@ def check_legend(name, rows):
             assert ch in LEGEND, '%s: unknown glyph %r at %d,%d' % (name, ch, x, y)
 
 
+def check_sign_budget(name, rows):
+    """A level's signs ('@') stay within the budget: 1-1 at most 4, every
+    other level at most 3 (the feel labs, debug only, are free)."""
+    n = sum(r.count('@') for r in rows)
+    assert name.startswith('lab-') or n <= (4 if name == '1-1' else 3), \
+        '%s has %d signs: the budget is %d' % (name, n, 4 if name == '1-1' else 3)
+
+
 def write(name, header, rows, out_dir=None):
     check_legend(name, rows)
+    if SIGN_BUDGET:
+        check_sign_budget(name, rows)
     header = list(header)
     keys = [k for k, _v in header]
     over = getattr(rows, 'overlay', None)
