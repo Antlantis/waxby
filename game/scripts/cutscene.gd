@@ -31,6 +31,12 @@ extends CanvasLayer
 ## a portrait's "face" alias (E8), the cast roll after the credits, and
 ## replays from the Tales screen (replay: no chooser, no side effects). While
 ## Mother Taper rests, a scene in Story.REST_SUBS plays Hollin's instead.
+##
+## The oath's choose_name: Mother Taper's question stays up while the name
+## entry (name_entry.gd) asks the hero's name under the cue's own prompt (on
+## a phone the keyboard covers the box, never the entry), and the save keeps
+## what's given; the hero's name plate is blank until then. Where nobody
+## types (headless, stepped by hand, --autoplay) it answers Waxby at once.
 
 signal done
 signal need_class
@@ -49,6 +55,7 @@ const LIGHT_FIELD := "res://scripts/light_field.gd"     # Plan B's shared field
 const SELF_PATH := "res://scripts/cutscene.gd"
 const PANELS_PATH := "res://art/story/panels.json"
 const KEEPER_PATH := "res://scripts/keeper_screen.gd"
+const NameEntry := preload("res://scripts/name_entry.gd")
 const Keeper := preload("res://scripts/keeper_screen.gd")   # its ease words
 
 const CPS := 45.0              # typewriter characters per second
@@ -139,7 +146,7 @@ var manual := false            # tests: they call advance() themselves
 var auto := false              # lines move on by themselves (the setting; tests)
 var follow_next := true        # play a scene's "next" straight after it
 var finished := false
-var waiting := ""              # line, time, class, credits, fade_out, fade_in, drain, close, ""
+var waiting := ""              # line, time, class, name, hold, credits, fade_out, fade_in, drain, close, ""
 var blips := 0                 # voice blips played (the tests count them)
 var world: Node = null         # the level under an overlay
 var then_cb := Callable()
@@ -159,6 +166,10 @@ var replay := false
 # false says so outright: tests that exercise the hold set it false.
 var hold_instant = null
 var hold_down := false         # tests: a finger on the screen
+# The name entry answers Waxby at once when this is null and nobody types
+# (name_is_instant); true or false says so outright (tests of the entry set
+# it false).
+var name_instant = null
 var asked_id := ""             # the scene asked for, when REST_SUBS played another
 # main's --autoplay=scene:<id> sets it: the lines (and a hold) go by themselves.
 var auto_advance := false:
@@ -172,6 +183,7 @@ var _shot := {}
 var _shot_i := -1
 var _beat_i := 0
 var _class_done := true
+var _name_done := true         # the hero has his name (or this scene never asks it)
 var _clock := 0.0
 var _wait_until := 0.0
 var _last_tap := -1.0
@@ -240,6 +252,7 @@ var _box_shake := 0.0
 # The calling chooser.
 var _keeper = null             # keeper_screen.gd, when it exists
 var _chooser := {}             # the built-in one: {sel, prompt, deny, t}
+var _namer: Control = null     # the name entry while it asks
 var _pill_armed := 0.0
 
 var _stage: Node2D
@@ -725,6 +738,7 @@ func _begin_scene(id: String) -> void:
 	var g := _g()
 	seen_before = g != null and g.seen(id)
 	_class_done = replay or not _has_choose()
+	_name_done = replay or not _has_cue("choose_name")
 	_lb_goal = 1.0
 	if overlay:
 		_dim_goal = 1.0
@@ -1283,7 +1297,8 @@ func _run() -> void:
 		if b is Dictionary and b.has("if") and not Story.flag(str(b["if"])):
 			continue
 		if b is Dictionary and _cue(b):
-			_hide_line()
+			if waiting != "name":   # (the question stays up while the name is asked)
+				_hide_line()
 			return
 	_hide_line()
 	_next_shot()
@@ -1294,6 +1309,8 @@ func _start_line(b: Array, nudge := false) -> void:
 	## letters. A nudge (the hold's) shows while the scene still waits on it.
 	var r := Story.resolve(b, cls)
 	var sp := Story.speaker(r["who"], cls)
+	if r["who"] == "wick" and not _name_done:
+		sp["name"] = ""   # (the oath: no name yet, till Taper asks it)
 	var style: String = sp["style"]
 	var text: String = r["text"]
 	if style == "hush":
@@ -1555,6 +1572,10 @@ func _cue(b: Dictionary) -> bool:
 				return false
 			_open_chooser(str(b.get("prompt", "Choose your calling")))
 			return true
+		"choose_name":
+			if replay:
+				return false
+			return _open_namer(str(b.get("prompt", NameEntry.PROMPT)))
 		"credits":
 			_credits = {"t": 0.0, "cast_t": 0.0, "fast": false, "embers": []}
 			# The cast roll's faces: their 128 px copies (drawn at r 26), asked
@@ -1989,6 +2010,74 @@ func _chooser_key(dir: int) -> void:
 	_hover(ids[cur])
 
 
+# ---------------------------------------------------------------- the name entry
+
+func name_is_instant() -> bool:
+	## Nobody is there to type (as the chooser and the hold are answered
+	## there): headless, stepped by hand (the tests and the shot tools), its
+	## lines going by themselves for --autoplay=scene:<id> or the bot's
+	## level, or any --autoplay launch. name_instant says so outright.
+	if name_instant != null:
+		return bool(name_instant)
+	if manual or auto_advance or DisplayServer.get_name() == "headless":
+		return true
+	var g := _g()
+	return g != null and g.has_method("autoplay_launch") and bool(g.autoplay_launch())
+
+
+func _open_namer(prompt: String) -> bool:
+	## choose_name: the entry over the shot, headed by the cue's prompt (a
+	## phone's keyboard covers the box, where Mother Taper's question stays
+	## up), holding Waxby to start from; true while it waits. Where nobody
+	## types, Waxby at once (and false: the scene goes straight on).
+	var g := _g()
+	if name_is_instant():
+		if g != null and g.has_method("set_hero_name"):
+			g.set_hero_name(Story.HERO_NAME)
+		_name_done = true
+		return false
+	waiting = "name"
+	_namer = NameEntry.new()
+	_namer.name = "NameEntry"
+	_namer.prompt = prompt
+	_namer.start = Story.HERO_NAME
+	_namer.accent = Color(Classes.ALL[cls]["color"]) if Classes.ALL.has(cls) else UI.GOLD
+	_namer.dim = 0.25
+	_namer.named.connect(func(n): name_hero(n))
+	_ui.add_child(_namer)
+	return true
+
+
+func name_hero(text: String) -> bool:
+	## The name is given (the entry's Confirm, or a test): the save keeps it
+	## (Story.clean_name's: nothing fit to keep is Waxby), and the scene goes on.
+	if waiting != "name":
+		return false
+	var g := _g()
+	if g != null and g.has_method("set_hero_name"):
+		g.set_hero_name(text)
+	_close_namer()
+	waiting = ""
+	_run()
+	return true
+
+
+func naming() -> bool:
+	## The name entry is up, waiting.
+	return waiting == "name" and _namer != null
+
+
+func name_entry() -> Control:
+	return _namer
+
+
+func _close_namer() -> void:
+	_name_done = true
+	if _namer != null:
+		_namer.queue_free()
+		_namer = null
+
+
 # ---------------------------------------------------------------- the end of a scene
 
 func _end_scene() -> void:
@@ -2072,25 +2161,21 @@ func _finish() -> void:
 
 
 func skip() -> void:
-	## Skip the rest of this scene. A calling still has to be chosen, so an
-	## oath skips to its chooser first.
+	## Skip the rest of this scene. A calling still has to be chosen and a
+	## name given, so an oath skips to its chooser first, then to its name
+	## entry (where someone types: else the name stays Waxby).
 	if finished:
 		return
 	if not _class_done:
 		if waiting == "class":
 			return
-		for si in range(maxi(_shot_i, 0), _shots.size()):
-			var beats: Array = _shots[si].get("beats", [])
-			for bi in beats.size():
-				if beats[bi] is Dictionary and beats[bi].get("do", "") == "choose_class":
-					_shot_i = si
-					_setup_shot(_shots[si])
-					_beat_i = bi
-					_fade = 0.0
-					_fade_goal = 0.0
-					_line = {}
-					_run()
-					return
+		if _jump_to("choose_class"):
+			return
+	if not _name_done and not name_is_instant():
+		if waiting == "name":
+			return
+		if _jump_to("choose_name"):
+			return
 	_card = {}
 	_boss = {}
 	_credits = {}
@@ -2103,6 +2188,47 @@ func skip() -> void:
 		_actor_def["walk"] = {}
 	_sfx("back")
 	_close()
+
+
+func _jump_to(cue: String) -> bool:
+	## Skip on to this scene's next `cue` (a choice still to make): its shot
+	## set up afresh, with the lights and the hero's mood as the cues before
+	## it in the shot would have left them (the oath's name: his flame lit);
+	## the lines and waits before it dropped. False when there's none ahead.
+	for si in range(maxi(_shot_i, 0), _shots.size()):
+		var beats: Array = _shots[si].get("beats", [])
+		for bi in beats.size():
+			if beats[bi] is Dictionary and beats[bi].get("do", "") == cue:
+				_shot_i = si
+				_setup_shot(_shots[si])
+				for k in bi:
+					_settle(beats[k])
+				_beat_i = bi
+				_fade = 0.0
+				_fade_goal = 0.0
+				_line = {}
+				_run()
+				return true
+	return false
+
+
+func _settle(b) -> void:
+	## A cue _jump_to skips over, as it would have left things (no sound, no
+	## burst, no wait).
+	if not (b is Dictionary) or (b.has("if") and not Story.flag(str(b["if"]))):
+		return
+	match str(b.get("do", "")):
+		"ignite":
+			_set_light(str(b["light"]), 1.0)
+		"snuff":
+			_set_light(str(b["light"]), 0.0)
+		"light":
+			_set_light(str(b["light"]), float(b["r"]))
+		"mood":
+			if _rig != null:
+				_rig.mood = str(b["mood"])
+		"pose":
+			_pose(str(b["fig"]), str(b["frame"]))
 
 
 # ---------------------------------------------------------------- the clock
@@ -2543,6 +2669,8 @@ func _on_ui_input(e: InputEvent) -> void:
 	if waiting == "hold" and not finished and _hold_input(e):
 		_ui.accept_event()
 		return
+	if waiting == "name":
+		return   # (the name entry takes its own taps)
 	var pos = null
 	if e is InputEventScreenTouch and e.pressed:
 		pos = e.position
@@ -2600,6 +2728,8 @@ func _input(e: InputEvent) -> void:
 			return
 	if finished or not (e is InputEventKey) or not e.pressed or e.echo:
 		return
+	if waiting == "name":
+		return   # every key is the name entry's (Z, X and Space are letters there)
 	if waiting == "class" and _keeper != null:
 		return
 	var handled := true
@@ -2624,7 +2754,7 @@ func _input(e: InputEvent) -> void:
 
 
 func _pill_visible() -> bool:
-	return waiting != "class" and waiting != "close" and not finished
+	return waiting != "class" and waiting != "name" and waiting != "close" and not finished
 
 
 func _pill_rect() -> Rect2:

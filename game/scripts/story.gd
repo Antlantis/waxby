@@ -23,11 +23,13 @@ extends RefCounted
 ##       ["wick", "@slot"] (CLASS_LINES[slot][calling]) | {"do": cue, ...}
 ##       (a cue may carry "if": flag: it runs only when the flag is set)
 ## "{calling}" in a text becomes the calling's name, "{hero}" the hero's own
-## name. The hero's speaker id is "wick": Wick is a title (any keeper who
-## carries the flame is one), kept where the role is the point ("No Wick goes
-## down alone again"); his name plate shows his name. Hollin says it in his
-## warmest lines to him; Mother Taper calls him sprout, and says it only when
-## it counts (homecoming's "Well done").
+## name: the save's (Game.hero_name, asked for at the oath and changed on the
+## Sheet), Waxby until then. The hero's speaker id is "wick": Wick is a title
+## (any keeper who carries the flame is one, as Taper tells him at the oath),
+## kept where the role is the point ("No Wick goes down alone again"); his
+## name plate says his own name. Hollin says it in his warmest lines to him;
+## Mother Taper calls him sprout, and says it only when it counts (her
+## welcome at the oath, homecoming's "Well done").
 ## A panel light may carry "off": true (dark until a cue lights it), "color"
 ## (its tint) and "hush": true (a light that eats light).
 ##
@@ -36,7 +38,8 @@ extends RefCounted
 
 const Classes := preload("res://scripts/classes.gd")
 
-const HERO_NAME := "Waxby"
+const HERO_NAME := "Waxby"      # the hero's name until the player gives him one (and what a bad one falls back to)
+const NAME_MAX := 12           # a name's most characters (every line fits in MAX_LINE with one this long)
 const MAX_LINE := 80
 const MAX_SIGN := 56           # a sign's inscription (the HUD's hint slot)
 const DESCENT_SCRIPT := "res://scripts/modes/descent.gd"   # the Endless Descent (MO), once it's in the build
@@ -78,14 +81,17 @@ const LOST_WICKS := {1: "lamplighter", 2: "oldchandler", 3: "gardenboy", 4: "roo
 
 # Every cue and the parameters it needs (optional ones are left out: a card's
 # "at", top|mid|low, else it goes wherever no one is standing; an sfx's
-# "vol"; a chain's "snuff"; a hold's "nudge" and "nudge_at").
+# "vol"; a chain's "snuff"; a hold's "nudge" and "nudge_at"; a chooser's
+# "prompt", and the name entry's). choose_name asks the hero's name (the
+# oath's entry: the line before it, the question, stays up under it, and the
+# cue's "prompt" heads the entry, where a phone's keyboard can't cover it).
 const CUES := {
 	"wait": ["t"], "cam": ["to", "t"], "snuff": ["light"], "ignite": ["light"], "light": ["light", "r", "t"],
 	"chain": ["lights", "gap"], "fig": ["fig", "t"], "pose": ["fig", "frame"], "walk": ["to", "t"],
 	"face": ["dir"], "mood": ["mood"], "burst": ["at", "n", "color"], "shake": ["amt"], "flash": [],
 	"sfx": ["name"], "music": ["track"], "haptic": ["ms"], "dawn": ["t"], "iris": ["on", "t"],
 	"card": ["sub", "title"], "boss_card": ["name", "title", "portrait"], "choose_class": [], "credits": [],
-	"hold": ["light", "into", "t", "prompt"],
+	"hold": ["light", "into", "t", "prompt"], "choose_name": [],
 }
 # The motes a shot may name (a panel's own, or the shot's).
 const MOTES := ["", "dust", "snow", "embers", "wax", "moths", "spores", "rime", "shards", "fireflies"]
@@ -143,7 +149,10 @@ const SCENES_W1 := {
 		]},
 	]},
 
-	# Choose, Taper's reaction, the lighting, then two lines. No spire, no iris.
+	# Choose, Taper's reaction, the lighting and the hero's oath; then the
+	# name (Taper asks, the player answers in the entry; the hero's plate is
+	# blank till then), the title explained (any keeper who carries the flame
+	# is a Wick) as she welcomes him by it, and the send-off. No spire, no iris.
 	"oath": {"music": "story", "shots": [
 		{"panel": "callings", "in": "fade",
 		 "lights_off": ["plinth_knight", "plinth_founder", "plinth_witch", "plinth_runner", "plinth_sexton"],
@@ -158,7 +167,10 @@ const SCENES_W1 := {
 			{"do": "wait", "t": 0.6},
 			["wick:happy", "@oath"],
 			{"do": "mood", "mood": ""},
-			["taper:warm", "Then go and ring the bells, sprout. Give Evenbell its breath back."],
+			["taper:warm", "Tell the flame your name, sprout."],
+			{"do": "choose_name", "prompt": "Tell the flame your name"},
+			["taper:proud", "Carry the flame and you're a Wick. Every keeper is. Welcome, {hero}."],
+			["taper:warm", "Now go and ring the bells, sprout. Give Evenbell its breath back."],
 			# On the floor under the hero, clear of his flame whatever his calling.
 			{"do": "card", "sub": "World 1", "title": "The Sunken Cathedral", "at": "low"},
 		]},
@@ -1090,7 +1102,7 @@ const CLASS_LINES := {
 		"knight": ["happy", "Thank you, Mother. The Vigil stands."],
 		"founder": ["happy", "Thank you. Is it supper now? It feels like supper."],
 		"witch": ["happy", "You said my name! Say it again. Louder."],
-		"runner": ["happy", "You know my name? ...Nobody ever uses my name."],
+		"runner": ["happy", "You remembered my name? ...I thought I'd always be sprout."],
 		"sexton": ["happy", "My name. I'll keep it somewhere safe."]},
 	"waxworks_won": {  # Waxley, when a calling beats one of his casts (the draft's trial_won)
 		"knight": "A Candleknight on my podium! Here's your prize. Polish it yourself.",
@@ -1405,12 +1417,13 @@ static func longest_calling() -> String:
 
 static func speaker(who: String, cls: String) -> Dictionary:
 	## {name, color: Color, voice, blip, side, style, face} for a speaker id;
-	## the hero's colour and voice come from his calling.
+	## the hero's colour and voice come from his calling, his name plate from
+	## the save (hero_name).
 	var c: Dictionary = CAST.get(who, CAST["narrator"])
 	var info: Dictionary = Classes.ALL.get(cls, Classes.ALL["knight"])
 	var col = c["color"]
 	var voice = c["voice"]
-	return {"name": c["name"], "color": Color(info["color"] if str(col) == "@class" else col),
+	return {"name": hero_name() if who == "wick" else c["name"], "color": Color(info["color"] if str(col) == "@class" else col),
 			"voice": float(info["voice"]) if str(voice) == "@class" else float(voice),
 			"blip": c.get("blip", ""), "side": c.get("side", "right"), "style": c.get("style", "box"),
 			"face": face_of(who)}
@@ -1436,7 +1449,72 @@ static func class_line(slot: String, cls: String) -> Array:
 
 
 static func fill(text: String, cls: String) -> String:
-	return text.replace("{calling}", calling_name(cls)).replace("{hero}", HERO_NAME)
+	return text.replace("{calling}", calling_name(cls)).replace("{hero}", hero_name())
+
+
+# ---------------------------------------------------------------- the hero's name
+# One name a save (Game.hero_name): asked for at the oath (cutscene.gd's
+# choose_name), changed on the Sheet (the Stats tab's Rename), Waxby until
+# then and for every save made before there was a name to give.
+
+static func hero_name() -> String:
+	## The hero's own name: the save's, else HERO_NAME (no Game: a test or a
+	## tool on its own).
+	var g := _game()
+	if g != null and g.has_method("hero_name"):
+		return str(g.hero_name())
+	return HERO_NAME
+
+
+static func is_name_letter(ch: String) -> bool:
+	## A letter of any alphabet (Godot's Unicode identifier start: no digits,
+	## marks or emoji); "_" isn't one.
+	return ch.length() == 1 and ch != "_" and ch.is_valid_unicode_identifier()
+
+
+static func is_name_mark(ch: String) -> bool:
+	## A combining mark (an accent typed on its own, a vowel sign): part of
+	## the letter it follows.
+	return ch.length() == 1 and ch.unicode_at(0) >= 0x300 and not is_name_letter(ch) and ("a" + ch).is_valid_unicode_identifier()
+
+
+static func name_typed(text: String) -> String:
+	## What the entry keeps of a name while it's typed: letters (and the
+	## marks on them), spaces, apostrophes and hyphens (a phone's curly
+	## apostrophe and its dashes made plain), no space first or two together,
+	## at most NAME_MAX characters. A space at the end stays (the next word
+	## is coming).
+	var out := ""
+	for raw in text:
+		var ch: String = raw
+		if ch in ["’", "‘", "\u02bc", "`", "´"]:   # (curly, modifier and stray apostrophes)
+			ch = "'"
+		elif ch in ["\u2010", "\u2011", "\u2013", "\u2014"]:   # (the hyphens and dashes a phone types)
+			ch = "-"
+		elif ch in ["\t", "\u00a0"]:   # (a tab, a no-break space)
+			ch = " "
+		if ch == " ":
+			if out == "" or out.ends_with(" "):
+				continue
+		elif is_name_mark(ch):
+			if out == "" or not (is_name_letter(out[-1]) or is_name_mark(out[-1])):
+				continue
+		elif ch != "'" and ch != "-" and not is_name_letter(ch):
+			continue
+		if out.length() >= NAME_MAX:
+			break
+		out += ch
+	return out
+
+
+static func clean_name(text) -> String:
+	## A name fit to keep: name_typed's, trimmed; one with no letter in it (an
+	## empty field, junk in a save) is HERO_NAME.
+	var s := name_typed(str(text) if (text is String or text is StringName) else "").strip_edges()
+	for ch in s:
+		if is_name_letter(ch):
+			return s
+	return HERO_NAME
 
 
 static func resolve(beat: Array, cls: String) -> Dictionary:
@@ -1492,7 +1570,8 @@ static func slots_used() -> Array:
 # ---------------------------------------------------------------- barks and after-lines
 
 static func bark_line(key: String, cls: String) -> Dictionary:
-	## {who, mood, text, face, portrait} for a bark, or {} for an unknown key.
+	## {who, mood, text, face, portrait, name} for a bark, or {} for an
+	## unknown key (name: the speaker's plate, the hero's own for his).
 	## Mother Taper speaks in her faint portrait while she is faint (E7).
 	if not BARKS.has(key):
 		return {}
@@ -1506,7 +1585,8 @@ static func _shown(r: Dictionary, cls: String) -> Dictionary:
 		mood = "faint"
 	elif who == "taper" and mood == "faint" and taper_phase() == "tall":
 		mood = "warm"   # (a W3-W4 line written faint, heard after the ending: she's tall now)
-	return {"who": who, "mood": mood, "text": r["text"], "face": face_of(who), "portrait": portrait_path(who, mood, cls)}
+	return {"who": who, "mood": mood, "text": r["text"], "face": face_of(who), "portrait": portrait_path(who, mood, cls),
+			"name": str(speaker(who, cls)["name"])}
 
 
 static func bark_every(key: String) -> bool:
@@ -1537,7 +1617,7 @@ static func bark_heard(key: String) -> bool:
 
 static func take_bark(key: String, cls: String, mark := true) -> Dictionary:
 	## What the HUD calls: the line to show now ({who, mood, text, face,
-	## portrait}), or {} when it's a once-only bark heard before. Marks
+	## portrait, name}), or {} when it's a once-only bark heard before. Marks
 	## once-only barks seen. While Mother Taper rests, her REST_SUBS lines are
 	## Hollin's (and hers counts as heard, so she doesn't say it later).
 	## mark false (the feel lab, which writes nothing): the line alone,
@@ -1559,7 +1639,7 @@ static func take_bark(key: String, cls: String, mark := true) -> Dictionary:
 
 
 static func after_line(level_id: String, cls: String) -> Dictionary:
-	## {who, mood, text, face, portrait} for the results screen, or {}.
+	## {who, mood, text, face, portrait, name} for the results screen, or {}.
 	if not AFTER.has(level_id):
 		return {}
 	var e: Array = AFTER[level_id]
@@ -1581,7 +1661,7 @@ static func medal_line(medal: String) -> Dictionary:
 	if not lines.has(medal):
 		return {}
 	var mood := "grin" if who == "hollin" else ("faint" if taper_phase() == "faint" else "proud")
-	return {"who": who, "mood": mood, "text": str(lines[medal])}
+	return {"who": who, "mood": mood, "text": str(lines[medal]).replace("{hero}", hero_name())}
 
 
 static func lost_wick_bark(w: int) -> String:

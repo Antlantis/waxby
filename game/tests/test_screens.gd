@@ -20,7 +20,8 @@ extends SceneTree
 ## life, 2- to 5-digit. Barks follow story.gd's once / every
 ## rule, and the HUD's clocks hold while the level is paused. The Sheet buys
 ## a skill and respecs, equips from the satchel, salvages, and edits the belt
-## only where it may. Real taps (sent through Input, as a phone sends them)
+## only where it may; its Stats tab names the hero and renames him (the
+## oath's name entry: Confirm, Cancel, Escape, above a phone's keyboard). Real taps (sent through Input, as a phone sends them)
 ## do one thing each on the belt, the keeper, the map and the Sheet. The
 ## keeper hosted by the oath scene hides its Back and backdrop; the map says
 ## when a world's tab opens. With the satchel full, a pickup is never lost
@@ -176,6 +177,8 @@ func _initialize() -> void:
 	_no_errors("flask_drinks")
 	await _test_skills()
 	_no_errors("skills")
+	await _test_rename()
+	_no_errors("rename")
 	await _test_gear()
 	_no_errors("gear")
 	await _test_belt()
@@ -402,6 +405,57 @@ func _fresh_hero(level := 1, cls := "knight") -> void:
 
 
 # ---------------------------------------------------------------- layout
+
+func _name_plates() -> void:
+	## The hero's own name on the map's pill and the Sheet's top-bar plate,
+	## his calling and level beside it while they fit (at the phone's own
+	## 844 x 390, "Ash" keeps both); the longest name a player can give, at
+	## the level cap with points waiting, still fits: the pill clear of the
+	## bells, their chips and the buttons, the plate's words inside it (cut
+	## short only where nothing else fits).
+	var wide := root.content_scale_size.x >= 844
+	for named in ["Ash", "WWWWWWWWWWWW"]:
+		_fresh_hero(7)
+		if named.length() > 3:
+			game.add_xp(Progression.total_to(Progression.CAP))
+		game.set_hero_name(named)
+		var lv := int(game.hero()["level"])
+		_check(game.hero_name() == named and (named == "Ash" or int(game.hero().get("points", 0)) > 0), "(%s at Lv %d)" % [named, lv])
+		var m = load("res://scripts/map_screen.gd").new()
+		root.add_child(m)
+		await _frames(2)
+		var pw: Dictionary = m.pill_words()
+		var pr: Rect2 = m.pill_rect()
+		var said := str(pw["name"])
+		_check(said == named or (said.ends_with("…") and named.begins_with(said.trim_suffix("…"))), "the map's pill names him: %s" % [pw])
+		_check(str(pw["sub"]) in ["Candleknight Lv %d" % lv, "Lv %d" % lv, ""] and int(pw["size"]) >= 10, "and his calling and level while they fit: %s" % [pw])
+		if named == "Ash" and wide:
+			_check(pw["sub"] == "Candleknight Lv 7", "at the phone's own width, 'Ash' keeps his calling on the pill")
+		_inside(pr, "map hero plate, '%s'" % named)
+		for r in m.bell_rects():
+			_apart(r, pr, "map bell and '%s's plate" % named)
+		for d in Combat.DIFFS:
+			var cr: Rect2 = m.chip_rect(d)
+			if cr.has_area():
+				_apart(cr, pr, "%s chip and '%s's plate" % [d, named])
+		for b in _buttons(m, []):
+			_apart(pr, b.get_global_rect(), "'%s's plate and button '%s'" % [named, b.text])
+		m.queue_free()
+		var h = load("res://scripts/hero_screen.gd").new()
+		root.add_child(h)
+		await _frames(2)
+		var pl: Dictionary = h.plate_words()
+		said = str(pl["name"])
+		var used: float = 30.0 + UI.text_width(said, pl["size"], "title", 700) + UI.text_width(pl["lvl"], 15, "body", 700)
+		_check(said == named or (said.ends_with("…") and named.begins_with(said.trim_suffix("…"))), "the Sheet's plate names him: %s" % [pl])
+		_check(str(pl["lvl"]) in ["Candleknight · Level %d" % lv, "Level %d" % lv, ""] and int(pl["size"]) >= 11, "and his calling and level while they fit: %s" % [pl])
+		_check(used <= h.plate_rect().size.x + 0.5, "its words fit the plate (%.0f of %.0f)" % [used, h.plate_rect().size.x])
+		if named == "Ash" and wide:
+			_check(pl["lvl"] == "Candleknight · Level 7", "at the phone's own width, 'Ash' keeps his calling on the plate")
+		h.queue_free()
+		await _frames(1)
+	_fresh_hero(7)
+
 
 func _test_hud_layout() -> void:
 	var w := _stub_world()
@@ -716,6 +770,7 @@ func _test_screen_layouts() -> void:
 				for r in h.panel.slot_rects() + h.panel.codex_rects():
 					_inside(_local(r, h.panel), "belt tile")
 	h.queue_free()
+	await _name_plates()
 	# Pause, on its own.
 	var pm = load("res://scripts/pause_menu.gd").new()
 	root.add_child(pm)
@@ -2166,6 +2221,93 @@ func _test_skills() -> void:
 	_check(int(game.hero()["points"]) == pts and (game.hero()["skills"] as Dictionary).is_empty(), "respec gives every point back")
 	h.queue_free()
 	await _frames(2)
+
+
+func _test_rename() -> void:
+	## The Stats tab names the hero by his own name, and Rename renames him:
+	## the oath's name entry over the Sheet, holding the name he has, its
+	## field, Cancel and Confirm a thumb tall, in the safe area and above a
+	## phone's keyboard. Confirm (or Return) keeps the new name in the save
+	## (every calling's); Cancel and Escape leave it, and the Sheet open; what
+	## a name can't hold doesn't land, and nothing fit to keep is Waxby.
+	_where = "rename"
+	_fresh_hero(5, "founder")
+	var h = await _sheet("stats")
+	var p = h.panel
+	_check(p.hero_name() == "Waxby", "before he's named, the Stats tab calls him Waxby (%s)" % p.hero_name())
+	var rb: Button = p._rename
+	_check(rb != null and rb.visible and rb.text == "Rename" and rb.size.y >= UI.TAP_H - 0.5, "a Rename button, a thumb tall")
+	var L: Rect2 = p._left_rect()
+	var rr := Rect2(rb.position, rb.size)
+	_check(rr.position.y >= L.position.y + 64.0 and rr.end.y <= L.position.y + p.LEVEL_Y - 16.0 and rr.position.x >= L.position.x + 90.0
+			and rr.end.x <= L.end.x, "under his name and calling, clear of the face and the level line (%s in %s)" % [rr, L])
+	rb.pressed.emit()
+	await _frames(2)
+	_check(h.renaming(), "Rename opens the name entry")
+	var e = h.name_entry()
+	_check(e != null and e.get_script().resource_path == "res://scripts/name_entry.gd" and e.get_parent() == h, "the oath's own entry, over the Sheet")
+	if e == null:
+		h.queue_free()
+		return
+	_check(e.field.text == "Waxby" and e.can_cancel and e.cancel_btn != null and e.field.has_focus(), "holding Waxby, with a Cancel, the field taking the keys")
+	_buttons_ok(e, "rename entry")
+	_inside(e.field.get_global_rect(), "rename field")
+	var vs := Vector2(root.content_scale_size)
+	for kb in [0.0, 200.0, 250.0]:
+		e.keyboard_override = kb
+		e._layout()
+		for c in [e.field, e.cancel_btn, e.confirm_btn]:
+			_check((c as Control).get_global_rect().end.y <= vs.y - kb, "a %d-high keyboard: %s stays above it" % [kb, c.name])
+	e.field.text = "Ember-Lou9"
+	e.field.text_changed.emit("Ember-Lou9")
+	_check(e.field.text == "Ember-Lou", "a digit doesn't land (%s)" % e.field.text)
+	e.confirm_btn.pressed.emit()
+	await _frames(1)
+	_check(game.hero_name() == "Ember-Lou" and not h.renaming(), "Confirm: he's Ember-Lou (%s)" % game.hero_name())
+	_check(p.hero_name() == "Ember-Lou", "and the Stats tab says so")
+	var disk = JSON.parse_string(FileAccess.get_file_as_string(game.save_path))
+	_check(disk is Dictionary and str(disk.get("hero_name", "")) == "Ember-Lou", "the save holds it")
+	game.new_hero("witch")
+	_check(game.hero_name() == "Ember-Lou", "one name for every calling of the save")
+	game.set_hero("founder")
+	# Cancel leaves it.
+	rb.pressed.emit()
+	await _frames(2)
+	e = h.name_entry()
+	_check(e.field.text == "Ember-Lou", "the entry starts from the name he has")
+	e.field.text = "Nope"
+	e.cancel_btn.pressed.emit()
+	await _frames(1)
+	_check(game.hero_name() == "Ember-Lou" and not h.renaming(), "Cancel leaves it")
+	# Escape cancels, and the Sheet stays open.
+	var backs := [0]
+	h.back.connect(func(): backs[0] += 1)
+	rb.pressed.emit()
+	await _frames(2)
+	e = h.name_entry()
+	e.field.text = "Nope"
+	var esc := InputEventKey.new()
+	esc.keycode = KEY_ESCAPE
+	esc.physical_keycode = KEY_ESCAPE
+	esc.pressed = true
+	Input.parse_input_event(esc)
+	await _frames(2)
+	var up: InputEventKey = esc.duplicate()
+	up.pressed = false
+	Input.parse_input_event(up)
+	await _frames(2)
+	_check(not h.renaming() and game.hero_name() == "Ember-Lou" and backs[0] == 0, "Escape cancels the entry, not the Sheet (backs %d)" % backs[0])
+	# Nothing fit to keep: Waxby. Return confirms.
+	rb.pressed.emit()
+	await _frames(2)
+	e = h.name_entry()
+	e.field.text = "  "
+	e.field.text_submitted.emit("  ")
+	await _frames(1)
+	_check(game.hero_name() == "Waxby" and not h.renaming(), "an empty name (Return) is Waxby (%s)" % game.hero_name())
+	h.queue_free()
+	await _frames(1)
+	game.reset()
 
 
 func _test_gear() -> void:

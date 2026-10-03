@@ -15,6 +15,7 @@ extends RefCounted
 ## Static only; no autoloads (Game builds its save defaults from modes_save.gd,
 ## which reads this).
 
+const Story := preload("res://scripts/story.gd")   # (the hero's own name, in a source's words)
 const HUE_LO := 330.0             # the warm band, degrees (wrapping through 0)
 const HUE_HI := 60.0
 const SAT_MIN := 0.4
@@ -102,7 +103,7 @@ const SRC_TEXT := {
 	"waxworks:bronze6": "Seal all six casts in Bronze or better",
 	"gauntlet:any": "Clear the Waxworks' Gauntlet", "gauntlet:nightfall": "Clear the Gauntlet on Nightfall",
 	"gauntlet:witching": "Clear the Gauntlet in the Witching Hour", "gauntlet:drips12": "Clear the Gauntlet at 12 drips",
-	"story:homecoming": "See Waxby home",
+	"story:homecoming": "See {hero} home",
 	"trials:gold4:knight": "Win Gold in all four Candleknight trials", "trials:gold4:witch": "Win Gold in all four Taperwitch trials",
 	"trials:gold4:runner": "Win Gold in all four Sootrunner trials", "trials:gold4:founder": "Win Gold in all four Bellfounder trials",
 	"trials:gold4:sexton": "Win Gold in all four Sexton trials",
@@ -165,8 +166,9 @@ static func source_of(nid: String) -> String:
 
 
 static func source_text(nid: String) -> String:
+	## What earns it, in words ("{hero}": the hero's own name).
 	var s := source_of(nid)
-	return str(SRC_TEXT.get(s, s))
+	return str(SRC_TEXT.get(s, s)).replace("{hero}", Story.hero_name())
 
 
 static func ids_for(src: String) -> Array:

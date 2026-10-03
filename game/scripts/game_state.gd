@@ -52,6 +52,11 @@ extends Node
 ## levels live in SECRET_LEVELS, outside the linear ALL_LEVELS, so the
 ## index-based unlocks never shift.
 ##
+## The hero's own name (hero_name): one a save, asked for at the oath and
+## changed on the Sheet; Story.clean_name keeps it to NAME_MAX letters,
+## spaces, apostrophes and hyphens. A save from before there was a name (any
+## version, the v1 migration too) or one holding junk there is Waxby.
+##
 ## The Chandler by depth (spec §8.2): shop_depth = max(hero.deepest, level
 ## - 1) sets the stock (4 wares below 13, 5 from 13, 6 from 28; the weakest
 ## slot's pick is the best of 6 Rares from 18), the relic shelf (3, 4 from
@@ -67,6 +72,7 @@ const Progression := preload("res://scripts/progression.gd")
 const Combat := preload("res://scripts/combat.gd")
 const Classes := preload("res://scripts/classes.gd")
 const SettingsLib := preload("res://scripts/settings.gd")
+const Story := preload("res://scripts/story.gd")    # the hero's name: its default and its rules
 const SAVE_PATH := "user://save.json"
 const AUTOPLAY_SAVE := "user://autoplay_save.json"   # the bot's own (its slots sit beside it)
 const VERSION := 3
@@ -239,7 +245,7 @@ func reset() -> void:
 			"saved_at": 0, "unbanked": 0,
 			"secrets": {"dusk": {}, "nightfall": {}, "witching": {}}, "flask": {"draughts": 0, "rich": false},
 			"legends_found": [], "modes": _modes_defaults(), "suspend": {}, "notices": [NOTICE_V3, NOTICE_POINTS], "relocked": {},
-			"bosses": 0}
+			"bosses": 0, "hero_name": Story.HERO_NAME}
 	_temp_hero = {}
 	_prizes_paid = []
 	reload_settings()
@@ -671,6 +677,7 @@ func _sanitize() -> void:
 		if dd != "dusk" and n > 0:
 			d["relocked"][dd] = n
 	d["bosses"] = maxi(int(_num(fresh.get("bosses", 0))), 0)
+	d["hero_name"] = Story.clean_name(fresh.get("hero_name", ""))
 	# Only a save whose Vigil ranks came back as points holds points_back
 	# (every other save is written without the key).
 	var pb := maxi(int(_num(fresh.get("points_back", 0))), 0)
@@ -1042,8 +1049,9 @@ func slot_summary(n: int) -> Dictionary:
 	## kept beside it as .bad, as load_save keeps one), else {slot, cls, name,
 	## level, callings, furthest (a level id), furthest_title, bells, sigils
 	## (every difficulty), embers, diffs (those open), played (unix time),
-	## veteran, world (the furthest level's)}. cls and name are "" before a
-	## calling is chosen.
+	## veteran, world (the furthest level's), hero_name (the hero's own;
+	## name is his calling's)}. cls and name are "" before a calling is
+	## chosen.
 	n = clampi(n, 1, SLOTS)
 	var path := slot_path(n)
 	var found := _found(path)
@@ -1075,7 +1083,7 @@ func slot_summary(n: int) -> Dictionary:
 			"level": int(hs[cls]["level"]) if hs.has(cls) else 0, "callings": hs.size(), "furthest": fid,
 			"furthest_title": level_title(fid), "bells": int(_num(d["bells"])), "sigils": sig,
 			"embers": int(_num(d["embers"])), "diffs": diffs, "played": played, "veteran": int(_num(d["veteran"])),
-			"world": fworld}
+			"world": fworld, "hero_name": str(d.get("hero_name", Story.HERO_NAME))}
 
 
 func _peek(path: String, slot: int) -> Dictionary:
@@ -1484,6 +1492,23 @@ func set_hero(cls: String) -> void:
 	if has_hero(cls):
 		data["hero"] = cls
 		save()
+
+
+func hero_name() -> String:
+	## The hero's own name in this save (every calling's; Waxby until one is
+	## given).
+	return str(data.get("hero_name", Story.HERO_NAME))
+
+
+func set_hero_name(text: String) -> String:
+	## Names the hero (the oath's entry, the Sheet's Rename): what's typed,
+	## made fit by Story.clean_name (nothing fit to keep is Waxby). Saved
+	## when it changes. Returns the name kept.
+	var n := Story.clean_name(text)
+	if n != hero_name():
+		data["hero_name"] = n
+		save()
+	return n
 
 
 func hero_stats(h: Dictionary = {}, d := "") -> Dictionary:

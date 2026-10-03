@@ -1,7 +1,9 @@
 extends Control
-## The Sheet's Stats tab: who the hero is (face, calling, level, XP, points
-## to spend) on the left, and what the numbers come to now (life, damage,
-## crit, damage reduction, light, the resource and the rest) on the right.
+## The Sheet's Stats tab: who the hero is (face, his own name with Rename
+## under it, calling, level, XP, points to spend) on the left, and what the
+## numbers come to now (life, damage, crit, damage reduction, light, the
+## resource and the rest) on the right. Rename opens the oath's name entry
+## over the Sheet (hero_screen.rename).
 
 const UI := preload("res://scripts/ui.gd")
 const Classes := preload("res://scripts/classes.gd")
@@ -9,9 +11,12 @@ const Hero := preload("res://scripts/hero.gd")
 const Combat := preload("res://scripts/combat.gd")
 const Progression := preload("res://scripts/progression.gd")
 const CAPSTONE_LEVEL := 8         # classes.gd's can_buy gate for Tier 3
+const RENAME_Y := 70.0            # Rename's top in the hero's card, under his name and calling
+const LEVEL_Y := 128.0            # the level line's baseline under it
 
 var host: Control
 var _spend: Button
+var _rename: Button
 var _face := {}
 
 
@@ -23,6 +28,12 @@ func _ready() -> void:
 	UI.small_button(_spend, 14)
 	_spend.custom_minimum_size = Vector2(0, UI.TAP_H)
 	add_child(_spend)
+	_rename = UI.make_button("Rename", false, func():
+		if host and host.has_method("rename"):
+			host.rename(), "click", 14)
+	UI.small_button(_rename, 14)
+	_rename.custom_minimum_size = Vector2(0, UI.TAP_H)
+	add_child(_rename)
 	_face = UI.hero_face(_cls(), "happy")
 
 
@@ -37,6 +48,12 @@ func _hero() -> Dictionary:
 
 func _cls() -> String:
 	return str(_hero().get("cls", "knight"))
+
+
+func hero_name() -> String:
+	## The hero's own name (the save's; Waxby with no Game).
+	var g := _game()
+	return str(g.hero_name()) if g != null and g.has_method("hero_name") else "Waxby"
 
 
 func _stats() -> Dictionary:
@@ -88,7 +105,9 @@ func _process(_dt: float) -> void:
 	_spend.visible = pts > 0
 	_spend.reset_size()
 	var left := _left_rect()
-	_spend.position = Vector2(left.end.x - _spend.size.x - 12.0, left.position.y + 168.0 - _spend.size.y * 0.5 - 5.0)
+	_spend.position = Vector2(left.end.x - _spend.size.x - 12.0, left.position.y + LEVEL_Y + 50.0 - _spend.size.y * 0.5 - 5.0)
+	_rename.reset_size()
+	_rename.position = Vector2(left.position.x + 96.0, left.position.y + RENAME_Y)
 	queue_redraw()
 
 
@@ -103,18 +122,22 @@ func _draw() -> void:
 	var info: Dictionary = Classes.info(cls)
 	var col := UI.class_color(cls)
 	var g := _game()
-	# Who: the face, the calling, the level and XP.
+	# Who: the face, his name (Rename under it), the calling, the level and XP.
 	var L := _left_rect()
 	UI.panel(self, L, Color(col, 0.6), Color(UI.PANEL, 0.92), 12.0)
 	var fc := Vector2(L.position.x + 50.0, L.position.y + 52.0)
 	draw_circle(fc, 44.0, Color(col, 0.12))
-	UI.portrait(self, fc, 34.0, _face.get("tex"), col, 1.0, _face.get("uv", Rect2(0, 0, 1, 1)), str(info["name"]).substr(0, 1))
+	var nm := hero_name()
+	UI.portrait(self, fc, 34.0, _face.get("tex"), col, 1.0, _face.get("uv", Rect2(0, 0, 1, 1)), nm.substr(0, 1))
 	var tx := L.position.x + 96.0
 	var tw := L.end.x - tx - 10.0
-	UI.text(self, Vector2(tx, L.position.y + 44.0), str(info["name"]), UI.fit_size(str(info["name"]), tw, 24, 16, "title", 700), UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, tw, "title", 700)
-	UI.text(self, Vector2(tx, L.position.y + 64.0), str(info["role"]).to_upper(), 11, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, tw, "body", 700)
+	UI.text(self, Vector2(tx, L.position.y + 42.0), nm, UI.fit_size(nm, tw, 24, 15, "title", 700), UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, tw, "title", 700)
+	var what := "%s · %s" % [info["name"], info["role"]]
+	if UI.text_width(what, 9, "body", 700) > tw:
+		what = str(info["name"])
+	UI.text(self, Vector2(tx, L.position.y + 61.0), what, UI.fit_size(what, tw, 12, 9, "body", 700), col.lightened(0.35), HORIZONTAL_ALIGNMENT_LEFT, tw, "body", 700)
 	var xp: Dictionary = g.xp_progress() if g else {"level": 1, "into": 0, "need": 80, "frac": 0.0}
-	var y := L.position.y + 118.0
+	var y := L.position.y + LEVEL_Y
 	UI.text(self, Vector2(L.position.x + 14.0, y), "Level %d" % int(xp["level"]), 22, UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700)
 	var need := int(xp["need"])
 	var into := "%d / %d XP" % [int(xp["into"]), need] if need > 0 else "The highest level"
