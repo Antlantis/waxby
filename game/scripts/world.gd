@@ -100,6 +100,7 @@ const ARENA_EDGE := 64.0         # px Waxby keeps inside the view's safe edge wh
 const SPIKE_PCT := 0.20
 const HITSTOP_BUDGET := 0.12     # at most this much freeze in any half second
 const FULL_RETRY := 1.2          # s before an item the full satchel turned away asks again
+const LEGEND_FREEZE := 0.25      # s the world stops when a Legendary is taken (_legend_moment)
 const CHAIN_PAY_MAX := 4         # bonus embers a single chained stomp pays at most
 const PUSH_CAP := 170.0          # px/s: every push together, on every difficulty
 const GUST_GRACE := 0.8          # a gust that starts while he's airborne waits until he lands, or this long
@@ -2479,9 +2480,12 @@ func _take_item(it: Dictionary) -> String:
 	## Returns where it went: "equipped", "satchel", "salvaged" (melted into
 	## embers: a Common with auto-salvage, or anything no better than what's
 	## worn when the satchel is full) or "full" (no room: it stays put).
+	## A Legendary counts as better over a worn piece that isn't one (its
+	## power is nothing in the chips: _legend_over), and has its moment.
 	var h: Dictionary = Game.hero()
 	var chips := Hero.compare(h, it["slot"], it, h.get("belt", []), diff)
 	var better: bool = chips["dmg"] >= 0.0 and chips["life"] >= 0.0 and (chips["dmg"] > 0.0 or chips["life"] > 0.0)
+	better = better or _legend_over(h, it)
 	var where := ""
 	if better and bool(Game.setting("auto_equip")):
 		Game.equip(it)
@@ -2503,9 +2507,46 @@ func _take_item(it: Dictionary) -> String:
 			g.note_legend(str(it["legend"]))
 	if hud and hud.has_method("show_pickup"):
 		hud.show_pickup(it, chips, where)
+	_legend_moment(it, where)
 	if where != "full":
 		bark("first_item")   # "...the rest waits in your satchel": not while it's full
 	return where
+
+
+func _legend_over(h: Dictionary, it: Dictionary) -> bool:
+	## A new Legendary is worn (with auto-equip) over a piece that isn't one,
+	## or in an empty slot, whatever its chips say, unless wearing it would
+	## melt the worn piece for good (the satchel full: Game.melt_on_equip);
+	## then the card asks, as for any piece.
+	if str(it.get("legend", "")) == "":
+		return false
+	var worn = h.get("equip", {}).get(str(it.get("slot", "")))
+	if worn is Dictionary and str(worn.get("rarity", "")) == "legendary":
+		return false
+	return Game.melt_on_equip(it).is_empty()
+
+
+func _legend_moment(it: Dictionary, where: String) -> void:
+	## A Legendary taken (worn, or into the satchel): the world stops a beat
+	## (LEGEND_FREEZE), its glow bursts round him, a buzz, and the HUD holds
+	## its card 5 s as a "New power" (hud.power_card). Only for a player at
+	## the controls (_loot_moment_ok). A Legendary the full satchel left on
+	## the ground has its card ask instead (and asks again), never a moment.
+	if str(it.get("legend", "")) == "" or not (where in ["equipped", "satchel"]) or not _loot_moment_ok():
+		return
+	freeze(LEGEND_FREEZE, true)
+	if glow:
+		glow.burst(player.center(), 30, glow.RARITY["legendary"], 210.0, 0.9, -30.0, 3.0, 60.0)
+	_haptic(40)
+	hud_call("power_card", [it])
+
+
+func _loot_moment_ok() -> bool:
+	## A pickup's moment (a freeze, a held card) is a player's: never headless,
+	## under --autoplay, or while a golden route is replayed or recorded
+	## (no_monsters, on_pad, test_pad), where a freeze would put the run off
+	## its recorded ticks.
+	return not headless and not autoplay and not no_monsters and test_pad == null and not on_pad.is_valid()
 
 
 func claim_item(it: Dictionary) -> void:
@@ -2906,6 +2947,9 @@ func _log(cleared: bool) -> void:
 	for k in ["_last", "_move", "_feature"]:
 		causes.erase(k)   # the running "what hurt last", not a snuff
 	Playlog.write(Playlog.entry(self, cleared, causes))
+	var g := _game()
+	if g != null and g.get("embers_spent") != null:
+		g.set("embers_spent", 0)   # (a line's embers_spent: what was paid since the one before)
 
 
 # ---------------------------------------------------------------- pickups & drops
@@ -3074,7 +3118,7 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 		drop_item(at, "dread", "", gift)
 		drop_item(at + Vector2(10, -8), "boss")
 	elif e.kind == "lidlurk":
-		drop_item(at, "lidlurk")
+		_lidlurk_prize(at)
 	elif rng.randf() < chance:
 		drop_item(at, "kill")
 	if rng.randf() < e.relic_chance and not e.respawned:
@@ -3101,8 +3145,9 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 		# leaves it to drop again.
 		var h: Dictionary = Game.hero()
 		var slot := _pick_slot()
-		# A world's boss drops one of its pair (Items.world_legends: W3-W6)
-		# in the pair's own slot; W1-W2 have none and pick as v2 did.
+		# A world's boss drops one of its pair (Items.world_legends: W3-W6's
+		# two, Tollgrave's and the Snuffer's one) in the pair's own slot; a
+		# world without one picks as v2 did.
 		var pair: Array = Items.world_legends(world_n).filter(func(id):
 			return not (Items.LEGENDS[id] as Dictionary).has("cls") or Items.LEGENDS[id]["cls"] == h["cls"])
 		var legend := ""
@@ -3119,6 +3164,7 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 	drop_item(at + Vector2(-16, -10), "boss")
 	drop_item(at + Vector2(16, -10), "boss")
 	_drop_relic(at + Vector2(0, -20), false, "rare", world_n)
+	_pay_boss_embers(b, at)
 	shake = 8.0
 	_haptic(60)
 	freeze(0.25, true)
@@ -3126,6 +3172,31 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 		hud.boss_bar({})
 	if _has_sfx():
 		Sfx.stop_music(1.0)
+
+
+func _pay_boss_embers(b: Node2D, at: Vector2) -> void:
+	## A boss's embers (b.embers pieces, 30 to 120, each ember_worth()), loose
+	## from where he fell, as a kill's are: the kill handler returns for him
+	## before its ember loop. Only with his drops (boss_defeated's loot
+	## branch): a rush boss is paid by its mode (the Waxworks' embers and
+	## seals, the Descent's echo drops) and a feel lab keeps nothing.
+	var n := int(b.get("embers")) if b != null and b.get("embers") != null else 0
+	for i in n:
+		var p := _add_pickup("ember", at)
+		p["loose"] = true
+		p["vel"] = Vector2(randf_range(-170, 170), randf_range(-480, -240))
+
+
+func _lidlurk_prize(at: Vector2) -> void:
+	## The Lidlurk guarding a level's hidden vault pays a relic: at least a
+	## Blessed while one is left, else any not yet found, and once the codex
+	## is full a gold-table item (_drop_relic's fallback, Rare 92 / Legendary
+	## 8). A mode's Lidlurk (a Descent room's) keeps the Lidlurk table's item,
+	## and a feel lab's pays nothing (it keeps no relic either).
+	if mode != null or not allows("loot"):
+		drop_item(at, "lidlurk")
+		return
+	_drop_relic(at, true, "magic")
 
 
 func boss_phase(b: Node2D, phase: int) -> void:

@@ -198,6 +198,7 @@ var _modes_lib = null      # ModesSave's script once looked for (false: not in t
 var milestone_alternate := MILESTONE_ALTERNATE   # tests turn it on to check the v3 rule
 var _prizes := {}          # a secret prize made this session: its uid -> [level id, difficulty] (paid when taken)
 var _prizes_paid := []     # "id|diff" of prizes taken since the last record_result
+var embers_spent := 0      # embers paid at the Chandler since the playlog's last line (playlog.gd; never saved)
 
 
 func _init() -> void:
@@ -1632,9 +1633,16 @@ func add_embers(n: int) -> void:
 func spend_embers(n: int) -> bool:
 	if n < 0 or int(data["embers"]) < n:
 		return false
-	data["embers"] = int(data["embers"]) - n
+	_pay(n)
 	save()
 	return true
+
+
+func _pay(n: int) -> void:
+	## A price out of the purse (the caller's verdict said he has it), counted
+	## for the playlog's embers_spent.
+	data["embers"] = embers() - n
+	embers_spent += n
 
 
 # ---------------------------------------------------------------- gear
@@ -1915,7 +1923,7 @@ func buy_ware(i: int) -> String:
 		return where
 	var h := hero()
 	var it: Dictionary = h["wares"][i]
-	data["embers"] = embers() - Items.price(it)
+	_pay(Items.price(it))
 	h["wares"][i] = null
 	if where == "equipped":
 		equip(it)
@@ -1926,8 +1934,9 @@ func buy_ware(i: int) -> String:
 
 
 func relic_offers(n := -1) -> Array:
-	## The Chandler's relic shelf: the cheapest relics not yet found, from the
-	## worlds reached; 3 of them (4 from shop depth 23), or n.
+	## The Chandler's relic shelf (Relics.for_sale: the cheapest not yet found
+	## of each rarity), from the worlds reached; 3 of them (4 from shop depth
+	## 23), or n.
 	var k := n if n >= 0 else int(_shop_row(shop_depth())["shelf"])
 	return Relics.for_sale(data["relics"], k, world_reached())
 
@@ -2271,7 +2280,7 @@ func buy_reserve() -> String:
 		return where
 	var h := hero()
 	var it: Dictionary = h["reserve"]
-	data["embers"] = embers() - Items.price(it)
+	_pay(Items.price(it))
 	h["reserve"] = null
 	h["reserve_new"] = false
 	note_legend(str(it.get("legend", "")))
@@ -2335,7 +2344,7 @@ func buy_draught(id: String) -> String:
 	var why := draught_verdict(id)
 	if why != "buy":
 		return why
-	data["embers"] = embers() - RICH_PRICE
+	_pay(RICH_PRICE)
 	data["flask"]["rich"] = true
 	save()
 	return "bought"
@@ -2419,7 +2428,7 @@ func rekindle(item: Dictionary) -> bool:
 	var cls: String = str(item.get("cls", "")) if str(item.get("cls", "")) != "" else str(h["cls"])
 	var it := Items.make(str(item["slot"]), cls, rekindle_level(), "legendary", rng, str(item["legend"]))
 	it["uid"] = str(item.get("uid", it["uid"]))
-	data["embers"] = embers() - rekindle_price(item)
+	_pay(rekindle_price(item))
 	if at.has("slot"):
 		h["equip"][at["slot"]] = it
 	else:

@@ -17,7 +17,9 @@ extends SceneTree
 ## every kind's XP; the deep tree (off, then on); the new stat keys; items'
 ## five tiers, the Lantern, live slots and pick_legend; relic worlds; the
 ## level registry; the v2 -> v3 migration (a fixture and the owner's own
-## saves, copies only) and every new Game API.
+## saves, copies only) and every new Game API. Build 1's loot: no Dusk
+## Commons, half the kill drops, the boss signature pieces, one relic of each
+## rarity on the shelf, embers_spent and legendaries_worn for the playlog.
 ##
 ##     godot --headless --path game --script res://tests/test_progression.gd
 
@@ -101,6 +103,7 @@ func _initialize() -> void:
 	_test_items_p1()
 	_test_legends_p1()
 	_test_relics_p1()
+	_test_loot_build1()
 	_test_deep_tree()
 	_test_registry()
 	_test_migration()
@@ -1306,7 +1309,9 @@ func _test_items_v3() -> void:
 	var want_share := 1.0 / (1.0 + 3.0 * (candles.size() - 1))
 	_check(absf(share - want_share) < 0.03, "one the hero owns is a third as likely (%.2f of %d candles, want %.2f)" % [share, candles.size(), want_share])
 	_check(Items.world_legends(3) == [] or Items.world_legends(3) == ["rootbound", "marrow_lantern"], "world_legends: the boss pair, those in LEGENDS")
-	_check(Items.SECRET_PRIZES.size() == 6 and Items.SECRET_PRIZES["1-S"] == "hymnal" and Items.WORLD_LEGENDS.size() == 4, "the prizes and pairs are named")
+	_check(Items.SECRET_PRIZES.size() == 6 and Items.SECRET_PRIZES["1-S"] == "hymnal" and Items.WORLD_LEGENDS.size() == 6, "the prizes and pairs are named")
+	_check(Items.world_legends(1) == ["tollbreaker"] and Items.world_legends(2) == ["twin_wick"],
+			"build 1: Tollgrave's signature prize is Tollbreaker, the Snuffer's the Twin Wick")
 
 
 func _test_relics_v3() -> void:
@@ -1412,14 +1417,17 @@ func _test_items_p1() -> void:
 				rising = rising and Items.median(id, t) >= Items.median(id, t - 1)
 	_check(rising, "every affix's median is at least the tier below's")
 	_check(int(Items.make("coat", "knight", 80, "rare", rng)["ilvl"]) == Items.ILVL_CAP and Items.tier_of(Items.ILVL_CAP) == 5, "item level stops at %d (T5)" % Items.ILVL_CAP)
-	# Dusk kills get richer with depth (spec §8.1); Nightfall and Witching as v2.
-	var v2 := {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5}
-	_check(Items.kill_weights(1, "dusk") == v2 and Items.kill_weights(12, "dusk") == v2, "Dusk kills to area 12 roll v2's weights")
-	_check(Items.kill_weights(13, "dusk") == {"common": 55.0, "magic": 34.0, "rare": 10.0, "legendary": 1.0}
+	# Dusk kills get richer with depth (spec §8.1) and, since build 1, roll no
+	# Commons (v2's Blessed / Rare / Legendary proportions kept); Nightfall and
+	# Witching as v2.
+	var w12 := {"common": 0.0, "magic": 80.0, "rare": 19.0, "legendary": 1.0}
+	_check(Items.kill_weights(1, "dusk") == w12 and Items.kill_weights(12, "dusk") == w12, "Dusk kills to area 12: 80/19/1, no Commons")
+	_check(Items.kill_weights(13, "dusk") == {"common": 0.0, "magic": 76.0, "rare": 22.0, "legendary": 2.0}
 			and Items.kill_weights(22, "dusk") == Items.kill_weights(13, "dusk")
-			and Items.kill_weights(23, "dusk") == {"common": 50.0, "magic": 35.0, "rare": 13.5, "legendary": 1.5}
-			and Items.kill_weights(31, "dusk") == Items.kill_weights(23, "dusk"), "areas 13-22: 55/34/10/1, 23 on: 50/35/13.5/1.5")
-	_check(Items.kill_weights(40, "nightfall")["legendary"] == 2.0 and Items.kill_weights(45, "witching")["rare"] == 21.0, "Nightfall and Witching kills keep v2's")
+			and Items.kill_weights(23, "dusk") == {"common": 0.0, "magic": 70.0, "rare": 27.0, "legendary": 3.0}
+			and Items.kill_weights(31, "dusk") == Items.kill_weights(23, "dusk"), "areas 13-22: 76/22/2, 23 on: 70/27/3")
+	_check(Items.kill_weights(40, "nightfall")["legendary"] == 2.0 and Items.kill_weights(45, "witching")["rare"] == 21.0
+			and Items.kill_weights(40, "nightfall")["common"] == 45.0 and Items.kill_weights(45, "witching")["common"] == 30.0, "Nightfall and Witching kills keep v2's")
 
 
 func _test_legends_p1() -> void:
@@ -1439,8 +1447,12 @@ func _test_legends_p1() -> void:
 		pairs_ok = pairs_ok and pair.size() == 2
 		for id in pair:
 			pairs_ok = pairs_ok and int(Items.LEGENDS[id]["min_area"]) == [13, 18, 23, 28][w - 3] and not Items.LEGENDS[id].get("secret", false)
-	_check(pairs_ok and Items.world_legends(3) == ["rootbound", "marrow_lantern"] and Items.world_legends(1).is_empty(),
-			"each new world's boss pair (min_area 13 / 18 / 23 / 28); Worlds 1-2 have none")
+	var sig_ok := true
+	for w in [1, 2]:
+		var one := Items.world_legends(w)
+		sig_ok = sig_ok and one.size() == 1 and not Items.LEGENDS[one[0]].has("min_area") and not Items.LEGENDS[one[0]].has("cls")
+	_check(pairs_ok and Items.world_legends(3) == ["rootbound", "marrow_lantern"] and sig_ok and Items.world_legends(1) == ["tollbreaker"],
+			"each new world's boss pair (min_area 13 / 18 / 23 / 28); Worlds 1-2 one signature piece each, v2's, any calling's")
 	var secret_ok := true
 	for sid in Items.SECRET_PRIZES:
 		var lid: String = Items.SECRET_PRIZES[sid]
@@ -1516,8 +1528,9 @@ func _test_relics_p1() -> void:
 			w3_fav += 1
 	_check(leaked == 0 and Relics.for_sale([], 20, 2).size() == 12, "worlds not reached never roll or sell (%d)" % leaked)
 	_check(w3_fav > w3 * 1.4, "a favored world's relics roll about twice as often (%d vs %d of 3000)" % [w3_fav, w3])
-	_check(Relics.for_sale(Relics.ids().slice(0, 12), 3, 6).size() == 3 and Relics.for_sale(Relics.ids().slice(0, 12), 3, 6)[0]["rarity"] == "magic",
-			"the shelf offers the new worlds' once they're reached, cheapest first")
+	var deep_shelf: Array = Relics.for_sale(Relics.ids().slice(0, 12), 3, 6).map(func(r): return r["id"])
+	_check(deep_shelf == ["sporeward", "bone_flute", "taper_match"],
+			"the shelf offers the new worlds' once they're reached, one of each rarity, cheapest first (%s)" % [deep_shelf])
 	# Their numbers (hero.gd RELIC_MODS and RELIC_FLAGS).
 	var h := Hero.blank("witch", 25)
 	var s0 := Hero.stats(h, [])
@@ -2051,6 +2064,84 @@ func _descent_rate(area: int, depth: int, hero_level: int, fx: Dictionary) -> fl
 	var xp: float = float(p["density"]) * tiles * float(Progression.kill_xp("skeleton", area, hero_level, "nightfall")) * float(p["xp_avg"]) / 5.0
 	xp += Progression.event_xp("depth", area) + Progression.event_xp("altar", area)
 	return xp / (tiles / float(p["tiles_min"]))
+
+
+# ---------------------------------------------------------------- build 1: loot
+
+func _test_loot_build1() -> void:
+	## Build 1's loot slice: Dusk kills roll no Commons and half as often, so a
+	## kill gives a Legendary as often as before and the Blessed / Rare mix
+	## stays as it was (nothing up-tiered); the Chandler's shelf holds one
+	## relic of each rarity; what's paid there is counted for the playlog
+	## (Game.embers_spent, never saved); the playlog's legendaries_worn.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1001
+	var drop := float(Combat.diff("dusk")["drop"])
+	_check(drop == 0.5 and float(Combat.diff("nightfall")["drop"]) == 1.2 and float(Combat.diff("witching")["drop"]) == 1.4,
+			"Dusk kills drop half as often (0.5); Nightfall and Witching as before")
+	var v2 := {1: {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5}, 13: {"common": 55.0, "magic": 34.0, "rare": 10.0, "legendary": 1.0},
+			23: {"common": 50.0, "magic": 35.0, "rare": 13.5, "legendary": 1.5}}
+	for a in v2:
+		var old: Dictionary = v2[a]
+		var now := Items.kill_weights(a, "dusk")
+		var tot := 0.0
+		var old_tot := 0.0
+		for r in Items.RARITIES:
+			tot += float(now.get(r, 0.0))
+			old_tot += float(old[r])
+		var leg_now := drop * float(now["legendary"]) / tot
+		var leg_old := float(old["legendary"]) / old_tot
+		_check(absf(leg_now - leg_old) < 1e-6, "area %d: a Dusk kill drops a Legendary as often as before (%.4f vs %.4f)" % [a, leg_now, leg_old])
+		var mix_now := float(now["rare"]) / (float(now["magic"]) + float(now["rare"]))
+		var mix_old := float(old["rare"]) / (float(old["magic"]) + float(old["rare"]))
+		_check(absf(mix_now - mix_old) < 0.01, "area %d: the Blessed / Rare mix is v2's (%.3f Rare vs %.3f): nothing up-tiered" % [a, mix_now, mix_old])
+	var commons := 0
+	for i in 4000:
+		if Items.pick_rarity(Items.kill_weights(1 + i % 31, "dusk"), rng) == "common":
+			commons += 1
+	_check(commons == 0, "4,000 Dusk kill rolls over areas 1-31: no Commons (%d)" % commons)
+	# The shelf: one of each rarity, the cheapest rarities first.
+	var ids := func(rs: Array) -> Array: return rs.map(func(r): return r["id"])
+	_check(ids.call(Relics.for_sale([], 3, 1)) == ["tallow_heart", "rook_feather", "saints_knuckle"],
+			"World 1's shelf: Tallow Heart, Rook Feather, Saint's Knuckle (%s)" % [ids.call(Relics.for_sale([], 3, 1))])
+	_check(ids.call(Relics.for_sale([], 4, 1)) == ["tallow_heart", "rook_feather", "saints_knuckle", "phoenix_wick"],
+			"a shelf of four (shop depth 23): one of every rarity")
+	var w1 := Relics.every().filter(func(r): return int(r.get("world", 1)) == 1)
+	var commons_owned: Array = ids.call(w1.filter(func(r): return r["rarity"] == "common"))
+	_check(ids.call(Relics.for_sale(commons_owned, 3, 1)) == ["rook_feather", "saints_knuckle", "phoenix_wick"],
+			"every Common found: a Blessed, a Rare and the Legendary")
+	var but_magic: Array = ids.call(w1.filter(func(r): return r["rarity"] != "magic"))
+	_check(ids.call(Relics.for_sale(but_magic, 3, 1)) == ["rook_feather", "iron_boots", "bellows"],
+			"only Blessed ones left: the cheapest of them fill the shelf")
+	_check(Relics.for_sale([], 0, 1).is_empty() and Relics.for_sale(ids.call(w1), 3, 1).is_empty(), "no places or nothing left: a bare shelf")
+	_fresh()
+	_check(ids.call(game.relic_offers()) == ["tallow_heart", "rook_feather", "saints_knuckle"], "a new game's Chandler sells Rook Feather in World 1")
+	# What's paid at the Chandler, counted for the playlog.
+	game.add_xp(Progression.total_to(6))
+	game.add_embers(5000)
+	game.embers_spent = 0
+	var rid: String = game.relic_offers()[1]["id"]
+	game.buy_relic(rid)
+	_check(game.embers_spent == Relics.price(rid), "a relic bought counts its price (%d)" % game.embers_spent)
+	var paid: int = game.embers_spent
+	var stock: Array = game.wares()
+	var wp: int = game.ware_price(stock[0])
+	var sold: String = game.buy_ware(0)
+	_check((sold == "equipped" or sold == "satchel") and game.embers_spent == paid + wp, "a ware too (%d)" % wp)
+	_check(not game.spend_embers(999999) and game.embers_spent == paid + wp, "a spend refused counts nothing")
+	_check(not JSON.stringify(game.data).contains("embers_spent"), "and the count is never saved")
+	game.embers_spent = 0
+	# The playlog's legendaries_worn: the Legendaries found that he wears.
+	var Playlog = load("res://scripts/playlog.gd")
+	var h: Dictionary = game.hero()
+	var worn := Items.make("weapon", "knight", 6, "legendary", rng, "dawnsliver")
+	var carried := Items.make("candle", "knight", 6, "legendary", rng, "twin_wick")
+	var plain := Items.make("coat", "knight", 6, "rare", rng)
+	game.equip(worn)
+	game.equip(plain)
+	(h["satchel"] as Array).append(carried)
+	_check(Playlog.legends_worn([worn, carried, plain], h) == 1 and Playlog.legends_worn([], h) == 0,
+			"legendaries_worn: of the items found, the Legendaries worn (1)")
 
 
 # ---------------------------------------------------------------- v3: the tree
@@ -2940,7 +3031,7 @@ func _test_chandler_logic() -> void:
 	_check(game.buy_ware(1) == "equipped" and h["equip"]["coat"] != null, "a ware for an empty slot is worn at once")
 	# Relics.
 	var offers: Array = game.relic_offers()
-	_check(offers.size() == 3 and offers[0]["rarity"] == "common", "three relics on the shelf, cheapest first")
+	_check(offers.map(func(r): return r["rarity"]) == ["common", "magic", "rare"], "three relics on the shelf, one of each rarity, cheapest first")
 	var e0: int = game.embers()
 	_check(game.relic_verdict(offers[0]["id"]) == "belt" and game.embers() == e0 and not game.has_relic(offers[0]["id"]), "relic_verdict tells without buying")
 	_check(game.buy_relic(offers[0]["id"]) == "belt" and game.embers() == e0 - Relics.PRICE["common"], "buying a relic puts it on the belt and costs its price")

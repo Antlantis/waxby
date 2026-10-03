@@ -813,13 +813,13 @@ func _test_lidlurk() -> void:
 	pl.invuln = 100.0
 	_step(w, int(1.0 / DT))
 	_check(lurk.state == "hop", "then it hops at him")
-	var items := 0
+	var relics := 0
 	w.deal(lurk, 1.0, {"how": "slash", "flat": 9999.0})
 	_step(w, 10)
 	for p in w.pickups:
-		if p["kind"] == "item":
-			items += 1
-	_check(items >= 1, "it always drops an item")
+		if p["kind"] == "relic":
+			relics += 1
+	_check(relics >= 1, "it always drops a relic (build 1: the vault's prize; an item once the codex is full)")
 	await _done(w)
 
 

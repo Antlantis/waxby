@@ -9,7 +9,12 @@ extends RefCounted
 ## 16-tile band, "0-15": n), moves (snuffs by move id, "rootmother:sweep_high":
 ## n), features (snuffs by terrain: "vine_snap", "glass", "gust", "tide",
 ## "float", "still", "dawnglass": n; any name a feature notes is kept), phase (the boss phase reached, 0 without a boss),
-## and mode (a mode's id, "" for the story).
+## and mode (a mode's id, "" for the story). Build 1's loot and embers:
+## items_found (items taken this attempt), legendaries_worn (of those, the
+## Legendaries he wears at the line), relics_found (relics taken),
+## embers_earned (embers picked up, in worth, banked or not: world.embers_got)
+## and embers_spent (paid at the Chandler since the last line: Game.embers_spent,
+## which world.gd _log clears once the line is written).
 
 const PATH := "user://playlog.json"
 static var path := PATH           # a test points it into its own folder (test_slots)
@@ -40,7 +45,26 @@ static func entry(w: Node, cleared: bool, causes: Dictionary) -> Dictionary:
 			"cleared": cleared, "snuffs": w.snuffs, "causes": causes, "time": roundf(w.time),
 			"flask": w.flask_uses, "altar_hp": w._last_altar_hp.duplicate(), "xp": w.xp_gained,
 			"sections": sections, "by_section": bands, "moves": moves, "features": feats,
-			"phase": int(w.phase_reached), "mode": str(w.mode.id) if w.mode != null else ""}
+			"phase": int(w.phase_reached), "mode": str(w.mode.id) if w.mode != null else "",
+			"items_found": w.items_found.size(), "legendaries_worn": legends_worn(w.items_found, g.hero() if g else {}),
+			"relics_found": w.relics_found.size(), "embers_earned": int(w.embers_got),
+			"embers_spent": int(g.get("embers_spent")) if g and g.get("embers_spent") != null else 0}
+
+
+static func legends_worn(found: Array, h: Dictionary) -> int:
+	## How many of the items found are Legendaries the hero wears now (worn on
+	## pickup, or from the card; not one taken off again).
+	var worn := {}
+	var eq = h.get("equip", {})
+	if eq is Dictionary:
+		for slot in eq:
+			if eq[slot] is Dictionary:
+				worn[str(eq[slot].get("uid", ""))] = true
+	var n := 0
+	for it in found:
+		if it is Dictionary and str(it.get("legend", "")) != "" and worn.has(str(it.get("uid", "-"))):
+			n += 1
+	return n
 
 
 static func write(entry: Dictionary) -> void:

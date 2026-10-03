@@ -181,6 +181,8 @@ func _initialize() -> void:
 	_no_errors("results")
 	await _test_pickup_states()
 	_no_errors("pickup_states")
+	await _test_power_card()
+	_no_errors("power_card")
 	await _test_level_up_card()
 	_no_errors("level_up_card")
 	await _test_touch_specials()
@@ -2422,6 +2424,77 @@ func _test_pickup_states() -> void:
 	w2.queue_free()
 	await _frames(2)
 	await _test_full_in_a_level()
+
+
+func _test_power_card() -> void:
+	## Build 1: a Legendary's "New power" card (power_card, called by world.gd's
+	## moment): NEW POWER heads it, its power on one or two big lines (13 or
+	## 12 px), the chips small; it holds CARD_POWER s, cards waiting or not,
+	## while its tap window stays CARD_TAP (a tap still undoes). A plain
+	## item's card gives way as before.
+	_where = "power card"
+	_fresh_hero(3)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 55
+	var w := _stub_world()
+	root.add_child(w)
+	var hud = HudScript.new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	await _frames(2)
+	var short: Dictionary = HudScript.card_power_lines(str(Items.LEGENDS["dawnsliver"]["text"]), 238.0)
+	_check(int(short["size"]) >= 12 and (short["lines"] as Array).size() <= 2, "a power's text fits big: %d px, %d lines" % [int(short["size"]), (short["lines"] as Array).size()])
+	var long_text := str(Items.LEGENDS["hollins_ember"]["text"]) + " " + str(Items.LEGENDS["last_candle"]["text"])
+	_check(HudScript.card_power_lines(long_text, 238.0) == HudScript.card_key_lines(long_text, 238.0), "one too long for two big lines falls back to the small ones")
+	var leg: Dictionary = Items.make("weapon", "knight", 3, "legendary", rng, "dawnsliver")
+	game.equip(leg)
+	hud.show_pickup(leg, {"dmg": -4.0, "life": 0.0}, "equipped")
+	hud.power_card(leg)
+	hud._process(0.05)
+	_check(bool(hud._card.get("power", false)) and float(hud._card["tap_left"]) > HudScript.CARD_TAP - 0.1 and float(hud._card["tap_left"]) <= HudScript.CARD_TAP,
+			"the Legendary's card is a New power, its tap window CARD_TAP")
+	await _frames(1)
+	_check(hud.card_line.begins_with("NEW POWER") and hud.card_line.contains("UNDO"), "it says so, and that a tap undoes: \"%s\"" % hud.card_line)
+	_check(hud.card_hit(hud.card_rect().get_center()), "and it takes the tap")
+	var t := 0.05
+	while not hud._card.is_empty() and float(hud._card["tap_left"]) > 0.0 and t < 8.0:
+		hud._process(0.05)
+		t += 0.05
+	_check(not hud._card.is_empty() and t < HudScript.CARD_POWER - 1.0, "its tap window closes after %.1f s, the card still up" % t)
+	await _frames(1)
+	_check(hud.card_line == "NEW POWER", "then it reads just NEW POWER (\"%s\")" % hud.card_line)
+	while not hud._card.is_empty() and t < 8.0:
+		hud._process(0.05)
+		t += 0.05
+	_check(absf(t - HudScript.CARD_POWER) < 0.11, "it holds %.2f s (CARD_POWER)" % t)
+	# With a card waiting behind it: a plain item's gives way at 1.6 s, a New power holds.
+	for power in [false, true]:
+		var it: Dictionary = Items.make("coat", "knight", 3, "legendary" if power else "rare", rng, "ossuary_coat" if power else "")
+		hud.show_pickup(it, {"dmg": 0.0, "life": 2.0}, "satchel")
+		if power:
+			hud.power_card(it)
+		hud._cards.append({"kind": "relic", "id": "rook_feather", "on": false, "t": 0.0, "tap_left": 0.0})
+		t = 0.0
+		hud._process(0.05)
+		while not hud._card.is_empty() and str(hud._card.get("kind", "")) == "item" and t < 8.0:
+			hud._process(0.05)
+			t += 0.05
+		_check(t < 2.5 if not power else absf(t - HudScript.CARD_POWER) < 0.15,
+				"a relic card waiting: %s card is up %.1f s" % ["a New power" if power else "a plain item's", t])
+		hud._card = {}
+		hud._cards.clear()
+	# Into the satchel: NEW POWER, tap to wear.
+	var sat: Dictionary = Items.make("boots", "knight", 3, "legendary", rng, "thornsole")
+	hud.show_pickup(sat, {"dmg": 0.0, "life": -1.0}, "satchel")
+	hud.power_card(sat)
+	hud._process(0.05)
+	await _frames(1)
+	_check(hud.card_line.begins_with("NEW POWER") and hud.card_line.contains("WEAR"), "one in the satchel: \"%s\"" % hud.card_line)
+	hud._card = {}
+	hud._cards.clear()
+	w.queue_free()
+	await _frames(2)
 
 
 func _fill_satchel(rng: RandomNumberGenerator) -> void:
