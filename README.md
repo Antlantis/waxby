@@ -16,7 +16,9 @@ ring them again.
   - Sexton: Knell wisps and Toll the Dead, runs on Dirge; grave step.
 - **Levels and loot:** XP to level 30, skill points, gear with affixes and
   Legendaries, a relic codex with a belt of 2 to 4 slots, and the Chandler's
-  shop.
+  shop. A lit altar with a skill point waiting offers three skills (the Altar
+  Rites). Dusk kills drop half as often and never a Common; a Legendary taken
+  is worn over a piece that isn't one, and announced.
 - **Four worlds of four levels** so far (v3 builds toward six), each ending
   in a boss:
   - World 1, the Sunken Cathedral: the Nave, the Crypt Stair, the Burning
@@ -29,7 +31,10 @@ ring them again.
     Escapement, the Hall of Weights, and the Hour Chamber with the Tinker
     of Hours.
 - **Three difficulties:** Dusk, Nightfall and Witching. There are elites with
-  Omens, Dreads, and a Guttered Pool of spilled embers you can win back.
+  Omens, Dreads, and a Guttered Pool of spilled embers you can win back. Dusk
+  stays gentle in Worlds 1-2 and pushes back from World 3 (Combat.DUSK_TEETH):
+  altars heal 40%, the monsters killed come back after a snuff, Anointed come
+  about twice as often, and Hushlings hunt in twos and threes.
 - **Illustrated story scenes** between the worlds, with portraits and voices.
 
 Every picture is drawn in code (Python-generated SVG) and every sound is
