@@ -21,7 +21,7 @@ extends SceneTree
 ## Levels (when 4-*.txt exist): the headers and registry; altars and
 ## checkpoint gaps (<= 85); sigils, the Dread, monsters (24-31) and the
 ## threat cost (11 per 100 tiles, within 15%); no Gutterwings; each level's
-## two inscriptions on its signs, in x order; required ice landings >= 3
+## inscription (one at most) on a sign; required ice landings >= 3
 ## tiles in 4-1 / 4-2 and >= 2 from 4-3 (lone ice blocks only on the star
 ## routes); rime never a required floor (the bot reaches every goal with rime
 ## as air, and with rime solid until he leans on it); no weight, swing or cog
@@ -34,8 +34,7 @@ extends SceneTree
 ## and the bridge weights over floors, not pits; stone every 14 tiles over a
 ## pit (the level checks shown to fail on a made-up level first); icicles
 ## hang <= 7 rows over a floor; per-screen caps (cogs <= 3, weights and
-## swings <= 5);
-## each feature taught at a sign; the star routes (sigil 3) tight and the
+## swings <= 5); the star routes (sigil 3) tight and the
 ## only way; the golden routes: every cog, swing and weight crossing on the
 ## critical path is ridden in one, and no route stands still on ice within 5
 ## tiles of a pit's edge, and takes no hit (4-4's approach route is replayed
@@ -823,7 +822,7 @@ func _test_headers(ids: Array) -> void:
 							vent += 1
 				_check(lv.secret == "" and lv.count("silver_bell") == 0 and vent == 0,
 						"4-2 without 4-S: no silver bell, no secret: header, no vent to a loft (%d, '%s', %d)" % [lv.count("silver_bell"), lv.secret, vent])
-		# Its two inscriptions stand on its signs, in x order.
+		# Its inscription (one at most since the sign cut; 4-2 has none) on a sign.
 		var ins: Array = Story.INSCRIPTIONS.get(id, [])
 		var at := []
 		for t in ins:
@@ -832,7 +831,7 @@ func _test_headers(ids: Array) -> void:
 				if e["kind"] == "sign" and str(e["text"]) == str(t):
 					x = int(e["cell"].x)
 			at.append(x)
-		_check(ins.size() == 2 and at[0] >= 0 and at[1] > at[0], "%s: its inscriptions on its signs, in x order (%s)" % [id, at])
+		_check(Story.INSCRIPTIONS.has(id) and ins.size() <= 1 and not at.has(-1), "%s: its inscription on a sign (%s)" % [id, at])
 
 
 func _test_rules(ids: Array) -> void:
@@ -1578,8 +1577,9 @@ func _test_safe_first(ids: Array) -> void:
 	## Safe first (decisions.md): the first cogs (4-2's first pair) over a
 	## sunken floor, the first swings (4-3's first two) and the bridge
 	## weights (4-3's second to fourth) over thorn beds: under every column
-	## they sweep there's a floor, never a pit. And each feature is taught at
-	## a sign: its first cell in the world lies within 12 tiles after one.
+	## they sweep there's a floor, never a pit. (Each feature is taught by
+	## Hollin's first-time bark, BARK_LEAD tiles before it, since the sign
+	## cut: _test_bark_lead and the routes' bark checks.)
 	if ids.has("4-2"):
 		var lv := _load("4-2")
 		var cogs: Array = _by_x(lv.of_kind("cog"))
@@ -1609,40 +1609,6 @@ func _test_safe_first(ids: Array) -> void:
 				if lv.tile(x, y) == LevelData.SPIKES_UP:
 					thorns += 1
 		_check(thorns > 0, "4-3: and a thorn bed under the first swings")
-	var firsts := {}
-	for id in ids:
-		var lv := _load(id)
-		var signs := []
-		for e in lv.entities:
-			if e["kind"] == "sign":
-				signs.append(int(e["cell"].x))
-		var found := {}
-		for y in lv.height:
-			for x in lv.width:
-				var t: int = lv.tile(x, y)
-				var what := ""
-				if LevelData.is_slick(t):
-					what = "ice"
-				elif t == LevelData.RIME:
-					what = "rime"
-				elif LevelData.is_belt(t):
-					what = "belt"
-				if what != "" and (not found.has(what) or x < int(found[what])):
-					found[what] = x
-		for e in lv.entities:
-			var k := {"icicle": "icicle", "cog": "cog", "weight": "weight", "swing": "swing"}.get(e["kind"], "")
-			if k != "" and (not found.has(k) or int(e["cell"].x) < int(found[k])):
-				found[k] = int(e["cell"].x)
-		for what in found:
-			if firsts.has(what):
-				continue
-			firsts[what] = true
-			var fx: int = found[what]
-			var taught := false
-			for sx in signs:
-				if sx <= fx and fx - sx <= 12:
-					taught = true
-			_check(taught, "%s: %s first appears within 12 tiles after a sign (x %d)" % [id, what, fx])
 
 
 # ---------------------------------------------------------------- star routes

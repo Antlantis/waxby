@@ -6,7 +6,8 @@ extends SceneTree
 ##   - level ids are exact, case and all: every registry entry's file is named
 ##     byte for byte as its id (the iOS PCK is case-sensitive, the Mac isn't);
 ##   - every script under scripts/ parses (a file that fails to parse fails);
-##   - the v2 level files nobody retrofits are still v2's, byte for byte;
+##   - the v2 level files nobody retrofits are still v2's, byte for byte, but
+##     for the signs the sign cut took;
 ##   - no draw_circle / draw_colored_polygon / draw_polyline in the v3 drawing
 ##     code (feature modules, painters, backdrop styles, ambient, edge lines);
 ##   - both iOS presets open Documents to the Files app (the playlog), and the
@@ -16,14 +17,15 @@ extends SceneTree
 
 const PRESETS := "res://export_presets.cfg"
 # sha256 of the v2 level files that stay as v2 wrote them (1-3 and 2-2 get
-# the secret exits' retrofits, WLS's).
+# the secret exits' retrofits, WLS's), less the signs the sign cut took
+# (their '@' to '.', their hints gone or reworded; 1-4's one sign stays).
 const V2_SHA := {
-	"1-1": "7e923860989d306fd272914fd146e0b2efb03fc118fb38a407e856109d1df3e1",
-	"1-2": "02141e8a8c73d7536785c446f500a34dfc8eb19971419658f67f32a7f8580156",
+	"1-1": "7a804439e3938f49b111c37d4fe3592634169987ff4cbbd80499f4fdc17b5802",
+	"1-2": "26d5dd350ba41b118f5116a9d75a966e275db68f0ce2ea7a14aef2944f00f7b4",
 	"1-4": "a720f34fa5c98dfa8d5eea6d8de9f3f50449627df4293a02e0b2c83e86e29162",
-	"2-1": "2871971489d4dfffee64dfbfdc6c02120021fbf09e8b6aa0d2a45321ef202b7e",
-	"2-3": "b5ae3503f342fb492c4ff1078257e91e1d6d0a0dad5b9c9c7d172650cb67fd1e",
-	"2-4": "9d13a3b1a369bd43ca450a79cddb5db44cd0f5a09122806fc9697cadf9716d60",
+	"2-1": "4d47de6f10acd91ca8b94644d109422543e25cecbce3e6cb341fb88c530f5239",
+	"2-3": "a30199c6c3e349b5acec870cf3e0404623f499e6221b3063f260e12aa6e9c7c4",
+	"2-4": "c419ee42c070ef3f531b6e91e2ad0817b7903e763cde08a21657e746fb1e5d02",
 }
 const NO_POLY_DIRS := ["res://scripts/features", "res://scripts/tiles", "res://scripts/backdrops"]
 const NO_POLY_FILES := ["res://scripts/ambient.gd", "res://scripts/edge_lines.gd"]

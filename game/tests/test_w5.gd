@@ -867,12 +867,11 @@ func _test_cast() -> void:
 func _test_signs() -> void:
 	var story = load("res://scripts/story.gd")
 	var ins: Dictionary = (story as Script).get_script_constant_map().get("INSCRIPTIONS", {}) if story != null else {}
-	var teach := {"5-1": ["The floor is gone. Every fall costs your flame", "Glass cracks when you land. Land twice and it breaks",
-					"Mites crack glass. Watch the lines", "Plant your feet before the gust", "Ring the bell"],
-			"5-2": ["Gusts whistle first. Wait for the calm", "The line turns white. Then step aside", "Arrows crack glass. Stay off their line",
-					"Glass knights break only edge-on", "Ring the bell"],
-			"5-3": ["Dawnglass holds only in lamplight", "Wind eats lamplight", "A lamp that lights nothing?", "Ring the bell"],
-			"5-4": ["The Saint waits at the bottom of the light", "Turn its light back on it"]}
+	# Since the sign cut the glass, the wind and the dawnglass teach
+	# themselves (glass.gd's first-time barks); a sign stays for what no bark
+	# says: the glass knights' guard, and the Saint's rule at her door.
+	var teach := {"5-1": [], "5-2": ["Glass knights block face-on. Strike after they lunge"], "5-3": [],
+			"5-4": ["When her light locks, get behind a mirror"]}
 	for id in IDS:
 		var lv: RefCounted = _levels[id]
 		var signs := _entities(lv, "sign")
@@ -885,10 +884,8 @@ func _test_signs() -> void:
 		for t in teach[id]:
 			_check(texts.has(t), "%s signs: %s" % [id, t])
 		var mine: Array = ins.get(id, [])
-		var at := []
-		for t in mine:
-			at.append(texts.find(t))
-		_check(mine.size() == 2 and not at.has(-1) and at[0] < at[1], "%s carries its two inscriptions, in x order (%s)" % [id, at])
+		_check(mine.size() == 1 and texts.has(mine[0]), "%s carries its window's inscription (%s)" % [id, mine])
+		_check(texts.size() == teach[id].size() + mine.size(), "%s: no other signs (%s)" % [id, texts])
 
 
 func _test_layout() -> void:
@@ -1015,29 +1012,28 @@ func _test_arena() -> void:
 
 func _test_teaching() -> void:
 	## Safe first (spec §0.3 rule 3): each verb's first appearance is over
-	## ground that can't cost a fall, with a sign at most 12 tiles before it.
+	## ground that can't cost a fall. (Since the sign cut glass.gd's
+	## first-time barks teach them, not signs.)
 	var l1: RefCounted = _levels["5-1"]
 	var first := _first_tile(l1, LevelData.GLASS)
 	_check(first.x >= 0 and _floor_below(l1, first, 4), "5-1: the first glass has stone under it (a safe dip) %s" % first)
-	_check(_sign_before(l1, first.x, 12), "5-1: a sign within 12 tiles before the first glass")
 	var l2: RefCounted = _levels["5-2"]
 	var z0: Dictionary = l2.gusts[0]
 	var solid := true
 	for x in range(int(z0["x0"]), int(z0["x1"]) + 1):
 		solid = solid and LevelData.is_safe(l2.tile(x, 13))
 	_check(solid, "5-2: the first gust zone blows over solid stone")
-	_check(_sign_before(l2, int(z0["x0"]), 12), "5-2: a sign within 12 tiles before it")
 	var d2 := _first_tile(l2, LevelData.DAWNGLASS)
 	_check(d2.x >= 0 and _floor_below(l2, d2, 4), "5-2: its one dawnglass step (a first look at 5-3) is over a safe drop %s" % d2)
 	var l3: RefCounted = _levels["5-3"]
 	var d3 := _first_tile(l3, LevelData.DAWNGLASS)
-	_check(d3.x >= 0 and _floor_below(l3, d3, 4) and _sign_before(l3, d3.x, 12), "5-3: dawnglass taught over a safe dip, a sign before it %s" % d3)
+	_check(d3.x >= 0 and _floor_below(l3, d3, 4), "5-3: dawnglass taught over a safe dip %s" % d3)
 	# The first Glassmite stands on glass over stone.
 	var mites := _entities(l1, "glassmite")
 	mites.sort_custom(func(a, b): return a["cell"].x < b["cell"].x)
 	var m0: Vector2i = mites[0]["cell"]
-	_check(l1.tile(m0.x, m0.y + 1) == LevelData.GLASS and _floor_below(l1, m0 + Vector2i(0, 1), 4) and _sign_before(l1, m0.x, 12),
-			"5-1: the first Glassmite, on glass pews over stone, with its sign %s" % m0)
+	_check(l1.tile(m0.x, m0.y + 1) == LevelData.GLASS and _floor_below(l1, m0 + Vector2i(0, 1), 4),
+			"5-1: the first Glassmite, on glass pews over stone %s" % m0)
 
 
 func _test_pockets(id: String) -> void:
@@ -1223,13 +1219,6 @@ func _first_tile(lv: RefCounted, t: int) -> Vector2i:
 func _floor_below(lv: RefCounted, c: Vector2i, rows: int) -> bool:
 	for y in range(c.y + 1, mini(c.y + 1 + rows, lv.height)):
 		if LevelData.is_safe(lv.tile(c.x, y)):
-			return true
-	return false
-
-
-func _sign_before(lv: RefCounted, x: int, within: int) -> bool:
-	for s in _entities(lv, "sign"):
-		if int(s["cell"].x) <= x and x - int(s["cell"].x) <= within:
 			return true
 	return false
 

@@ -29,7 +29,9 @@ Rules this world is laid out to (tests/test_w4.gd holds them):
     under it;
   - one keeper nook in each regular level (spec 3.1, 3.5.3): 4-1 Stampede
     (RS_ALTAR3), 4-2 Grave Step (ES_GUARD), 4-3 Ledge Grab (WT_VAULT);
-  - each level's two Story.INSCRIPTIONS stand on its signs, in x order.
+  - each level's Story.INSCRIPTIONS line (none in 4-2) stands on a sign; the
+    features teach themselves by Hollin's first-time barks (clockwork.gd),
+    and 4-4's only other sign is the Tinker's rule at his door.
 
 Thin ice (%, v2's crumble) keeps the crumble's grip (level_data.gd gives it
 no F_SLICK): it's the timing verb, not the slide, and a slick strip before a
@@ -41,20 +43,20 @@ import common
 from common import block, T_OPEN
 
 # 4-2's silver bell opens 4-S (WLS builds it): as 3-3's (w3.py SECRET_3S), the
-# bell, the loft over the mainspring's vent, the vent's false stone, the sign's
-# pointer to it and the level's `secret:` header are written only once
-# game/levels/4-S.txt is in the build (WLS re-runs make_levels then), so a
-# build without 4-S has no bell to a level that isn't there.
+# bell, the loft over the mainspring's vent, the vent's false stone and the
+# level's `secret:` header are written only once game/levels/4-S.txt is in
+# the build (WLS re-runs make_levels then), so a build without 4-S has no
+# bell to a level that isn't there.
 # WAXBY_W4_SECRET=1 writes them anyway.
 SECRET_4S = os.path.exists(os.path.join(common.OUT, '4-S.txt')) or os.environ.get('WAXBY_W4_SECRET') == '1'
 
 LEVELS = []
 
 INSCRIPTIONS = {
-    '4-1': ['Wind at eleven. Oil at half past. NEVER be late. — T.', 'Gear seven squeaks. It is not haunted. — T.'],
-    '4-2': ['Whoever keeps borrowing my oil: I know. — T.', 'The bells ring down. Mind your head. — T.'],
-    '4-3': ['I was late. One minute. My fault. — T.', 'If I hold the minute, it won\'t be. — T.'],
-    '4-4': ['Hold it. Hold it. Hold it. — T.', 'Tick.'],
+    '4-1': ['Wind at eleven. Oil at half past. NEVER be late. — T.'],
+    '4-2': [],
+    '4-3': ['I was one minute late. If I hold it, I never was. — T.'],
+    '4-4': ['Hold it. Hold it. Hold it. — T.'],
 }
 
 # ============================================================ 4-1 The Rime Stair
@@ -78,7 +80,7 @@ RS_START = block('''
  9|........................
 10|.....c.........c........
 11|...................###..
-12|.P..@..............###..
+12|.P.................###..
 13|####IIIIIIIIIIIIIII#####
 14|########################
 ''')
@@ -121,7 +123,7 @@ RS_RIME = block('''
  9|..........#...............
 10|....c.....Z..L......c.....
 11|..........Z.###.##ZZZ##.a.
-12|.@...@....Z.###.#.ooos#.#s
+12|..........Z.###.#.ooos#.#s
 13|##########################
 14|##########################
 ''')
@@ -159,7 +161,7 @@ RS_ICICLES = block('''
  9|..................................
 10|..c...............................
 11|..................................
-12|..@.............s.............s...
+12|................s.............s...
 13|##IIIIIIIIIIIIIIIIIIIIIIIIIIIIII##
 14|##################################
 ''')
@@ -218,7 +220,7 @@ RS_TICKWIND = block('''
  9|..................................
 10|....c...........c...........c.....
 11|................................##
-12|..@.......j.........j....j..s...##
+12|..........j.........j....j..s...##
 13|################IIIIIIIIIIIIIIII##
 14|##################################
 ''')
@@ -238,7 +240,7 @@ RS_VAULT = block('''
  9|.......##........#....
 10|....===F.........#....
 11|.......F.......2.#....
-12|..@....F....M....#.s..
+12|.......F....M....#.s..
 13|######################
 14|######################
 ''')
@@ -261,7 +263,7 @@ RS_ALTAR3 = block('''
  9|..............
 10|..c.......c...
 11|..............
-12|...K...@......
+12|...K..........
 13|##############
 14|##############
 ''')
@@ -282,7 +284,7 @@ RS_THIN = block('''
  9|..............||.#.r.j#....###
 10|.................######....###
 11|.................######....###
-12|.@........###....######....###
+12|..........###....######....###
 13|####%%%...###....######....###
 14|####......###....######....###
 ''')
@@ -330,8 +332,8 @@ RS_ALTAR4 = block('''
 # hung a tile over the floor (too low to pass under, so it's a closed loop:
 # the wheel never leaves it). Hop the box while the wheel is under it, or
 # strike it where it catches at a corner. Nothing else within 8 tiles (the
-# Rattle is back by the sign, the Flit by the bell); then icicles over an
-# ice ramp.
+# Rattle is back at the gallery's mouth, the Flit by the bell); then
+# icicles over an ice ramp.
 RS_CHIMES = block('''
  0|##############################
  1|##############################
@@ -345,7 +347,7 @@ RS_CHIMES = block('''
  9|..............................
 10|........q...........IIIIIIIIII
 11|.......#####........IIIIIIIIII
-12|s.@.................IIIIIIIIII
+12|s...................IIIIIIIIII
 13|##############################
 14|##############################
 ''')
@@ -366,7 +368,7 @@ RS_BELL = block('''
  9|IIIIIIIIIIIIII....................
 10|IIIIIIIIIIIIII....................
 11|IIIIIIIIIIIIII....................
-12|IIIIIIIIIIIIII.....j..a..@.s...E..
+12|IIIIIIIIIIIIII.....j..a....s...E..
 13|##################################
 14|##################################
 ''')
@@ -374,17 +376,7 @@ RS_BELL = block('''
 LEVELS.append({
     'id': '4-1', 'name': 'The Rime Stair', 'area': 18, 'theme': 'clockface', 'music': 'carillon',
     'dread': 'Sergeant Sprocket|tickwind|Swift,Twinned', 'tick': '0.536', 'story_start': 'beat_4_1',
-    'hints': ['Wax-ice is slick. Start slowing early',
-              'Rime melts in your flame. Lean on it',
-              'A bright flame melts faster',
-              INSCRIPTIONS['4-1'][0],
-              'Icicles crack before they fall',
-              'Jump the wind-ups. Strike their keys',
-              'Frost lies thin on hollow stone',
-              INSCRIPTIONS['4-1'][1],
-              'Thin ice cracks, then goes',
-              'Wheels rest at corners. Strike them then',
-              'Ring the bell'],
+    'hints': [INSCRIPTIONS['4-1'][0]],
     'sections': [RS_START, RS_SLIDE, RS_RIME, RS_ALTAR, RS_ICICLES, RS_STAIR, RS_ALTAR2, RS_TICKWIND, RS_VAULT,
                  RS_ALTAR3, RS_THIN, RS_DREAD, RS_ALTAR4, RS_CHIMES, RS_BELL],
 })
@@ -413,7 +405,7 @@ ES_START = block('''
  9|........................
 10|.....c.........c........
 11|........................
-12|.P..@...o..o..o..o.s....
+12|.P......o..o..o..o.s....
 13|######>>>>>>>>>>>>>#####
 14|########################
 ''')
@@ -460,7 +452,7 @@ ES_COG = block('''
  7|............................
  8|...........O.......O.....s..
  9|...####.................####
-10|.@.####.................####
+10|...####.................####
 11|########................####
 12|########................####
 13|############################
@@ -480,7 +472,7 @@ ES_ALTAR = block('''
  9|..............
 10|..c.......c...
 11|..............
-12|...K...@......
+12|...K..........
 13|##############
 14|##############
 ''')
@@ -528,7 +520,7 @@ ES_GUARD = block('''
  9|............................
 10|....c.............c.........
 11|............................
-12|..@.............e.......s...
+12|................e.......s...
 13|############################
 14|############################
 ''')
@@ -590,12 +582,11 @@ ES_MAINSPRING = block('''
  9|............................
 10|....c...............c.q.....
 11|...................####.....
-12|..@.........j...............
+12|............j...............
 13|############################
 14|############################
 ''')
 
-MAINSPRING_HINT = 'The mainspring is wound from above' if SECRET_4S else "The mainspring keeps the hall's time"
 if not SECRET_4S:
     ES_MAINSPRING[1] = '#' * len(ES_MAINSPRING[1])
     ES_MAINSPRING[2] = '#' * len(ES_MAINSPRING[2])
@@ -614,7 +605,7 @@ ES_ALTAR3 = block('''
  9|..............
 10|..c.......c...
 11|..............
-12|...K...@......
+12|...K..........
 13|##############
 14|##############
 ''')
@@ -659,7 +650,7 @@ ES_LIFTS = block('''
  9|......<<<<<##...................
 10|......#######...........===.....
 11|....||#######...................
-12|.@.j..#######.............j.....
+12|...j..#######.............j.....
 13|####..#######............#######
 14|####..#######............#######
 ''')
@@ -721,7 +712,7 @@ ES_BELL = block('''
  9|................................
 10|................................
 11|................................
-12|..j.......e.............s.@..E..
+12|..j.......e.............s....E..
 13|################################
 14|################################
 ''')
@@ -731,14 +722,6 @@ ESCAPEMENT = {
     'dread': 'Sir Hoarfrost|frostbuckle|Warded,Echoing', 'tick': '0.536', 'story_start': 'beat_4_2',
     'cog_phase': {(ES_COG, 11): 0.0, (ES_COG, 19): 0.0, (ES_TRAIN, 8): 0.0, (ES_TRAIN, 20): 0.0,
                   (ES_WORKS, 10): 0.0, (ES_WORKS, 18): 0.125, (ES_MAINSPRING, 10): 0.0, (ES_BELL, 8): 0.0},
-    'hints': ['Gear belts carry you. Run with them, or against',
-              'Ride a cog\'s teeth across',
-              INSCRIPTIONS['4-2'][0],
-              'Ice cracks show where spikes will rise',
-              MAINSPRING_HINT,
-              INSCRIPTIONS['4-2'][1],
-              'Owls see by their own light. Stay out of it',
-              'Ring the bell'],
     'sections': [ES_START, ES_BELTS, ES_COG, ES_ALTAR, ES_TRAIN, ES_GUARD, ES_ALTAR2, ES_WORKS, ES_MAINSPRING,
                  ES_ALTAR3, ES_VAULT, ES_LIFTS, ES_ALTAR4, ES_DREAD, ES_BELL],
 }
@@ -773,7 +756,7 @@ WT_START = block('''
  9|........................
 10|....c..............c....
 11|........................
-12|.P.@................s...
+12|.P..................s...
 13|########################
 14|########################
 ''')
@@ -815,7 +798,7 @@ WT_SWING = block('''
  6|............................
  7|............................
  8|............................
- 9|.@.........................b
+ 9|...........................b
 10|#####...TTT.......TTT...####
 11|#####...................####
 12|#####^^^^^^^^^^^^^^^^^^^####
@@ -978,7 +961,7 @@ WT_ALTAR3 = block('''
  9|..............
 10|..c.......c...
 11|..............
-12|...K...@......
+12|...K..........
 13|##############
 14|##############
 ''')
@@ -1000,7 +983,7 @@ WT_ICEWEIGHT = block('''
  9|................................
 10|.....c.......c........c........
 11|................................
-12|.@..............................
+12|................................
 13|###IIIIIIIIIIIIIIIIIIIIIIIIIII##
 14|################################
 ''')
@@ -1085,7 +1068,7 @@ WT_BELL = block('''
  9|....................................
 10|....TTT.............................
 11|###.................................
-12|###...j...a..........s...@.....E....
+12|###...j...a..........s.........E....
 13|####################################
 14|####################################
 ''')
@@ -1098,12 +1081,7 @@ LEVELS.append({
     # alternation by entity order would put them half a swing apart, and the
     # bob would meet a rider at the swing's near end).
     'weight_phase': {(WT_PENDULA, 23): 0.5},
-    'hints': ['Weights swing on the tick. Go as one swings away',
-              'Ride the swing. Jump at the far end',
-              INSCRIPTIONS['4-3'][0],
-              INSCRIPTIONS['4-3'][1],
-              'On ice, choose your stop before you start',
-              'Ring the bell'],
+    'hints': [INSCRIPTIONS['4-3'][0]],
     'sections': [WT_START, WT_WEIGHTS, WT_SWING, WT_ALTAR, WT_PENDULA, WT_RIMEWEIGHT, WT_ALTAR2, WT_CLOCKWALL,
                  WT_VAULT, WT_ALTAR3, WT_ICEWEIGHT, WT_DREAD, WT_ALTAR4, WT_TOLLS, WT_BELL],
 })
@@ -1131,7 +1109,7 @@ HC_START = block('''
  9|.......................##...
 10|....c..................##.c.
 11|.......................##...
-12|.P..@.j.....s..........##...
+12|.P....j.....s..........##...
 13|###IIIIIII>>>>>>############
 14|############################
 ''')
@@ -1222,7 +1200,7 @@ HC_DOOR = block('''
  9|...===........
 10|..c.......c...
 11|..............
-12|.jj..@.....K..
+12|.jj........K..
 13|##############
 14|##############
 ''')
@@ -1254,9 +1232,7 @@ LEVELS.append({
     'boss': 'tinker', 'boss_music': 'tinker', 'tick': '0.536',
     'story_start': 'beat_4_4', 'story_boss': 'boss_4_before', 'story_end': 'boss_4_after',
     'cog_phase': {(HC_START, 18): 0.0, (HC_GEARS, 8): 0.0, (K_ARENA, 10): 0.0, (K_ARENA, 24): 0.5},
-    'hints': ['The Tinker keeps the hours above',
-              INSCRIPTIONS['4-4'][0],
-              INSCRIPTIONS['4-4'][1],
-              'Ring the hour the clock shows'],
+    'hints': [INSCRIPTIONS['4-4'][0],
+              'Ring the bell the clock shows. Then hit his spring'],
     'sections': [HC_START, HC_CLIMB, HC_ALTAR, HC_GEARS, HC_DOOR, T_OPEN, K_ARENA],
 })

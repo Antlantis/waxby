@@ -1822,15 +1822,18 @@ func _test_level_rules() -> void:
 
 
 func _test_tutorial_signs() -> void:
-	## 1-1 teaches the v2 verbs, not just v1's. Past the run and jump signs
-	## and before the first skeleton stands the Special's sign: its hint is
+	## 1-1 teaches the v2 verbs, not just v1's. Past the jump sign (the
+	## arrows on screen teach the run since the sign cut) and before the
+	## first skeleton stands the Special's sign: its hint is
 	## {special_tip}, which the World fills with the calling's own line
 	## (classes.gd "sign_tip", written round the button's icon, since the
 	## player never learns the button is called Aegis). Just before the
 	## first altar stands the flask's sign (a drink is a hold, and altars
 	## refill it). In every level the signs stand 4 tiles apart or more, so
 	## each hint shows on its own (a sign shows within world.SIGN_REACH,
-	## 64 px, so two signs' reach never overlaps), and every
+	## 64 px, so two signs' reach never overlaps), there are no more than
+	## the sign budget allows (tools/levels/common.py: 1-1 four, any other
+	## level three, the feel labs free), and every
 	## hint, filled for every calling, fits the phone's message slot at
 	## 13 px or more (the HUD shrinks a long one from 15 down to 11).
 	var EK = load("res://scripts/enemy_kinds.gd")
@@ -1852,14 +1855,13 @@ func _test_tutorial_signs() -> void:
 	signs.sort_custom(func(a, b): return a[0] < b[0])
 	var at := {}   # a word in a hint -> that sign's x
 	for s in signs:
-		for word in ["to run", "to jump", "{special_tip}", "flask"]:
+		for word in ["to jump", "{special_tip}", "flask"]:
 			if (s[1] as String).contains(word) and not at.has(word):
 				at[word] = s[0]
-	var run_x: int = at.get("to run", -1)
 	var jump_x: int = at.get("to jump", -1)
 	var special_x: int = at.get("{special_tip}", -1)
-	_check(run_x >= 0 and jump_x > run_x and special_x > jump_x and special_x < skel,
-			"1-1: the Special's sign stands past the run and jump signs, before the first skeleton (%d, %d, %d < %d)" % [run_x, jump_x, special_x, skel])
+	_check(jump_x >= 0 and special_x > jump_x and special_x < skel,
+			"1-1: the Special's sign stands past the jump sign, before the first skeleton (%d, %d < %d)" % [jump_x, special_x, skel])
 	var flask_x: int = at.get("flask", -1)
 	var flask_hint := ""
 	for s in signs:
@@ -1872,14 +1874,18 @@ func _test_tutorial_signs() -> void:
 	_check(flask_x >= 0 and flask_x < altar and altar - flask_x <= 12 and between == 0,
 			"1-1: the flask's sign stands just before the first altar, nothing between (%d, altar %d)" % [flask_x, altar])
 	_check(flask_hint.contains("Hold") and flask_hint.contains("refill"), "1-1: it says the flask is a hold and altars refill it ('%s')" % flask_hint)
-	# Every level: signs 4 tiles apart or more on the same floor.
+	# Every level: signs 4 tiles apart or more on the same floor, and within
+	# the budget.
 	var close := []
+	var over := []
 	for info in game.LEVELS:
 		var l = LevelData.load_file(info["path"])
 		var cells := []
 		for e in l.entities:
 			if e["kind"] == "sign":
 				cells.append(e["cell"])
+		if not str(l.id).begins_with("lab-") and cells.size() > (4 if str(l.id) == "1-1" else 3):
+			over.append("%s %d" % [l.id, cells.size()])
 		cells.sort()
 		for i in range(1, cells.size()):
 			var a: Vector2i = cells[i - 1]
@@ -1887,6 +1893,7 @@ func _test_tutorial_signs() -> void:
 			if b.x - a.x < 4 and absi(b.y - a.y) < 2:
 				close.append("%s %s-%s" % [l.id, a, b])
 	_check(close.is_empty(), "every level's signs stand 4 tiles apart or more %s" % [close])
+	_check(over.is_empty(), "every level keeps the sign budget (1-1 four, else three) %s" % [over])
 	# Filled for every calling, as the World shows them, on the phone.
 	var was := root.size
 	root.size = Vector2i(844, 390)

@@ -95,8 +95,9 @@ const PALETTES := {
 # bone-gold, never the chartreuse of a real cloud; near the candle they turn
 # gold (near_light). They hang and settle (a slow fall with a sway), never
 # rise: in 3-3 the one stream of spores going UP is the secret's updraft
-# (spec 3.9, "These spores rise. Where to?"; the orchard feature draws it),
-# so it must be the only one. Counts share ambient's 64-mote cap.
+# (spec 3.9; secret_hint_3 points it out, "Spores don't fall up"; the orchard
+# feature draws it), so it must be the only one. Counts share ambient's
+# 64-mote cap.
 const AMBIENT := {
 	"orchard": [
 		{"kind": "spore", "count": 36, "size": 1.1, "color": Color("e0d4a0"), "alpha": 0.40, "drift": Vector2(4, 4),

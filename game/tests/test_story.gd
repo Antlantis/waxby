@@ -2860,18 +2860,29 @@ func _test_v3_script() -> void:
 	for e in _all_scene_lines():
 		if str(e[2][0]).get_slice(":", 0) == "hush":
 			_check(str(e[2][1]) == str(e[2][1]).to_lower(), "%s: the Hush speaks in lowercase" % e[0])
-	# Nobody says his name until homecoming: "Waxby" / {hero} in one line only.
+	# His name is always {hero}, never written out. Hollin says it in his
+	# warmest lines to him; Mother Taper (who says sprout) only when it
+	# counts: homecoming, and her welcome at the oath once the oath asks his
+	# name; the hero never says his own. "Wick" is the title.
 	var named_lines := []
+	var hardcoded := []
 	for pair in _lines_raw():
 		var raw := str(pair[1][1])
-		if raw.contains("Waxby") or raw.contains("{hero}"):
-			named_lines.append(pair[0])
+		if raw.contains("Waxby"):
+			hardcoded.append(pair[0])
+		if raw.contains("{hero}"):
+			named_lines.append([pair[0], str(pair[1][0]).get_slice(":", 0)])
 	for cls in Classes.ids():
 		for slot in Story.CLASS_LINES:
 			var t := str(Story.class_line(slot, cls)[1])
 			if t.contains("Waxby"):
-				named_lines.append("@%s/%s" % [slot, cls])
-	_check(named_lines == ["homecoming shot 2"], "the hero's name is said in one line, Taper's in homecoming: %s" % [named_lines])
+				hardcoded.append("@%s/%s" % [slot, cls])
+	_check(hardcoded.is_empty(), "no line writes the hero's name out (it's {hero}) %s" % [hardcoded])
+	var by_taper := named_lines.filter(func(n): return n[1] == "taper")
+	var others := named_lines.filter(func(n): return n[1] != "taper" and n[1] != "hollin")
+	var taper_ok := by_taper.has(["homecoming shot 2", "taper"]) and by_taper.all(func(n): return n[0] in ["oath shot 1", "homecoming shot 2"])
+	_check(taper_ok and others.is_empty() and named_lines.size() >= 4,
+			"the hero's name: Taper's in homecoming (and at the oath's welcome); else Hollin's: %s" % [named_lines])
 	var said := ""
 	for l in Story.lines_of("homecoming", "witch"):
 		if l["who"] == "taper" and str(l["text"]).contains(Story.HERO_NAME):
@@ -2933,7 +2944,9 @@ func _test_v3_script() -> void:
 			"1-S", "2-S", "3-S", "4-S", "5-S", "6-S"]:
 		_check(not Story.after_line(id, "knight").is_empty(), "the after-line for %s" % id)
 		var ins: Array = Story.INSCRIPTIONS.get(id, [])
-		_check(ins.size() == (1 if id.ends_with("-S") else 2), "%s has its inscriptions" % id)
+		# One a level at most since the sign cut (4-2 has none); a secret's epitaph.
+		_check((ins.size() == 1) if id.ends_with("-S") else (ins.size() <= 1), "%s has its inscription (%d)" % [id, ins.size()])
+		_check(Story.INSCRIPTIONS.has(id), "%s is in INSCRIPTIONS" % id)
 		for t in ins:
 			_check(str(t).length() <= Story.MAX_SIGN, "%s's sign fits in %d: %s" % [id, Story.MAX_SIGN, t])
 			if id.begins_with("6-") and not id.ends_with("-S"):
