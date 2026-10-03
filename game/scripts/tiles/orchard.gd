@@ -7,11 +7,11 @@ extends RefCounted
 ##   #  stone     packed loam with bone fragments for mortar and a knuckle, a
 ##                moss fringe off every lit lip, hair roots under the bottoms;
 ##                one buried tile in nine holds a skull niche
-##   F  false     drawn as its stone, with one tell the levels' signs name: a
-##                root curling over its face ("Roots grow round hollow
-##                places"), or in the rootvault a plaster skull in a niche on
-##                an open face ("Some skulls here are only plaster"); real
-##                niches sit only in buried stone
+##   F  false     drawn as its stone, with one tell: a root curling over its
+##                face, or in the rootvault a plaster skull in a niche on an
+##                open face; real niches sit only in buried stone (no sign
+##                names the tells: 2-1's "Some walls are false. Their cracks
+##                show in your light" taught false stone already)
 ##   B  brick     coffin planks: three boards, two iron straps, the crack
 ##   =  ledge     a bark branch: rounded, a knot, twig stubs at its ends, a
 ##                leaf pair on every other cell

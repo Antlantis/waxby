@@ -2861,8 +2861,9 @@ func _test_v3_script() -> void:
 		if str(e[2][0]).get_slice(":", 0) == "hush":
 			_check(str(e[2][1]) == str(e[2][1]).to_lower(), "%s: the Hush speaks in lowercase" % e[0])
 	# His name is always {hero}, never written out. Hollin says it in his
-	# warmest lines to him; Mother Taper only once, in homecoming (she says
-	# sprout); the hero never says his own. "Wick" is the title.
+	# warmest lines to him; Mother Taper (who says sprout) only when it
+	# counts: homecoming, and her welcome at the oath once the oath asks his
+	# name; the hero never says his own. "Wick" is the title.
 	var named_lines := []
 	var hardcoded := []
 	for pair in _lines_raw():
@@ -2879,8 +2880,9 @@ func _test_v3_script() -> void:
 	_check(hardcoded.is_empty(), "no line writes the hero's name out (it's {hero}) %s" % [hardcoded])
 	var by_taper := named_lines.filter(func(n): return n[1] == "taper")
 	var others := named_lines.filter(func(n): return n[1] != "taper" and n[1] != "hollin")
-	_check(by_taper == [["homecoming shot 2", "taper"]] and others.is_empty() and named_lines.size() >= 4,
-			"the hero's name: Taper's once, in homecoming; else Hollin's: %s" % [named_lines])
+	var taper_ok := by_taper.has(["homecoming shot 2", "taper"]) and by_taper.all(func(n): return n[0] in ["oath shot 1", "homecoming shot 2"])
+	_check(taper_ok and others.is_empty() and named_lines.size() >= 4,
+			"the hero's name: Taper's in homecoming (and at the oath's welcome); else Hollin's: %s" % [named_lines])
 	var said := ""
 	for l in Story.lines_of("homecoming", "witch"):
 		if l["who"] == "taper" and str(l["text"]).contains(Story.HERO_NAME):

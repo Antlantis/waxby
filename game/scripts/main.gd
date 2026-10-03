@@ -1348,7 +1348,7 @@ func _story_end(id: String, path: String) -> String:
 func _finale_due() -> String:
 	## A finale owed: a level whose closing scene names one ("finale") is
 	## cleared, and the finale hasn't played yet. A finale that resumes into
-	## the next world (the_pull: "Go down, Wick", then Onward into World 3)
+	## the next world (the_pull: "Then go, Wick", then Onward into World 3)
 	## waits until a level of that world is built, so a W1-W2 build owes
 	## nothing after 2-4 (as v3-p0, once v2's ending was seen) and the turn
 	## isn't spent, with Taper faint from then on, in a build with nowhere

@@ -26,7 +26,8 @@ extends RefCounted
 ## name. The hero's speaker id is "wick": Wick is a title (any keeper who
 ## carries the flame is one), kept where the role is the point ("No Wick goes
 ## down alone again"); his name plate shows his name. Hollin says it in his
-## warmest lines to him; Mother Taper only once, in homecoming (she says sprout).
+## warmest lines to him; Mother Taper calls him sprout, and says it only when
+## it counts (homecoming's "Well done").
 ## A panel light may carry "off": true (dark until a cue lights it), "color"
 ## (its tint) and "hush": true (a light that eats light).
 ##
@@ -789,7 +790,7 @@ const SCENES_W6 := {
 			["tickwell:kind", "Seven o'clock exactly. And breakfast is late. Typical."],
 			["waxley:shifty", "Those free candles? Small misunderstanding. Invoice to follow."],
 		]},
-		# Close on the two of them. The only time Mother Taper says his name.
+		# Close on the two of them: Mother Taper calls him by his name, not sprout.
 		{"panel": "homecoming", "in": "cut",
 		 "figs": {"tollgrave": "tollgrave_stand", "taper": "taper_stand", "hollin": "hollin_warm",
 				  "waxley": "waxley_pack", "tickwell": "tickwell"},
@@ -1085,7 +1086,7 @@ const CLASS_LINES := {
 		"witch": ["happy", "Told you. Somebody always lights it again."],
 		"runner": ["happy", "You all came? For me? ...It's the smoke. I'm not crying."],
 		"sexton": ["happy", "Even the old ones came. Look at them all. Nobody's lost."]},
-	"homecoming": { # "Well done, {hero}." (Mother Taper's first time)
+	"homecoming": { # Taper: "Well done, {hero}."
 		"knight": ["happy", "Thank you, Mother. The Vigil stands."],
 		"founder": ["happy", "Thank you. Is it supper now? It feels like supper."],
 		"witch": ["happy", "You said my name! Say it again. Louder."],
