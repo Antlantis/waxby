@@ -1,0 +1,151 @@
+{
+ "_doc": "A2 World 6 props. Frame units, 2 units = 1 world px (sprites drawn at scale 0.25). bell_buoy*: 64 x 96, its float's crest (\"water\") on the lake line; \"bell\" the bell (the toll ring), \"light\" the lantern. vigil_candle_*: 64 x 64, \"foot\" on the floor, \"flame\" the wick tip (a live flame and the light go there). grasp_hand: 64 x 160 (32 x 80 px), two hands filling the grasp's 28 x 80 px hurt rect (\"hurt\", units), the highest fingertip at \"tips\", its bottom \"base\" on the water line when fully risen (show only what is above the line). buoy_lantern_*: v2's lantern_post frame (64 x 96, \"foot\" on the floor, \"flame\" the light), its cork float at \"water\". altar_hush*, bell_hush*: v2's altar and bell frames. sconce_dead: v2's sconce frame (no flame, no light). eye_seal_*: 128 x 192 over the two-by-three doorway boss_arena.gd seals.",
+ "altar_hush": {
+  "flame": [
+   32,
+   22
+  ],
+  "foot": [
+   32,
+   96
+  ]
+ },
+ "altar_hush_lit": {
+  "flame": [
+   32,
+   22
+  ],
+  "foot": [
+   32,
+   96
+  ]
+ },
+ "bell_buoy": {
+  "bell": [
+   32,
+   48
+  ],
+  "light": [
+   32,
+   18
+  ],
+  "water": [
+   32,
+   70
+  ]
+ },
+ "bell_buoy_rung": {
+  "bell": [
+   32,
+   48
+  ],
+  "light": [
+   32,
+   18
+  ],
+  "water": [
+   32,
+   70
+  ]
+ },
+ "bell_hush": {
+  "hang": [
+   64,
+   20
+  ],
+  "rope": [
+   58,
+   108,
+   12,
+   82
+  ]
+ },
+ "bell_hush_beam": {
+  "hang": [
+   64,
+   20
+  ]
+ },
+ "buoy_lantern_lit": {
+  "flame": [
+   32,
+   30
+  ],
+  "foot": [
+   32,
+   96
+  ],
+  "water": [
+   32,
+   54
+  ]
+ },
+ "buoy_lantern_out": {
+  "flame": [
+   32,
+   30
+  ],
+  "foot": [
+   32,
+   96
+  ],
+  "water": [
+   32,
+   54
+  ]
+ },
+ "eye_seal_closed": {
+  "cells": [
+   2,
+   3
+  ]
+ },
+ "eye_seal_open": {
+  "cells": [
+   2,
+   3
+  ]
+ },
+ "grasp_hand": {
+  "base": [
+   32,
+   160
+  ],
+  "hurt": [
+   4,
+   0,
+   56,
+   160
+  ],
+  "tips": [
+   14,
+   11
+  ]
+ },
+ "sconce_dead": {
+  "flame": [
+   32,
+   14
+  ]
+ },
+ "vigil_candle_lit": {
+  "flame": [
+   32,
+   8
+  ],
+  "foot": [
+   32,
+   64
+  ]
+ },
+ "vigil_candle_out": {
+  "flame": [
+   32,
+   8
+  ],
+  "foot": [
+   32,
+   64
+  ]
+ }
+}

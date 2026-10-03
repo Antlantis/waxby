@@ -1,0 +1,256 @@
+{
+ "_doc": "A1 World 4 props (tools/art/props_w4.py). Frame units, 2 units = 1 world px (sprite scale 0.25). gear_*: square, centred, turning; gear_*_shine: the same size, drawn over and never turned. cog_tooth and swing_ledge*: the ledge rect (x, y, w, h) from the frame top-left, top = the mover rect's top; arm / rod = where the cog's arm or the swing's rod meets it. belt_teeth: a strip periodic every `period` units; draw a `window`-unit slice from an offset in [0, period) on a belt tile's top 8 px, chevrons pointing `points` (mirror for a left belt). pendulum_bob: centred on its hurt circle (hurt_r units); the rod meets it at rod; lamp = the frost lamp. pendulum_pivot: the rod hangs from pin. icicle_*: top on the ceiling, tip = its point; glint = the tell's star. flame = where the engine draws a live flame or hangs a light. Standing props stand on y 96 (base).",
+ "altar_frost": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   22
+  ]
+ },
+ "altar_frost_lit": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   22
+  ]
+ },
+ "bell_frost": {
+  "hang": [
+   64,
+   20
+  ]
+ },
+ "bell_frost_beam": {
+  "hang": [
+   64,
+   20
+  ]
+ },
+ "belt_teeth": {
+  "period": 32,
+  "points": "right",
+  "size": [
+   96,
+   16
+  ],
+  "window": 64
+ },
+ "brass_lamp_lit": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   30
+  ]
+ },
+ "brass_lamp_out": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   30
+  ]
+ },
+ "clock_door_closed": {
+  "face": [
+   64,
+   58
+  ],
+  "size": [
+   128,
+   192
+  ]
+ },
+ "clock_door_open": {
+  "face": [
+   64,
+   20
+  ],
+  "size": [
+   128,
+   192
+  ]
+ },
+ "cog_tooth": {
+  "arm": [
+   64,
+   28
+  ],
+  "ledge": [
+   0,
+   0,
+   128,
+   24
+  ],
+  "size": [
+   128,
+   32
+  ]
+ },
+ "gear_l": {
+  "center": [
+   96,
+   96
+  ],
+  "size": [
+   192,
+   192
+  ]
+ },
+ "gear_m": {
+  "center": [
+   64,
+   64
+  ],
+  "size": [
+   128,
+   128
+  ]
+ },
+ "gear_s": {
+  "center": [
+   32,
+   32
+  ],
+  "size": [
+   64,
+   64
+  ]
+ },
+ "icicle_crack": {
+  "glint": [
+   46,
+   18
+  ],
+  "tip": [
+   32,
+   60
+  ],
+  "top": [
+   32,
+   0
+  ]
+ },
+ "icicle_fall": {
+  "body": [
+   22,
+   2,
+   42,
+   62
+  ],
+  "tip": [
+   32,
+   62
+  ]
+ },
+ "icicle_hang": {
+  "body": [
+   22,
+   0,
+   42,
+   60
+  ],
+  "tip": [
+   32,
+   60
+  ],
+  "top": [
+   32,
+   0
+  ]
+ },
+ "pendulum_bob": {
+  "body_r": 34.5,
+  "center": [
+   40,
+   40
+  ],
+  "hurt_r": 36,
+  "lamp": [
+   40,
+   40
+  ],
+  "rod": [
+   40,
+   3
+  ],
+  "size": [
+   80,
+   80
+  ]
+ },
+ "pendulum_pivot": {
+  "pin": [
+   32,
+   20
+  ],
+  "size": [
+   64,
+   64
+  ]
+ },
+ "sconce_brass": {
+  "flame": [
+   32,
+   14
+  ]
+ },
+ "swing_ledge": {
+  "ledge": [
+   0,
+   0,
+   64,
+   24
+  ],
+  "rod": [
+   32,
+   0
+  ],
+  "size": [
+   64,
+   32
+  ]
+ },
+ "swing_ledge_2": {
+  "ledge": [
+   0,
+   0,
+   128,
+   24
+  ],
+  "rod": [
+   64,
+   0
+  ],
+  "size": [
+   128,
+   32
+  ]
+ },
+ "swing_ledge_3": {
+  "ledge": [
+   0,
+   0,
+   192,
+   24
+  ],
+  "rod": [
+   96,
+   0
+  ],
+  "size": [
+   192,
+   32
+  ]
+ }
+}

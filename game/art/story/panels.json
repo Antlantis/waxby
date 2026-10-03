@@ -1,0 +1,4984 @@
+{
+ "_doc": {
+  "units": "panel units; figure and portrait points are in their frame units",
+  "layers": "rect is the panel area the texture covers; px = texture pixels per unit (scale a layer by scale_d / px); lit layers are not shaded by the darkness. Layers and figures draw strictly by depth (a figure at its anchor depth + 0.001), ties in list order, so light falling from a far window to the floor comes as two lit layers that cross-fade (chapel beam + pool, belfry shafts + pools)",
+  "glass_legend": "three glass tiles (glass_a/b/c, one lancet each, x 0/800/1600) and four mullion tiles, so every texture is at most 4096 px wide; tiles of one depth move together",
+  "lights": "depth = the layer a light rides on; kind flame/cold draws a Glow flame of height h at p; glow is a darkness light only; eyes: pts (the two eyes), dot, color, and h (their size: 5.2 h apart); hidden: true = no flame; color (= tint) = the light colour",
+  "anchors": "p = where the figure feet go; h overrides the figure h; figures are drawn facing right and flip mirrors one about its feet, its flame and eye points too (x -> 2 feet.x - x); face is the actor facing hint",
+  "figures": "flames {name: [x, y, h, kind, color?]} in frame units (base of the flame, height; eyes: the point between them and their size, 5.2 h apart); a figure at anchor A lights A.name; light.name gives the exact look: kind, r (frame units), s, color, pts and dot (eyes)",
+  "portraits": "flame [x, y, h] in the 128 frame: the first mood's first live flame, left out when there is none; flames lists every live flame, mood_flames overrides it per mood; h is the full flame height; the dialogue box crops the frame to the circle of radius 0.42 (53.8 units) around (64, 62)"
+ },
+ "panels": {
+  "glass_legend": {
+   "size": [
+    2400,
+    460
+   ],
+   "dark": null,
+   "motes": null,
+   "layers": [
+    {
+     "tex": "res://art/story/sets/glass_legend_glass_a.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      800,
+      460
+     ],
+     "note": "The Undercandle"
+    },
+    {
+     "tex": "res://art/story/sets/glass_legend_glass_b.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      800,
+      0,
+      800,
+      460
+     ],
+     "note": "The Bells"
+    },
+    {
+     "tex": "res://art/story/sets/glass_legend_glass_c.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      1600,
+      0,
+      800,
+      460
+     ],
+     "note": "The Sinking"
+    },
+    {
+     "tex": "res://art/story/sets/glass_legend_m0.svg",
+     "depth": 1.12,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      -90,
+      -46,
+      180,
+      552
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/glass_legend_m1.svg",
+     "depth": 1.12,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      710,
+      -46,
+      180,
+      552
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/glass_legend_m2.svg",
+     "depth": 1.12,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      1510,
+      -46,
+      180,
+      552
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/glass_legend_m3.svg",
+     "depth": 1.12,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      2310,
+      -46,
+      180,
+      552
+     ]
+    }
+   ],
+   "lights": {},
+   "anchors": {},
+   "shimmer": true,
+   "tiles": "glass_a/b/c are the three lancets side by side (x 0, 800, 1600); mullions m0..m3 stand at x 0, 800, 1600, 2400"
+  },
+  "lanternfold": {
+   "size": [
+    1200,
+    460
+   ],
+   "dark": [
+    0.22,
+    0.24,
+    0.4
+   ],
+   "motes": "snow",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/lanternfold_sky.svg",
+     "depth": 0.3,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/lanternfold_moon.svg",
+     "depth": 0.3,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ],
+     "note": "the moon and stars; kept above y 140, clear of the roofs"
+    },
+    {
+     "tex": "res://art/story/sets/lanternfold_town.svg",
+     "depth": 0.65,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/lanternfold_lane.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ]
+    }
+   ],
+   "lights": {
+    "moon": {
+     "p": [
+      930,
+      90
+     ],
+     "r": 220,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.3
+    },
+    "lamp1": {
+     "p": [
+      140,
+      217.7
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 13
+    },
+    "lamp2": {
+     "p": [
+      262,
+      277.08
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "lamp3": {
+     "p": [
+      390,
+      243.6
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "lamp4": {
+     "p": [
+      520,
+      302.56
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "lamp5": {
+     "p": [
+      648,
+      263.6
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "lamp6": {
+     "p": [
+      770,
+      296.26
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "lamp7": {
+     "p": [
+      912,
+      310.26
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "lamp8": {
+     "p": [
+      1060,
+      217.7
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 13
+    },
+    "cat": {
+     "p": [
+      560,
+      283
+     ],
+     "r": 26,
+     "s": 0.35,
+     "kind": "eyes",
+     "depth": 1.0,
+     "h": 2.12,
+     "color": "e8d86a",
+     "pts": [
+      [
+       554.5,
+       284
+      ],
+      [
+       565.5,
+       284
+      ]
+     ],
+     "dot": 1.8
+    }
+   },
+   "anchors": {}
+  },
+  "chapel": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": [
+    0.3,
+    0.25,
+    0.42
+   ],
+   "motes": "dust",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/chapel_bg.svg",
+     "depth": 0.5,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/chapel_beam.svg",
+     "depth": 0.5,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ],
+     "note": "the top of the oculus moonbeam; the rest of it is chapel_pool"
+    },
+    {
+     "tex": "res://art/story/sets/chapel_fg.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/chapel_pool.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ],
+     "note": "the moonbeam down to its pool on the rug, under the figures"
+    }
+   ],
+   "lights": {
+    "lectern1": {
+     "p": [
+      230,
+      216
+     ],
+     "r": 100,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lectern2": {
+     "p": [
+      262,
+      198
+     ],
+     "r": 118,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 10
+    },
+    "lectern3": {
+     "p": [
+      294,
+      212
+     ],
+     "r": 100,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "hearth": {
+     "p": [
+      862,
+      270
+     ],
+     "r": 205,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 24
+    },
+    "window": {
+     "p": [
+      520,
+      136
+     ],
+     "r": 165,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 0.5
+    },
+    "moonpool": {
+     "p": [
+      606,
+      262
+     ],
+     "r": 150,
+     "s": 0.7,
+     "kind": "glow",
+     "depth": 1.0,
+     "tint": "c8ccff",
+     "color": "c8ccff"
+    }
+   },
+   "anchors": {
+    "taper": {
+     "p": [
+      334,
+      279
+     ],
+     "depth": 1.0
+    },
+    "novice": {
+     "p": [
+      615,
+      302
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "actor": {
+     "p": [
+      615,
+      302
+     ],
+     "depth": 1.0,
+     "h": 120,
+     "face": -1
+    },
+    "hollin": {
+     "p": [
+      742,
+      302
+     ],
+     "depth": 1.0,
+     "flip": true
+    }
+   }
+  },
+  "callings": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": [
+    0.26,
+    0.22,
+    0.38
+   ],
+   "motes": "dust",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/callings_bg.svg",
+     "depth": 0.5,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/callings_plinths.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    }
+   ],
+   "lights": {
+    "sconce_l": {
+     "p": [
+      66,
+      189.05
+     ],
+     "r": 130,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.5,
+     "h": 11
+    },
+    "sconce_r": {
+     "p": [
+      934,
+      189.05
+     ],
+     "r": 130,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.5,
+     "h": 11
+    },
+    "plinth_knight": {
+     "p": [
+      180.0,
+      194.87
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 11
+    },
+    "plinth_founder": {
+     "p": [
+      340.0,
+      179.47
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 11
+    },
+    "plinth_witch": {
+     "p": [
+      523.6,
+      153.1
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 11
+    },
+    "plinth_runner": {
+     "p": [
+      725.0,
+      267.7
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 11
+    },
+    "plinth_sexton": {
+     "p": [
+      820.0,
+      162.8
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 11
+    }
+   },
+   "anchors": {}
+  },
+  "crypt_row": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": [
+    0.24,
+    0.3,
+    0.32
+   ],
+   "motes": "dust",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/crypt_row_vault.svg",
+     "depth": 0.6,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/crypt_row_floor.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    }
+   ],
+   "lights": {
+    "c1": {
+     "p": [
+      150.0,
+      298.01
+     ],
+     "r": 120,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 17.0
+    },
+    "c2": {
+     "p": [
+      242.4,
+      277.55
+     ],
+     "r": 100,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 13.7
+    },
+    "c3": {
+     "p": [
+      309.6,
+      262.67
+     ],
+     "r": 86,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.6,
+     "h": 11.3
+    },
+    "c4": {
+     "p": [
+      360.0,
+      251.5
+     ],
+     "r": 74,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.6,
+     "h": 9.5
+    },
+    "c5": {
+     "p": [
+      397.8,
+      243.13
+     ],
+     "r": 64,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.6,
+     "h": 8.1
+    },
+    "c6": {
+     "p": [
+      427.2,
+      236.47
+     ],
+     "r": 56,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.6,
+     "h": 7.1
+    },
+    "c7": {
+     "p": [
+      450.3,
+      230.97
+     ],
+     "r": 50,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.6,
+     "h": 6.3
+    },
+    "c8": {
+     "p": [
+      467.1,
+      226.98
+     ],
+     "r": 44,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.6,
+     "h": 5.7
+    },
+    "far_glass": {
+     "p": [
+      570.0,
+      201
+     ],
+     "r": 150,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 0.6
+    }
+   },
+   "anchors": {
+    "far": {
+     "p": [
+      600,
+      275
+     ],
+     "depth": 0.6,
+     "h": 137,
+     "flip": true
+    }
+   }
+  },
+  "belfry": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": [
+    0.26,
+    0.28,
+    0.46
+   ],
+   "motes": "dust",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/belfry_louvers.svg",
+     "depth": 0.4,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/belfry_shafts.svg",
+     "depth": 0.4,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ],
+     "note": "moonlight through the louvers, down to the wall's foot; the rest is belfry_pools"
+    },
+    {
+     "tex": "res://art/story/sets/belfry_floor.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/belfry_pools.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ],
+     "note": "the moon shafts where they fall across the boards, under the figures"
+    },
+    {
+     "tex": "res://art/story/sets/belfry_rafters.svg",
+     "depth": 1.3,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      -100.0,
+      -46.0,
+      1200.0,
+      552.0
+     ]
+    }
+   ],
+   "lights": {
+    "moon1": {
+     "p": [
+      230,
+      196
+     ],
+     "r": 150,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 0.4,
+     "tint": "c0c8f0",
+     "color": "c0c8f0"
+    },
+    "moon2": {
+     "p": [
+      500,
+      186
+     ],
+     "r": 150,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 0.4,
+     "tint": "c0c8f0",
+     "color": "c0c8f0"
+    },
+    "moon3": {
+     "p": [
+      770,
+      150
+     ],
+     "r": 175,
+     "s": 0.85,
+     "kind": "glow",
+     "depth": 0.4,
+     "tint": "c0c8f0",
+     "color": "c0c8f0"
+    },
+    "bell_beam": {
+     "p": [
+      500,
+      92
+     ],
+     "r": 210,
+     "s": 0.95,
+     "kind": "glow",
+     "depth": 1.0
+    }
+   },
+   "anchors": {
+    "boss": {
+     "p": [
+      520,
+      330
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "sit": {
+     "p": [
+      575,
+      330
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "actor_after": {
+     "p": [
+      360,
+      330
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "sill": {
+     "p": [
+      770,
+      262
+     ],
+     "depth": 0.4,
+     "h": 274,
+     "flip": true
+    }
+   }
+  },
+  "tallow_vista": {
+   "size": [
+    1400,
+    460
+   ],
+   "dark": [
+    0.32,
+    0.28,
+    0.26
+   ],
+   "motes": "wax",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/tallow_vista_far.svg",
+     "depth": 0.3,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/tallow_vista_terraces.svg",
+     "depth": 0.65,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/tallow_vista_ledge.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 2.9,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    }
+   ],
+   "lights": {
+    "under_far": {
+     "p": [
+      700,
+      364
+     ],
+     "r": 90,
+     "s": 0.85,
+     "kind": "glow",
+     "depth": 0.3
+    },
+    "reed1": {
+     "p": [
+      56,
+      213
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed2": {
+     "p": [
+      146,
+      191
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed3": {
+     "p": [
+      228,
+      219
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed4": {
+     "p": [
+      335,
+      269
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed5": {
+     "p": [
+      404,
+      281
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed6": {
+     "p": [
+      483,
+      277
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed7": {
+     "p": [
+      895,
+      263
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed8": {
+     "p": [
+      984,
+      273
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed9": {
+     "p": [
+      1107,
+      199
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed10": {
+     "p": [
+      1205,
+      183
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed11": {
+     "p": [
+      1286,
+      207
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "reed12": {
+     "p": [
+      1372,
+      213
+     ],
+     "r": 74,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 0.65,
+     "h": 8
+    },
+    "moth": {
+     "p": [
+      1190,
+      310
+     ],
+     "r": 150,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 1.0,
+     "tint": "a8e0d0",
+     "color": "a8e0d0"
+    }
+   },
+   "anchors": {
+    "edge": {
+     "p": [
+      200,
+      297
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "actor": {
+     "p": [
+      200,
+      297
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "waxley": {
+     "p": [
+      320,
+      299
+     ],
+     "depth": 1.0,
+     "flip": true
+    }
+   }
+  },
+  "undercandle": {
+   "size": [
+    1000,
+    600
+   ],
+   "dark": [
+    0.2,
+    0.18,
+    0.3
+   ],
+   "motes": "wax",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/undercandle_chamber.svg",
+     "depth": 0.4,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/undercandle_candle.svg",
+     "depth": 0.8,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/undercandle_floor.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      600
+     ]
+    }
+   ],
+   "lights": {
+    "under_flame": {
+     "p": [
+      500,
+      58
+     ],
+     "r": 700,
+     "s": 1.0,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 60,
+     "tint": "a8c8ff",
+     "color": "a8c8ff"
+    },
+    "reed1": {
+     "p": [
+      85,
+      419
+     ],
+     "r": 80,
+     "s": 0.8,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "reed2": {
+     "p": [
+      234,
+      451
+     ],
+     "r": 80,
+     "s": 0.8,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "reed3": {
+     "p": [
+      767,
+      447
+     ],
+     "r": 80,
+     "s": 0.8,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "reed4": {
+     "p": [
+      945,
+      423
+     ],
+     "r": 80,
+     "s": 0.8,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "under_warm": {
+     "p": [
+      500,
+      58
+     ],
+     "r": 700,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 60,
+     "color": "ffd070",
+     "off": true
+    }
+   },
+   "anchors": {
+    "boss": {
+     "p": [
+      650,
+      500
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "cone": {
+     "p": [
+      640,
+      500
+     ],
+     "depth": 1.0
+    },
+    "hollin": {
+     "p": [
+      575,
+      500
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "actor_near": {
+     "p": [
+      430,
+      500
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "grasp": {
+     "p": [
+      500,
+      492
+     ],
+     "depth": 0.85,
+     "h": 640
+    }
+   }
+  },
+  "bells_all": {
+   "size": [
+    1000,
+    1100
+   ],
+   "dark": [
+    0.28,
+    0.24,
+    0.4
+   ],
+   "motes": "dust",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/bells_all_cutaway.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      1100
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/bells_all_beams.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      1100
+     ],
+     "note": "soft light only, so px 2 is enough at depth 1; shaded, so it shows as the bells light"
+    }
+   ],
+   "lights": {
+    "under_flame": {
+     "p": [
+      500,
+      933.5
+     ],
+     "r": 330,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 40
+    },
+    "bell1": {
+     "p": [
+      180,
+      790
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell2": {
+     "p": [
+      820,
+      770
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell3": {
+     "p": [
+      180,
+      570
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell4": {
+     "p": [
+      820,
+      550
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell5": {
+     "p": [
+      180,
+      350
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell6": {
+     "p": [
+      820,
+      330
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell7": {
+     "p": [
+      500,
+      320
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    },
+    "bell8": {
+     "p": [
+      500,
+      110
+     ],
+     "r": 165,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 1.0
+    }
+   },
+   "anchors": {}
+  },
+  "dawn_rise": {
+   "size": [
+    1200,
+    460
+   ],
+   "dark": [
+    0.25,
+    0.25,
+    0.4
+   ],
+   "motes": "embers",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/dawn_rise_sky.svg",
+     "depth": 0.25,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/dawn_rise_cathedral.svg",
+     "depth": 0.55,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/dawn_rise_town.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1200,
+      460
+     ]
+    }
+   ],
+   "lights": {
+    "sun": {
+     "p": [
+      840,
+      200
+     ],
+     "r": 400,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 0.25
+    },
+    "lamp1": {
+     "p": [
+      140,
+      217.7
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 13
+    },
+    "lamp2": {
+     "p": [
+      262,
+      277.08
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lamp3": {
+     "p": [
+      390,
+      243.6
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lamp4": {
+     "p": [
+      520,
+      302.56
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lamp5": {
+     "p": [
+      648,
+      263.6
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lamp6": {
+     "p": [
+      770,
+      296.26
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lamp7": {
+     "p": [
+      912,
+      310.26
+     ],
+     "r": 84,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 8
+    },
+    "lamp8": {
+     "p": [
+      1060,
+      217.7
+     ],
+     "r": 110,
+     "s": 1.0,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 13
+    }
+   },
+   "anchors": {}
+  },
+  "hush_eye": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": null,
+   "motes": null,
+   "layers": [
+    {
+     "tex": "res://art/story/sets/hush_eye_void.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ],
+     "note": "black with ripples; the panel has no darkness"
+    }
+   ],
+   "lights": {},
+   "anchors": {
+    "eye": {
+     "p": [
+      500,
+      230
+     ],
+     "depth": 1.0
+    },
+    "float": {
+     "p": [
+      500,
+      352
+     ],
+     "depth": 1.0
+    }
+   }
+  },
+  "orchard_vista": {
+   "size": [
+    1400,
+    460
+   ],
+   "dark": [
+    0.26,
+    0.3,
+    0.24
+   ],
+   "motes": "spores",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/orchard_vista_roof.svg",
+     "depth": 0.35,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/orchard_vista_roof_glow.svg",
+     "depth": 0.35,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      20,
+      0,
+      500,
+      190
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/orchard_vista_trees.svg",
+     "depth": 0.7,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/orchard_vista_seam.svg",
+     "depth": 0.7,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      440,
+      150,
+      820,
+      270
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/orchard_vista_ledge.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      150,
+      720,
+      310
+     ]
+    }
+   ],
+   "lights": {
+    "scorch1": {
+     "p": [
+      190,
+      52
+     ],
+     "r": 70,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.35,
+     "color": "ff9a4a"
+    },
+    "scorch2": {
+     "p": [
+      380,
+      120
+     ],
+     "r": 80,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.35,
+     "color": "ff9a4a"
+    },
+    "scorch3": {
+     "p": [
+      590,
+      190
+     ],
+     "r": 90,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "ff9a4a"
+    },
+    "scorch4": {
+     "p": [
+      800,
+      250
+     ],
+     "r": 80,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "ff9a4a"
+    },
+    "scorch5": {
+     "p": [
+      1000,
+      310
+     ],
+     "r": 70,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "ff9a4a"
+    },
+    "scorch6": {
+     "p": [
+      1180,
+      372
+     ],
+     "r": 90,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "ff9a4a"
+    },
+    "glowcap1": {
+     "p": [
+      180,
+      305
+     ],
+     "r": 70,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "a8e0a0"
+    },
+    "glowcap2": {
+     "p": [
+      706,
+      350
+     ],
+     "r": 70,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "a8e0a0"
+    },
+    "glowcap3": {
+     "p": [
+      926,
+      390
+     ],
+     "r": 70,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "a8e0a0"
+    },
+    "glowcap4": {
+     "p": [
+      1276,
+      380
+     ],
+     "r": 70,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "a8e0a0"
+    },
+    "lantern": {
+     "p": [
+      332,
+      262
+     ],
+     "r": 150,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 12
+    }
+   },
+   "anchors": {
+    "edge": {
+     "p": [
+      250,
+      318
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "waxley": {
+     "p": [
+      450,
+      318
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "cone": {
+     "p": [
+      555,
+      318
+     ],
+     "depth": 1.0,
+     "h": 260
+    }
+   }
+  },
+  "heartwood": {
+   "size": [
+    1000,
+    600
+   ],
+   "dark": [
+    0.22,
+    0.28,
+    0.22
+   ],
+   "motes": "spores",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/heartwood_chamber.svg",
+     "depth": 0.4,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/heartwood_tree.svg",
+     "depth": 0.8,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/heartwood_floor.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      340,
+      1000,
+      260
+     ]
+    }
+   ],
+   "lights": {
+    "cage1": {
+     "p": [
+      100,
+      205
+     ],
+     "r": 70,
+     "s": 0.8,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 12,
+     "color": "a8d0ff"
+    },
+    "cage2": {
+     "p": [
+      200,
+      120
+     ],
+     "r": 70,
+     "s": 0.8,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 12,
+     "color": "a8d0ff"
+    },
+    "cage3": {
+     "p": [
+      320,
+      190
+     ],
+     "r": 70,
+     "s": 0.8,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 12,
+     "color": "a8d0ff"
+    },
+    "cage4": {
+     "p": [
+      800,
+      115
+     ],
+     "r": 70,
+     "s": 0.8,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 12,
+     "color": "a8d0ff"
+    },
+    "cage5": {
+     "p": [
+      880,
+      225
+     ],
+     "r": 70,
+     "s": 0.8,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 12,
+     "color": "a8d0ff"
+    },
+    "cage6": {
+     "p": [
+      950,
+      130
+     ],
+     "r": 70,
+     "s": 0.8,
+     "kind": "cold",
+     "depth": 0.8,
+     "h": 12,
+     "color": "a8d0ff"
+    },
+    "kept1": {
+     "p": [
+      100,
+      205
+     ],
+     "r": 90,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 14,
+     "off": true
+    },
+    "kept2": {
+     "p": [
+      200,
+      120
+     ],
+     "r": 90,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 14,
+     "off": true
+    },
+    "kept3": {
+     "p": [
+      320,
+      190
+     ],
+     "r": 90,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 14,
+     "off": true
+    },
+    "kept4": {
+     "p": [
+      800,
+      115
+     ],
+     "r": 90,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 14,
+     "off": true
+    },
+    "kept5": {
+     "p": [
+      880,
+      225
+     ],
+     "r": 90,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 14,
+     "off": true
+    },
+    "kept6": {
+     "p": [
+      950,
+      130
+     ],
+     "r": 90,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 0.8,
+     "h": 14,
+     "off": true
+    },
+    "trowel": {
+     "p": [
+      425,
+      400
+     ],
+     "r": 70,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "ffe8b0"
+    },
+    "moss1": {
+     "p": [
+      655,
+      395
+     ],
+     "r": 110,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "a8e0a0"
+    },
+    "moss2": {
+     "p": [
+      540,
+      150
+     ],
+     "r": 120,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.8,
+     "color": "a8e0a0"
+    }
+   },
+   "anchors": {
+    "boss": {
+     "p": [
+      620,
+      415
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "spirit": {
+     "p": [
+      430,
+      405
+     ],
+     "depth": 1.0,
+     "h": 110,
+     "flip": true
+    },
+    "actor": {
+     "p": [
+      240,
+      415
+     ],
+     "depth": 1.0,
+     "h": 120
+    }
+   }
+  },
+  "carillon_vista": {
+   "size": [
+    1000,
+    900
+   ],
+   "dark": [
+    0.22,
+    0.28,
+    0.4
+   ],
+   "motes": "rime",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/carillon_vista_abyss.svg",
+     "depth": 0.35,
+     "lit": false,
+     "px": 1.5,
+     "rect": [
+      0,
+      0,
+      1000,
+      900
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/carillon_vista_tower.svg",
+     "depth": 0.75,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      900
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/carillon_vista_ledge.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      420
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/carillon_vista_scorch.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      280,
+      260,
+      200,
+      40
+     ]
+    }
+   ],
+   "lights": {
+    "clock": {
+     "p": [
+      640,
+      430
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "bfe8ff"
+    },
+    "bell1": {
+     "p": [
+      640,
+      175
+     ],
+     "r": 60,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "a8d8ff"
+    },
+    "bell2": {
+     "p": [
+      640,
+      315
+     ],
+     "r": 60,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "a8d8ff"
+    },
+    "bell3": {
+     "p": [
+      640,
+      565
+     ],
+     "r": 60,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "a8d8ff"
+    },
+    "bell4": {
+     "p": [
+      640,
+      680
+     ],
+     "r": 60,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "a8d8ff"
+    },
+    "scorch": {
+     "p": [
+      430,
+      280
+     ],
+     "r": 90,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "ff9a4a"
+    },
+    "ice1": {
+     "p": [
+      150,
+      330
+     ],
+     "r": 40,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "e8f8ff"
+    },
+    "ice2": {
+     "p": [
+      520,
+      340
+     ],
+     "r": 40,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "e8f8ff"
+    },
+    "ice3": {
+     "p": [
+      820,
+      250
+     ],
+     "r": 40,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "e8f8ff"
+    }
+   },
+   "anchors": {
+    "edge": {
+     "p": [
+      360,
+      285
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "waxley": {
+     "p": [
+      470,
+      285
+     ],
+     "depth": 1.0,
+     "flip": true
+    }
+   }
+  },
+  "escapement": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": [
+    0.22,
+    0.26,
+    0.38
+   ],
+   "motes": "rime",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/escapement_gears.svg",
+     "depth": 0.45,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/escapement_engine.svg",
+     "depth": 0.8,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/escapement_floor.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      100,
+      1000,
+      360
+     ]
+    }
+   ],
+   "lights": {
+    "clock": {
+     "p": [
+      500,
+      110
+     ],
+     "r": 140,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.45,
+     "color": "bfe8ff"
+    },
+    "pend": {
+     "p": [
+      430,
+      236
+     ],
+     "r": 50,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.8,
+     "color": "e8f8ff"
+    },
+    "grate": {
+     "p": [
+      620,
+      300
+     ],
+     "r": 190,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "9ac8e0"
+    },
+    "sconce": {
+     "p": [
+      130,
+      179.7
+     ],
+     "r": 150,
+     "s": 0.85,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 10
+    },
+    "bench_lamp": {
+     "p": [
+      870,
+      282
+     ],
+     "r": 160,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 10,
+     "off": true
+    },
+    "forge": {
+     "p": [
+      942,
+      292
+     ],
+     "r": 120,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 16,
+     "color": "f08a3a",
+     "off": true
+    }
+   },
+   "anchors": {
+    "boss": {
+     "p": [
+      560,
+      322
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "tickwell": {
+     "p": [
+      690,
+      322
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "bench": {
+     "p": [
+      820,
+      294
+     ],
+     "depth": 1.0,
+     "h": 300
+    },
+    "actor": {
+     "p": [
+      330,
+      322
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "waxley": {
+     "p": [
+      240,
+      322
+     ],
+     "depth": 1.0
+    }
+   }
+  },
+  "sanctum_vista": {
+   "size": [
+    1400,
+    460
+   ],
+   "dark": [
+    0.3,
+    0.26,
+    0.4
+   ],
+   "motes": "shards",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/sanctum_vista_void.svg",
+     "depth": 0.3,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/sanctum_vista_shards.svg",
+     "depth": 0.65,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/sanctum_vista_beams.svg",
+     "depth": 0.65,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/sanctum_vista_ledge.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      200,
+      620,
+      260
+     ]
+    }
+   ],
+   "lights": {
+    "beam1": {
+     "p": [
+      560,
+      160
+     ],
+     "r": 120,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "b8324e"
+    },
+    "beam2": {
+     "p": [
+      760,
+      230
+     ],
+     "r": 120,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "3a6ab8"
+    },
+    "beam3": {
+     "p": [
+      960,
+      140
+     ],
+     "r": 120,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "d8a830"
+    },
+    "beam4": {
+     "p": [
+      1140,
+      250
+     ],
+     "r": 120,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "5aa860"
+    },
+    "beam5": {
+     "p": [
+      1300,
+      170
+     ],
+     "r": 120,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "7a5ab8"
+    },
+    "glint1": {
+     "p": [
+      180,
+      280
+     ],
+     "r": 90,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "f0f4ff"
+    },
+    "glint2": {
+     "p": [
+      470,
+      330
+     ],
+     "r": 40,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "f0f4ff"
+    },
+    "glint3": {
+     "p": [
+      860,
+      330
+     ],
+     "r": 40,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "f0f4ff"
+    },
+    "glint4": {
+     "p": [
+      1220,
+      90
+     ],
+     "r": 40,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 0.65,
+     "color": "f0f4ff"
+    }
+   },
+   "anchors": {
+    "edge": {
+     "p": [
+      270,
+      318
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "waxley": {
+     "p": [
+      150,
+      318
+     ],
+     "depth": 1.0
+    }
+   }
+  },
+  "glass_throne": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": [
+    0.26,
+    0.24,
+    0.4
+   ],
+   "motes": "shards",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/glass_throne_rose.svg",
+     "depth": 0.5,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/glass_throne_rays.svg",
+     "depth": 0.5,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/glass_throne_steps.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      100,
+      1000,
+      360
+     ]
+    }
+   ],
+   "lights": {
+    "rose_center": {
+     "p": [
+      500,
+      175
+     ],
+     "r": 380,
+     "s": 0.6,
+     "kind": "glow",
+     "depth": 0.5,
+     "color": "f0f4ff"
+    },
+    "pane1": {
+     "p": [
+      380,
+      90
+     ],
+     "r": 160,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "b8324e",
+     "off": true
+    },
+    "pane2": {
+     "p": [
+      620,
+      90
+     ],
+     "r": 160,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "3a6ab8",
+     "off": true
+    },
+    "pane3": {
+     "p": [
+      325,
+      190
+     ],
+     "r": 160,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "d8a830",
+     "off": true
+    },
+    "pane4": {
+     "p": [
+      675,
+      190
+     ],
+     "r": 160,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "5aa860",
+     "off": true
+    },
+    "pane5": {
+     "p": [
+      385,
+      285
+     ],
+     "r": 160,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "7a5ab8",
+     "off": true
+    },
+    "pane6": {
+     "p": [
+      615,
+      285
+     ],
+     "r": 160,
+     "s": 0.55,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "e07aa0",
+     "off": true
+    },
+    "step1": {
+     "p": [
+      500,
+      340
+     ],
+     "r": 90,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "b8324e",
+     "off": true
+    },
+    "step2": {
+     "p": [
+      522,
+      376
+     ],
+     "r": 90,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "d8a830",
+     "off": true
+    },
+    "step3": {
+     "p": [
+      546,
+      412
+     ],
+     "r": 90,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "3a6ab8",
+     "off": true
+    },
+    "step4": {
+     "p": [
+      572,
+      448
+     ],
+     "r": 90,
+     "s": 0.4,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "5aa860",
+     "off": true
+    }
+   },
+   "anchors": {
+    "saint": {
+     "p": [
+      500,
+      300
+     ],
+     "depth": 1.0
+    },
+    "actor": {
+     "p": [
+      280,
+      318
+     ],
+     "depth": 0.96,
+     "h": 120
+    }
+   }
+  },
+  "glass_truth": {
+   "size": [
+    1000,
+    460
+   ],
+   "dark": null,
+   "motes": null,
+   "layers": [
+    {
+     "tex": "res://art/story/sets/glass_truth_glass.svg",
+     "depth": 1.0,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      1000,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/glass_truth_mullions.svg",
+     "depth": 1.12,
+     "lit": true,
+     "px": 3.0,
+     "rect": [
+      -100.0,
+      -46.0,
+      1200.0,
+      552.0
+     ]
+    }
+   ],
+   "lights": {},
+   "anchors": {},
+   "shimmer": true,
+   "title": "The Girl Who Sang"
+  },
+  "hushdeep_vista": {
+   "size": [
+    1400,
+    460
+   ],
+   "dark": [
+    0.1,
+    0.09,
+    0.16
+   ],
+   "motes": null,
+   "layers": [
+    {
+     "tex": "res://art/story/sets/hushdeep_vista_sky.svg",
+     "depth": 0.3,
+     "lit": false,
+     "px": 0.25,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_vista_ripples.svg",
+     "depth": 0.3,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_vista_lake.svg",
+     "depth": 0.7,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1400,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_vista_mirror.svg",
+     "depth": 0.7,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      160,
+      1400,
+      300
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_vista_shore.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      0,
+      0,
+      700,
+      460
+     ]
+    }
+   ],
+   "lights": {
+    "far_flame": {
+     "p": [
+      1020,
+      250
+     ],
+     "r": 50,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.7,
+     "color": "ffd84a"
+    },
+    "stair1": {
+     "p": [
+      60,
+      60
+     ],
+     "r": 50,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "b8324e"
+    },
+    "stair2": {
+     "p": [
+      130,
+      140
+     ],
+     "r": 50,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "d8a830"
+    },
+    "stair3": {
+     "p": [
+      190,
+      215
+     ],
+     "r": 50,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "3a6ab8"
+    },
+    "stair4": {
+     "p": [
+      240,
+      290
+     ],
+     "r": 50,
+     "s": 0.3,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "5aa860"
+    }
+   },
+   "anchors": {
+    "edge": {
+     "p": [
+      390,
+      318
+     ],
+     "depth": 1.0,
+     "h": 120
+    }
+   }
+  },
+  "hushdeep_heart": {
+   "size": [
+    1800,
+    600
+   ],
+   "dark": [
+    0.08,
+    0.08,
+    0.14
+   ],
+   "motes": null,
+   "layers": [
+    {
+     "tex": "res://art/story/sets/hushdeep_heart_void.svg",
+     "depth": 0.3,
+     "lit": false,
+     "px": 0.25,
+     "rect": [
+      0,
+      0,
+      1800,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_heart_ripples.svg",
+     "depth": 0.3,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1800,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_heart_water.svg",
+     "depth": 0.7,
+     "lit": false,
+     "px": 1.2,
+     "rect": [
+      0,
+      0,
+      1800,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_heart_mirror.svg",
+     "depth": 0.7,
+     "lit": true,
+     "px": 2.0,
+     "rect": [
+      0,
+      140,
+      1800,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_heart_stair.svg",
+     "depth": 0.85,
+     "lit": false,
+     "px": 2.4,
+     "rect": [
+      0,
+      0,
+      1150,
+      600
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/hushdeep_heart_shore.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 3.0,
+     "rect": [
+      500,
+      350,
+      1300,
+      250
+     ]
+    }
+   ],
+   "lights": {
+    "stair1": {
+     "p": [
+      123.6,
+      5.64
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.85,
+     "color": "b8324e",
+     "off": true
+    },
+    "stair2": {
+     "p": [
+      176.62,
+      126.06
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.85,
+     "color": "d8a830",
+     "off": true
+    },
+    "stair3": {
+     "p": [
+      241.56,
+      209.62
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.85,
+     "color": "3a6ab8",
+     "off": true
+    },
+    "stair4": {
+     "p": [
+      325.7,
+      279.06
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.85,
+     "color": "5aa860",
+     "off": true
+    },
+    "stair5": {
+     "p": [
+      429.04,
+      334.38
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.85,
+     "color": "7a5ab8",
+     "off": true
+    },
+    "stair6": {
+     "p": [
+      551.6,
+      375.6
+     ],
+     "r": 120,
+     "s": 0.5,
+     "kind": "glow",
+     "depth": 0.85,
+     "color": "e07aa0",
+     "off": true
+    },
+    "eye_glow": {
+     "p": [
+      1450,
+      300
+     ],
+     "r": 260,
+     "s": 0.45,
+     "kind": "glow",
+     "depth": 0.75,
+     "color": "d8d4f0"
+    },
+    "shore_glow": {
+     "p": [
+      900,
+      412
+     ],
+     "r": 180,
+     "s": 0.35,
+     "kind": "glow",
+     "depth": 1.0,
+     "color": "6a5a9a"
+    }
+   },
+   "anchors": {
+    "eye": {
+     "p": [
+      1450,
+      300
+     ],
+     "depth": 0.75,
+     "h": 380
+    },
+    "wick": {
+     "p": [
+      790,
+      424
+     ],
+     "depth": 0.92
+    },
+    "actor": {
+     "p": [
+      950,
+      440
+     ],
+     "depth": 1.0,
+     "h": 120
+    },
+    "actor_give": {
+     "p": [
+      870,
+      440
+     ],
+     "depth": 1.0,
+     "h": 120,
+     "face": -1
+    },
+    "town": {
+     "p": [
+      148.14,
+      101.98
+     ],
+     "depth": 0.85,
+     "h": 150
+    },
+    "waxley": {
+     "p": [
+      202.1,
+      193.6
+     ],
+     "depth": 0.85,
+     "h": 120
+    },
+    "carry": {
+     "p": [
+      275.26,
+      271.1
+     ],
+     "depth": 0.85,
+     "h": 104
+    },
+    "tollgrave": {
+     "p": [
+      367.64,
+      334.5
+     ],
+     "depth": 0.85,
+     "h": 230
+    },
+    "tickwell": {
+     "p": [
+      479.22,
+      383.78
+     ],
+     "depth": 0.85,
+     "h": 100
+    },
+    "lost": {
+     "p": [
+      590.14,
+      414.78
+     ],
+     "depth": 0.85,
+     "h": 100
+    }
+   }
+  },
+  "homecoming": {
+   "size": [
+    1600,
+    460
+   ],
+   "dark": [
+    0.45,
+    0.42,
+    0.55
+   ],
+   "motes": "embers",
+   "layers": [
+    {
+     "tex": "res://art/story/sets/homecoming_sky.svg",
+     "depth": 0.25,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1600,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/homecoming_evenbell.svg",
+     "depth": 0.55,
+     "lit": false,
+     "px": 2.0,
+     "rect": [
+      0,
+      0,
+      1600,
+      460
+     ]
+    },
+    {
+     "tex": "res://art/story/sets/homecoming_square.svg",
+     "depth": 1.0,
+     "lit": false,
+     "px": 2.5,
+     "rect": [
+      0,
+      150,
+      1600,
+      310
+     ]
+    }
+   ],
+   "lights": {
+    "bunting1": {
+     "p": [
+      520,
+      124.0
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting2": {
+     "p": [
+      580,
+      143.3
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting3": {
+     "p": [
+      640,
+      153.6
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting4": {
+     "p": [
+      700,
+      149.9
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting5": {
+     "p": [
+      760,
+      134.0
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting6": {
+     "p": [
+      820,
+      113.5
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting7": {
+     "p": [
+      880,
+      97.9
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting8": {
+     "p": [
+      940,
+      94.5
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting9": {
+     "p": [
+      1000,
+      105.1
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "bunting10": {
+     "p": [
+      1060,
+      124.5
+     ],
+     "r": 50,
+     "s": 0.7,
+     "kind": "flame",
+     "depth": 0.55,
+     "h": 6
+    },
+    "rose": {
+     "p": [
+      800,
+      150
+     ],
+     "r": 220,
+     "s": 0.6,
+     "kind": "glow",
+     "depth": 0.55,
+     "color": "ffd8b0"
+    },
+    "sun": {
+     "p": [
+      1320,
+      110
+     ],
+     "r": 400,
+     "s": 0.9,
+     "kind": "glow",
+     "depth": 0.25
+    },
+    "lamp1": {
+     "p": [
+      150,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp2": {
+     "p": [
+      300,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp3": {
+     "p": [
+      470,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp4": {
+     "p": [
+      730,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp5": {
+     "p": [
+      900,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp6": {
+     "p": [
+      1170,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp7": {
+     "p": [
+      1330,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    },
+    "lamp8": {
+     "p": [
+      1480,
+      207.7
+     ],
+     "r": 130,
+     "s": 0.9,
+     "kind": "flame",
+     "depth": 1.0,
+     "h": 9
+    }
+   },
+   "anchors": {
+    "tollgrave": {
+     "p": [
+      380,
+      330
+     ],
+     "depth": 1.0
+    },
+    "taper": {
+     "p": [
+      560,
+      330
+     ],
+     "depth": 1.0
+    },
+    "hollin": {
+     "p": [
+      660,
+      330
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "waxley": {
+     "p": [
+      960,
+      330
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "tickwell": {
+     "p": [
+      1070,
+      330
+     ],
+     "depth": 1.0,
+     "flip": true
+    },
+    "actor": {
+     "p": [
+      800,
+      330
+     ],
+     "depth": 1.0,
+     "h": 120,
+     "face": -1
+    }
+   }
+  }
+ },
+ "figures": {
+  "taper_stand": {
+   "tex": "res://art/story/figures/taper_stand.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "head": [
+     132.0,
+     122.45,
+     26.0,
+     "flame"
+    ],
+    "lantern": [
+     203.0,
+     155.0,
+     15.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "head": {
+     "kind": "flame",
+     "r": 150.0,
+     "s": 0.95
+    },
+    "lantern": {
+     "kind": "flame",
+     "r": 170.0,
+     "s": 0.9
+    }
+   }
+  },
+  "taper_chair": {
+   "tex": "res://art/story/figures/taper_chair.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "head": [
+     132.0,
+     72.45,
+     26.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "head": {
+     "kind": "flame",
+     "r": 150.0,
+     "s": 0.95
+    }
+   }
+  },
+  "taper_smoke": {
+   "tex": "res://art/story/figures/taper_smoke.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {}
+  },
+  "novice_back": {
+   "tex": "res://art/story/figures/novice_back.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {}
+  },
+  "waxley_pack": {
+   "tex": "res://art/story/figures/waxley_pack.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 160.0,
+   "flames": {
+    "brim1": [
+     98.0,
+     103.59,
+     16.5,
+     "flame"
+    ],
+    "brim2": [
+     116.0,
+     102.89,
+     16.5,
+     "flame"
+    ],
+    "brim3": [
+     137.0,
+     105.65,
+     16.5,
+     "flame"
+    ],
+    "brim4": [
+     158.0,
+     102.89,
+     16.5,
+     "flame"
+    ],
+    "brim5": [
+     176.0,
+     103.59,
+     16.5,
+     "flame"
+    ]
+   },
+   "light": {
+    "brim1": {
+     "kind": "flame",
+     "r": 82.5,
+     "s": 0.8
+    },
+    "brim2": {
+     "kind": "flame",
+     "r": 82.5,
+     "s": 0.8
+    },
+    "brim3": {
+     "kind": "flame",
+     "r": 82.5,
+     "s": 0.8
+    },
+    "brim4": {
+     "kind": "flame",
+     "r": 82.5,
+     "s": 0.8
+    },
+    "brim5": {
+     "kind": "flame",
+     "r": 82.5,
+     "s": 0.8
+    }
+   }
+  },
+  "tollgrave_boss": {
+   "tex": "res://art/story/figures/tollgrave_boss.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 340.0,
+   "flames": {
+    "eyes": [
+     153.4,
+     125.1,
+     3.0,
+     "eyes",
+     "7ef0c8"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "7ef0c8",
+     "pts": [
+      [
+       145.6,
+       125.4
+      ],
+      [
+       161.2,
+       124.8
+      ]
+     ],
+     "dot": 3.4,
+     "r": 120,
+     "s": 0.8
+    }
+   }
+  },
+  "tollgrave_sit": {
+   "tex": "res://art/story/figures/tollgrave_sit.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 240.0,
+   "flames": {
+    "eyes": [
+     119.5,
+     116.5,
+     3.66,
+     "eyes",
+     "f7b64a"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "f7b64a",
+     "pts": [
+      [
+       110,
+       117
+      ],
+      [
+       129,
+       116
+      ]
+     ],
+     "dot": 3.0,
+     "r": 110,
+     "s": 0.75
+    }
+   }
+  },
+  "snuffer_stand": {
+   "tex": "res://art/story/figures/snuffer_stand.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 400.0,
+   "flames": {
+    "eyes": [
+     144.04,
+     144.46,
+     3.23,
+     "eyes",
+     "eeeaf8"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "eeeaf8",
+     "dot": 2.52,
+     "r": 60.0,
+     "s": 0.55,
+     "pts": [
+      [
+       135.64,
+       144.21
+      ],
+      [
+       152.44,
+       144.71
+      ]
+     ]
+    }
+   }
+  },
+  "snuffer_reach": {
+   "tex": "res://art/story/figures/snuffer_reach.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 400.0,
+   "flames": {
+    "eyes": [
+     143.12,
+     141.51,
+     3.23,
+     "eyes",
+     "eeeaf8"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "eeeaf8",
+     "dot": 2.52,
+     "r": 60.0,
+     "s": 0.55,
+     "pts": [
+      [
+       134.91,
+       143.3
+      ],
+      [
+       151.32,
+       139.72
+      ]
+     ]
+    }
+   }
+  },
+  "cone_broken": {
+   "tex": "res://art/story/figures/cone_broken.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 400.0,
+   "flames": {}
+  },
+  "hollin_cold": {
+   "tex": "res://art/story/figures/hollin_cold.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {}
+  },
+  "hollin_warm": {
+   "tex": "res://art/story/figures/hollin_warm.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "head": [
+     131.65,
+     51.73,
+     30.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "head": {
+     "kind": "flame",
+     "r": 260.0,
+     "s": 1.0
+    }
+   }
+  },
+  "moth_swarm": {
+   "tex": "res://art/story/figures/moth_swarm.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 240.0,
+   "flames": {
+    "eyes": [
+     128.0,
+     123.75,
+     3.08,
+     "eyes",
+     "e8e4ff"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "e8e4ff",
+     "pts": [
+      [
+       120.0,
+       124.0
+      ],
+      [
+       136.0,
+       123.5
+      ]
+     ],
+     "dot": 1.7,
+     "r": 80.0,
+     "s": 0.6
+    }
+   }
+  },
+  "hush_eye": {
+   "tex": "res://art/story/figures/hush_eye.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    128.0
+   ],
+   "px": 8,
+   "h": 640.0,
+   "flames": {
+    "pupil": [
+     128.0,
+     131.0,
+     10.0,
+     "flame",
+     "ffd84a"
+    ]
+   },
+   "light": {
+    "pupil": {
+     "kind": "flame",
+     "color": "ffd84a",
+     "r": 80,
+     "s": 0.6,
+     "off": true
+    }
+   }
+  },
+  "hush_grasp": {
+   "tex": "res://art/story/figures/hush_grasp.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    200.0
+   ],
+   "px": 4,
+   "h": 640.0,
+   "flames": {
+    "stolen": [
+     128,
+     30,
+     16,
+     "flame",
+     "ffd070"
+    ]
+   },
+   "light": {
+    "stolen": {
+     "kind": "flame",
+     "color": "ffd070",
+     "r": 300,
+     "s": 1.0,
+     "off": true
+    }
+   }
+  },
+  "rootmother_boss": {
+   "tex": "res://art/story/figures/rootmother_boss.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 340.0,
+   "flames": {
+    "eyes": [
+     152.33,
+     113.5,
+     6.11,
+     "eyes",
+     "d8f0c0"
+    ],
+    "ember": [
+     138.38,
+     198.4,
+     14,
+     "cold",
+     "a8d0ff"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "d8f0c0",
+     "pts": [
+      [
+       136.46,
+       112.72
+      ],
+      [
+       168.2,
+       114.28
+      ]
+     ],
+     "dot": 1.7,
+     "r": 90,
+     "s": 0.6
+    },
+    "ember": {
+     "kind": "cold",
+     "color": "a8d0ff",
+     "r": 90,
+     "s": 0.8
+    }
+   }
+  },
+  "rootmother_open": {
+   "tex": "res://art/story/figures/rootmother_open.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 340.0,
+   "flames": {
+    "eyes": [
+     151.07,
+     119.72,
+     6.12,
+     "eyes",
+     "f7d88a"
+    ],
+    "ember": [
+     148.54,
+     50.9,
+     12,
+     "flame"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "f7d88a",
+     "pts": [
+      [
+       135.2,
+       118.66
+      ],
+      [
+       166.95,
+       120.79
+      ]
+     ],
+     "dot": 1.7,
+     "r": 90,
+     "s": 0.6
+    },
+    "ember": {
+     "kind": "flame",
+     "r": 110,
+     "s": 0.95
+    }
+   }
+  },
+  "yarrow_spirit": {
+   "tex": "res://art/story/figures/yarrow_spirit.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "head": [
+     146.0,
+     65.5,
+     16.0,
+     "flame"
+    ],
+    "aura": [
+     132.0,
+     170.0,
+     8.0,
+     "glow",
+     "d8e8a0"
+    ]
+   },
+   "light": {
+    "head": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.85,
+     "off": true
+    },
+    "aura": {
+     "kind": "glow",
+     "color": "d8e8a0",
+     "r": 220.0,
+     "s": 0.6
+    }
+   }
+  },
+  "tinker_boss": {
+   "tex": "res://art/story/figures/tinker_boss.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 340.0,
+   "flames": {
+    "eyes": [
+     139.61,
+     71.08,
+     2.99,
+     "eyes",
+     "bfe8ff"
+    ],
+    "heart": [
+     64.28,
+     125.56,
+     6,
+     "cold",
+     "bfe8ff"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "bfe8ff",
+     "pts": [
+      [
+       131.84,
+       71.44
+      ],
+      [
+       147.38,
+       70.72
+      ]
+     ],
+     "dot": 2.2,
+     "r": 70,
+     "s": 0.6
+    },
+    "heart": {
+     "kind": "cold",
+     "color": "bfe8ff",
+     "r": 50,
+     "s": 0.6
+    }
+   }
+  },
+  "tickwell": {
+   "tex": "res://art/story/figures/tickwell.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "watch": [
+     136.0,
+     194.18,
+     12.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "watch": {
+     "kind": "flame",
+     "r": 110.0,
+     "s": 0.85
+    }
+   }
+  },
+  "cone_bell": {
+   "tex": "res://art/story/figures/cone_bell.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 400.0,
+   "flames": {
+    "rim": [
+     152.0,
+     221.2,
+     6,
+     "glow",
+     "ffd08a"
+    ]
+   },
+   "light": {
+    "rim": {
+     "kind": "glow",
+     "color": "ffd08a",
+     "r": 60,
+     "s": 0.3
+    }
+   }
+  },
+  "saint_boss": {
+   "tex": "res://art/story/figures/saint_boss.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 400.0,
+   "flames": {
+    "eyes": [
+     128.0,
+     115.31,
+     2.92,
+     "eyes",
+     "f8f4ff"
+    ],
+    "halo": [
+     128.0,
+     115.66,
+     6,
+     "glow",
+     "f0f4ff"
+    ],
+    "prism": [
+     128.69,
+     172.93,
+     6,
+     "glow",
+     "f0f4ff"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "f8f4ff",
+     "pts": [
+      [
+       120.41,
+       115.66
+      ],
+      [
+       135.59,
+       114.97
+      ]
+     ],
+     "dot": 1.6,
+     "r": 70,
+     "s": 0.6
+    },
+    "halo": {
+     "kind": "glow",
+     "color": "f0f4ff",
+     "r": 170,
+     "s": 0.6
+    },
+    "prism": {
+     "kind": "glow",
+     "color": "f0f4ff",
+     "r": 50,
+     "s": 0.6
+    }
+   }
+  },
+  "tessel_lit": {
+   "tex": "res://art/story/figures/tessel_lit.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 400.0,
+   "flames": {
+    "heart": [
+     128.0,
+     147.36,
+     7,
+     "flame"
+    ],
+    "eyes": [
+     128.0,
+     115.31,
+     2.92,
+     "eyes",
+     "ffd8a0"
+    ]
+   },
+   "light": {
+    "heart": {
+     "kind": "flame",
+     "r": 120,
+     "s": 0.95,
+     "off": true
+    },
+    "eyes": {
+     "kind": "eyes",
+     "color": "ffd8a0",
+     "pts": [
+      [
+       120.41,
+       115.66
+      ],
+      [
+       135.59,
+       114.97
+      ]
+     ],
+     "dot": 1.6,
+     "r": 70,
+     "s": 0.6
+    }
+   }
+  },
+  "stolen_wick": {
+   "tex": "res://art/story/figures/stolen_wick.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "wick": [
+     132.0,
+     148.0,
+     85.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "wick": {
+     "kind": "flame",
+     "r": 420.0,
+     "s": 1.0,
+     "off": true
+    }
+   }
+  },
+  "hollin_carry": {
+   "tex": "res://art/story/figures/hollin_carry.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 140.0,
+   "flames": {
+    "hollin": [
+     133.65,
+     51.73,
+     30.0,
+     "flame"
+    ],
+    "taper": [
+     56.0,
+     20.0,
+     12.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "hollin": {
+     "kind": "flame",
+     "r": 240.0,
+     "s": 1.0
+    },
+    "taper": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.9
+    }
+   }
+  },
+  "tollgrave_stand": {
+   "tex": "res://art/story/figures/tollgrave_stand.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 300.0,
+   "flames": {
+    "eyes": [
+     131.5,
+     110.5,
+     3.66,
+     "eyes",
+     "f7b64a"
+    ],
+    "lantern": [
+     206,
+     122,
+     10,
+     "flame"
+    ]
+   },
+   "light": {
+    "eyes": {
+     "kind": "eyes",
+     "color": "f7b64a",
+     "pts": [
+      [
+       122,
+       111
+      ],
+      [
+       141,
+       110
+      ]
+     ],
+     "dot": 3.0,
+     "r": 110,
+     "s": 0.75
+    },
+    "lantern": {
+     "kind": "flame",
+     "r": 110,
+     "s": 0.9
+    }
+   }
+  },
+  "townsfolk_line": {
+   "tex": "res://art/story/figures/townsfolk_line.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 220.0,
+   "flames": {
+    "lamp1": [
+     25.67,
+     198.18,
+     7.64,
+     "flame"
+    ],
+    "lamp2": [
+     57.85,
+     198.18,
+     7.64,
+     "flame"
+    ],
+    "lamp3": [
+     90.03,
+     198.18,
+     7.64,
+     "flame"
+    ],
+    "lamp4": [
+     120.77,
+     204.6,
+     7.64,
+     "flame"
+    ],
+    "lamp5": [
+     152.96,
+     204.6,
+     7.64,
+     "flame"
+    ],
+    "lamp6": [
+     186.58,
+     198.18,
+     7.64,
+     "flame"
+    ],
+    "lamp7": [
+     218.77,
+     198.18,
+     7.64,
+     "flame"
+    ],
+    "lamp8": [
+     250.95,
+     198.18,
+     7.64,
+     "flame"
+    ]
+   },
+   "light": {
+    "lamp1": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp2": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp3": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp4": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp5": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp6": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp7": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    },
+    "lamp8": {
+     "kind": "flame",
+     "r": 60.0,
+     "s": 0.8
+    }
+   }
+  },
+  "deep_candle": {
+   "tex": "res://art/story/figures/deep_candle.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "wick": [
+     128.0,
+     147.5,
+     30.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "wick": {
+     "kind": "flame",
+     "r": 160.0,
+     "s": 0.9,
+     "off": true
+    }
+   }
+  },
+  "lost_wicks": {
+   "tex": "res://art/story/figures/lost_wicks.svg",
+   "frame": [
+    256,
+    256
+   ],
+   "feet": [
+    128.0,
+    244.0
+   ],
+   "px": 4,
+   "h": 120.0,
+   "flames": {
+    "w1": [
+     30.0,
+     172.0,
+     18.0,
+     "flame"
+    ],
+    "w2": [
+     69.0,
+     182.0,
+     18.0,
+     "flame"
+    ],
+    "w3": [
+     108.0,
+     172.0,
+     18.0,
+     "flame"
+    ],
+    "w4": [
+     147.0,
+     182.0,
+     18.0,
+     "flame"
+    ],
+    "w5": [
+     186.0,
+     172.0,
+     18.0,
+     "flame"
+    ],
+    "w6": [
+     225.0,
+     182.0,
+     18.0,
+     "flame"
+    ]
+   },
+   "light": {
+    "w1": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.8,
+     "off": true
+    },
+    "w2": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.8,
+     "off": true
+    },
+    "w3": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.8,
+     "off": true
+    },
+    "w4": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.8,
+     "off": true
+    },
+    "w5": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.8,
+     "off": true
+    },
+    "w6": {
+     "kind": "flame",
+     "r": 120.0,
+     "s": 0.8,
+     "off": true
+    }
+   }
+  }
+ },
+ "portraits": {
+  "taper": {
+   "moods": [
+    "warm",
+    "worried",
+    "stern",
+    "sad",
+    "proud",
+    "faint"
+   ],
+   "color": "f2c75a",
+   "flame": [
+    63.11,
+    12.04,
+    11.56
+   ],
+   "flames": [
+    [
+     63.11,
+     12.04,
+     11.56
+    ]
+   ],
+   "mood_flames": {
+    "faint": [
+     [
+      63.11,
+      12.04,
+      4.04
+     ]
+    ]
+   }
+  },
+  "waxley": {
+   "moods": [
+    "grin",
+    "shifty",
+    "shock"
+   ],
+   "color": "f7b64a",
+   "flame": [
+    35.56,
+    33.73,
+    13.33
+   ],
+   "flames": [
+    [
+     35.56,
+     33.73,
+     13.33
+    ],
+    [
+     92.44,
+     33.73,
+     13.33
+    ]
+   ]
+  },
+  "tollgrave": {
+   "moods": [
+    "hushed",
+    "kind"
+   ],
+   "color": "7ef0c8",
+   "flames": []
+  },
+  "snuffer": {
+   "moods": [
+    "cold",
+    "wrath"
+   ],
+   "color": "c9c2f0",
+   "flames": []
+  },
+  "hollin": {
+   "moods": [
+    "lost",
+    "relit",
+    "worried",
+    "grin"
+   ],
+   "color": "a8b8d0",
+   "flames": [],
+   "mood_flames": {
+    "relit": [
+     [
+      57.96,
+      10.75,
+      11.56
+     ]
+    ],
+    "worried": [
+     [
+      57.96,
+      10.75,
+      11.56
+     ]
+    ],
+    "grin": [
+     [
+      57.96,
+      10.75,
+      11.56
+     ]
+    ]
+   }
+  },
+  "rootmother": {
+   "moods": [
+    "keeping",
+    "wrath"
+   ],
+   "color": "9fc46a",
+   "flames": []
+  },
+  "yarrow": {
+   "moods": [
+    "gentle",
+    "merry"
+   ],
+   "color": "d8e8a0",
+   "flame": [
+    74.67,
+    20.31,
+    11.56
+   ],
+   "flames": [
+    [
+     74.67,
+     20.31,
+     11.56
+    ]
+   ]
+  },
+  "tinker": {
+   "moods": [
+    "ticking",
+    "wrath"
+   ],
+   "color": "8ccfe8",
+   "flames": []
+  },
+  "tickwell": {
+   "moods": [
+    "dazed",
+    "kind"
+   ],
+   "color": "e0b870",
+   "flames": []
+  },
+  "saint": {
+   "moods": [
+    "serene",
+    "wrath"
+   ],
+   "color": "eef0ff",
+   "flames": []
+  },
+  "tessel": {
+   "moods": [
+    "gentle",
+    "sad"
+   ],
+   "color": "ff9ab8",
+   "flames": []
+  },
+  "hush": {
+   "moods": [
+    "open"
+   ],
+   "color": "9a90c8",
+   "flames": []
+  },
+  "echo": {
+   "moods": [
+    "glow"
+   ],
+   "color": "e8d8a0",
+   "flame": [
+    64.0,
+    24.89,
+    10.67
+   ],
+   "flames": [
+    [
+     64.0,
+     24.89,
+     10.67
+    ]
+   ]
+  }
+ }
+}

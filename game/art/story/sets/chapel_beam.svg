@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="920" viewBox="0 0 1000 460">
+<defs><linearGradient id="chmg1" x1="0" y1="190" x2="0" y2="330" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e8e8ff" stop-opacity="0.2"/><stop offset="0.12" stop-color="#e4e2ff" stop-opacity="0.16"/><stop offset="0.3" stop-color="#dcd8ff" stop-opacity="0.05"/><stop offset="0.43" stop-color="#dcd8ff" stop-opacity="0.0"/></linearGradient></defs>
+<path d="M478 190 L562 190 L668 330 L560 330 Z" fill="url(#chmg1)"/><path d="M500 192 L540 192 L626 312 L578 312 Z" fill="url(#chmg1)" opacity="0.8"/>
+</svg>

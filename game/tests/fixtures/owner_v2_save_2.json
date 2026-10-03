@@ -1,0 +1,25 @@
+{
+	"bells": 0,
+	"difficulty": "dusk",
+	"embers": 0,
+	"hero": "",
+	"heroes": {},
+	"levels": {
+		"dusk": {},
+		"nightfall": {},
+		"witching": {}
+	},
+	"relics": [],
+	"run_counter": 0,
+	"saved_at": 1790394965,
+	"seen": [],
+	"sigil_rewards": 0,
+	"unlocked": {
+		"dusk": 1,
+		"nightfall": 0,
+		"witching": 0
+	},
+	"v1_levels": {},
+	"version": 2,
+	"veteran": 0
+}

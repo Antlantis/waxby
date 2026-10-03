@@ -1,0 +1,461 @@
+{
+ "_about": "The spec's model of Worlds 3-6 and the secret levels, for test_progression (placements: spec 3.10; kinds and moves: 4.2-4.5 with decisions.md's fixes; Dreads and Wardens: 4.6; bosses: 5.2-5.5; altars: 3.1). A level file, a kind's script or a boss's script wins over this where it exists.",
+ "altars": {
+  "3": 3,
+  "4": 4,
+  "5": 4,
+  "6": 4,
+  "boss": 2,
+  "secret": 3
+ },
+ "anoint": [
+  "rootling",
+  "weepcap",
+  "rattlehound",
+  "creepbone",
+  "tickwind",
+  "frostbuckle",
+  "hoarowl",
+  "glassmite",
+  "gustling",
+  "refractor",
+  "paneguard",
+  "hushling",
+  "stillmaw",
+  "unwick"
+ ],
+ "bosses": {
+  "hush": {
+   "level": "6-4",
+   "moves": {
+    "bolt": 18,
+    "gaze": 24,
+    "grasp": 23,
+    "inhale": 31,
+    "snuff": 28
+   },
+   "touch": 21
+  },
+  "rootmother": {
+   "level": "3-4",
+   "moves": {
+    "seed": 16,
+    "spear": 34,
+    "sweep_high": 38,
+    "sweep_low": 38,
+    "thorns": 24
+   },
+   "touch": 26
+  },
+  "saint": {
+   "level": "5-4",
+   "moves": {
+    "beam": 31,
+    "rose": 18,
+    "shard_beam": 25
+   },
+   "touch": 21
+  },
+  "tinker": {
+   "level": "4-4",
+   "moves": {
+    "hands": 30,
+    "midnight": 26,
+    "minute": 35,
+    "pendulum": 32,
+    "toss": 26
+   },
+   "touch": 24
+  }
+ },
+ "dreads": {
+  "3-1": "rootling",
+  "3-2": "weepcap",
+  "3-3": "rattlehound",
+  "4-1": "tickwind",
+  "4-2": "frostbuckle",
+  "4-3": "spurwheel",
+  "5-1": "glassmite",
+  "5-2": "refractor",
+  "5-3": "paneguard",
+  "6-1": "hushling",
+  "6-2": "stillmaw",
+  "6-3": "unwick"
+ },
+ "kinds": {
+  "bat": {
+   "moves": {},
+   "role": "fodder",
+   "touch": 20
+  },
+  "bonebow": {
+   "moves": {
+    "arrow": 22
+   },
+   "role": "fodder",
+   "touch": 16
+  },
+  "brinejaw": {
+   "moves": {},
+   "role": "fodder",
+   "touch": 30
+  },
+  "creepbone": {
+   "moves": {
+    "lunge": 32
+   },
+   "role": "fodder",
+   "touch": 28
+  },
+  "dripkin": {
+   "moves": {
+    "drop": 28
+   },
+   "role": "fodder",
+   "touch": 20
+  },
+  "frostbuckle": {
+   "moves": {
+    "slam": 40,
+    "spike_line": 34
+   },
+   "role": "brute",
+   "touch": 28
+  },
+  "glassmite": {
+   "moves": {},
+   "role": "fodder",
+   "touch": 24
+  },
+  "gustling": {
+   "moves": {},
+   "role": "fodder",
+   "touch": 20
+  },
+  "gutterwing": {
+   "moves": {},
+   "role": "drain",
+   "touch": 0
+  },
+  "hoarowl": {
+   "moves": {
+    "icicle": 24
+   },
+   "role": "fodder",
+   "touch": 18
+  },
+  "hollow_helm": {
+   "moves": {
+    "bash": 36
+   },
+   "role": "heavy",
+   "touch": 24
+  },
+  "hushling": {
+   "moves": {
+    "lunge": 30
+   },
+   "role": "fodder",
+   "touch": 26
+  },
+  "lidlurk": {
+   "moves": {},
+   "role": "heavy",
+   "touch": 34
+  },
+  "lurecoil": {
+   "moves": {
+    "bite": 40,
+    "body": 30
+   },
+   "role": "brute",
+   "touch": 30
+  },
+  "paneguard": {
+   "moves": {
+    "cut": 34,
+    "lunge": 36
+   },
+   "role": "heavy",
+   "touch": 26
+  },
+  "rattlehound": {
+   "moves": {
+    "pounce": 34
+   },
+   "role": "heavy",
+   "touch": 24
+  },
+  "refractor": {
+   "moves": {
+    "beam": 24
+   },
+   "role": "fodder",
+   "touch": 18
+  },
+  "rootling": {
+   "moves": {
+    "pop": 32
+   },
+   "role": "fodder",
+   "touch": 24
+  },
+  "skeleton": {
+   "moves": {},
+   "role": "fodder",
+   "touch": 30
+  },
+  "spurwheel": {
+   "moves": {
+    "spikes": 32
+   },
+   "role": "heavy",
+   "touch": 32
+  },
+  "stillmaw": {
+   "moves": {
+    "gulp": 36
+   },
+   "role": "heavy",
+   "touch": 22
+  },
+  "thornback": {
+   "moves": {},
+   "role": "heavy",
+   "touch": 34
+  },
+  "tickwind": {
+   "moves": {
+    "charge": 32
+   },
+   "role": "fodder",
+   "touch": 26
+  },
+  "unwick": {
+   "moves": {
+    "echo_strike": 34
+   },
+   "role": "heavy",
+   "touch": 28
+  },
+  "weepcap": {
+   "moves": {
+    "burst": 18
+   },
+   "role": "heavy",
+   "touch": 20
+  }
+ },
+ "placements": {
+  "1-S": {
+   "bat": 6,
+   "bonebow": 2,
+   "thornback": 2
+  },
+  "2-S": {
+   "bonebow": 1,
+   "brinejaw": 2,
+   "dripkin": 3,
+   "hollow_helm": 1
+  },
+  "3-1": {
+   "bat": 3,
+   "bonebow": 2,
+   "dripkin": 1,
+   "lidlurk": 1,
+   "rootling": 7,
+   "skeleton": 14,
+   "weepcap": 1
+  },
+  "3-2": {
+   "bat": 4,
+   "gutterwing": 2,
+   "hollow_helm": 1,
+   "lidlurk": 1,
+   "rattlehound": 2,
+   "rootling": 4,
+   "skeleton": 6,
+   "weepcap": 3
+  },
+  "3-3": {
+   "bonebow": 1,
+   "creepbone": 7,
+   "gutterwing": 1,
+   "lidlurk": 1,
+   "rattlehound": 1,
+   "rootling": 3,
+   "skeleton": 5,
+   "thornback": 1,
+   "weepcap": 4
+  },
+  "3-4": {
+   "creepbone": 1,
+   "rattlehound": 1,
+   "rootling": 6,
+   "skeleton": 2,
+   "weepcap": 1
+  },
+  "3-S": {
+   "bat": 2,
+   "creepbone": 4,
+   "gutterwing": 1,
+   "weepcap": 1
+  },
+  "4-1": {
+   "bat": 3,
+   "bonebow": 4,
+   "lidlurk": 1,
+   "rootling": 1,
+   "skeleton": 15,
+   "spurwheel": 1,
+   "tickwind": 6
+  },
+  "4-2": {
+   "bat": 2,
+   "frostbuckle": 2,
+   "hoarowl": 1,
+   "hollow_helm": 1,
+   "lidlurk": 1,
+   "skeleton": 6,
+   "spurwheel": 2,
+   "tickwind": 9
+  },
+  "4-3": {
+   "bat": 2,
+   "bonebow": 2,
+   "frostbuckle": 1,
+   "hoarowl": 2,
+   "hollow_helm": 1,
+   "lidlurk": 1,
+   "rattlehound": 1,
+   "skeleton": 8,
+   "spurwheel": 1,
+   "thornback": 1,
+   "tickwind": 5
+  },
+  "4-4": {
+   "bonebow": 1,
+   "hoarowl": 1,
+   "skeleton": 2,
+   "spurwheel": 1,
+   "tickwind": 4
+  },
+  "4-S": {
+   "frostbuckle": 1,
+   "hoarowl": 1,
+   "spurwheel": 1,
+   "tickwind": 3
+  },
+  "5-1": {
+   "bat": 8,
+   "bonebow": 2,
+   "glassmite": 7,
+   "gustling": 1,
+   "lidlurk": 1,
+   "skeleton": 7,
+   "thornback": 1,
+   "tickwind": 3
+  },
+  "5-2": {
+   "bat": 2,
+   "bonebow": 2,
+   "glassmite": 6,
+   "gustling": 7,
+   "gutterwing": 2,
+   "lidlurk": 1,
+   "paneguard": 1,
+   "refractor": 2,
+   "skeleton": 5
+  },
+  "5-3": {
+   "bat": 1,
+   "bonebow": 1,
+   "frostbuckle": 1,
+   "glassmite": 3,
+   "gustling": 2,
+   "gutterwing": 2,
+   "hollow_helm": 1,
+   "lidlurk": 1,
+   "paneguard": 3,
+   "rattlehound": 1,
+   "refractor": 1,
+   "skeleton": 2,
+   "tickwind": 1
+  },
+  "5-4": {
+   "bonebow": 1,
+   "glassmite": 3,
+   "gustling": 3,
+   "skeleton": 1
+  },
+  "5-S": {
+   "bonebow": 1,
+   "glassmite": 2,
+   "gustling": 1,
+   "refractor": 1
+  },
+  "6-1": {
+   "bonebow": 1,
+   "brinejaw": 5,
+   "creepbone": 1,
+   "dripkin": 1,
+   "gutterwing": 1,
+   "hollow_helm": 2,
+   "hushling": 10,
+   "lidlurk": 1,
+   "skeleton": 11,
+   "stillmaw": 1
+  },
+  "6-2": {
+   "bonebow": 1,
+   "brinejaw": 4,
+   "hollow_helm": 1,
+   "hushling": 13,
+   "lidlurk": 1,
+   "lurecoil": 1,
+   "skeleton": 4,
+   "spurwheel": 1,
+   "stillmaw": 1,
+   "unwick": 1
+  },
+  "6-3": {
+   "brinejaw": 2,
+   "frostbuckle": 1,
+   "hollow_helm": 1,
+   "hushling": 12,
+   "lidlurk": 1,
+   "paneguard": 1,
+   "rattlehound": 1,
+   "refractor": 1,
+   "skeleton": 3,
+   "stillmaw": 1,
+   "unwick": 1
+  },
+  "6-4": {
+   "creepbone": 1,
+   "glassmite": 1,
+   "gustling": 1,
+   "hushling": 4,
+   "lurecoil": 1,
+   "rootling": 1,
+   "spurwheel": 1,
+   "stillmaw": 1,
+   "tickwind": 1
+  },
+  "6-S": {
+   "hushling": 5,
+   "stillmaw": 1,
+   "unwick": 1
+  }
+ },
+ "reliquaries": 3,
+ "sigils": 3,
+ "wardens": {
+  "1-S": "thornback",
+  "2-S": "hollow_helm",
+  "3-S": "creepbone",
+  "4-S": "hoarowl",
+  "5-S": "gustling",
+  "6-S": "lurecoil"
+ }
+}

@@ -1,0 +1,400 @@
+{
+	"bells": 4,
+	"difficulty": "dusk",
+	"embers": 202,
+	"hero": "knight",
+	"heroes": {
+		"knight": {
+			"belt": [
+				"moth_charm",
+				"tallow_heart",
+				"rook_feather"
+			],
+			"cls": "knight",
+			"equip": {
+				"boots": {
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 1,
+							"v": 8.0
+						}
+					],
+					"base": "Worn Boots",
+					"cls": "",
+					"ilvl": 1,
+					"implicit": {
+						"dr": 1.0,
+						"id": "stomp_pct",
+						"v": 28.0
+					},
+					"legend": "",
+					"name": "Waxen Worn Boots",
+					"rarity": "magic",
+					"slot": "boots",
+					"tier": 1,
+					"uid": "i096acbd8"
+				},
+				"candle": {
+					"affixes": [
+						{
+							"id": "bright",
+							"t": 1,
+							"v": 8.0
+						},
+						{
+							"id": "precision",
+							"t": 1,
+							"v": 2.7
+						}
+					],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 7,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 5.0,
+						"v": 9.0
+					},
+					"legend": "",
+					"name": "Bright Tallow Stub of Precision",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i375e3ef6"
+				},
+				"charm": {
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 9.0
+						},
+						{
+							"id": "swift",
+							"t": 1,
+							"v": 5.0
+						},
+						{
+							"id": "keen",
+							"t": 1,
+							"v": 9.0
+						}
+					],
+					"base": "Bead",
+					"cls": "",
+					"ilvl": 3,
+					"implicit": {},
+					"legend": "",
+					"name": "Keen Bead of the Bell",
+					"rarity": "magic",
+					"slot": "charm",
+					"tier": 1,
+					"uid": "i7cd34f9f"
+				},
+				"coat": {
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.9
+						},
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 9.0
+						},
+						{
+							"id": "warded",
+							"t": 1,
+							"v": 2.4
+						}
+					],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 7,
+					"implicit": {
+						"id": "dr",
+						"v": 6.0
+					},
+					"legend": "",
+					"name": "Grim Shroud",
+					"rarity": "rare",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i136ffc42"
+				},
+				"weapon": {
+					"affixes": [
+						{
+							"id": "ruin",
+							"t": 1,
+							"v": 16.0
+						},
+						{
+							"id": "keen",
+							"t": 1,
+							"v": 8.0
+						},
+						{
+							"id": "swift",
+							"t": 1,
+							"v": 5.7
+						},
+						{
+							"id": "hallowed",
+							"t": 1,
+							"v": 11.0
+						}
+					],
+					"base": "Arming Sword",
+					"cls": "knight",
+					"ilvl": 3,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 15.0
+					},
+					"legend": "",
+					"name": "Grim Bite",
+					"rarity": "rare",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i5eb141e4"
+				}
+			},
+			"level": 7,
+			"points": 6,
+			"satchel": [
+				{
+					"affixes": [],
+					"base": "Arming Sword",
+					"cls": "knight",
+					"ilvl": 1,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 12.0
+					},
+					"legend": "",
+					"name": "Arming Sword",
+					"rarity": "common",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i6b57ea8c"
+				},
+				{
+					"affixes": [
+						{
+							"id": "precision",
+							"t": 1,
+							"v": 2.0
+						},
+						{
+							"id": "hallowed",
+							"t": 1,
+							"v": 12.0
+						},
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 1.0
+						},
+						{
+							"id": "keen",
+							"t": 1,
+							"v": 6.0
+						}
+					],
+					"base": "Arming Sword",
+					"cls": "knight",
+					"ilvl": 7,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 21.0
+					},
+					"legend": "",
+					"name": "Pale Fang",
+					"rarity": "rare",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i1961595c"
+				},
+				{
+					"affixes": [],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 1,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 4.0,
+						"v": 6.0
+					},
+					"legend": "",
+					"name": "Tallow Stub",
+					"rarity": "common",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i549801d6"
+				},
+				{
+					"affixes": [],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 1,
+					"implicit": {
+						"id": "dr",
+						"v": 3.0
+					},
+					"legend": "",
+					"name": "Padded Coat",
+					"rarity": "common",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i53533957"
+				},
+				{
+					"affixes": [
+						{
+							"id": "precision",
+							"t": 1,
+							"v": 2.2
+						},
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.7
+						}
+					],
+					"base": "Arming Sword",
+					"cls": "knight",
+					"ilvl": 7,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 21.0
+					},
+					"legend": "tollbreaker",
+					"name": "Tollbreaker",
+					"rarity": "legendary",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i6bdddd1a"
+				}
+			],
+			"skills": {},
+			"vigil": 0,
+			"wares": [],
+			"wares_seed": 0,
+			"xp": 1168
+		}
+	},
+	"levels": {
+		"dusk": {
+			"1-1": {
+				"best_embers": 60,
+				"best_time": 129.33333333338004,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					false,
+					true,
+					false
+				]
+			},
+			"1-2": {
+				"best_embers": 40,
+				"best_time": 164.19166666668167,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					false,
+					false
+				]
+			},
+			"1-3": {
+				"best_embers": 92,
+				"best_time": 151.91666666669283,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"1-4": {
+				"best_embers": 10,
+				"best_time": 183.08333333333115,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					false,
+					true,
+					false
+				]
+			},
+			"2-4": {
+				"best_embers": 0,
+				"best_time": 0.0,
+				"boss_first": false,
+				"cleared": false,
+				"dread": false,
+				"sigils": [
+					false,
+					false,
+					false
+				]
+			}
+		},
+		"nightfall": {},
+		"witching": {}
+	},
+	"relics": [
+		"moth_charm",
+		"tallow_heart",
+		"rook_feather"
+	],
+	"run_counter": 4,
+	"saved_at": 1790435833,
+	"seen": [
+		"intro",
+		"oath",
+		"beat_1_1",
+		"bark:beat_1_1_a",
+		"bark:beat_1_1_b",
+		"bark:first_dread",
+		"bark:first_altar",
+		"bark:first_hurt",
+		"bark:first_item",
+		"bark:low_flame",
+		"bark:skill_point",
+		"bark:first_sigil",
+		"beat_1_2",
+		"bark:beat_1_2_a",
+		"bark:beat_1_2_b",
+		"bark:first_snuff",
+		"bark:first_pool",
+		"bark:first_relic",
+		"beat_1_3",
+		"bark:beat_1_3_a",
+		"bark:beat_1_3_b",
+		"beat_1_4",
+		"bark:first_elite",
+		"boss_1_before",
+		"boss_card_tollgrave",
+		"boss_1_after"
+	],
+	"sigil_rewards": 1,
+	"unbanked": 0,
+	"unlocked": {
+		"dusk": 5,
+		"nightfall": 0,
+		"witching": 0
+	},
+	"v1_levels": {},
+	"version": 2,
+	"veteran": 0
+}

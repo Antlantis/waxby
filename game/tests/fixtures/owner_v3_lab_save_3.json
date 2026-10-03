@@ -1,0 +1,144 @@
+{
+	"bells": 0,
+	"difficulty": "dusk",
+	"embers": 24,
+	"flask": {
+		"draughts": 0,
+		"rich": false
+	},
+	"hero": "witch",
+	"heroes": {
+		"witch": {
+			"belt": [],
+			"cls": "witch",
+			"deepest": 0,
+			"equip": {
+				"boots": null,
+				"candle": {
+					"affixes": [],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 1,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 4.0,
+						"v": 6.0
+					},
+					"legend": "",
+					"name": "Tallow Stub",
+					"rarity": "common",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i513cbed9"
+				},
+				"charm": null,
+				"coat": {
+					"affixes": [],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 1,
+					"implicit": {
+						"id": "dr",
+						"v": 3.0
+					},
+					"legend": "",
+					"name": "Padded Coat",
+					"rarity": "common",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i09f8074e"
+				},
+				"weapon": {
+					"affixes": [],
+					"base": "Taper Staff",
+					"cls": "witch",
+					"ilvl": 1,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 12.0
+					},
+					"legend": "",
+					"name": "Taper Staff",
+					"rarity": "common",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i7d691ec1"
+				}
+			},
+			"level": 1,
+			"look": {
+				"flame": "tallow",
+				"glow": "",
+				"trim": "",
+				"trim_color": "calling"
+			},
+			"points": 0,
+			"satchel": [],
+			"skills": {},
+			"vigil": 0,
+			"wares": [],
+			"wares_seed": 0,
+			"xp": 24
+		}
+	},
+	"legends_found": [],
+	"levels": {
+		"dusk": {
+			"1-1": {
+				"best_embers": 0,
+				"best_time": 0.0,
+				"boss_first": false,
+				"cleared": false,
+				"dread": false,
+				"sigils": [
+					false,
+					false,
+					false
+				]
+			},
+			"2-4": {
+				"best_embers": 0,
+				"best_time": 0.0,
+				"boss_first": false,
+				"cleared": false,
+				"dread": false,
+				"sigils": [
+					false,
+					false,
+					false
+				]
+			}
+		},
+		"nightfall": {},
+		"witching": {}
+	},
+	"modes": {},
+	"notices": [],
+	"relics": [],
+	"relocked": {},
+	"run_counter": 1,
+	"saved_at": 1790462403,
+	"secrets": {
+		"dusk": {},
+		"nightfall": {},
+		"witching": {}
+	},
+	"seen": [
+		"intro",
+		"oath",
+		"beat_1_1",
+		"bark:beat_1_1_a",
+		"bark:beat_1_1_b"
+	],
+	"sigil_rewards": 0,
+	"suspend": {},
+	"unbanked": 0,
+	"unlocked": {
+		"dusk": 1,
+		"nightfall": 0,
+		"witching": 0
+	},
+	"v1_levels": {},
+	"version": 3,
+	"veteran": 0
+}

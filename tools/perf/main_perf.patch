@@ -1,0 +1,66 @@
+--- a/game/scripts/main.gd	2026-09-26 06:21:23
++++ b/game/scripts/main.gd	2026-09-26 06:21:23
+@@ -72,6 +72,14 @@
+ 		if _autoplay == "screens":
+ 			_shoot_screens()
+ 			return
++		if _autoplay.begins_with("spike:"):
++			# The GPU spike (W0-render, scripts/perf_spike.gd): its own meter.
++			_autoplay = ""
++			var sp = load("res://scripts/perf_spike.gd").new()
++			sp.name_arg = a_spike(OS.get_cmdline_user_args() + OS.get_cmdline_args())
++			add_child(sp)
++			sp.run(sp.name_arg)
++			return
+ 		play_level(maxi(Game.index_of(_autoplay), 0))
+ 		current.autoplay = true
+ 		_shoot_later("user://autoplay_level.png", 6.0)
+@@ -142,6 +150,13 @@
+ 		CutsceneScript.prefetch(want)
+ 
+ 
++static func a_spike(args: Array) -> String:
++	for a in args:
++		if str(a).begins_with("--autoplay=spike:"):
++			return str(a).get_slice(":", 1)
++	return "all"
++
++
+ func _autoplay_save(and_load := true) -> void:
+ 	## The bot keeps its own save, and its slots sit beside it: the player's
+ 	## are left alone. (A test checks the paths without and_load.)
+@@ -196,6 +211,7 @@
+ var _perf_worst := 0.0
+ var _perf_skip := false        # the next frame held the meter's own screenshot: not counted
+ var _perf_pipes: Array = []
++var _meter: RefCounted = null  # scripts/perf_meter.gd: the v3 line's GPU, CPU and light figures
+ 
+ 
+ func _process(dt: float) -> void:
+@@ -222,6 +238,8 @@
+ 	_perf_start_us = Time.get_ticks_usec() if now < 0 else now
+ 	_perf_last_us = _perf_start_us
+ 	_perf_pipes = _pipelines()
++	_meter = load("res://scripts/perf_meter.gd").new()
++	_meter.start(get_viewport() if is_inside_tree() else null)
+ 
+ 
+ func perf_frame(real: float, dt: float, now := -1) -> void:
+@@ -245,12 +263,15 @@
+ 	_perf_t += real
+ 	_perf_frames += 1
+ 	_perf_worst = maxf(_perf_worst, real)
++	if _meter != null:
++		_meter.sample()
+ 	if real > PERF_HITCH:
+ 		_perf_say("[perf] %s t=%.2fs hitch %.1f ms (dt %.1f ms), pipelines %s" % [_autoplay, at, real * 1000.0, dt * 1000.0,
+ 				", ".join(grew) if not grew.is_empty() else "none new"])
+ 	if _perf_t >= PERF_WINDOW:
+-		_perf_say("[perf] %s fps %.1f worst frame %.1f ms, draw calls %d" % [_autoplay, _perf_frames / _perf_t, _perf_worst * 1000.0,
+-				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)])
++		# [perf] <id> fps F worst frame W ms dc D | gpu G ms rcpu R ms | proc P ms phys Q ms
++		#        | lights L hush H tint T refl M | sparks S motes A | texmem X MB   (spec §13.2)
++		_perf_say(_meter.line(_autoplay, _perf_frames / _perf_t, _perf_worst, current if current is Node2D else null))
+ 		_perf_t = 0.0
+ 		_perf_frames = 0
+ 		_perf_worst = 0.0

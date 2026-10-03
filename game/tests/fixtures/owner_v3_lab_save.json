@@ -1,0 +1,1410 @@
+{
+	"bells": 15,
+	"difficulty": "dusk",
+	"embers": 2204,
+	"flask": {
+		"draughts": 0,
+		"rich": false
+	},
+	"hero": "witch",
+	"heroes": {
+		"runner": {
+			"belt": [
+				"longsword",
+				"tallow_heart",
+				"moth_charm",
+				"rook_feather"
+			],
+			"cls": "runner",
+			"deepest": 14,
+			"equip": {
+				"boots": null,
+				"candle": {
+					"affixes": [
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 12.0
+						},
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 13.0
+						},
+						{
+							"id": "precision",
+							"t": 2,
+							"v": 4.6
+						},
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.1
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 13,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 7.0,
+						"v": 13.0
+					},
+					"legend": "",
+					"name": "Mute Vigil",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i15ffc1ec"
+				},
+				"charm": null,
+				"coat": {
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 2,
+							"v": 3.7
+						},
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 11.0
+						},
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.3
+						},
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 19.0
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 14,
+					"implicit": {
+						"id": "dr",
+						"v": 10.0
+					},
+					"legend": "",
+					"name": "Ashen Hauberk",
+					"rarity": "rare",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i04e248a7"
+				},
+				"weapon": {
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.3
+						},
+						{
+							"id": "swift",
+							"t": 2,
+							"v": 8.0
+						},
+						{
+							"id": "hallowed",
+							"t": 2,
+							"v": 19.0
+						},
+						{
+							"id": "keen",
+							"t": 2,
+							"v": 15.0
+						}
+					],
+					"base": "Moth Knife",
+					"cls": "runner",
+					"ilvl": 14,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 35.0
+					},
+					"legend": "",
+					"name": "Grim Edge",
+					"rarity": "rare",
+					"slot": "weapon",
+					"tier": 2,
+					"uid": "i5b62bf1f"
+				}
+			},
+			"level": 15,
+			"look": {
+				"flame": "tallow",
+				"glow": "",
+				"trim": "",
+				"trim_color": "calling"
+			},
+			"points": 0,
+			"satchel": [
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 1,
+							"v": 6.0
+						},
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.8
+						}
+					],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 3,
+					"implicit": {
+						"id": "dr",
+						"v": 4.0
+					},
+					"legend": "ossuary_coat",
+					"name": "Ossuary Coat",
+					"rarity": "legendary",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i74868e09"
+				},
+				{
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 1,
+							"v": 2.0
+						},
+						{
+							"id": "bright",
+							"t": 1,
+							"v": 6.0
+						}
+					],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 8,
+					"implicit": {
+						"id": "dr",
+						"v": 6.0
+					},
+					"legend": "ossuary_coat",
+					"name": "Ossuary Coat",
+					"rarity": "legendary",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i4fdcffbd"
+				},
+				{
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.8
+						},
+						{
+							"id": "waxen",
+							"t": 1,
+							"v": 6.0
+						}
+					],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 7,
+					"implicit": {
+						"id": "dr",
+						"v": 6.0
+					},
+					"legend": "ossuary_coat",
+					"name": "Ossuary Coat",
+					"rarity": "legendary",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i017e5969"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 10.0
+						},
+						{
+							"id": "warded",
+							"t": 2,
+							"v": 3.7
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 10,
+					"implicit": {
+						"id": "dr",
+						"v": 8.0
+					},
+					"legend": "ossuary_coat",
+					"name": "Ossuary Coat",
+					"rarity": "legendary",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i320b0346"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 16.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 10.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 14,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 13.0
+					},
+					"legend": "gutterlight",
+					"name": "Gutterlight",
+					"rarity": "legendary",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i59dd76d1"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 14.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 14,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 13.0
+					},
+					"legend": "",
+					"name": "Waxen Chapel Candle",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i7de03088"
+				}
+			],
+			"skills": {
+				"r_bandolier": 2,
+				"r_cuts": 1,
+				"r_deadly": 2,
+				"r_keen": 2,
+				"r_quick": 2,
+				"r_ricochet": 3,
+				"r_veil": 2
+			},
+			"vigil": 0,
+			"wares": [
+				{
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 16.0
+						}
+					],
+					"base": "Moth Knife",
+					"cls": "runner",
+					"ilvl": 15,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 36.0
+					},
+					"legend": "",
+					"name": "Moth Knife of the Bell",
+					"rarity": "magic",
+					"slot": "weapon",
+					"tier": 2,
+					"uid": "i7252dc97"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 9.0
+						},
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 14.0
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 15,
+					"implicit": {
+						"id": "dr",
+						"v": 10.0
+					},
+					"legend": "",
+					"name": "Bright Chain Coat",
+					"rarity": "magic",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i1485e605"
+				},
+				{
+					"affixes": [
+						{
+							"id": "precision",
+							"t": 2,
+							"v": 4.7
+						},
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 16.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 11.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 15,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 14.0
+					},
+					"legend": "",
+					"name": "Ashen Wick",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i43335241"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 12.0
+						},
+						{
+							"id": "precision",
+							"t": 2,
+							"v": 4.5
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 15,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 14.0
+					},
+					"legend": "",
+					"name": "Waxen Chapel Candle of Precision",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i5a9f1a46"
+				}
+			],
+			"wares_seed": 13,
+			"xp": 8049
+		},
+		"witch": {
+			"belt": [
+				"longsword",
+				"tallow_heart",
+				"moth_charm",
+				"rook_feather"
+			],
+			"cls": "witch",
+			"deepest": 17,
+			"equip": {
+				"boots": null,
+				"candle": {
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 3,
+							"v": 18.0
+						},
+						{
+							"id": "bell",
+							"t": 3,
+							"v": 26.0
+						}
+					],
+					"base": "Pillar Candle",
+					"cls": "",
+					"ilvl": 20,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 10.0,
+						"v": 19.0
+					},
+					"legend": "",
+					"name": "Waxen Pillar Candle of the Bell",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 3,
+					"uid": "i29ecee90"
+				},
+				"charm": null,
+				"coat": {
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 2,
+							"v": 3.9
+						},
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 22.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 9.0
+						},
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.4
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 19,
+					"implicit": {
+						"id": "dr",
+						"v": 12.0
+					},
+					"legend": "",
+					"name": "Mute Shroud",
+					"rarity": "rare",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i11106046"
+				},
+				"weapon": {
+					"affixes": [],
+					"base": "Candelabra Staff",
+					"cls": "witch",
+					"ilvl": 19,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 43.0
+					},
+					"legend": "",
+					"name": "Candelabra Staff",
+					"rarity": "common",
+					"slot": "weapon",
+					"tier": 2,
+					"uid": "i6b7c9ea0"
+				}
+			},
+			"level": 18,
+			"look": {
+				"flame": "tallow",
+				"glow": "",
+				"trim": "",
+				"trim_color": "calling"
+			},
+			"points": 0,
+			"satchel": [
+				{
+					"affixes": [
+						{
+							"id": "precision",
+							"t": 1,
+							"v": 2.8
+						},
+						{
+							"id": "keen",
+							"t": 1,
+							"v": 7.0
+						},
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.9
+						}
+					],
+					"base": "Taper Staff",
+					"cls": "witch",
+					"ilvl": 3,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 15.0
+					},
+					"legend": "",
+					"name": "Sallow Fang",
+					"rarity": "rare",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i488d1cc8"
+				},
+				{
+					"affixes": [
+						{
+							"id": "precision",
+							"t": 1,
+							"v": 2.1
+						},
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 10.0
+						},
+						{
+							"id": "keen",
+							"t": 1,
+							"v": 8.0
+						}
+					],
+					"base": "Taper Staff",
+					"cls": "witch",
+					"ilvl": 3,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 15.0
+					},
+					"legend": "",
+					"name": "Grim Fang",
+					"rarity": "rare",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i0890124d"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 1,
+							"v": 6.5
+						}
+					],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 8,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 6.0,
+						"v": 9.0
+					},
+					"legend": "",
+					"name": "Waxen Tallow Stub",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i35f10bfe"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 9.0
+						}
+					],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 3,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 5.0,
+						"v": 7.0
+					},
+					"legend": "",
+					"name": "Tallow Stub of the Bell",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i09b08aeb"
+				},
+				{
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 1,
+							"v": 2.5
+						}
+					],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 8,
+					"implicit": {
+						"id": "dr",
+						"v": 6.0
+					},
+					"legend": "",
+					"name": "Warded Padded Coat",
+					"rarity": "magic",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i17ae3f24"
+				},
+				{
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.3
+						},
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 10.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 10.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 17,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 15.0
+					},
+					"legend": "",
+					"name": "Cinder Vigil",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i05f632f0"
+				},
+				{
+					"affixes": [],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 15,
+					"implicit": {
+						"id": "dr",
+						"v": 10.0
+					},
+					"legend": "",
+					"name": "Chain Coat",
+					"rarity": "common",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i31c6f427"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 1,
+							"v": 6.0
+						},
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 11.0
+						},
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.8
+						},
+						{
+							"id": "bright",
+							"t": 1,
+							"v": 6.0
+						}
+					],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 2,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 4.0,
+						"v": 6.0
+					},
+					"legend": "",
+					"name": "Hollow Vigil",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i058be889"
+				},
+				{
+					"affixes": [
+						{
+							"id": "precision",
+							"t": 2,
+							"v": 4.7
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 12.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 16,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 15.0
+					},
+					"legend": "twin_wick",
+					"name": "The Twin Wick",
+					"rarity": "legendary",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i518e322d"
+				},
+				{
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.1
+						},
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 17.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 9.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 17,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 15.0
+					},
+					"legend": "",
+					"name": "Sable Taper",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i250c4372"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 10.0
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 17,
+					"implicit": {
+						"id": "dr",
+						"v": 11.0
+					},
+					"legend": "",
+					"name": "Bright Chain Coat",
+					"rarity": "magic",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i31921008"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 18.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 12.0
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 15,
+					"implicit": {
+						"id": "dr",
+						"v": 10.0
+					},
+					"legend": "ossuary_coat",
+					"name": "Ossuary Coat",
+					"rarity": "legendary",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i1297d079"
+				},
+				{
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 2,
+							"v": 1.5
+						}
+					],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 17,
+					"implicit": {
+						"id": "dr",
+						"v": 11.0
+					},
+					"legend": "",
+					"name": "Chain Coat of the Moth",
+					"rarity": "magic",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "i6881741d"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 12.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 11.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 18,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 9.0,
+						"v": 16.0
+					},
+					"legend": "",
+					"name": "Waxen Chapel Candle",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i2c6158c3"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 3,
+							"v": 33.0
+						},
+						{
+							"id": "precision",
+							"t": 3,
+							"v": 7.9
+						},
+						{
+							"id": "bright",
+							"t": 3,
+							"v": 17.0
+						}
+					],
+					"base": "Pillar Candle",
+					"cls": "",
+					"ilvl": 20,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 10.0,
+						"v": 19.0
+					},
+					"legend": "",
+					"name": "Weeping Taper",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 3,
+					"uid": "i3b2159e5"
+				},
+				{
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 2,
+							"v": 10.0
+						},
+						{
+							"id": "bright",
+							"t": 2,
+							"v": 11.0
+						},
+						{
+							"id": "precision",
+							"t": 2,
+							"v": 4.1
+						},
+						{
+							"id": "bell",
+							"t": 2,
+							"v": 16.0
+						}
+					],
+					"base": "Chapel Candle",
+					"cls": "",
+					"ilvl": 15,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 8.0,
+						"v": 14.0
+					},
+					"legend": "",
+					"name": "Tolling Wick",
+					"rarity": "rare",
+					"slot": "candle",
+					"tier": 2,
+					"uid": "i63d513c5"
+				}
+			],
+			"skills": {
+				"w_flare": 3,
+				"w_hotter": 2,
+				"w_kindle": 3,
+				"w_reservoir": 2,
+				"w_seal": 3,
+				"w_sunburst": 1,
+				"w_twin": 2,
+				"w_waxskin": 2
+			},
+			"vigil": 0,
+			"wares": [
+				{
+					"affixes": [
+						{
+							"id": "bright",
+							"t": 1,
+							"v": 6.0
+						}
+					],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 8,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 6.0,
+						"v": 9.0
+					},
+					"legend": "",
+					"name": "Bright Tallow Stub",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i084b9bc5"
+				},
+				{
+					"affixes": [
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.9
+						},
+						{
+							"id": "precision",
+							"t": 1,
+							"v": 2.5
+						}
+					],
+					"base": "Taper Staff",
+					"cls": "witch",
+					"ilvl": 8,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 22.0
+					},
+					"legend": "",
+					"name": "Taper Staff of the Moth",
+					"rarity": "magic",
+					"slot": "weapon",
+					"tier": 1,
+					"uid": "i58802c28"
+				},
+				{
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 1,
+							"v": 2.2
+						},
+						{
+							"id": "moth",
+							"t": 1,
+							"v": 0.9
+						},
+						{
+							"id": "bright",
+							"t": 1,
+							"v": 8.0
+						},
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 10.0
+						}
+					],
+					"base": "Padded Coat",
+					"cls": "",
+					"ilvl": 8,
+					"implicit": {
+						"id": "dr",
+						"v": 6.0
+					},
+					"legend": "",
+					"name": "Tolling Hauberk",
+					"rarity": "rare",
+					"slot": "coat",
+					"tier": 1,
+					"uid": "i6e39af49"
+				},
+				{
+					"affixes": [
+						{
+							"id": "bell",
+							"t": 1,
+							"v": 11.0
+						},
+						{
+							"id": "waxen",
+							"t": 1,
+							"v": 6.0
+						}
+					],
+					"base": "Tallow Stub",
+					"cls": "",
+					"ilvl": 8,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 6.0,
+						"v": 9.0
+					},
+					"legend": "",
+					"name": "Waxen Tallow Stub of the Bell",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 1,
+					"uid": "i42d3517b"
+				}
+			],
+			"wares_seed": 8,
+			"xp": 12588
+		}
+	},
+	"legends_found": [
+		"ossuary_coat",
+		"gutterlight",
+		"twin_wick"
+	],
+	"levels": {
+		"dusk": {
+			"1-1": {
+				"best_embers": 78,
+				"best_time": 124.8000000000454,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"1-2": {
+				"best_embers": 47,
+				"best_time": 150.15000000002777,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					false,
+					true,
+					true
+				]
+			},
+			"1-3": {
+				"best_embers": 88,
+				"best_time": 145.16666666669897,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"1-4": {
+				"best_embers": 11,
+				"best_time": 189.8416666666583,
+				"boss_first": true,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"2-1": {
+				"best_embers": 68,
+				"best_time": 115.9000000000383,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"2-2": {
+				"best_embers": 78,
+				"best_time": 141.7500000000354,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					false,
+					true,
+					false
+				]
+			},
+			"2-3": {
+				"best_embers": 114,
+				"best_time": 159.11666666668629,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					false,
+					true
+				]
+			},
+			"2-4": {
+				"best_embers": 39,
+				"best_time": 63.39166666666371,
+				"boss_first": true,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			}
+		},
+		"nightfall": {
+			"1-1": {
+				"best_embers": 160,
+				"best_time": 92.8583333333533,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"1-2": {
+				"best_embers": 118,
+				"best_time": 74.6750000000055,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					false,
+					true,
+					true
+				]
+			},
+			"1-3": {
+				"best_embers": 178,
+				"best_time": 514.6749999996963,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"1-4": {
+				"best_embers": 16,
+				"best_time": 76.80833333334053,
+				"boss_first": true,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"2-1": {
+				"best_embers": 144,
+				"best_time": 146.5333333333644,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			}
+		},
+		"witching": {}
+	},
+	"modes": {},
+	"notices": [
+		"nightfall_waits"
+	],
+	"relics": [
+		"longsword",
+		"tallow_heart",
+		"moth_charm",
+		"rook_feather",
+		"bellows",
+		"saints_knuckle",
+		"iron_boots",
+		"phoenix_wick",
+		"choir_bone",
+		"bell_shard",
+		"wind_wick",
+		"owls_eye"
+	],
+	"relocked": {
+		"nightfall": 6
+	},
+	"run_counter": 23,
+	"saved_at": 1790463403,
+	"secrets": {
+		"dusk": {},
+		"nightfall": {},
+		"witching": {}
+	},
+	"seen": [
+		"intro",
+		"oath",
+		"beat_1_1",
+		"bark:beat_1_1_a",
+		"bark:beat_1_1_b",
+		"bark:first_sigil",
+		"bark:first_dread",
+		"bark:first_altar",
+		"bark:skill_point",
+		"bark:first_item",
+		"bark:first_relic",
+		"bark:first_hurt",
+		"beat_1_2",
+		"bark:beat_1_2_a",
+		"bark:beat_1_2_b",
+		"bark:first_douse",
+		"bark:low_flame",
+		"bark:first_snuff",
+		"beat_1_3",
+		"bark:beat_1_3_a",
+		"bark:beat_1_3_b",
+		"bark:first_pool",
+		"beat_1_4",
+		"bark:first_elite",
+		"boss_card_tollgrave",
+		"boss_1_before",
+		"boss_1_after",
+		"world_2",
+		"beat_2_1",
+		"meet_waxley",
+		"beat_2_2",
+		"bark:beat_2_2_a",
+		"beat_2_3",
+		"bark:beat_2_3_a",
+		"bark:beat_2_3_b",
+		"new_calling",
+		"beat_2_4",
+		"boss_card_snuffer",
+		"boss_2_before",
+		"bark:boss_2_a",
+		"boss_2_after",
+		"ending",
+		"post_credits",
+		"bark:nightfall"
+	],
+	"sigil_rewards": 5,
+	"suspend": {},
+	"unbanked": 0,
+	"unlocked": {
+		"dusk": 9,
+		"nightfall": 0,
+		"witching": 0
+	},
+	"v1_levels": {
+		"1-1": {
+			"best_embers": 46.0,
+			"best_time": 80.0000000000097,
+			"cleared": true,
+			"sigils": [
+				true,
+				true,
+				true
+			]
+		},
+		"1-2": {
+			"best_embers": 35.0,
+			"best_time": 136.541666666707,
+			"cleared": true,
+			"sigils": [
+				false,
+				true,
+				true
+			]
+		},
+		"1-3": {
+			"best_embers": 39.0,
+			"best_time": 83.5666666666792,
+			"cleared": true,
+			"sigils": [
+				true,
+				true,
+				true
+			]
+		},
+		"1-4": {
+			"best_embers": 0.0,
+			"best_time": 0.0,
+			"cleared": false,
+			"sigils": [
+				false,
+				false,
+				false
+			]
+		}
+	},
+	"version": 3,
+	"veteran": 3
+}

@@ -1,0 +1,34 @@
+{
+ "candle_base": [
+  60,
+  34.4
+ ],
+ "flame_scale": 1.0,
+ "flame_tip": [
+  60,
+  19
+ ],
+ "light_mult": 1.0,
+ "offhand": true,
+ "offhand_front": true,
+ "portrait_flame": [
+  37,
+  8,
+  20.5
+ ],
+ "portrait_flame_uv": [
+  0.4512,
+  0.0976
+ ],
+ "portrait_viewbox": [
+  23,
+  11,
+  82,
+  82
+ ],
+ "weapon_rest_deg": 80,
+ "weapon_tip": [
+  64,
+  41.6
+ ]
+}

@@ -1,0 +1,118 @@
+{
+ "_anchor": [
+  192,
+  368
+ ],
+ "_doc": "The Snuffer's 384-unit frames: 2 units = 1 world px, facing right, anchor (feet) at (192, 368). head = the face (his hit target); bell_mouth = the snuffer bell's mouth; slam_centre = where the slam lands; cone_tip = the lunge's leading point. World offset = (point - anchor) / 2.",
+ "_height_units": 220.0,
+ "_lunge_box": {
+  "frame": [
+   92,
+   220,
+   200,
+   104
+  ],
+  "how": "snuffer_lunge is drawn hovering 6 px off the floor (HOVER); its body, cone tip to hem, fills this box. In snuffer_boss.gd body_rect() for \"lunge\" and \"lunge_draw\": Rect2(position.x - 50, floor_y - 80, 100, 52) (symmetric about the anchor, so it holds for either facing). The bell and smoke trailing behind it are harmless.",
+  "up_from_floor": [
+   28.0,
+   80.0
+  ],
+  "w": 100.0,
+  "x": -50.0
+ },
+ "_pole_units": 308.0,
+ "snuffer_curdled": {
+  "bell_mouth": [
+   351.9,
+   93.7
+  ],
+  "head": [
+   202.8,
+   199.3
+  ]
+ },
+ "snuffer_die": {
+  "head": [
+   170.1,
+   197.4
+  ]
+ },
+ "snuffer_glide": {
+  "bell_mouth": [
+   171.2,
+   105.7
+  ],
+  "head": [
+   251.5,
+   204.6
+  ]
+ },
+ "snuffer_idle": {
+  "bell_mouth": [
+   290.5,
+   106.5
+  ],
+  "head": [
+   212.0,
+   207.0
+  ]
+ },
+ "snuffer_lunge": {
+  "bell_mouth": [
+   28.2,
+   299.7
+  ],
+  "cone_tip": [
+   286.3,
+   237.7
+  ],
+  "head": [
+   231.9,
+   279.1
+  ]
+ },
+ "snuffer_raise": {
+  "bell_mouth": [
+   112.0,
+   72.4
+  ],
+  "head": [
+   193.7,
+   204.8
+  ]
+ },
+ "snuffer_slam": {
+  "bell_mouth": [
+   322,
+   366
+  ],
+  "head": [
+   244.6,
+   220.1
+  ],
+  "slam_centre": [
+   322,
+   368
+  ]
+ },
+ "snuffer_snuff": {
+  "bell_mouth": [
+   318.5,
+   288.1
+  ],
+  "head": [
+   225.9,
+   208.3
+  ]
+ },
+ "snuffer_stuck": {
+  "bell_mouth": [
+   318,
+   368
+  ],
+  "head": [
+   270.5,
+   262.2
+  ]
+ }
+}

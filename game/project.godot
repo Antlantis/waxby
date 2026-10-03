@@ -1,0 +1,61 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Waxby"
+run/main_scene="res://scenes/main.tscn"
+config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.0705882, 0.0509804, 0.0941176, 1)
+config/features=PackedStringArray("4.7", "Mobile")
+
+[audio]
+
+general/ios/session_category=3
+general/ios/mix_with_others=true
+
+[autoload]
+
+Sfx="*res://scripts/sfx.gd"
+Game="*res://scripts/game_state.gd"
+
+[debug]
+
+gdscript/warnings/inference_on_variant=0
+file_logging/enable_file_logging=true
+
+[display]
+
+window/size/viewport_width=844
+window/size/viewport_height=390
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=4
+
+[importer_defaults]
+
+texture={
+"mipmaps/generate": true
+}
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[physics]
+
+common/physics_ticks_per_second=120
+common/max_physics_steps_per_frame=6
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/canvas_textures/default_texture_filter=1
+textures/vram_compression/import_etc2_astc=true

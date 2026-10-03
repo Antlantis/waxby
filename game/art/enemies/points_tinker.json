@@ -1,0 +1,602 @@
+{
+ "_anchor": [
+  192,
+  368
+ ],
+ "_doc": "The Tinker of Hours' 384-unit frames: 2 units = 1 world px, drawn facing right (the case on his back is on the left), anchor (feet) at (192, 368). World offset = (point - anchor) / 2 px, mirrored with the facing. spring = the mainspring (the window's target: full damage, a stomp 3x), spring_box = its hit box [x, y, w, h]; face = the chest clock face; key = the winding key; hand_l = his back (gear) hand, hand_r = his front (blade) hand, as drawn facing right; case = the case's centre; blade_tip = the minute hand's point (the Minute Hand's arc starts there); eye_l, eye_r = his lamp lenses (lights r 12, 8ae0ff); body = his box [x, y, w, h] (touch and chip hits). tinker_chimed: he lies flat on his front (turned 90 degrees, the head toward his facing), the case on his back sprung open with Tickwell tucked safe in it, and the mainspring sprung out of it on a gold strip, coiled on the floor in front of him: spring_box there is the window's hurt box (0..39 px over the floor, 11 px ahead of the anchor), in reach of a standing slash (8..42 px), a floor wave and a stomp from a jump, from either side (he is not solid while Chimed). Hit the spring, never Tickwell. The spring is his back's: a Sootrunner's spring hit counts as a Backstab from either side. A light (gold, r 50) on spring while Chimed.",
+ "_height_units": 340,
+ "_props": {
+  "clock_face": {
+   "frame": [
+    576,
+    576
+   ],
+   "hub": [
+    288,
+    288
+   ],
+   "note": "a 9-tile background prop: centre it on the arena clock; draw the one hand in glow from hub",
+   "radius": 266
+  },
+  "gear_saw": {
+   "center": [
+    32,
+    32
+   ],
+   "frame": [
+    64,
+    64
+   ],
+   "note": "spin it in code as it rolls",
+   "radius": 27
+  },
+  "hour_bell_frozen": {
+   "box": [
+    10,
+    20,
+    44,
+    64
+   ],
+   "frame": [
+    64,
+    96
+   ],
+   "hook": [
+    32,
+    8
+   ],
+   "mouth": [
+    32,
+    81
+   ]
+  },
+  "hour_bell_lit": {
+   "box": [
+    10,
+    20,
+    44,
+    64
+   ],
+   "frame": [
+    64,
+    96
+   ],
+   "hook": [
+    32,
+    8
+   ],
+   "mouth": [
+    32,
+    81
+   ],
+   "note": "the lit bell: add its gold ring and light (r 60) in glow"
+  },
+  "hour_hand": {
+   "frame": [
+    96,
+    32
+   ],
+   "hub": [
+    14,
+    16
+   ],
+   "note": "points right: turn it to its flight",
+   "tip": [
+    86,
+    16
+   ]
+  },
+  "soldier_hatch": {
+   "center": [
+    32,
+    14
+   ],
+   "floor": 16,
+   "frame": [
+    64,
+    32
+   ],
+   "note": "the floor line is y 16"
+  }
+ },
+ "tinker_chimed": {
+  "blade_tip": [
+   22.1,
+   360.5
+  ],
+  "body": [
+   98.0,
+   156.0,
+   250.0,
+   212.0
+  ],
+  "case": [
+   208.0,
+   158.0
+  ],
+  "eye_l": [
+   317.6,
+   262.4
+  ],
+  "eye_r": [
+   318.8,
+   288.3
+  ],
+  "face": [
+   192.0,
+   262.0
+  ],
+  "hand_l": [
+   110.0,
+   220.0
+  ],
+  "hand_r": [
+   150.0,
+   356.0
+  ],
+  "key": [
+   318.8,
+   186.8
+  ],
+  "spring": [
+   214.0,
+   328.0
+  ],
+  "spring_box": [
+   176.0,
+   290.0,
+   76.0,
+   78.0
+  ]
+ },
+ "tinker_die": {
+  "blade_tip": [
+   366.8,
+   339.8
+  ],
+  "body": [
+   92.0,
+   92.0,
+   212.0,
+   276.0
+  ],
+  "case": [
+   94.0,
+   234.0
+  ],
+  "eye_l": [
+   204.0,
+   125.7
+  ],
+  "eye_r": [
+   229.5,
+   130.8
+  ],
+  "face": [
+   198.0,
+   250.0
+  ],
+  "hand_l": [
+   94.0,
+   284.4
+  ],
+  "hand_r": [
+   240.0,
+   322.0
+  ],
+  "key": [
+   131.0,
+   106.3
+  ],
+  "spring": [
+   92.0,
+   250.0
+  ],
+  "spring_box": [
+   70.0,
+   228.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_idle": {
+  "blade_tip": [
+   369.4,
+   360.9
+  ],
+  "body": [
+   92.0,
+   48.0,
+   212.0,
+   320.0
+  ],
+  "case": [
+   94.0,
+   190.0
+  ],
+  "eye_l": [
+   198.4,
+   80.4
+  ],
+  "eye_r": [
+   224.3,
+   79.2
+  ],
+  "face": [
+   198.0,
+   206.0
+  ],
+  "hand_l": [
+   93.9,
+   273.8
+  ],
+  "hand_r": [
+   296.0,
+   256.0
+  ],
+  "key": [
+   122.8,
+   79.2
+  ],
+  "spring": [
+   92.0,
+   206.0
+  ],
+  "spring_box": [
+   70.0,
+   184.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_overwind": {
+  "blade_tip": [
+   338.2,
+   9.9
+  ],
+  "body": [
+   92.0,
+   48.0,
+   212.0,
+   320.0
+  ],
+  "case": [
+   94.0,
+   190.0
+  ],
+  "eye_l": [
+   195.9,
+   80.3
+  ],
+  "eye_r": [
+   221.6,
+   76.4
+  ],
+  "face": [
+   198.0,
+   206.0
+  ],
+  "hand_l": [
+   59.6,
+   122.0
+  ],
+  "hand_r": [
+   316.0,
+   136.0
+  ],
+  "key": [
+   120.7,
+   87.0
+  ],
+  "spring": [
+   92.0,
+   206.0
+  ],
+  "spring_box": [
+   70.0,
+   184.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_rewind": {
+  "blade_tip": [
+   358.1,
+   327.0
+  ],
+  "body": [
+   78.0,
+   48.0,
+   226.0,
+   320.0
+  ],
+  "case": [
+   86.3,
+   190.0
+  ],
+  "eye_l": [
+   184.6,
+   80.4
+  ],
+  "eye_r": [
+   210.6,
+   79.2
+  ],
+  "face": [
+   191.4,
+   206.0
+  ],
+  "hand_l": [
+   72.3,
+   106.8
+  ],
+  "hand_r": [
+   298.0,
+   214.0
+  ],
+  "key": [
+   109.1,
+   79.2
+  ],
+  "spring": [
+   85.4,
+   206.0
+  ],
+  "spring_box": [
+   63.4,
+   184.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_swing": {
+  "blade_tip": [
+   159.5,
+   21.5
+  ],
+  "body": [
+   82.0,
+   48.0,
+   222.0,
+   320.0
+  ],
+  "case": [
+   88.5,
+   190.0
+  ],
+  "eye_l": [
+   186.9,
+   80.3
+  ],
+  "eye_r": [
+   212.7,
+   77.3
+  ],
+  "face": [
+   193.3,
+   206.0
+  ],
+  "hand_l": [
+   93.9,
+   273.8
+  ],
+  "hand_r": [
+   250.0,
+   112.0
+  ],
+  "key": [
+   111.5,
+   84.4
+  ],
+  "spring": [
+   87.3,
+   206.0
+  ],
+  "spring_box": [
+   65.3,
+   184.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_toss": {
+  "blade_tip": [
+   369.4,
+   360.9
+  ],
+  "body": [
+   84.0,
+   48.0,
+   220.0,
+   320.0
+  ],
+  "case": [
+   89.6,
+   190.0
+  ],
+  "eye_l": [
+   190.5,
+   80.4
+  ],
+  "eye_r": [
+   216.5,
+   79.2
+  ],
+  "face": [
+   194.2,
+   206.0
+  ],
+  "hand_l": [
+   142.0,
+   93.6
+  ],
+  "hand_r": [
+   296.0,
+   256.0
+  ],
+  "key": [
+   115.0,
+   79.2
+  ],
+  "spring": [
+   88.2,
+   206.0
+  ],
+  "spring_box": [
+   66.2,
+   184.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_walk1": {
+  "blade_tip": [
+   367.8,
+   364.6
+  ],
+  "body": [
+   92.0,
+   44.0,
+   216.0,
+   324.0
+  ],
+  "case": [
+   96.2,
+   186.0
+  ],
+  "eye_l": [
+   202.3,
+   76.4
+  ],
+  "eye_r": [
+   228.2,
+   75.2
+  ],
+  "face": [
+   199.9,
+   202.0
+  ],
+  "hand_l": [
+   83.9,
+   271.8
+  ],
+  "hand_r": [
+   300.0,
+   256.0
+  ],
+  "key": [
+   126.8,
+   75.2
+  ],
+  "spring": [
+   93.9,
+   202.0
+  ],
+  "spring_box": [
+   71.9,
+   180.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_walk2": {
+  "blade_tip": [
+   351.8,
+   364.6
+  ],
+  "body": [
+   92.0,
+   44.0,
+   216.0,
+   324.0
+  ],
+  "case": [
+   96.2,
+   186.0
+  ],
+  "eye_l": [
+   202.3,
+   76.4
+  ],
+  "eye_r": [
+   228.2,
+   75.2
+  ],
+  "face": [
+   199.9,
+   202.0
+  ],
+  "hand_l": [
+   111.9,
+   271.8
+  ],
+  "hand_r": [
+   284.0,
+   256.0
+  ],
+  "key": [
+   126.8,
+   75.2
+  ],
+  "spring": [
+   93.9,
+   202.0
+  ],
+  "spring_box": [
+   71.9,
+   180.0,
+   44.0,
+   44.0
+  ]
+ },
+ "tinker_watch": {
+  "blade_tip": [
+   369.4,
+   360.9
+  ],
+  "body": [
+   92.0,
+   48.0,
+   212.0,
+   320.0
+  ],
+  "case": [
+   94.0,
+   190.0
+  ],
+  "eye_l": [
+   198.4,
+   80.4
+  ],
+  "eye_r": [
+   224.3,
+   79.2
+  ],
+  "face": [
+   198.0,
+   206.0
+  ],
+  "hand_l": [
+   212.4,
+   56.9
+  ],
+  "hand_r": [
+   296.0,
+   256.0
+  ],
+  "key": [
+   122.8,
+   79.2
+  ],
+  "spring": [
+   92.0,
+   206.0
+  ],
+  "spring_box": [
+   70.0,
+   184.0,
+   44.0,
+   44.0
+  ]
+ }
+}

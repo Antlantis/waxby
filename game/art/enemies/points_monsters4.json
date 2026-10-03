@@ -1,0 +1,1517 @@
+{
+ "_anchors": {
+  "coil": [
+   64,
+   64
+  ],
+  "gust": [
+   64,
+   64
+  ],
+  "hushling": [
+   64,
+   122
+  ],
+  "maw": [
+   64,
+   64
+  ],
+  "mite": [
+   64,
+   122
+  ],
+  "pane": [
+   64,
+   122
+  ],
+  "refractor": [
+   64,
+   64
+  ]
+ },
+ "_doc": "World 5 and World 6 monster frames (enemies4.py): 128-unit frames, 2 units = 1 world px, facing right. Each kind has one anchor (its feet, or its middle). Offsets from the anchor in world px = (point - anchor) / 2 (elites.frame_point). eyes = the list of the lit eyes' points ([[x, y]] for one); eye1 and eye2 (or eye) name them; eye_mid = the middle of two; eye_r = an eye's radius; hit = [x, y, w, h], the body's box on that frame.",
+ "_frames": {
+  "coil": [
+   "coil_head_closed",
+   "coil_head_open",
+   "coil_head_rest",
+   "coil_seg",
+   "coil_tail",
+   "coil_hit",
+   "coil_head_closed_bare",
+   "coil_head_open_bare",
+   "coil_head_rest_bare",
+   "coil_hit_bare"
+  ],
+  "gust": [
+   "gust_idle1",
+   "gust_idle2",
+   "gust_inhale",
+   "gust_blow",
+   "gust_hit"
+  ],
+  "hushling": [
+   "hushling_idle1",
+   "hushling_idle2",
+   "hushling_crouch",
+   "hushling_lunge",
+   "hushling_blink",
+   "hushling_pop"
+  ],
+  "maw": [
+   "maw_idle",
+   "maw_strain",
+   "maw_open",
+   "maw_choke",
+   "maw_hit"
+  ],
+  "mite": [
+   "mite_walk1",
+   "mite_walk2",
+   "mite_gnaw",
+   "mite_hit"
+  ],
+  "pane": [
+   "pane_face1",
+   "pane_face2",
+   "pane_turn",
+   "pane_edge",
+   "pane_cut",
+   "pane_hit",
+   "pane_shatter"
+  ],
+  "refractor": [
+   "refractor_idle1",
+   "refractor_idle2",
+   "refractor_charge",
+   "refractor_fire",
+   "refractor_hit"
+  ]
+ },
+ "_notes": {
+  "coil": "W6: the head faces right; chain coil_seg frames behind it from the neck (about 20 px apart) and end with coil_tail (its fin trails behind, to the left when the head faces right). coil_hit is the head recoiling; coil_head_rest the head resting on an islet edge (its jaw's underside flat on the ground). Once the candle is knocked loose (flames 0), show the _bare twin of each head frame instead.",
+  "hushling": "W6: ink with the silver rim (4 units). The ink ends at y 120; its silver rim reaches the floor line.",
+  "maw": "W6: a porcelain mask with the silver rim. It floats: anchored on its middle.",
+  "mite": "Neutral glass: tint it by the sprite modulate (enemy.gd tint) with one of _tints, picked by hash(cell). Its hit box is 40 units (20 px) tall (spec: at least 20), reaching up over its 14 px dome.",
+  "pane": "Neutral glass: tint it as the Glassmite. pane_turn is the turn tell (halfway), pane_edge the 8 px edge-on window (full damage).",
+  "unwick": "No frames: the Unwick is the player's own rig (wick_rig.gd) in black with a silver rim."
+ },
+ "_omens": {
+  "Echoing": "omen_echo_dial at its feet, scaled so its half-width (48 units) is size.x * 0.75 + 4 px (the elite ring's width), flattened as drawn; the hand is a line from the middle to the dial, one tick every W4 beat (0.536 s). The echo itself: the monster's frame redrawn at the strike place in e8fcff at alpha 0.45, its box outlined from the first strike.",
+  "Glassed": "omen_glassed centred on center(), scaled so its 96-unit width is max(size) * 1.35 px, alpha 0.5 + 0.2 * sin(ftime * 3); gone when the shell breaks (spark burst, omen_glass_break).",
+  "Hushed": "A violet rim: the frame redrawn 4 times offset by 1 px (up, down, left, right) in 6a5a9a at alpha 0.35 under the eye glints, plus 3 omen_hush_mote orbiting slowly (r = size.x * 0.7); its eyes go dark.",
+  "Sporebound": "Up to 6 omen_spore_mote drifting up from the body (rise 14 px/s, sway 3 px, 1.6 s life, scale 0.12-0.2), and its eyes glow green (eye points drawn in b8e070).",
+  "frames": [
+   "omen_glassed",
+   "omen_echo_dial",
+   "omen_spore_mote",
+   "omen_hush_mote"
+  ],
+  "how": "Glow-layer overlays for the four new Omens (P1), loaded in _ready. omen_glassed and omen_echo_dial are 128-unit frames anchored on their middle (64, 64); the motes are 32-unit frames (64 px) anchored on their middle. Colours: Sporebound green b8e070, Echoing frost e8fcff (W4 tell accent), Glassed prism white f8f0ff, Hushed violet 6a5a9a."
+ },
+ "_rim": {
+  "w5": "#ffeccc",
+  "w6": "#c8c8f0",
+  "w6_width_units": 4.0
+ },
+ "_roles": {
+  "coil": "swimming: coil_head_closed; the leap bite: coil_head_open; the rest window: coil_head_rest; hit: coil_hit; the same four as coil_head_closed_bare, _head_open_bare, _head_rest_bare, coil_hit_bare once its candle is knocked loose; the body: coil_seg links and coil_tail",
+  "gust": "idle1/idle2 (the bob); the tell: inhale; blow; hit",
+  "hushling": "idle1/idle2; the tell: crouch; lunge; open after it: blink; death: pop",
+  "maw": "idle; the Swallow and Gulp tells: strain (tipped back, the jaw stretched, the ties flared), then open; the gulp: open; a hit in a tell: choke (it spits the light); hit",
+  "mite": "walk1/walk2; the tell: gnaw; hit",
+  "pane": "advance: face1/face2; the tell: turn; edge-on (the lunge and the recover window): edge; Glass Cut: cut; face-on hit: hit; death: shatter",
+  "refractor": "track: idle1/idle2; lock: charge; fire; hit (code draws the aim line and the beam from lens)"
+ },
+ "_tells": {
+  "coil_*.bite": "the jaws' front (the bite)",
+  "coil_*.lure": "the stolen candle's flame (the lure light, r 30); the _bare frames have none",
+  "coil_*.neck": "where the first segment joins the head",
+  "coil_seg.top": "the segment's fin",
+  "coil_tail.tip": "the tail fin's tip",
+  "gust_*.mouth": "the mouth the gust blows from (the band runs forward from it)",
+  "gust_blow.gust": "the far end of the drawn gust lines (off the art)",
+  "hushling_lunge.mouth": "the mouth at the front of the lunge",
+  "maw_*.mouth": "the stitched mouth: Swallow and Gulp pull toward it; choke spits the light from it",
+  "mite_gnaw.jaws": "the gnaw tell: the mandibles tapping the glass (the crack runs from here)",
+  "pane_cut.arc": "the middle of the swing's glass smear (the 60 x 40 arc runs from over the head down to the tip)",
+  "pane_cut.blade": "the sword tip at the end of the Glass Cut's swing (low in front)",
+  "pane_edge.glint": "edge-on, the glint running up the lead",
+  "pane_turn.glint": "the turn tell: the glint running along the lead",
+  "refractor_*.beam": "the lock and fire glint round the lens, where code starts the aim line and the beam (the frames draw no line: it aims at any angle)",
+  "refractor_*.lens": "the eye in its core: the beam starts here"
+ },
+ "_tints": {
+  "blue": "#8cb4ff",
+  "gold": "#ffd870",
+  "red": "#ff8878"
+ },
+ "coil_head_closed": {
+  "bite": [
+   98.0,
+   74.0
+  ],
+  "eye1": [
+   60.8,
+   56.0
+  ],
+  "eye2": [
+   73.2,
+   55.2
+  ],
+  "eye_mid": [
+   67.0,
+   55.6
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    60.8,
+    56.0
+   ],
+   [
+    73.2,
+    55.2
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "lure": [
+   103.4,
+   55.8
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_head_closed_bare": {
+  "bite": [
+   98.0,
+   74.0
+  ],
+  "eye1": [
+   60.8,
+   56.0
+  ],
+  "eye2": [
+   73.2,
+   55.2
+  ],
+  "eye_mid": [
+   67.0,
+   55.6
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    60.8,
+    56.0
+   ],
+   [
+    73.2,
+    55.2
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_head_open": {
+  "bite": [
+   98.6,
+   69.1
+  ],
+  "eye1": [
+   59.7,
+   55.2
+  ],
+  "eye2": [
+   72.0,
+   53.1
+  ],
+  "eye_mid": [
+   65.8,
+   54.2
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    59.7,
+    55.2
+   ],
+   [
+    72.0,
+    53.1
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "lure": [
+   104.7,
+   49.7
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_head_open_bare": {
+  "bite": [
+   98.6,
+   69.1
+  ],
+  "eye1": [
+   59.7,
+   55.2
+  ],
+  "eye2": [
+   72.0,
+   53.1
+  ],
+  "eye_mid": [
+   65.8,
+   54.2
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    59.7,
+    55.2
+   ],
+   [
+    72.0,
+    53.1
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_head_rest": {
+  "bite": [
+   96.4,
+   80.3
+  ],
+  "eye1": [
+   62.1,
+   57.2
+  ],
+  "eye2": [
+   74.5,
+   58.1
+  ],
+  "eye_mid": [
+   68.3,
+   57.7
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    62.1,
+    57.2
+   ],
+   [
+    74.5,
+    58.1
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "lure": [
+   107.8,
+   71.8
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_head_rest_bare": {
+  "bite": [
+   96.4,
+   80.3
+  ],
+  "eye1": [
+   62.1,
+   57.2
+  ],
+  "eye2": [
+   74.5,
+   58.1
+  ],
+  "eye_mid": [
+   68.3,
+   57.7
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    62.1,
+    57.2
+   ],
+   [
+    74.5,
+    58.1
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_hit": {
+  "bite": [
+   98.4,
+   61.0
+  ],
+  "eye1": [
+   57.7,
+   54.2
+  ],
+  "eye2": [
+   69.4,
+   50.0
+  ],
+  "eye_mid": [
+   63.6,
+   52.1
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    57.7,
+    54.2
+   ],
+   [
+    69.4,
+    50.0
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "lure": [
+   96.0,
+   38.7
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_hit_bare": {
+  "bite": [
+   98.4,
+   61.0
+  ],
+  "eye1": [
+   57.7,
+   54.2
+  ],
+  "eye2": [
+   69.4,
+   50.0
+  ],
+  "eye_mid": [
+   63.6,
+   52.1
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    57.7,
+    54.2
+   ],
+   [
+    69.4,
+    50.0
+   ]
+  ],
+  "hit": [
+   26.0,
+   36.0,
+   76,
+   50
+  ],
+  "neck": [
+   34.0,
+   66.0
+  ]
+ },
+ "coil_seg": {
+  "hit": [
+   42.0,
+   42.0,
+   44,
+   44
+  ],
+  "top": [
+   64.0,
+   40.0
+  ]
+ },
+ "coil_tail": {
+  "hit": [
+   20.0,
+   48.0,
+   70,
+   32
+  ],
+  "tip": [
+   20.0,
+   62.0
+  ]
+ },
+ "gust_blow": {
+  "eye1": [
+   64.4,
+   64.0
+  ],
+  "eye2": [
+   73.6,
+   63.6
+  ],
+  "eye_mid": [
+   69.0,
+   63.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    64.4,
+    64.0
+   ],
+   [
+    73.6,
+    63.6
+   ]
+  ],
+  "gust": [
+   120.0,
+   72.0
+  ],
+  "hit": [
+   40.0,
+   42.0,
+   50,
+   50
+  ],
+  "mouth": [
+   77.2,
+   72.0
+  ]
+ },
+ "gust_hit": {
+  "eye1": [
+   64.4,
+   66.0
+  ],
+  "eye2": [
+   73.6,
+   65.6
+  ],
+  "eye_mid": [
+   69.0,
+   65.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    64.4,
+    66.0
+   ],
+   [
+    73.6,
+    65.6
+   ]
+  ],
+  "hit": [
+   38.0,
+   44.0,
+   54,
+   48
+  ]
+ },
+ "gust_idle1": {
+  "eye1": [
+   64.4,
+   64.0
+  ],
+  "eye2": [
+   73.6,
+   63.6
+  ],
+  "eye_mid": [
+   69.0,
+   63.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    64.4,
+    64.0
+   ],
+   [
+    73.6,
+    63.6
+   ]
+  ],
+  "hit": [
+   40.0,
+   42.0,
+   50,
+   50
+  ],
+  "mouth": [
+   75.0,
+   72.0
+  ]
+ },
+ "gust_idle2": {
+  "eye1": [
+   64.4,
+   65.6
+  ],
+  "eye2": [
+   73.6,
+   65.2
+  ],
+  "eye_mid": [
+   69.0,
+   65.4
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    64.4,
+    65.6
+   ],
+   [
+    73.6,
+    65.2
+   ]
+  ],
+  "hit": [
+   40.0,
+   42.0,
+   50,
+   50
+  ],
+  "mouth": [
+   74.6,
+   73.6
+  ]
+ },
+ "gust_inhale": {
+  "eye1": [
+   64.4,
+   63.0
+  ],
+  "eye2": [
+   73.6,
+   62.6
+  ],
+  "eye_mid": [
+   69.0,
+   62.8
+  ],
+  "eye_r": 3.6,
+  "eyes": [
+   [
+    64.4,
+    63.0
+   ],
+   [
+    73.6,
+    62.6
+   ]
+  ],
+  "hit": [
+   36.0,
+   36.0,
+   58,
+   56
+  ],
+  "mouth": [
+   76.8,
+   71.0
+  ]
+ },
+ "hushling_blink": {
+  "eye1": [
+   57.4,
+   107.5
+  ],
+  "eye2": [
+   70.4,
+   107.1
+  ],
+  "eye_mid": [
+   63.9,
+   107.3
+  ],
+  "eye_r": 6.0,
+  "eyes": [
+   [
+    57.4,
+    107.5
+   ],
+   [
+    70.4,
+    107.1
+   ]
+  ],
+  "hit": [
+   43.1,
+   92.5,
+   41.8,
+   29.5
+  ]
+ },
+ "hushling_crouch": {
+  "eye1": [
+   57.4,
+   99.0
+  ],
+  "eye2": [
+   70.4,
+   98.6
+  ],
+  "eye_mid": [
+   63.9,
+   98.8
+  ],
+  "eye_r": 6.4,
+  "eyes": [
+   [
+    57.4,
+    99.0
+   ],
+   [
+    70.4,
+    98.6
+   ]
+  ],
+  "hit": [
+   49.7,
+   73.8,
+   28.6,
+   48.2
+  ]
+ },
+ "hushling_idle1": {
+  "eye1": [
+   57.4,
+   105.0
+  ],
+  "eye2": [
+   70.4,
+   104.6
+  ],
+  "eye_mid": [
+   63.9,
+   104.8
+  ],
+  "eye_r": 6.0,
+  "eyes": [
+   [
+    57.4,
+    105.0
+   ],
+   [
+    70.4,
+    104.6
+   ]
+  ],
+  "hit": [
+   45.3,
+   87.0,
+   37.4,
+   35.0
+  ]
+ },
+ "hushling_idle2": {
+  "eye1": [
+   57.4,
+   105.7
+  ],
+  "eye2": [
+   70.4,
+   105.3
+  ],
+  "eye_mid": [
+   63.9,
+   105.5
+  ],
+  "eye_r": 6.0,
+  "eyes": [
+   [
+    57.4,
+    105.7
+   ],
+   [
+    70.4,
+    105.3
+   ]
+  ],
+  "hit": [
+   44.4,
+   88.5,
+   39.2,
+   33.5
+  ]
+ },
+ "hushling_lunge": {
+  "eye1": [
+   78.3,
+   95.6
+  ],
+  "eye2": [
+   85.2,
+   105.5
+  ],
+  "eye_mid": [
+   81.8,
+   100.5
+  ],
+  "eye_r": 5.8,
+  "eyes": [
+   [
+    78.3,
+    95.6
+   ],
+   [
+    85.2,
+    105.5
+   ]
+  ],
+  "hit": [
+   40.0,
+   78.0,
+   62,
+   42
+  ],
+  "mouth": [
+   73.9,
+   106.6
+  ]
+ },
+ "hushling_pop": {
+  "eye1": [
+   58.0,
+   104.0
+  ],
+  "eye2": [
+   70.0,
+   104.0
+  ],
+  "eye_mid": [
+   64.0,
+   104.0
+  ],
+  "eye_r": 5.5,
+  "eyes": [
+   [
+    58.0,
+    104.0
+   ],
+   [
+    70.0,
+    104.0
+   ]
+  ],
+  "hit": [
+   40.0,
+   90.0,
+   48,
+   32
+  ]
+ },
+ "maw_choke": {
+  "eye1": [
+   55.9,
+   57.0
+  ],
+  "eye2": [
+   75.0,
+   59.0
+  ],
+  "eye_mid": [
+   65.5,
+   58.0
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    55.9,
+    57.0
+   ],
+   [
+    75.0,
+    59.0
+   ]
+  ],
+  "hit": [
+   36.0,
+   30.0,
+   56,
+   64
+  ],
+  "mouth": [
+   62.3,
+   77.9
+  ]
+ },
+ "maw_hit": {
+  "eye1": [
+   54.8,
+   60.1
+  ],
+  "eye2": [
+   73.6,
+   56.1
+  ],
+  "eye_mid": [
+   64.2,
+   58.1
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    54.8,
+    60.1
+   ],
+   [
+    73.6,
+    56.1
+   ]
+  ],
+  "hit": [
+   36.0,
+   30.0,
+   56,
+   64
+  ],
+  "mouth": [
+   67.3,
+   77.7
+  ]
+ },
+ "maw_idle": {
+  "eye1": [
+   55.4,
+   58.0
+  ],
+  "eye2": [
+   74.6,
+   58.0
+  ],
+  "eye_mid": [
+   65.0,
+   58.0
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    55.4,
+    58.0
+   ],
+   [
+    74.6,
+    58.0
+   ]
+  ],
+  "hit": [
+   36.0,
+   30.0,
+   56,
+   64
+  ],
+  "mouth": [
+   64.0,
+   78.0
+  ]
+ },
+ "maw_open": {
+  "eye1": [
+   54.7,
+   60.8
+  ],
+  "eye2": [
+   73.1,
+   55.5
+  ],
+  "eye_mid": [
+   63.9,
+   58.1
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    54.7,
+    60.8
+   ],
+   [
+    73.1,
+    55.5
+   ]
+  ],
+  "hit": [
+   34.0,
+   26.0,
+   64,
+   86
+  ],
+  "mouth": [
+   70.6,
+   85.1
+  ]
+ },
+ "maw_strain": {
+  "eye1": [
+   54.8,
+   60.1
+  ],
+  "eye2": [
+   73.6,
+   56.1
+  ],
+  "eye_mid": [
+   64.2,
+   58.1
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    54.8,
+    60.1
+   ],
+   [
+    73.6,
+    56.1
+   ]
+  ],
+  "hit": [
+   34.0,
+   26.0,
+   62,
+   80
+  ],
+  "mouth": [
+   68.3,
+   82.3
+  ]
+ },
+ "mite_gnaw": {
+  "eye1": [
+   83.3,
+   112.2
+  ],
+  "eye2": [
+   87.9,
+   112.0
+  ],
+  "eye_mid": [
+   85.6,
+   112.1
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    83.3,
+    112.2
+   ],
+   [
+    87.9,
+    112.0
+   ]
+  ],
+  "hit": [
+   44.0,
+   82.0,
+   54,
+   40
+  ],
+  "jaws": [
+   93.9,
+   119.4
+  ]
+ },
+ "mite_hit": {
+  "eye1": [
+   81.8,
+   100.2
+  ],
+  "eye2": [
+   86.4,
+   100.0
+  ],
+  "eye_mid": [
+   84.1,
+   100.1
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    81.8,
+    100.2
+   ],
+   [
+    86.4,
+    100.0
+   ]
+  ],
+  "hit": [
+   42.0,
+   82.0,
+   54,
+   40
+  ]
+ },
+ "mite_walk1": {
+  "eye1": [
+   83.6,
+   107.4
+  ],
+  "eye2": [
+   88.2,
+   107.2
+  ],
+  "eye_mid": [
+   85.9,
+   107.3
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    83.6,
+    107.4
+   ],
+   [
+    88.2,
+    107.2
+   ]
+  ],
+  "hit": [
+   44.0,
+   82.0,
+   50,
+   40
+  ],
+  "jaws": [
+   94.0,
+   112.6
+  ]
+ },
+ "mite_walk2": {
+  "eye1": [
+   83.6,
+   106.6
+  ],
+  "eye2": [
+   88.2,
+   106.4
+  ],
+  "eye_mid": [
+   85.9,
+   106.5
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    83.6,
+    106.6
+   ],
+   [
+    88.2,
+    106.4
+   ]
+  ],
+  "hit": [
+   44.0,
+   82.0,
+   50,
+   40
+  ],
+  "jaws": [
+   94.0,
+   111.8
+  ]
+ },
+ "pane_cut": {
+  "arc": [
+   114.0,
+   62.0
+  ],
+  "blade": [
+   114.7,
+   107.4
+  ],
+  "eye1": [
+   65.1,
+   54.5
+  ],
+  "eye2": [
+   72.9,
+   54.9
+  ],
+  "eye_mid": [
+   69.0,
+   54.7
+  ],
+  "eye_r": 2.9,
+  "eyes": [
+   [
+    65.1,
+    54.5
+   ],
+   [
+    72.9,
+    54.9
+   ]
+  ],
+  "hit": [
+   38.0,
+   28.0,
+   80,
+   94
+  ]
+ },
+ "pane_edge": {
+  "eye": [
+   64.0,
+   54.0
+  ],
+  "eye_r": 2.6,
+  "eyes": [
+   [
+    64.0,
+    54.0
+   ]
+  ],
+  "glint": [
+   64.0,
+   64.0
+  ],
+  "hit": [
+   56.0,
+   26.0,
+   16,
+   96
+  ]
+ },
+ "pane_face1": {
+  "eye1": [
+   60.4,
+   54.6
+  ],
+  "eye2": [
+   68.2,
+   54.4
+  ],
+  "eye_mid": [
+   64.3,
+   54.5
+  ],
+  "eye_r": 2.9,
+  "eyes": [
+   [
+    60.4,
+    54.6
+   ],
+   [
+    68.2,
+    54.4
+   ]
+  ],
+  "halo": [
+   64.0,
+   44.0
+  ],
+  "hit": [
+   38.0,
+   30.0,
+   52,
+   92
+  ]
+ },
+ "pane_face2": {
+  "eye1": [
+   60.4,
+   54.6
+  ],
+  "eye2": [
+   68.2,
+   54.4
+  ],
+  "eye_mid": [
+   64.3,
+   54.5
+  ],
+  "eye_r": 2.9,
+  "eyes": [
+   [
+    60.4,
+    54.6
+   ],
+   [
+    68.2,
+    54.4
+   ]
+  ],
+  "halo": [
+   64.0,
+   44.0
+  ],
+  "hit": [
+   38.0,
+   30.0,
+   52,
+   92
+  ]
+ },
+ "pane_hit": {
+  "eye1": [
+   55.7,
+   55.0
+  ],
+  "eye2": [
+   63.5,
+   54.3
+  ],
+  "eye_mid": [
+   59.6,
+   54.6
+  ],
+  "eye_r": 2.9,
+  "eyes": [
+   [
+    55.7,
+    55.0
+   ],
+   [
+    63.5,
+    54.3
+   ]
+  ],
+  "hit": [
+   38.0,
+   30.0,
+   52,
+   92
+  ]
+ },
+ "pane_shatter": {
+  "eye": [
+   62.0,
+   107.0
+  ],
+  "eye_r": 2.6,
+  "eyes": [
+   [
+    62.0,
+    107.0
+   ]
+  ],
+  "hit": [
+   34.0,
+   76.0,
+   64,
+   46
+  ]
+ },
+ "pane_turn": {
+  "eye1": [
+   62.2,
+   54.6
+  ],
+  "eye2": [
+   66.1,
+   54.4
+  ],
+  "eye_mid": [
+   64.2,
+   54.5
+  ],
+  "eye_r": 2.6,
+  "eyes": [
+   [
+    62.2,
+    54.6
+   ],
+   [
+    66.1,
+    54.4
+   ]
+  ],
+  "glint": [
+   64.0,
+   84.0
+  ],
+  "halo": [
+   64.0,
+   44.0
+  ],
+  "hit": [
+   48.0,
+   30.0,
+   32,
+   92
+  ]
+ },
+ "refractor_charge": {
+  "beam": [
+   65.0,
+   62.0
+  ],
+  "eye": [
+   65.0,
+   62.0
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    65.0,
+    62.0
+   ]
+  ],
+  "hit": [
+   48.0,
+   32.0,
+   32,
+   64
+  ],
+  "lens": [
+   65.0,
+   62.0
+  ]
+ },
+ "refractor_fire": {
+  "beam": [
+   64.9,
+   61.9
+  ],
+  "eye": [
+   64.9,
+   61.9
+  ],
+  "eye_r": 6.2,
+  "eyes": [
+   [
+    64.9,
+    61.9
+   ]
+  ],
+  "hit": [
+   48.0,
+   32.0,
+   32,
+   64
+  ],
+  "lens": [
+   64.9,
+   61.9
+  ]
+ },
+ "refractor_hit": {
+  "eye": [
+   65.4,
+   64.3
+  ],
+  "eye_r": 4.6,
+  "eyes": [
+   [
+    65.4,
+    64.3
+   ]
+  ],
+  "hit": [
+   46.0,
+   34.0,
+   36,
+   64
+  ]
+ },
+ "refractor_idle1": {
+  "eye": [
+   65.0,
+   62.0
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    65.0,
+    62.0
+   ]
+  ],
+  "hit": [
+   48.0,
+   32.0,
+   32,
+   64
+  ],
+  "lens": [
+   65.0,
+   62.0
+  ]
+ },
+ "refractor_idle2": {
+  "eye": [
+   65.0,
+   60.4
+  ],
+  "eye_r": 5.6,
+  "eyes": [
+   [
+    65.0,
+    60.4
+   ]
+  ],
+  "hit": [
+   48.0,
+   32.0,
+   32,
+   64
+  ],
+  "lens": [
+   65.0,
+   60.4
+  ]
+ }
+}

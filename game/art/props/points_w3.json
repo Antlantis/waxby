@@ -1,0 +1,201 @@
+{
+ "_doc": "A1 World 3 props (tools/art/props_w3.py). Frame units, 2 units = 1 world px (sprite scale 0.25). 64 x 64: vine_top, spore_pod_* and glowfruit_* (floor ones stand on y 64, _hang ones and glowfruit_hang hang from y 0), sconce_bone. 64 x 96 (standing on y 96): skull_lantern_*, altar_orchard*. 128 x 192: bell_orchard (hangs from (64, 20)), bell_orchard_beam, root_seal_* (2 x 3 tiles, top-left on the door's top-left cell). flame = where the engine draws a live flame or hangs a light; light = a glowfruit's light; glow = a pod's dim glow (r 24); puff = where a burst's cloud starts; center = the body's centre.",
+ "altar_orchard": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   22
+  ]
+ },
+ "altar_orchard_lit": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   22
+  ]
+ },
+ "bell_orchard": {
+  "hang": [
+   64,
+   20
+  ]
+ },
+ "bell_orchard_beam": {
+  "hang": [
+   64,
+   20
+  ]
+ },
+ "glowfruit_dim": {
+  "base": [
+   32,
+   64
+  ],
+  "light": [
+   32,
+   50
+  ]
+ },
+ "glowfruit_hang": {
+  "fruit": [
+   32,
+   37
+  ],
+  "light": [
+   32,
+   38
+  ],
+  "top": [
+   32,
+   0
+  ]
+ },
+ "glowfruit_lit": {
+  "base": [
+   32,
+   64
+  ],
+  "light": [
+   32,
+   50
+  ]
+ },
+ "root_seal_closed": {
+  "size": [
+   128,
+   192
+  ]
+ },
+ "root_seal_open": {
+  "size": [
+   128,
+   192
+  ]
+ },
+ "sconce_bone": {
+  "flame": [
+   32,
+   14
+  ]
+ },
+ "skull_lantern_lit": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   30
+  ]
+ },
+ "skull_lantern_out": {
+  "base": [
+   32,
+   96
+  ],
+  "flame": [
+   32,
+   30
+  ]
+ },
+ "spore_pod_burst": {
+  "base": [
+   32,
+   64
+  ],
+  "center": [
+   32,
+   56
+  ],
+  "puff": [
+   32,
+   22
+  ]
+ },
+ "spore_pod_closed": {
+  "base": [
+   32,
+   64
+  ],
+  "center": [
+   32,
+   44
+  ],
+  "glow": [
+   32,
+   44
+  ]
+ },
+ "spore_pod_hang_burst": {
+  "center": [
+   32,
+   9
+  ],
+  "puff": [
+   32,
+   42
+  ],
+  "top": [
+   32,
+   0
+  ]
+ },
+ "spore_pod_hang_closed": {
+  "center": [
+   32,
+   27
+  ],
+  "glow": [
+   32,
+   27
+  ],
+  "top": [
+   32,
+   0
+  ]
+ },
+ "spore_pod_hang_swell": {
+  "center": [
+   32,
+   30
+  ],
+  "glow": [
+   32,
+   30
+  ],
+  "top": [
+   32,
+   0
+  ]
+ },
+ "spore_pod_swell": {
+  "base": [
+   32,
+   64
+  ],
+  "center": [
+   32,
+   40
+  ],
+  "glow": [
+   32,
+   40
+  ]
+ },
+ "vine_top": {
+  "hang": [
+   32,
+   0
+  ],
+  "stem": [
+   32,
+   64
+  ]
+ }
+}

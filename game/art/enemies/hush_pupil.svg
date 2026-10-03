@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64">
+<defs><radialGradient id="hpr1" cx="0.5" cy="0.5" r="0.5" gradientUnits="objectBoundingBox"><stop offset="0" stop-color="#6a5a9a" stop-opacity="0.55"/><stop offset="0.45" stop-color="#6a5a9a" stop-opacity="0.231"/><stop offset="1" stop-color="#6a5a9a" stop-opacity="0"/></radialGradient></defs>
+<ellipse cx="32.0" cy="32.0" rx="30.8" ry="30.8" fill="url(#hpr1)"/><circle cx="32" cy="32" r="15.0" fill="none" stroke="#6a5a9a" stroke-width="2.4" opacity="0.8"/><circle cx="32" cy="32" r="14.0" fill="#06050a"/><circle cx="26.68" cy="26.40" r="4.20" fill="#ffffff"/><circle cx="37.60" cy="37.88" r="1.68" fill="#d8d4f0" opacity="0.6"/>
+</svg>

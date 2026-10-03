@@ -1,0 +1,102 @@
+{
+ "_doc": "A2 secrets and modes props. Frame units, 2 units = 1 world px (sprites drawn at scale 0.25, the silver bell at 0.14). secret_door (+ _glint): 128 x 192, \"foot\" on the floor under the S cell; the silver bell hangs at \"bell\" (60 px over the floor, as world.add_bell hangs it); \"window\" = [x, y, w, h]. legend_shrine_*: 64 x 96, the prize at \"prize\". grave_candle_*: 64 x 64, the live flame at \"flame\". waxley_cart: 128 x 112, bottom centre on the floor, its light at \"lantern\". trial_candle_*: 32 x 56 (16 x 28 px), the live flame at \"flame\".",
+ "grave_candle_lit": {
+  "flame": [
+   43.8,
+   32
+  ],
+  "foot": [
+   32,
+   64
+  ]
+ },
+ "grave_candle_out": {
+  "flame": [
+   43.8,
+   32
+  ],
+  "foot": [
+   32,
+   64
+  ]
+ },
+ "legend_shrine_lit": {
+  "foot": [
+   32,
+   96
+  ],
+  "prize": [
+   32,
+   50
+  ]
+ },
+ "legend_shrine_out": {
+  "foot": [
+   32,
+   96
+  ],
+  "prize": [
+   32,
+   50
+  ]
+ },
+ "secret_door": {
+  "bell": [
+   64,
+   72
+  ],
+  "foot": [
+   64,
+   192
+  ],
+  "window": [
+   24,
+   30,
+   80,
+   154
+  ]
+ },
+ "secret_door_glint": {
+  "foot": [
+   64,
+   192
+  ]
+ },
+ "silver_bell": {
+  "hang": [
+   64,
+   20
+  ],
+  "scale": 0.14
+ },
+ "trial_candle_lit": {
+  "flame": [
+   16,
+   6
+  ],
+  "foot": [
+   16,
+   54
+  ]
+ },
+ "trial_candle_out": {
+  "flame": [
+   16,
+   6
+  ],
+  "foot": [
+   16,
+   54
+  ]
+ },
+ "waxley_cart": {
+  "foot": [
+   64,
+   112
+  ],
+  "lantern": [
+   114,
+   26
+  ]
+ }
+}

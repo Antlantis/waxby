@@ -1,0 +1,115 @@
+{
+ "_doc": "A2 World 5 props. Frame units, 2 units = 1 world px (sprites drawn at scale 0.25). pennant_*: 64 x 64, hung from \"hang\" (a pole top), blowing right (mirror for left). prism_lamp_* and altar_glass*: 64 x 96, \"foot\" on the floor, \"flame\" where the light (and a live flame) goes, as v2's lantern_post and altar. bell_glass*: 128 x 192 hung from (64, 20), v2's bell; rope = [x, y, w, h]. sconce_glass: 64 x 64, wick tip \"flame\". window_seal_*: 128 x 192 over the two-by-three doorway boss_arena.gd seals. glass_crack*: 64 x 64 overlays for a pane cell (stage 1 at strain 0.4, 2 at 0.8, 3 as it flashes).",
+ "altar_glass": {
+  "flame": [
+   32,
+   22
+  ],
+  "foot": [
+   32,
+   96
+  ]
+ },
+ "altar_glass_lit": {
+  "flame": [
+   32,
+   22
+  ],
+  "foot": [
+   32,
+   96
+  ]
+ },
+ "bell_glass": {
+  "hang": [
+   64,
+   20
+  ],
+  "rope": [
+   58,
+   108,
+   12,
+   82
+  ]
+ },
+ "bell_glass_beam": {
+  "hang": [
+   64,
+   20
+  ]
+ },
+ "glass_crack1": {
+  "impact": [
+   30,
+   8
+  ]
+ },
+ "glass_crack2": {
+  "impact": [
+   30,
+   8
+  ]
+ },
+ "glass_crack3": {
+  "impact": [
+   30,
+   8
+  ]
+ },
+ "pennant_full": {
+  "hang": [
+   8,
+   2
+  ]
+ },
+ "pennant_lift": {
+  "hang": [
+   8,
+   2
+  ]
+ },
+ "pennant_slack": {
+  "hang": [
+   8,
+   2
+  ]
+ },
+ "prism_lamp_lit": {
+  "flame": [
+   32,
+   30
+  ],
+  "foot": [
+   32,
+   96
+  ]
+ },
+ "prism_lamp_out": {
+  "flame": [
+   32,
+   30
+  ],
+  "foot": [
+   32,
+   96
+  ]
+ },
+ "sconce_glass": {
+  "flame": [
+   32,
+   14
+  ]
+ },
+ "window_seal_closed": {
+  "cells": [
+   2,
+   3
+  ]
+ },
+ "window_seal_open": {
+  "cells": [
+   2,
+   3
+  ]
+ }
+}

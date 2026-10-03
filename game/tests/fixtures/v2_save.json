@@ -1,0 +1,438 @@
+{
+	"bells": 31,
+	"difficulty": "nightfall",
+	"embers": 1234,
+	"hero": "knight",
+	"heroes": {
+		"knight": {
+			"belt": [
+				"tallow_heart",
+				"rook_feather",
+				"bellows",
+				"longsword"
+			],
+			"cls": "knight",
+			"equip": {
+				"boots": null,
+				"candle": {
+					"affixes": [
+						{
+							"id": "waxen",
+							"t": 3,
+							"v": 19.0
+						}
+					],
+					"base": "Pillar Candle",
+					"cls": "",
+					"ilvl": 24,
+					"implicit": {
+						"id": "max_hp_pct",
+						"light": 11.0,
+						"v": 21.0
+					},
+					"legend": "",
+					"name": "Waxen Pillar Candle",
+					"rarity": "magic",
+					"slot": "candle",
+					"tier": 3,
+					"uid": "ik000002"
+				},
+				"charm": {
+					"affixes": [
+						{
+							"id": "keen",
+							"t": 2,
+							"v": 14.0
+						},
+						{
+							"id": "precision",
+							"t": 2,
+							"v": 4.2
+						},
+						{
+							"id": "swift",
+							"t": 2,
+							"v": 8.0
+						}
+					],
+					"base": "Knot",
+					"cls": "",
+					"ilvl": 18,
+					"implicit": {},
+					"legend": "first_dawn",
+					"name": "Glass of the First Dawn",
+					"rarity": "legendary",
+					"slot": "charm",
+					"tier": 2,
+					"uid": "ik000004"
+				},
+				"coat": {
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 3,
+							"v": 4.5
+						},
+						{
+							"id": "waxen",
+							"t": 3,
+							"v": 17.0
+						},
+						{
+							"id": "moth",
+							"t": 3,
+							"v": 1.8
+						}
+					],
+					"base": "Choir Plate",
+					"cls": "",
+					"ilvl": 25,
+					"implicit": {
+						"id": "dr",
+						"v": 12.0
+					},
+					"legend": "",
+					"name": "Grim Hauberk",
+					"rarity": "rare",
+					"slot": "coat",
+					"tier": 3,
+					"uid": "ik000003"
+				},
+				"weapon": {
+					"affixes": [
+						{
+							"id": "keen",
+							"t": 3,
+							"v": 24.0
+						},
+						{
+							"id": "ruin",
+							"t": 3,
+							"v": 44.0
+						}
+					],
+					"base": "Dawnsteel",
+					"cls": "knight",
+					"ilvl": 25,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 59.0
+					},
+					"legend": "dawnsliver",
+					"name": "Dawnsliver",
+					"rarity": "legendary",
+					"slot": "weapon",
+					"tier": 3,
+					"uid": "ik000001"
+				}
+			},
+			"level": 25,
+			"points": 0,
+			"respecs": 1,
+			"satchel": [
+				{
+					"affixes": [
+						{
+							"id": "warded",
+							"t": 3,
+							"v": 4.0
+						},
+						{
+							"id": "hallowed",
+							"t": 3,
+							"v": 27.0
+						}
+					],
+					"base": "Sabatons",
+					"cls": "",
+					"ilvl": 22,
+					"implicit": {
+						"dr": 4.0,
+						"id": "stomp_pct",
+						"v": 116.0
+					},
+					"legend": "cinderstep",
+					"name": "Cinderstep",
+					"rarity": "legendary",
+					"slot": "boots",
+					"tier": 3,
+					"uid": "ik000005"
+				},
+				{
+					"affixes": [],
+					"base": "Chain Coat",
+					"cls": "",
+					"ilvl": 12,
+					"implicit": {
+						"id": "dr",
+						"v": 9.0
+					},
+					"legend": "",
+					"name": "Chain Coat",
+					"rarity": "common",
+					"slot": "coat",
+					"tier": 2,
+					"uid": "ik000006"
+				}
+			],
+			"skills": {
+				"k_aegis": 5,
+				"k_crescent": 3,
+				"k_devout": 2,
+				"k_honed": 2,
+				"k_keen": 2,
+				"k_mirror": 3,
+				"k_tempered": 2,
+				"k_unbroken": 1
+			},
+			"vigil": 5,
+			"wares": [],
+			"wares_seed": 0,
+			"xp": 40065
+		},
+		"runner": {
+			"belt": [
+				"tallow_heart",
+				"rook_feather",
+				"bellows",
+				"longsword"
+			],
+			"cls": "runner",
+			"equip": {
+				"boots": null,
+				"candle": null,
+				"charm": null,
+				"coat": null,
+				"weapon": {
+					"affixes": [
+						{
+							"id": "keen",
+							"t": 3,
+							"v": 22.0
+						},
+						{
+							"id": "precision",
+							"t": 3,
+							"v": 7.0
+						},
+						{
+							"id": "ruin",
+							"t": 3,
+							"v": 50.0
+						}
+					],
+					"base": "Soot Fang",
+					"cls": "runner",
+					"ilvl": 30,
+					"implicit": {
+						"id": "dmg_pct",
+						"v": 69.0
+					},
+					"legend": "",
+					"name": "Sable Fang",
+					"rarity": "rare",
+					"slot": "weapon",
+					"tier": 3,
+					"uid": "ir000001"
+				}
+			},
+			"level": 30,
+			"points": 0,
+			"skills": {
+				"r_bandolier": 2,
+				"r_deadly": 2,
+				"r_keen": 2,
+				"r_mercy": 1,
+				"r_quick": 2,
+				"r_ricochet": 3,
+				"r_step": 5,
+				"r_veil": 3
+			},
+			"vigil": 10,
+			"wares": [],
+			"wares_seed": 0,
+			"xp": 99415
+		}
+	},
+	"levels": {
+		"dusk": {
+			"1-1": {
+				"best_embers": 30,
+				"best_time": 80.25,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					false
+				]
+			},
+			"1-2": {
+				"best_embers": 31,
+				"best_time": 81.25,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					false
+				]
+			},
+			"1-3": {
+				"best_embers": 32,
+				"best_time": 82.25,
+				"boss_first": false,
+				"cleared": true,
+				"dread": true,
+				"sigils": [
+					true,
+					true,
+					false
+				]
+			},
+			"1-4": {
+				"best_embers": 33,
+				"best_time": 83.25,
+				"boss_first": true,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			},
+			"2-1": {
+				"best_embers": 34,
+				"best_time": 84.25,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					false
+				]
+			},
+			"2-2": {
+				"best_embers": 35,
+				"best_time": 85.25,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					false,
+					false
+				]
+			},
+			"2-3": {
+				"best_embers": 36,
+				"best_time": 86.25,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					false
+				]
+			},
+			"2-4": {
+				"best_embers": 37,
+				"best_time": 87.25,
+				"boss_first": true,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					true,
+					true
+				]
+			}
+		},
+		"nightfall": {
+			"1-1": {
+				"best_embers": 22,
+				"best_time": 101.5,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					true,
+					false,
+					false
+				]
+			},
+			"1-2": {
+				"best_embers": 18,
+				"best_time": 140.0,
+				"boss_first": false,
+				"cleared": true,
+				"dread": false,
+				"sigils": [
+					false,
+					true,
+					false
+				]
+			},
+			"1-3": {
+				"best_embers": 0,
+				"best_time": 0.0,
+				"boss_first": false,
+				"cleared": false,
+				"dread": false,
+				"sigils": [
+					true,
+					false,
+					false
+				]
+			}
+		},
+		"witching": {}
+	},
+	"relics": [
+		"tallow_heart",
+		"rook_feather",
+		"bellows",
+		"longsword",
+		"moth_charm"
+	],
+	"run_counter": 40,
+	"saved_at": 1790300000,
+	"seen": [
+		"intro",
+		"oath",
+		"beat_1_1",
+		"boss_1_after",
+		"world_2",
+		"meet_waxley",
+		"boss_2_after",
+		"ending",
+		"post_credits",
+		"bark:nightfall"
+	],
+	"sigil_rewards": 3,
+	"unbanked": 0,
+	"unlocked": {
+		"dusk": 8,
+		"nightfall": 3,
+		"witching": 0
+	},
+	"v1_levels": {
+		"1-1": {
+			"best_embers": 40.0,
+			"best_time": 77.5,
+			"cleared": true,
+			"sigils": [
+				true,
+				false,
+				true
+			]
+		}
+	},
+	"version": 2,
+	"veteran": 1
+}

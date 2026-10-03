@@ -1,0 +1,221 @@
+{
+ "_anchors": {
+  "bonebow": [
+   64,
+   122
+  ],
+  "drip": [
+   64,
+   122
+  ],
+  "helm": [
+   64,
+   122
+  ],
+  "jaw": [
+   64,
+   64
+  ],
+  "lurk": [
+   64,
+   122
+  ],
+  "wing": [
+   64,
+   64
+  ]
+ },
+ "_doc": "W6b monster frames: 128-unit frames, 2 units = 1 world px, facing right. Each kind has one anchor (its feet, or its middle for fliers), drip_hang included. Offsets from the anchor in world px = (point - anchor) / 2.",
+ "_drip_hang": {
+  "ceiling": [
+   64,
+   10
+  ],
+  "how": "drip_hang keeps the feet anchor (64, 122); its ceiling line is frame y 10. While hanging (position.y = the ceiling line), set sprite.position.y = 56 ((122 - 10) / 2) so frame y 10 sits on the ceiling; set it back to 0 when it lets go. Or write sprite.offset.y = -20 while hanging and -244 after. Do not change anchor at runtime: enemy.gd applies it to sprite.offset only in _ready.",
+  "sprite_position_y": 56.0
+ },
+ "bonebow_draw": {
+  "arrow_tip": [
+   110.4,
+   91.4
+  ],
+  "eyes": [
+   69,
+   80
+  ],
+  "glint": [
+   108.4,
+   91.4
+  ],
+  "nock": [
+   72.6,
+   91.4
+  ]
+ },
+ "bonebow_idle": {
+  "bow": [
+   89.4,
+   99.4
+  ],
+  "eyes": [
+   69,
+   80
+  ]
+ },
+ "bonebow_loose": {
+  "arrow_out": [
+   105,
+   92
+  ],
+  "eyes": [
+   69,
+   80
+  ]
+ },
+ "drip_hang": {
+  "ceiling": [
+   64,
+   10
+  ],
+  "glint": [
+   57,
+   32.4
+  ],
+  "tip": [
+   64,
+   49.4
+  ]
+ },
+ "drip_splat": {
+  "top": [
+   64,
+   110
+  ]
+ },
+ "helm_bash": {
+  "eyes": [
+   72,
+   78
+  ],
+  "rim": [
+   108,
+   80
+  ],
+  "shield": [
+   97.4,
+   97
+  ]
+ },
+ "helm_block": {
+  "eyes": [
+   69,
+   81
+  ],
+  "shield": [
+   88.6,
+   93
+  ]
+ },
+ "helm_hit": {
+  "eyes": [
+   64,
+   68
+  ]
+ },
+ "helm_noshield": {
+  "eyes": [
+   68,
+   74
+  ]
+ },
+ "helm_walk1": {
+  "eyes": [
+   68,
+   76
+  ],
+  "shield": [
+   86.4,
+   97.6
+  ]
+ },
+ "helm_walk2": {
+  "eyes": [
+   68,
+   77.0
+  ],
+  "shield": [
+   86.4,
+   98.6
+  ]
+ },
+ "jaw_fall": {
+  "centre": [
+   64,
+   64
+  ],
+  "lure": [
+   75.7,
+   44.9
+  ]
+ },
+ "jaw_hide": {
+  "centre": [
+   64,
+   64
+  ],
+  "lure": [
+   87.4,
+   45.6
+  ]
+ },
+ "jaw_leap": {
+  "centre": [
+   64,
+   64
+  ],
+  "lure": [
+   42.1,
+   59.6
+  ]
+ },
+ "lurk_hit": {
+  "eyes": [
+   64,
+   74.6
+  ]
+ },
+ "lurk_hop": {
+  "eyes": [
+   64,
+   62
+  ]
+ },
+ "lurk_open": {
+  "eyes": [
+   64,
+   62
+  ],
+  "mouth": [
+   74,
+   66
+  ]
+ },
+ "wing_fly1": {
+  "body": [
+   64,
+   64
+  ]
+ },
+ "wing_fly2": {
+  "body": [
+   64,
+   65.4
+  ]
+ },
+ "wing_latch": {
+  "flame": [
+   64,
+   64
+  ]
+ }
+}

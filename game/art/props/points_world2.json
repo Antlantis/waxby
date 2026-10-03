@@ -1,0 +1,54 @@
+{
+ "_doc": "W6b World 2 props. Frame units, 2 units = 1 world px. brazier_* and lantern_post_* are 64 x 96 (bottom centre (32, 96) on the floor); the rest are 64 x 64 tiles (drip_spout and waxfall_head hang from the tile top). flame = where the engine draws the live flame (brazier) or hangs the light (lantern, painted flame); drip = where drops form; pour = the waxfall column top centre, width its width in units.",
+ "brazier_lit": {
+  "flame": [
+   32,
+   33
+  ]
+ },
+ "brazier_out": {
+  "flame": [
+   32,
+   33
+  ],
+  "smoke": [
+   33,
+   30
+  ]
+ },
+ "drip_spout": {
+  "drip": [
+   32,
+   36
+  ]
+ },
+ "lantern_post_lit": {
+  "flame": [
+   32,
+   30
+  ]
+ },
+ "lantern_post_out": {
+  "flame": [
+   32,
+   30
+  ]
+ },
+ "nest_sconce": {
+  "cocoon": [
+   32,
+   53
+  ],
+  "flame": [
+   32,
+   14
+  ]
+ },
+ "waxfall_head": {
+  "pour": [
+   32,
+   53
+  ],
+  "width": 18
+ }
+}

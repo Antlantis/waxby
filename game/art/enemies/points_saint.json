@@ -1,0 +1,350 @@
+{
+ "_anchor": [
+  128,
+  244
+ ],
+ "_doc": "The Prism Saint's 256-unit frames: 2 units = 1 world px, drawn facing right (she is nearly frontal), anchor (128, 244) = the point of her gown (she floats: put the anchor where she hovers; Refracted hovers it about 40 px over the platform). World offset = (point - anchor) / 2 px, mirrored with the facing. mask = her face (the beam and the aim line start there); halo_center = where saint_halo's centre goes (drawn behind her); prism = the prism in her hands; heart = Tessel's pane; body = her box [x, y, w, h] in that frame (touch and chip hits: 5% through her glass). Refracted: at the spec's hover (her anchor about 40 px over the platform) a standing slash (8..42 px) only reaches her gown's point, so the window is for jump attacks and stomps (the Anvil Drop); to let standing slashes land too, hover the anchor at about 20 px (her lower gown then sits at 20..60 px).",
+ "_draw_scale": 1.15,
+ "_draw_scale_note": "REQUIRED: draw her frames, saint_halo and the saint_shard_* parts at 1.15 x 1:1 (sprite scale 0.25 x 1.15) and scale every offset by it: world offset = (point - anchor) / 2 x 1.15 px. At 1:1 her glass is 71 x 119 px and her halo's solid rose 90 px across, under the 96 x 128 px every boss must read at (spec 5.1); at 1.15 she is 82 x 137 px, and with the halo behind her 104 x 159 px. The 512-texel frames stay sharp on the phone up to about 1.18. The mirrors, the halo_shard blades and the beam are not scaled.",
+ "_height_units": 238,
+ "_parts": {
+  "halo_shard": {
+   "center": [
+    32,
+    16
+   ],
+   "frame": [
+    64,
+    32
+   ],
+   "note": "white: modulate it to a pane colour; it points right, turn it to its flight",
+   "tip": [
+    56,
+    16
+   ]
+  },
+  "mirror_shard": {
+   "center": [
+    32,
+    64
+   ],
+   "frame": [
+    64,
+    128
+   ],
+   "note": "the 16 x 56 px pane; the track anchor is its top",
+   "pane": [
+    16,
+    8,
+    32,
+    112
+   ]
+  },
+  "mirror_shard_dim": {
+   "center": [
+    32,
+    64
+   ],
+   "frame": [
+    64,
+    128
+   ],
+   "pane": [
+    16,
+    8,
+    32,
+    112
+   ]
+  },
+  "saint_halo": {
+   "center": [
+    128,
+    128
+   ],
+   "frame": [
+    256,
+    256
+   ],
+   "note": "drawn behind her at halo_center; turn it slowly, spin it up for the Rose",
+   "ray_r": 118,
+   "rim_r": 90
+  },
+  "saint_shard_blue": {
+   "box": [
+    40,
+    10,
+    48,
+    108
+   ],
+   "center": [
+    64,
+    64
+   ],
+   "frame": [
+    128,
+    128
+   ],
+   "mask": [
+    64,
+    56
+   ],
+   "note": "each shard fires its beam from its mask; draw its crack in glow when reflected"
+  },
+  "saint_shard_gold": {
+   "box": [
+    40,
+    10,
+    48,
+    108
+   ],
+   "center": [
+    64,
+    64
+   ],
+   "frame": [
+    128,
+    128
+   ],
+   "mask": [
+    64,
+    56
+   ]
+  },
+  "saint_shard_red": {
+   "box": [
+    40,
+    10,
+    48,
+    108
+   ],
+   "center": [
+    64,
+    64
+   ],
+   "frame": [
+    128,
+    128
+   ],
+   "mask": [
+    64,
+    56
+   ]
+  }
+ },
+ "saint_beam": {
+  "body": [
+   51.0,
+   9.0,
+   142.0,
+   237.0
+  ],
+  "halo_center": [
+   128.0,
+   58.0
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   128.0,
+   60.0
+  ],
+  "prism": [
+   206.0,
+   92.0
+  ]
+ },
+ "saint_charge": {
+  "body": [
+   57.0,
+   9.2,
+   142.0,
+   236.8
+  ],
+  "halo_center": [
+   125.3,
+   58.1
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   125.5,
+   60.1
+  ],
+  "prism": [
+   132.0,
+   72.0
+  ]
+ },
+ "saint_die": {
+  "body": [
+   57.0,
+   9.0,
+   142.0,
+   237.0
+  ],
+  "halo_center": [
+   128.0,
+   58.0
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   128.0,
+   60.0
+  ],
+  "prism": [
+   128.0,
+   143.0
+  ]
+ },
+ "saint_hurt": {
+  "body": [
+   65.0,
+   11.5,
+   142.4,
+   234.5
+  ],
+  "halo_center": [
+   118.8,
+   59.1
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   119.3,
+   61.1
+  ],
+  "prism": [
+   162.0,
+   144.0
+  ]
+ },
+ "saint_idle": {
+  "body": [
+   57.0,
+   9.0,
+   142.0,
+   237.0
+  ],
+  "halo_center": [
+   128.0,
+   58.0
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   128.0,
+   60.0
+  ],
+  "prism": [
+   129.0,
+   141.0
+  ]
+ },
+ "saint_refracted": {
+  "body": [
+   61.4,
+   13.1,
+   142.8,
+   232.9
+  ],
+  "halo_center": [
+   139.7,
+   59.9
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   139.1,
+   61.8
+  ],
+  "prism": [
+   164.0,
+   168.0
+  ]
+ },
+ "saint_rose": {
+  "body": [
+   56.2,
+   9.0,
+   143.6,
+   237.0
+  ],
+  "halo_center": [
+   128.0,
+   58.0
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   128.0,
+   60.0
+  ],
+  "prism": [
+   128.0,
+   143.0
+  ]
+ },
+ "saint_sing": {
+  "body": [
+   57.0,
+   10.8,
+   142.0,
+   235.2
+  ],
+  "halo_center": [
+   120.1,
+   58.8
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   120.5,
+   60.8
+  ],
+  "prism": [
+   128.0,
+   140.0
+  ]
+ },
+ "saint_split": {
+  "body": [
+   57.0,
+   9.0,
+   142.0,
+   237.0
+  ],
+  "halo_center": [
+   128.0,
+   58.0
+  ],
+  "heart": [
+   128.0,
+   112.0
+  ],
+  "mask": [
+   128.0,
+   60.0
+  ],
+  "prism": [
+   128.0,
+   146.0
+  ]
+ }
+}

@@ -1,0 +1,1770 @@
+{
+ "_anchors": {
+  "buckle": [
+   64,
+   122
+  ],
+  "creep": [
+   64,
+   122
+  ],
+  "hound": [
+   64,
+   122
+  ],
+  "owl": [
+   64,
+   122
+  ],
+  "rootling": [
+   64,
+   122
+  ],
+  "spur": [
+   64,
+   64
+  ],
+  "tick": [
+   64,
+   122
+  ],
+  "weepcap": [
+   64,
+   122
+  ]
+ },
+ "_doc": "World 3 and World 4 monster frames (enemies3.py): 128-unit frames, 2 units = 1 world px, facing right. Each kind has one anchor (its feet, or its middle). Offsets from the anchor in world px = (point - anchor) / 2 (elites.frame_point). eyes = the list of the lit eyes' points ([[x, y]] for one); eye1 and eye2 (or eye) name them; eye_mid = the middle of two; eye_r = an eye's radius; hit = [x, y, w, h], the body's box on that frame.",
+ "_frames": {
+  "buckle": [
+   "buckle_idle",
+   "buckle_walk1",
+   "buckle_walk2",
+   "buckle_raise",
+   "buckle_stomp",
+   "buckle_slam",
+   "buckle_thawed",
+   "buckle_hit",
+   "buckle_shell"
+  ],
+  "creep": [
+   "creep_crawl1",
+   "creep_crawl2",
+   "creep_coil",
+   "creep_lunge",
+   "creep_fall",
+   "creep_hit"
+  ],
+  "hound": [
+   "hound_prowl1",
+   "hound_prowl2",
+   "hound_howl",
+   "hound_run1",
+   "hound_run2",
+   "hound_crouch",
+   "hound_pounce",
+   "hound_land",
+   "hound_pant",
+   "hound_hit"
+  ],
+  "owl": [
+   "owl_body",
+   "owl_look_l",
+   "owl_look_c",
+   "owl_look_r",
+   "owl_screech",
+   "owl_hit",
+   "owl_broken"
+  ],
+  "rootling": [
+   "rootling_mound",
+   "rootling_swell",
+   "rootling_pop",
+   "rootling_dazed",
+   "rootling_walk1",
+   "rootling_walk2",
+   "rootling_hit"
+  ],
+  "spur": [
+   "spur_roll",
+   "spur_catch",
+   "spur_hit",
+   "spur_face",
+   "spur_face_catch",
+   "spur_face_hit"
+  ],
+  "tick": [
+   "tick_march1",
+   "tick_march2",
+   "tick_wind",
+   "tick_charge",
+   "tick_dizzy",
+   "tick_hit"
+  ],
+  "weepcap": [
+   "weepcap_idle",
+   "weepcap_inhale",
+   "weepcap_puff",
+   "weepcap_hit",
+   "weepcap_die"
+  ]
+ },
+ "_notes": {
+  "buckle": "buckle_shell (see-through ice) goes over any frame while the rime holds, shifted by that frame's shell_dx, shell_dy (frame units).",
+  "creep": "Drawn head-up with its tail end on the feet anchor (64, 122) and its lane along frame x 64, the skull about 40 px up (it fills its 16 x 40 box). Crawling down its lane, flip it vertically about the top of its box. Off the lane (a flat lane or knocked onto the floor) turn it 90 deg with the head toward its heading; its tail is at the anchor, so shift the sprite back by half its length (20 px) to centre it, and 8 px up (its body is 16 px thick). creep_fall is the knocked-off Creepbone on its back; it has no dizzy stars (they would lie sideways once it is turned): draw them upright over its `belly`.",
+  "owl": "Draw owl_body, then one head frame over it at the same anchor (the head sits on the body at `head`); the head frames swap to sweep (look_l, look_c, look_r), and `cone` is where the eye cone starts on each. owl_broken is the whole owl.",
+  "spur": "Centred on its hub (64, 64): it rolls along edges, so turn spur_roll / _catch / _hit about its middle (sprite.rotation = spin); its teeth reach 28 units (14 px) from the hub, 31 (15.5 px) bristling in the catch. Then draw the matching face overlay upright (rotation 0) at the same anchor: spur_face over roll, spur_face_catch over catch (the jam and the caught window), spur_face_hit over hit. It covers the cog's own hub face exactly, so the stern face stays the right way up; its eye1 / eye2 are the glow eyes, unturned. The frames draw no sparks or trail: code puts the sparks at the contact point."
+ },
+ "_roles": {
+  "buckle": "idle; walk1/walk2; both tells (Frost Stomp and Shield Slam): raise; stomp; slam; thawed (the rime shattered); hit (no rime); and buckle_shell over any frame while the rime holds",
+  "creep": "crawl1/crawl2; the tell: coil; lunge; stretched: lunge; knocked off and dazed: fall; hit",
+  "hound": "prowl: prowl1/prowl2; the chase tell: howl; chase: run1/run2; the tell: crouch; pounce; land (open); pant (tired); hit",
+  "owl": "owl_body with a head over it (same anchor): the sweep look_l / look_c / look_r, the alarm screech, hit; broken is the whole owl (its death)",
+  "rootling": "buried: mound; the tell: swell; pop; dazed; walking: walk1/walk2; hit; digging back in: swell then mound",
+  "spur": "roll (turn the sprite as it rolls) under spur_face; the jam tell and the caught window: catch (with the re-spin) under spur_face_catch; hit under spur_face_hit",
+  "tick": "march1/march2 on the tick; the tell: wind; charge; dizzy (after a wall) and rundown; hit",
+  "weepcap": "idle (sway it); the tell: inhale; puff; hit; die"
+ },
+ "_tells": {
+  "creep_coil.glint": "the coil tell: the eye glint (a light r 18)",
+  "creep_fall.belly": "the middle of its body, lying on its back: draw the dizzy stars upright over it",
+  "creep_lunge.bite": "the jaws at the front of the lunge",
+  "hound_crouch.teeth": "the crouch tell: the glint on the bared teeth",
+  "hound_howl.flare": "the lantern eye flaring (a green light r 30): the one lit socket",
+  "hound_pounce.bite": "the jaws, leading the pounce",
+  "rootling_mound.leaves": "the two leaves poking out of the mound",
+  "rootling_pop.column": "the middle of the pop column (22 x 40 px from the floor)",
+  "rootling_swell.glint": "the swell tell: the green glint (a light r 22) over the mound",
+  "spur_*.hub": "the hub (the middle of the turning and of the face overlay)",
+  "weepcap_*.gills": "the gills under the cap: the inhale glow (a violet light r 26)",
+  "weepcap_puff.burst": "the middle of the puff burst (r 36 px)"
+ },
+ "buckle_hit": {
+  "eye": [
+   64.3,
+   58.7
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    64.3,
+    58.7
+   ]
+  ],
+  "hit": [
+   38.0,
+   42.0,
+   60,
+   80
+  ],
+  "shell_dx": -2,
+  "shell_dy": 0
+ },
+ "buckle_idle": {
+  "eye": [
+   71.0,
+   59.0
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    71.0,
+    59.0
+   ]
+  ],
+  "hit": [
+   38.0,
+   42.0,
+   60,
+   80
+  ],
+  "shell_dx": 0,
+  "shell_dy": 0,
+  "shield": [
+   90.0,
+   92.0
+  ]
+ },
+ "buckle_raise": {
+  "eye": [
+   64.7,
+   54.8
+  ],
+  "eye_r": 3.4,
+  "eyes": [
+   [
+    64.7,
+    54.8
+   ]
+  ],
+  "foot": [
+   80.0,
+   108.0
+  ],
+  "hit": [
+   34.0,
+   30.0,
+   64,
+   92
+  ],
+  "shell_dx": -2,
+  "shell_dy": -4,
+  "shield": [
+   86.0,
+   66.0
+  ]
+ },
+ "buckle_shell": {
+  "hit": [
+   36.0,
+   34.0,
+   56,
+   76
+  ]
+ },
+ "buckle_slam": {
+  "eye": [
+   83.5,
+   62.8
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    83.5,
+    62.8
+   ]
+  ],
+  "hit": [
+   38.0,
+   42.0,
+   76,
+   80
+  ],
+  "shell_dx": 5,
+  "shell_dy": 1,
+  "shield": [
+   104.0,
+   90.0
+  ]
+ },
+ "buckle_stomp": {
+  "eye": [
+   74.2,
+   61.5
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    74.2,
+    61.5
+   ]
+  ],
+  "hit": [
+   38.0,
+   42.0,
+   60,
+   80
+  ],
+  "shell_dx": 1,
+  "shell_dy": 2,
+  "stomp": [
+   82.0,
+   120.0
+  ]
+ },
+ "buckle_thawed": {
+  "eye": [
+   68.8,
+   62.7
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    68.8,
+    62.7
+   ]
+  ],
+  "hit": [
+   38.0,
+   44.0,
+   64,
+   78
+  ],
+  "shell_dx": 0,
+  "shell_dy": 4,
+  "stars": [
+   64.0,
+   36.0
+  ]
+ },
+ "buckle_walk1": {
+  "eye": [
+   71.0,
+   57.8
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    71.0,
+    57.8
+   ]
+  ],
+  "hit": [
+   38.0,
+   42.0,
+   60,
+   80
+  ],
+  "shell_dx": 0,
+  "shell_dy": -1.2,
+  "shield": [
+   90.0,
+   90.8
+  ]
+ },
+ "buckle_walk2": {
+  "eye": [
+   71.0,
+   59.6
+  ],
+  "eye_r": 3.0,
+  "eyes": [
+   [
+    71.0,
+    59.6
+   ]
+  ],
+  "hit": [
+   38.0,
+   42.0,
+   60,
+   80
+  ],
+  "shell_dx": 0,
+  "shell_dy": 0.6,
+  "shield": [
+   90.0,
+   92.6
+  ]
+ },
+ "creep_coil": {
+  "eye1": [
+   55.6,
+   56.7
+  ],
+  "eye2": [
+   64.0,
+   55.0
+  ],
+  "eye_mid": [
+   59.8,
+   55.9
+  ],
+  "eye_r": 3.6,
+  "eyes": [
+   [
+    55.6,
+    56.7
+   ],
+   [
+    64.0,
+    55.0
+   ]
+  ],
+  "glint": [
+   64.0,
+   55.0
+  ],
+  "hit": [
+   44,
+   45.5,
+   40,
+   72
+  ]
+ },
+ "creep_crawl1": {
+  "eye1": [
+   58.7,
+   46.6
+  ],
+  "eye2": [
+   67.3,
+   47.0
+  ],
+  "eye_mid": [
+   63.0,
+   46.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    58.7,
+    46.6
+   ],
+   [
+    67.3,
+    47.0
+   ]
+  ],
+  "head": [
+   64,
+   48.5
+  ],
+  "hit": [
+   48,
+   35.5,
+   32,
+   84
+  ]
+ },
+ "creep_crawl2": {
+  "eye1": [
+   62.0,
+   46.8
+  ],
+  "eye2": [
+   70.6,
+   46.0
+  ],
+  "eye_mid": [
+   66.3,
+   46.4
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    62.0,
+    46.8
+   ],
+   [
+    70.6,
+    46.0
+   ]
+  ],
+  "head": [
+   64,
+   48.1
+  ],
+  "hit": [
+   48,
+   34.5,
+   32,
+   84
+  ]
+ },
+ "creep_fall": {
+  "belly": [
+   64,
+   82.5
+  ],
+  "eye1": [
+   60.2,
+   41.1
+  ],
+  "eye2": [
+   68.7,
+   42.7
+  ],
+  "eye_mid": [
+   64.5,
+   41.9
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    60.2,
+    41.1
+   ],
+   [
+    68.7,
+    42.7
+   ]
+  ],
+  "hit": [
+   46,
+   30.5,
+   36,
+   86
+  ]
+ },
+ "creep_hit": {
+  "eye1": [
+   66.8,
+   42.3
+  ],
+  "eye2": [
+   74.8,
+   45.6
+  ],
+  "eye_mid": [
+   70.8,
+   44.0
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    66.8,
+    42.3
+   ],
+   [
+    74.8,
+    45.6
+   ]
+  ],
+  "hit": [
+   48,
+   32.5,
+   36,
+   88
+  ]
+ },
+ "creep_lunge": {
+  "bite": [
+   64,
+   29.5
+  ],
+  "eye1": [
+   59.8,
+   17.9
+  ],
+  "eye2": [
+   68.4,
+   17.7
+  ],
+  "eye_mid": [
+   64.1,
+   17.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    59.8,
+    17.9
+   ],
+   [
+    68.4,
+    17.7
+   ]
+  ],
+  "hit": [
+   48,
+   8.5,
+   32,
+   112
+  ]
+ },
+ "hound_crouch": {
+  "eye": [
+   94.0,
+   99.3
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    94.0,
+    99.3
+   ]
+  ],
+  "hit": [
+   30.0,
+   86.0,
+   80,
+   36
+  ],
+  "teeth": [
+   106.5,
+   110.9
+  ]
+ },
+ "hound_hit": {
+  "eye": [
+   88.7,
+   86.7
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    88.7,
+    86.7
+   ]
+  ],
+  "hit": [
+   30.0,
+   74.0,
+   78,
+   48
+  ]
+ },
+ "hound_howl": {
+  "eye": [
+   81.4,
+   72.7
+  ],
+  "eye_r": 4.8,
+  "eyes": [
+   [
+    81.4,
+    72.7
+   ]
+  ],
+  "flare": [
+   81.4,
+   72.7
+  ],
+  "hit": [
+   36.0,
+   60.0,
+   60,
+   62
+  ],
+  "mouth": [
+   103.0,
+   67.2
+  ]
+ },
+ "hound_land": {
+  "eye": [
+   96.4,
+   97.6
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    96.4,
+    97.6
+   ]
+  ],
+  "hit": [
+   32.0,
+   84.0,
+   80,
+   38
+  ]
+ },
+ "hound_pant": {
+  "eye": [
+   87.9,
+   85.2
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    87.9,
+    85.2
+   ]
+  ],
+  "hit": [
+   34.0,
+   70.0,
+   66,
+   52
+  ],
+  "tongue": [
+   99.0,
+   101.3
+  ]
+ },
+ "hound_pounce": {
+  "bite": [
+   104.4,
+   86.6
+  ],
+  "eye": [
+   89.2,
+   78.8
+  ],
+  "eye_r": 4.8,
+  "eyes": [
+   [
+    89.2,
+    78.8
+   ]
+  ],
+  "hit": [
+   20.0,
+   64.0,
+   92,
+   56
+  ]
+ },
+ "hound_prowl1": {
+  "eye": [
+   92.3,
+   93.1
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    92.3,
+    93.1
+   ]
+  ],
+  "hit": [
+   30.0,
+   80.0,
+   78,
+   42
+  ],
+  "snout": [
+   108.0,
+   100.0
+  ]
+ },
+ "hound_prowl2": {
+  "eye": [
+   92.3,
+   91.9
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    92.3,
+    91.9
+   ]
+  ],
+  "hit": [
+   30.0,
+   80.0,
+   78,
+   42
+  ],
+  "snout": [
+   108.0,
+   100.0
+  ]
+ },
+ "hound_run1": {
+  "eye": [
+   89.7,
+   87.1
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    89.7,
+    87.1
+   ]
+  ],
+  "hit": [
+   24.0,
+   80.0,
+   84,
+   42
+  ]
+ },
+ "hound_run2": {
+  "eye": [
+   88.6,
+   88.0
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    88.6,
+    88.0
+   ]
+  ],
+  "hit": [
+   30.0,
+   76.0,
+   76,
+   46
+  ]
+ },
+ "owl_body": {
+  "head": [
+   64.0,
+   77.0
+  ],
+  "hit": [
+   40.0,
+   62.0,
+   48,
+   60
+  ],
+  "neck": [
+   64.0,
+   86.0
+  ]
+ },
+ "owl_broken": {
+  "eye1": [
+   67.5,
+   78.8
+  ],
+  "eye2": [
+   76.6,
+   85.9
+  ],
+  "eye_mid": [
+   72.0,
+   82.3
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    67.5,
+    78.8
+   ],
+   [
+    76.6,
+    85.9
+   ]
+  ],
+  "hit": [
+   40.0,
+   64.0,
+   50,
+   58
+  ]
+ },
+ "owl_hit": {
+  "cone": [
+   65.6,
+   76.4
+  ],
+  "eye1": [
+   60.0,
+   75.0
+  ],
+  "eye2": [
+   71.2,
+   77.8
+  ],
+  "eye_mid": [
+   65.6,
+   76.4
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    60.0,
+    75.0
+   ],
+   [
+    71.2,
+    77.8
+   ]
+  ],
+  "hit": [
+   48.0,
+   62.0,
+   32,
+   28
+  ],
+  "look": 0.3
+ },
+ "owl_look_c": {
+  "cone": [
+   64.0,
+   76.0
+  ],
+  "eye1": [
+   58.2,
+   76.0
+  ],
+  "eye2": [
+   69.8,
+   76.0
+  ],
+  "eye_mid": [
+   64.0,
+   76.0
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    58.2,
+    76.0
+   ],
+   [
+    69.8,
+    76.0
+   ]
+  ],
+  "hit": [
+   48.0,
+   62.0,
+   32,
+   28
+  ],
+  "look": 0
+ },
+ "owl_look_l": {
+  "cone": [
+   59.3,
+   76.6
+  ],
+  "eye1": [
+   53.6,
+   77.5
+  ],
+  "eye2": [
+   65.0,
+   75.8
+  ],
+  "eye_mid": [
+   59.3,
+   76.7
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    53.6,
+    77.5
+   ],
+   [
+    65.0,
+    75.8
+   ]
+  ],
+  "hit": [
+   48.0,
+   62.0,
+   32,
+   28
+  ],
+  "look": -1
+ },
+ "owl_look_r": {
+  "cone": [
+   68.7,
+   76.6
+  ],
+  "eye1": [
+   63.0,
+   75.8
+  ],
+  "eye2": [
+   74.4,
+   77.5
+  ],
+  "eye_mid": [
+   68.7,
+   76.7
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    63.0,
+    75.8
+   ],
+   [
+    74.4,
+    77.5
+   ]
+  ],
+  "hit": [
+   48.0,
+   62.0,
+   32,
+   28
+  ],
+  "look": 1
+ },
+ "owl_screech": {
+  "cone": [
+   63.8,
+   76.0
+  ],
+  "eye1": [
+   58.1,
+   77.0
+  ],
+  "eye2": [
+   69.5,
+   75.0
+  ],
+  "eye_mid": [
+   63.8,
+   76.0
+  ],
+  "eye_r": 5.2,
+  "eyes": [
+   [
+    58.1,
+    77.0
+   ],
+   [
+    69.5,
+    75.0
+   ]
+  ],
+  "hit": [
+   48.0,
+   62.0,
+   32,
+   28
+  ],
+  "look": 0
+ },
+ "rootling_dazed": {
+  "eye1": [
+   59.8,
+   104.9
+  ],
+  "eye2": [
+   70.8,
+   104.5
+  ],
+  "eye_mid": [
+   65.3,
+   104.7
+  ],
+  "eye_r": 4.2,
+  "eyes": [
+   [
+    59.8,
+    104.9
+   ],
+   [
+    70.8,
+    104.5
+   ]
+  ],
+  "hit": [
+   45.0,
+   84.0,
+   38,
+   38
+  ],
+  "stars": [
+   64.0,
+   78.0
+  ]
+ },
+ "rootling_hit": {
+  "eye1": [
+   56.2,
+   100.2
+  ],
+  "eye2": [
+   66.1,
+   98.3
+  ],
+  "eye_mid": [
+   61.1,
+   99.2
+  ],
+  "eye_r": 3.8,
+  "eyes": [
+   [
+    56.2,
+    100.2
+   ],
+   [
+    66.1,
+    98.3
+   ]
+  ],
+  "hit": [
+   45.0,
+   78.0,
+   36,
+   44
+  ]
+ },
+ "rootling_mound": {
+  "hit": [
+   44.0,
+   102.0,
+   40,
+   20
+  ],
+  "leaves": [
+   64.0,
+   102.0
+  ]
+ },
+ "rootling_pop": {
+  "column": [
+   64.0,
+   82.0
+  ],
+  "eye1": [
+   60.4,
+   61.9
+  ],
+  "eye2": [
+   69.8,
+   61.4
+  ],
+  "eye_mid": [
+   65.1,
+   61.6
+  ],
+  "eye_r": 3.6,
+  "eyes": [
+   [
+    60.4,
+    61.9
+   ],
+   [
+    69.8,
+    61.4
+   ]
+  ],
+  "hit": [
+   42.0,
+   42.0,
+   44,
+   80
+  ]
+ },
+ "rootling_swell": {
+  "glint": [
+   64.0,
+   96.0
+  ],
+  "hit": [
+   42.0,
+   98.0,
+   44,
+   24
+  ]
+ },
+ "rootling_walk1": {
+  "eye1": [
+   60.2,
+   99.4
+  ],
+  "eye2": [
+   70.2,
+   99.0
+  ],
+  "eye_mid": [
+   65.2,
+   99.2
+  ],
+  "eye_r": 3.8,
+  "eyes": [
+   [
+    60.2,
+    99.4
+   ],
+   [
+    70.2,
+    99.0
+   ]
+  ],
+  "hit": [
+   46.0,
+   78.0,
+   36,
+   44
+  ]
+ },
+ "rootling_walk2": {
+  "eye1": [
+   60.2,
+   98.2
+  ],
+  "eye2": [
+   70.2,
+   97.8
+  ],
+  "eye_mid": [
+   65.2,
+   98.0
+  ],
+  "eye_r": 3.8,
+  "eyes": [
+   [
+    60.2,
+    98.2
+   ],
+   [
+    70.2,
+    97.8
+   ]
+  ],
+  "hit": [
+   46.0,
+   78.0,
+   36,
+   44
+  ]
+ },
+ "spur_catch": {
+  "eye1": [
+   59.2,
+   62.0
+  ],
+  "eye2": [
+   69.0,
+   61.6
+  ],
+  "eye_mid": [
+   64.1,
+   61.8
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    59.2,
+    62.0
+   ],
+   [
+    69.0,
+    61.6
+   ]
+  ],
+  "hit": [
+   34.0,
+   34.0,
+   60,
+   60
+  ],
+  "hub": [
+   64.0,
+   64.0
+  ]
+ },
+ "spur_face": {
+  "eye1": [
+   59.2,
+   62.0
+  ],
+  "eye2": [
+   69.0,
+   61.6
+  ],
+  "eye_mid": [
+   64.1,
+   61.8
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    59.2,
+    62.0
+   ],
+   [
+    69.0,
+    61.6
+   ]
+  ],
+  "hit": [
+   52.0,
+   52.0,
+   24,
+   24
+  ],
+  "hub": [
+   64.0,
+   64.0
+  ]
+ },
+ "spur_face_catch": {
+  "eye1": [
+   59.2,
+   62.0
+  ],
+  "eye2": [
+   69.0,
+   61.6
+  ],
+  "eye_mid": [
+   64.1,
+   61.8
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    59.2,
+    62.0
+   ],
+   [
+    69.0,
+    61.6
+   ]
+  ],
+  "hit": [
+   52.0,
+   52.0,
+   24,
+   24
+  ],
+  "hub": [
+   64.0,
+   64.0
+  ]
+ },
+ "spur_face_hit": {
+  "eye1": [
+   59.2,
+   62.0
+  ],
+  "eye2": [
+   69.0,
+   61.6
+  ],
+  "eye_mid": [
+   64.1,
+   61.8
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    59.2,
+    62.0
+   ],
+   [
+    69.0,
+    61.6
+   ]
+  ],
+  "hit": [
+   52.0,
+   52.0,
+   24,
+   24
+  ],
+  "hub": [
+   64.0,
+   64.0
+  ]
+ },
+ "spur_hit": {
+  "eye1": [
+   59.2,
+   62.0
+  ],
+  "eye2": [
+   69.0,
+   61.6
+  ],
+  "eye_mid": [
+   64.1,
+   61.8
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    59.2,
+    62.0
+   ],
+   [
+    69.0,
+    61.6
+   ]
+  ],
+  "hit": [
+   34.0,
+   38.0,
+   60,
+   52
+  ],
+  "hub": [
+   64.0,
+   64.0
+  ]
+ },
+ "spur_roll": {
+  "eye1": [
+   59.2,
+   62.0
+  ],
+  "eye2": [
+   69.0,
+   61.6
+  ],
+  "eye_mid": [
+   64.1,
+   61.8
+  ],
+  "eye_r": 2.7,
+  "eyes": [
+   [
+    59.2,
+    62.0
+   ],
+   [
+    69.0,
+    61.6
+   ]
+  ],
+  "hit": [
+   36.0,
+   36.0,
+   56,
+   56
+  ],
+  "hub": [
+   64.0,
+   64.0
+  ]
+ },
+ "tick_charge": {
+  "eye1": [
+   72.6,
+   83.9
+  ],
+  "eye2": [
+   81.1,
+   85.3
+  ],
+  "eye_mid": [
+   76.8,
+   84.6
+  ],
+  "eye_r": 3.4,
+  "eyes": [
+   [
+    72.6,
+    83.9
+   ],
+   [
+    81.1,
+    85.3
+   ]
+  ],
+  "front": [
+   94.0,
+   100.0
+  ],
+  "hit": [
+   46.0,
+   56.0,
+   44,
+   66
+  ]
+ },
+ "tick_dizzy": {
+  "eye1": [
+   54.4,
+   84.9
+  ],
+  "eye2": [
+   62.8,
+   83.0
+  ],
+  "eye_mid": [
+   58.6,
+   84.0
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    54.4,
+    84.9
+   ],
+   [
+    62.8,
+    83.0
+   ]
+  ],
+  "hit": [
+   44.0,
+   56.0,
+   40,
+   66
+  ],
+  "stars": [
+   62.0,
+   52.0
+  ]
+ },
+ "tick_hit": {
+  "eye1": [
+   55.7,
+   84.6
+  ],
+  "eye2": [
+   64.1,
+   83.0
+  ],
+  "eye_mid": [
+   59.9,
+   83.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    55.7,
+    84.6
+   ],
+   [
+    64.1,
+    83.0
+   ]
+  ],
+  "hit": [
+   44.0,
+   56.0,
+   40,
+   66
+  ]
+ },
+ "tick_march1": {
+  "eye1": [
+   60.8,
+   83.8
+  ],
+  "eye2": [
+   69.4,
+   83.4
+  ],
+  "eye_mid": [
+   65.1,
+   83.6
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    60.8,
+    83.8
+   ],
+   [
+    69.4,
+    83.4
+   ]
+  ],
+  "hit": [
+   44.0,
+   56.0,
+   40,
+   66
+  ],
+  "key": [
+   38.0,
+   100.0
+  ]
+ },
+ "tick_march2": {
+  "eye1": [
+   60.8,
+   83.0
+  ],
+  "eye2": [
+   69.4,
+   82.6
+  ],
+  "eye_mid": [
+   65.1,
+   82.8
+  ],
+  "eye_r": 3.2,
+  "eyes": [
+   [
+    60.8,
+    83.0
+   ],
+   [
+    69.4,
+    82.6
+   ]
+  ],
+  "hit": [
+   44.0,
+   56.0,
+   40,
+   66
+  ],
+  "key": [
+   38.0,
+   100.0
+  ]
+ },
+ "tick_wind": {
+  "eye1": [
+   60.8,
+   84.8
+  ],
+  "eye2": [
+   69.4,
+   84.4
+  ],
+  "eye_mid": [
+   65.1,
+   84.6
+  ],
+  "eye_r": 3.4,
+  "eyes": [
+   [
+    60.8,
+    84.8
+   ],
+   [
+    69.4,
+    84.4
+   ]
+  ],
+  "hit": [
+   44.0,
+   56.0,
+   40,
+   66
+  ],
+  "key": [
+   37.0,
+   96.0
+  ]
+ },
+ "weepcap_die": {
+  "eye1": [
+   58.0,
+   98.6
+  ],
+  "eye2": [
+   67.8,
+   98.2
+  ],
+  "eye_mid": [
+   62.9,
+   98.4
+  ],
+  "eye_r": 3.3,
+  "eyes": [
+   [
+    58.0,
+    98.6
+   ],
+   [
+    67.8,
+    98.2
+   ]
+  ],
+  "hit": [
+   30.0,
+   64.0,
+   56,
+   58
+  ]
+ },
+ "weepcap_hit": {
+  "eye1": [
+   58.8,
+   97.0
+  ],
+  "eye2": [
+   68.6,
+   96.6
+  ],
+  "eye_mid": [
+   63.7,
+   96.8
+  ],
+  "eye_r": 3.3,
+  "eyes": [
+   [
+    58.8,
+    97.0
+   ],
+   [
+    68.6,
+    96.6
+   ]
+  ],
+  "hit": [
+   34.0,
+   52.0,
+   58,
+   70
+  ]
+ },
+ "weepcap_idle": {
+  "eye1": [
+   59.9,
+   97.0
+  ],
+  "eye2": [
+   69.7,
+   96.6
+  ],
+  "eye_mid": [
+   64.8,
+   96.8
+  ],
+  "eye_r": 3.3,
+  "eyes": [
+   [
+    59.9,
+    97.0
+   ],
+   [
+    69.7,
+    96.6
+   ]
+  ],
+  "gills": [
+   64.6,
+   86.0
+  ],
+  "hit": [
+   36.0,
+   52.0,
+   56,
+   70
+  ]
+ },
+ "weepcap_inhale": {
+  "eye1": [
+   59.6,
+   97.0
+  ],
+  "eye2": [
+   69.4,
+   96.6
+  ],
+  "eye_mid": [
+   64.5,
+   96.8
+  ],
+  "eye_r": 3.6,
+  "eyes": [
+   [
+    59.6,
+    97.0
+   ],
+   [
+    69.4,
+    96.6
+   ]
+  ],
+  "gills": [
+   64.0,
+   85.0
+  ],
+  "hit": [
+   30.0,
+   44.0,
+   68,
+   78
+  ]
+ },
+ "weepcap_puff": {
+  "burst": [
+   64.0,
+   76.0
+  ],
+  "eye1": [
+   59.6,
+   97.0
+  ],
+  "eye2": [
+   69.4,
+   96.6
+  ],
+  "eye_mid": [
+   64.5,
+   96.8
+  ],
+  "eye_r": 3.3,
+  "eyes": [
+   [
+    59.6,
+    97.0
+   ],
+   [
+    69.4,
+    96.6
+   ]
+  ],
+  "hit": [
+   34.0,
+   58.0,
+   60,
+   64
+  ]
+ }
+}

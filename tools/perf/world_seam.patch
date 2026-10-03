@@ -1,0 +1,319 @@
+--- a/game/scripts/world.gd	2026-09-26 06:18:00
++++ b/game/scripts/world.gd	2026-09-26 06:30:59
+@@ -29,6 +29,9 @@
+ const TileView := preload("res://scripts/tile_view.gd")
+ const BackdropScript := preload("res://scripts/backdrop.gd")
+ const GlowScript := preload("res://scripts/glow.gd")
++const WorldLights := preload("res://scripts/world_lights.gd")
++const AmbientScript := preload("res://scripts/ambient.gd")
++const EdgeLinesScript := preload("res://scripts/edge_lines.gd")
+ const HudScript := preload("res://scripts/hud.gd")
+ const TouchScript := preload("res://scripts/touch_controls.gd")
+ const PauseScript := preload("res://scripts/pause_menu.gd")
+@@ -42,7 +45,6 @@
+ const Floaters := preload("res://scripts/floaters.gd")
+ const Playlog := preload("res://scripts/playlog.gd")
+ const Arena := preload("res://scripts/boss_arena.gd")
+-const DARKNESS := preload("res://shaders/darkness.gdshader")
+ const UI := preload("res://scripts/ui.gd")
+ const TILE := LevelData.TILE
+ const MAX_LIGHTS := 48
+@@ -123,6 +125,10 @@
+ var camera: Camera2D
+ var backdrop: Node2D
+ var glow: Node2D
++var lights: RefCounted           # world_lights.gd: the packer, lit_at, the dims, reflections
++var ambient: Node2D              # ambient.gd on the glow layer
++var edges: Node2D                # edge_lines.gd on the glow layer
++var hero_flame := {}             # the hero's flame palette (glow.flame's pal), {} = the candle's own
+ var hud: CanvasLayer
+ var touch: CanvasLayer
+ var pause_menu: CanvasLayer
+@@ -180,15 +186,13 @@
+ var _ember_streak := 0
+ var _ember_streak_t := 0.0
+ var _phoenix_used := false      # the Phoenix Wick has risen in this level (a new level is a new World)
+-var _darkness: ColorRect
++var _darkness: Control
+ var _dark_mat: ShaderMaterial
+ var _pad := {}
+ var _prev := {}                 # test_pad: the last held state of each button
+ var _latched := {}              # edges pressed during a freeze, delivered after
+ var _special_held := false
+ var _special_t := 0.0
+-var _dyn_lights := {}           # id -> {p, r, s, life, tag}
+-var _next_light := 1
+ var _last_attack_scanned := -1
+ var _t := 0.0
+ var _last_altar_hp: Array = []
+@@ -226,6 +230,7 @@
+ 
+ 
+ func _build() -> void:
++	lights = WorldLights.new(self)
+ 	diff = Game.diff()
+ 	area = Combat.area_level(level.area, diff)
+ 	strength = str(Game.setting("candle_strength"))
+@@ -398,6 +403,14 @@
+ 	glow_layer.layer = 2
+ 	glow_layer.follow_viewport_enabled = true
+ 	add_child(glow_layer)
++	# Under glow: the readability lines (edge_lines.gd), then the motes (ambient.gd).
++	edges = EdgeLinesScript.new()
++	glow_layer.add_child(edges)
++	edges.build(level, int(level.get("world")) if level.get("world") != null else 0)
++	ambient = AmbientScript.new()
++	ambient.world = self
++	glow_layer.add_child(ambient)
++	ambient.set_theme(level.theme)
+ 	glow = GlowScript.new()
+ 	glow.world = self
+ 	glow_layer.add_child(glow)
+@@ -405,13 +418,10 @@
+ 	var dark_layer := CanvasLayer.new()
+ 	dark_layer.layer = 1
+ 	add_child(dark_layer)
+-	_darkness = ColorRect.new()
+-	_darkness.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+-	_darkness.mouse_filter = Control.MOUSE_FILTER_IGNORE
+-	_dark_mat = ShaderMaterial.new()
+-	_dark_mat.shader = DARKNESS
+-	_darkness.material = _dark_mat
+-	dark_layer.add_child(_darkness)
++	# The dark: Plan A (darkness.gdshader) or Plan B (the field at a quarter
++	# size), as world_lights.gd's setting says.
++	_darkness = lights.attach(dark_layer)
++	_dark_mat = lights.material()
+ 	_apply_theme_dark()
+ 
+ 	kit.on_level_start()
+@@ -443,7 +453,7 @@
+ 	var dark := {"nave": Color(0.30, 0.25, 0.42), "crypt": Color(0.24, 0.30, 0.32), "choir": Color(0.40, 0.24, 0.24), "tower": Color(0.26, 0.28, 0.46)}
+ 	var col: Color = c.get("dark", dark.get(_theme(), dark["nave"]))
+ 	var bright := float(Game.setting("brightness"))
+-	_dark_mat.set_shader_parameter("dark_color", col.lightened(bright))
++	lights.theme_dark(col, bright)
+ 
+ 
+ func _sprite(path: String, sc: float) -> Sprite2D:
+@@ -663,47 +673,56 @@
+ 	return h
+ 
+ 
+-func add_light(pos: Vector2, r: float, s := 0.8, life := -1.0, tag := "") -> int:
+-	## A light for the dark (-1 life = until removed). Returns its id.
+-	var id := _next_light
+-	_next_light += 1
+-	_dyn_lights[id] = {"p": pos, "r": r, "s": s, "life": life, "tag": tag}
+-	return id
++func add_light(pos: Vector2, r: float, s := 0.8, life := -1.0, tag := "", tint := Color(0, 0, 0, 0)) -> int:
++	## A light for the dark (-1 life = until removed). Returns its id. s < 0
++	## is a Hush light; tint.a is the tint amount; tag may list several,
++	## comma-separated ("lantern,haven,anchor"). world_lights.gd holds them.
++	return lights.add(pos, r, s, life, tag, tint)
+ 
+ 
+ func move_light(id: int, pos: Vector2, r := -1.0) -> void:
+-	if _dyn_lights.has(id):
+-		_dyn_lights[id]["p"] = pos
+-		if r >= 0.0:
+-			_dyn_lights[id]["r"] = r
++	lights.move(id, pos, r)
+ 
+ 
+ func remove_light(id: int) -> void:
+-	_dyn_lights.erase(id)
++	lights.remove(id)
+ 
+ 
+ func lights_tagged(tag: String) -> Array:
+-	## [{p, r, s}] of the live lights with this tag (braziers, beacons).
+-	var out := []
+-	for id in _dyn_lights:
+-		if _dyn_lights[id]["tag"] == tag:
+-			out.append(_dyn_lights[id])
+-	return out
++	## [{p, r, s, ...}] of the live lights carrying this tag (braziers, beacons).
++	return lights.tagged(tag)
+ 
+ 
+ func hero_light_radius() -> float:
+-	var mult: float = features.light_mult() if features else 1.0
+-	if player.has_status("douse"):
+-		mult *= 0.5
+-	if player.has_status("latch"):
+-		mult *= 0.55
+-	var extra := 0.0
+-	for l in kit.lights():
+-		if l.get("hero", false):
+-			extra += float(l["r"])
+-	return Combat.light_radius(player.life_frac(), player.stats, diff, mult, extra)
++	## Spec §1.7 (world_lights.gd): v2's radius, the dims (dim_resist each,
++	## floored by the difficulty), LIGHT_MIN, then light_override.
++	return lights.hero_radius()
+ 
+ 
++func set_dark(color: Color, seconds: float) -> void:
++	lights.set_dark(color, seconds)
++
++
++func set_warm(color: Color, seconds: float) -> void:
++	lights.set_warm(color, seconds)
++
++
++func lit_at(p: Vector2, pad := 0.0, opts := {}) -> bool:
++	return lights.lit_at(p, pad, opts)
++
++
++func dim(key: String, mult: float, seconds: float) -> void:
++	lights.dim(key, mult, seconds)
++
++
++func undim(key: String) -> void:
++	lights.undim(key)
++
++
++func light_override(r: float) -> void:
++	lights.light_override(r)
++
++
+ func add_temp_ledge(r: Rect2, life: float) -> Object:
+ 	## A one-way ledge that lasts a while (a kit's bone step).
+ 	var mv := Mover.new()
+@@ -978,12 +997,7 @@
+ 	_update_pool(dt)
+ 	features.step(dt)
+ 	floaters.step(dt)
+-	for id in _dyn_lights.keys():
+-		var l: Dictionary = _dyn_lights[id]
+-		if l["life"] >= 0.0:
+-			l["life"] -= dt
+-			if l["life"] <= 0.0:
+-				_dyn_lights.erase(id)
++	lights.step(dt)
+ 	if state == "play" and player.alive:
+ 		_touch_enemies()
+ 		_touch_pickups()
+@@ -1156,6 +1170,8 @@
+ 
+ 
+ func _redraw_at(x: int) -> void:
++	if edges:
++		edges.redraw_cell(x)
+ 	var i := x / TileView.CHUNK
+ 	if i >= 0 and i < chunks.size():
+ 		chunks[i].queue_redraw()
+@@ -2437,111 +2453,8 @@
+ 
+ 
+ func _update_lights() -> void:
+-	## Packed by priority: the hero, tells, shots, beacons and braziers,
+-	## altars and lanterns, eyes, pickups and the pool, then sconces, glass
+-	## and lava with what's left.
+-	var xf := get_viewport().get_canvas_transform()
+-	var view := view_rect().grow(120.0)
+-	var lights := PackedVector4Array()
+-	var k := xf.get_scale().x
+-	var flick := 1.0 + 0.03 * sin(_t * 13.0) + 0.02 * sin(_t * 23.0)
+-	var add := func(p: Vector2, r: float, s: float) -> void:
+-		if lights.size() < MAX_LIGHTS and view.has_point(p):
+-			var at: Vector2 = xf * p
+-			lights.append(Vector4(at.x, at.y, r * k, s))
+-	if player.alive:
+-		var r := hero_light_radius()
+-		if player.hurt_time < 0.3:
+-			r *= 0.6 + player.hurt_time * 1.3
+-		if player.life_frac() < 0.25:
+-			r *= 0.9 + 0.1 * sin(_t * TAU)
+-		add.call(player.center() + Vector2(0, -8), r * flick, 1.0)
+-	elif state == "dead":
+-		add.call(player.center(), 60.0 * maxf(0.0, 1.0 - snuff_time), 0.8)
+-	for e in enemies:
+-		if e.alive and e.active:
+-			for l in e.lights():
+-				add.call(l["p"], l["r"], l["s"])
+-	var nshots := 0
+-	for s in shots:
+-		if s["light"] > 0.0 and nshots < 4:
+-			add.call(s["pos"], s["light"], 0.8)
+-			nshots += 1
+-	for l in kit.lights():
+-		if not l.get("hero", false):
+-			add.call(l["p"], l["r"], l.get("s", 0.8))
+-	for id in _dyn_lights:
+-		var l: Dictionary = _dyn_lights[id]
+-		add.call(l["p"], l["r"], l["s"])
+-	for l in features.lights():
+-		add.call(l["p"], l["r"], l.get("s", 0.8))
+-	for a in altars:
+-		if a["lit"]:
+-			add.call(a["flame"], (150.0 + a["glow"] * 60.0) * flick, 0.95)
+-	if boss != null and is_instance_valid(boss) and boss.get("state") != "sleep":
+-		var flare := 1.0
+-		if boss.get("state") == "windup":
+-			flare = 1.5 + 0.3 * sin(_t * 30.0)
+-		add.call(boss.center() + Vector2(0, -20), 130.0 * flare, 0.7 if boss.alive else 0.4)
+-	var neyes := 0
+-	for e in enemies:
+-		if neyes >= 8:
+-			break
+-		if e.alive and e.active and e != boss:
+-			for p in e.eye_points():
+-				if view.has_point(p):
+-					add.call(p, 16.0, 0.35)
+-					neyes += 1
+-	for b in bells:
+-		add.call(b["top"] + Vector2(0, 50), 90.0, 0.5)
+-	if not pool.is_empty():
+-		add.call(pool["pos"], 60.0, 0.7)
+-	var npick := 0
+-	for p in pickups:
+-		if npick >= 6:
+-			break
+-		if p["taken"]:
+-			continue
+-		match p["kind"]:
+-			"ember":
+-				add.call(p["pos"], 34.0, 0.55)
+-			"relic", "item":
+-				add.call(p["pos"], 90.0, 0.9)
+-			"sigil":
+-				add.call(p["pos"], 60.0, 0.7)
+-		npick += 1
+-	for s in sconces:
+-		add.call(s, 110.0 * (1.0 + 0.04 * sin(_t * 11.0 + s.x)), 0.85)
+-	# The stained glass glows a little, and lights what's in front of it.
+-	if backdrop:
+-		var cam0 := view_rect().position
+-		var nwin := 0
+-		for wnd in backdrop.windows:
+-			if nwin >= 6 or lights.size() >= MAX_LIGHTS - 4:
+-				break
+-			var off: Vector2 = backdrop.layer_offset(wnd["layer"], cam0)
+-			var wc: Vector2 = (wnd["center"] if wnd["rose"] else (wnd["rect"] as Rect2).get_center()) + off
+-			if not view.has_point(wc):
+-				continue
+-			add.call(wc, (wnd["radius"] * 1.5 if wnd["rose"] else 70.0), 0.42)
+-			nwin += 1
+-	# Lava glows along its surface.
+-	var x0 := maxi(floori(view.position.x / TILE), 0)
+-	var x1 := mini(floori(view.end.x / TILE), level.width - 1)
+-	var y0 := maxi(floori(view.position.y / TILE), 0)
+-	var y1 := mini(floori(view.end.y / TILE), level.height - 1)
+-	for y in range(y0, y1 + 1):
+-		for x in range(x0, x1 + 1, 2):
+-			if lights.size() >= MAX_LIGHTS:
+-				break
+-			if level.tile(x, y) == LevelData.LAVA and level.tile(x, y - 1) != LevelData.LAVA:
+-				add.call(Vector2(x * TILE + 16, y * TILE + 10), 85.0 * (1.0 + 0.06 * sin(_t * 3.0 + x)), 0.75)
+-	var n := lights.size()
+-	while lights.size() < MAX_LIGHTS:
+-		lights.append(Vector4.ZERO)
+-	_dark_mat.set_shader_parameter("lights", lights)
+-	_dark_mat.set_shader_parameter("light_count", n)
+-	_dark_mat.set_shader_parameter("view_size", _view_size())
++	## world_lights.gd packs the v3 priority table (spec §11.2) into the dark.
++	lights.pack(view_rect())
+ 
+ 
+ # ---------------------------------------------------------------- pause, sound, haptics
