@@ -20,7 +20,7 @@ extends SceneTree
 ##     pits, the level's edge, a wall to its top); a Twinned Frostbuckle's
 ##     rime; a Perfect Guard told from a Peal
 ##   - elites deterministic per seed, the Omen pools by world, NEVER_ON, the
-##     second Omen of W5-W6 Dusk, W1-W2's picks unchanged
+##     second Omen of W3-W6 Dusk (Build 1's rows), W1-W2's picks unchanged
 ##   - the four new Omens (every echo drawn while it waits), the Warden
 ##     tier, the W3-W4 Dreads; eyes drawn at r >= 3 in the glow layer
 
@@ -1450,16 +1450,16 @@ func _test_omen_pools() -> void:
 				if Elites.roll_omens(k, "witching", 6, r).has(o):
 					never_ok = false
 	_check(never_ok, "NEVER_ON holds (%s)" % [Elites.NEVER_ON.keys()])
-	# Counts: Dusk W5 a second Omen about 35% of the time, W6 about 50%;
-	# never more than 3.
-	for wn in [5, 6]:
+	# Counts: Dusk (Build 1) a second Omen about 20% of the time in W3, 30%
+	# in W4, 50% in W5, 60% in W6; never more than 3.
+	for wn in [3, 4, 5, 6]:
 		var twos := 0
 		for i in 1000:
 			r.seed = i
 			var o: Array = Elites.roll_omens("skeleton", "dusk", wn, r, Combat.elite_rules("dusk", wn))
 			if o.size() == 2:
 				twos += 1
-		var want := 0.35 if wn == 5 else 0.50
+		var want: float = {3: 0.20, 4: 0.30, 5: 0.50, 6: 0.60}[wn]
 		_check(absf(twos / 1000.0 - want) < 0.05, "Dusk W%d: a second Omen %.0f%% of the time (want %.0f%%)" % [wn, twos / 10.0, want * 100.0])
 	var most := 0
 	for i in 300:

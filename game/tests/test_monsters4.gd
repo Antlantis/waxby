@@ -1166,6 +1166,27 @@ func _test_hushling() -> void:
 	_check(pack >= 3 and pack <= 5, "Nightfall: a lone Hushling brings its pack to 3-5 (%d)" % pack)
 	await _pack_relights(wn, "hushling", pack, "Nightfall's Hushling pack")
 	await _done(wn)
+	# Dusk's pairs and threes (Build 1: Dusk pushes back from World 3): a
+	# lone one brings 1-2 more, topped back up after a relight (a W6 story
+	# level on Dusk respawns its monsters), never past the rule; a placed
+	# three brings none.
+	var wd := await _world(_rows(60, {Vector2i(30, 12): "n"}), "", "dusk", 6)
+	_sturdy(wd)
+	for e in wd.enemies:
+		e.active = true
+	_step(wd, 2)
+	var pd := _only(wd, "hushling").size()
+	_check(pd >= 2 and pd <= 3, "Dusk: a lone Hushling brings its pack to 2-3 (%d)" % pd)
+	_check(wd.respawns_here(), "(Dusk in a World 6 level: the World respawns)")
+	await _pack_relights(wd, "hushling", pd, "Dusk's Hushling pack")
+	await _done(wd)
+	var w3 := await _world(_rows(60, {Vector2i(28, 12): "n", Vector2i(30, 12): "n", Vector2i(32, 12): "n"}), "", "dusk", 6)
+	_sturdy(w3)
+	for e in w3.enemies:
+		e.active = true
+	_step(w3, 2)
+	_check(_only(w3, "hushling").size() == 3, "Dusk: a placed three is a pack already, and brings none (%d)" % _only(w3, "hushling").size())
+	await _done(w3)
 	var ww := await _world(_rows(60), "", "witching", 6)
 	_sturdy(ww)
 	_settle(ww, Vector2(20 * TILE, 13 * TILE))

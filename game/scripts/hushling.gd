@@ -18,8 +18,9 @@ extends "res://scripts/elites.gd"
 ## and never lunges at a spot inside one; one caught in a light that comes on
 ## slinks out. Wick's own candle draws them in. Numbers: TUNE.
 ##
-## Nightfall: packs of 3-5 (the first of each placed pack brings the rest,
-## and brings them back up to size after every relight, as the World
+## Packs: 2-3 on Dusk (Build 1: Dusk pushes back from World 3), 3-5 on
+## Nightfall and Witching (the first of each placed pack brings the rest,
+## and brings them back up to size after every relight where the World
 ## respawns the placed ones; an Anointed first brings them too).
 ## Witching: they lunge twice. The 6-1 Dread is the Hush-a-Bye, one at x1.8.
 
@@ -35,8 +36,8 @@ const TUNE := {
 	"lunge_vx": 300.0, "lunge_vy": -250.0, "lunge_g": 1250.0,
 	"blink": 0.6,
 	"again": 0.4,                 # after the blink, before it can crouch again
-	"pack_min": {"dusk": 0, "nightfall": 3, "witching": 3},
-	"pack_max": {"dusk": 0, "nightfall": 5, "witching": 5},
+	"pack_min": {"dusk": 2, "nightfall": 3, "witching": 3},
+	"pack_max": {"dusk": 3, "nightfall": 5, "witching": 5},
 	"pack_tiles": 4,              # Hushlings this close (in tiles, on one floor) are a pack
 	"lunges": {"dusk": 1, "nightfall": 1, "witching": 2},
 	"again_reach": 1.5,           # x crouch_range: how far Witching's second lunge reaches for him
@@ -249,11 +250,12 @@ func _start_lunge() -> void:
 
 
 func _bring_pack() -> void:
-	## Nightfall and deeper: the first Hushling of each placed pack (the
-	## leftmost within pack_tiles on its floor) brings the pack up to 3-5:
-	## on its first think, and again after each relight (HK.relit), counting
-	## the extras it brought that still live, so a pack is never bigger than
-	## the rule. A Dread or a Warden (a one-off) brings none.
+	## The first Hushling of each placed pack (the leftmost within
+	## pack_tiles on its floor) brings the pack up to pack_min-pack_max (2-3
+	## on Dusk, 3-5 deeper): on its first think, and again after each
+	## relight (HK.relit), counting the extras it brought that still live,
+	## so a pack is never bigger than the rule. A Dread or a Warden (a
+	## one-off) brings none.
 	var lo := int(k("pack_min"))
 	if lo <= 0 or copy or tier == "dread" or tier == "warden" or world == null or pack_of.x >= 0:
 		return

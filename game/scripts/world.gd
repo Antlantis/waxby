@@ -2274,8 +2274,11 @@ func _touch_enemies() -> void:
 				if e.ordinary:
 					amt = maxf(amt, e.max_hp)   # a stomp always kills fodder
 				# A boss's head pays no chain: bouncing on it is no ember farm.
+				# A monster back from a snuff (Nightfall, Dusk from World 3)
+				# or an add counts but pays no embers: snuff, respawn and pogo
+				# would be one too.
 				if e != boss:
-					_stomp_chain(er)
+					_stomp_chain(er, not e.respawned)
 				# Gravebloom Treads: a stomp always crits (x the crit multiplier)
 				# and a stomp kill gives back 15% of his resource.
 				var bloom: bool = player.stats.get("legends", {}).has("gravebloom")
@@ -2333,14 +2336,15 @@ func _stomp_powers(e: Node2D, er: Rect2) -> void:
 		e.apply_status("slow", _flag("chill_t", 2.0))
 
 
-func _stomp_chain(er: Rect2) -> void:
+func _stomp_chain(er: Rect2, pays := true) -> void:
 	## Stomps without touching the floor: each pays one more ember, up to
 	## CHAIN_PAY_MAX a stomp (a long Drift chain doesn't pay quadratically),
-	## and five drops a wax stub (once a level).
+	## and five drops a wax stub (once a level). A stomp that doesn't pay (a
+	## respawned monster's) still counts, sounds and shows.
 	chain += 1
 	if chain < 2:
 		return
-	for i in mini(chain - 1, CHAIN_PAY_MAX):
+	for i in (mini(chain - 1, CHAIN_PAY_MAX) if pays else 0):
 		var p := _add_pickup("ember", Vector2(player.position.x, er.position.y - 8.0))
 		p["pop"] = true
 		p["age"] = -0.05 * i
@@ -2651,7 +2655,7 @@ func _light_altar(a: Dictionary) -> void:
 	a["lit"] = true
 	a["glow"] = 1.0
 	checkpoint = a["pos"]
-	var pct: float = float(Combat.diff(diff)["altar"])
+	var pct: float = Combat.altar_heal(diff, _teeth_world())   # (Dusk heals less from World 3)
 	_last_altar_hp.append(roundf(player.life_frac() * 100.0))
 	var healed = player.heal_pct(pct)
 	flask_charges = flask_max()
@@ -3568,7 +3572,7 @@ func _update_dead(dt: float) -> void:
 				hud.boss_bar({})
 			if _has_sfx():
 				Sfx.play_music(level.music)
-		if bool(Combat.diff(diff)["respawn"]):
+		if respawns_here():
 			_respawn_monsters()
 		kit.on_respawn()
 		features.on_respawn()
@@ -3600,8 +3604,23 @@ func checkpoint_allowed(boss_id: String, phase: int) -> bool:
 	return false
 
 
+func respawns_here() -> bool:
+	## Do ordinary monsters come back on a snuff here? Nightfall and deeper,
+	## and Dusk in a story level from World 3 (Combat.respawns). HK.relit
+	## asks it too, so a Hushling pack comes back with them.
+	return Combat.respawns(diff, _teeth_world())
+
+
+func _teeth_world() -> int:
+	## The world Combat's Dusk-from-World-3 rules see: world_n in a story
+	## level (a secret one too), 0 in a mode (its room's biome isn't the
+	## story's) or a feel lab, which keep the difficulty's row.
+	return world_n if mode == null and not is_lab() else 0
+
+
 func _respawn_monsters() -> void:
-	## Nightfall and deeper: ordinary monsters come back (less reward).
+	## Nightfall and deeper, and Dusk from World 3 (respawns_here): ordinary
+	## monsters come back (less reward).
 	for sp in spawns:
 		var alive_here := false
 		for e in enemies:
