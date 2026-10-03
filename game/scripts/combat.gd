@@ -12,7 +12,8 @@ extends RefCounted
 const DIFFS := ["dusk", "nightfall", "witching"]
 # "area0" and "per" replace v2's "offset" (0 / 10 / 20): area_level() below.
 # Dusk's "drop" (an ordinary kill's item chance) is 0.5 since build 1: half
-# as many kill drops, and none of them Commons (Items.KILL_WEIGHTS).
+# as many kill drops, and none of them Commons (Items.KILL_WEIGHTS). Story
+# levels only: a mode's Dusk keeps MODE_DUSK_DROP (kill_drop).
 const DIFF := {
 	"dusk": {"name": "Dusk", "area0": 1, "per": 1, "hp": 1.0, "dmg": 1.0, "tells": 1.0, "anoint": 0.06, "omens": 1,
 			"max_anoint": 2, "xp": 1.0, "embers": 1, "drop": 0.5, "light": 1.0, "pit": 0.33, "altar": 0.50,
@@ -54,10 +55,21 @@ const SHARE_CAPS := {"fodder": 0.30, "heavy": 0.36, "anointed": 0.40, "dread": 0
 # Elites on Dusk by world (spec §1.6): Anointed chance, most per level, Omens
 # each, and the chance of one more Omen. Nightfall and Witching use DIFF.
 # Build 1 (Dusk pushes back from World 3): W3-W6 about twice v3's chance, a
-# second Omen from W3 and a fourth Anointed in W6. W1-W2 stay v2's (the
-# Descent and v2 parity read them).
+# second Omen from W3 and a fourth Anointed in W6, in the story levels. W1-W2
+# stay v2's (v2 parity reads them); the modes read MODE_DUSK_ELITES.
 const DUSK_ELITES := {1: [0.06, 2, 1, 0.0], 2: [0.06, 2, 1, 0.0], 3: [0.12, 3, 1, 0.2],
 		4: [0.14, 3, 1, 0.3], 5: [0.16, 3, 1, 0.5], 6: [0.18, 4, 1, 0.6]}
+
+# The challenge modes (the Descent, the Waxworks, the Trials) keep Dusk as it
+# was before Build 1: its Dusk changes were for the story levels. A mode's
+# elites read MODE_DUSK_ELITES (v3's rows; the Descent ramps them by depth
+# from its room's world), and a mode's ordinary Dusk kill drops an item at
+# MODE_DUSK_DROP (v3's DIFF.dusk.drop, not Build 1's 0.5) with
+# Items.MODE_DUSK_KILL's weights, Commons and all. Hushling packs: hushling.gd
+# MODE_PACKS. world.gd passes story = (mode == null).
+const MODE_DUSK_ELITES := {1: [0.06, 2, 1, 0.0], 2: [0.06, 2, 1, 0.0], 3: [0.07, 2, 1, 0.0],
+		4: [0.08, 3, 1, 0.0], 5: [0.09, 3, 1, 0.35], 6: [0.10, 3, 1, 0.50]}
+const MODE_DUSK_DROP := 1.0
 
 # Dusk with teeth (Build 1, the author's ruling after his playtest): from
 # World 3 a Dusk altar heals DUSK_TEETH.altar, not the row's 0.50, and
@@ -134,15 +146,26 @@ static func level_area(level: RefCounted, diff_id: String) -> int:
 	return area_level(int(a) if (a is int or a is float) else 1, diff_id)
 
 
-static func elite_rules(diff_id: String, world: int) -> Dictionary:
+static func elite_rules(diff_id: String, world: int, story := true) -> Dictionary:
 	## {anoint (chance), max_anoint, omens (each Anointed's count), second_omen
-	## (the chance of one more)}. Dusk by world (spec §1.6); Nightfall and
+	## (the chance of one more)}. Dusk by world (spec §1.6): DUSK_ELITES in a
+	## story level, MODE_DUSK_ELITES in a mode (story false); Nightfall and
 	## Witching as DIFF. world.gd merges a mode's own rules over this.
 	var d := diff(diff_id)
 	if diff_id == "dusk" or not DIFF.has(diff_id):
-		var row: Array = DUSK_ELITES.get(clampi(world, 1, 6), DUSK_ELITES[1])
+		var rows: Dictionary = DUSK_ELITES if story else MODE_DUSK_ELITES
+		var row: Array = rows.get(clampi(world, 1, 6), rows[1])
 		return {"anoint": float(row[0]), "max_anoint": int(row[1]), "omens": int(row[2]), "second_omen": float(row[3])}
 	return {"anoint": float(d["anoint"]), "max_anoint": int(d["max_anoint"]), "omens": int(d["omens"]), "second_omen": 0.0}
+
+
+static func kill_drop(diff_id: String, story := true) -> float:
+	## An ordinary kill's item chance multiplier (world.gd kill_item_chance):
+	## DIFF.drop (Dusk's 0.5 since Build 1), or MODE_DUSK_DROP for a mode's
+	## Dusk (story false).
+	if not story and (diff_id == "dusk" or not DIFF.has(diff_id)):
+		return MODE_DUSK_DROP
+	return float(diff(diff_id)["drop"])
 
 
 static func dusk_teeth(diff_id: String, world: int) -> bool:

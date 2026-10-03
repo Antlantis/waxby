@@ -30,7 +30,7 @@ extends RefCounted
 ## the kits (stats.flags), or stats hero.gd applies itself.
 ##
 ## Dusk kills roll richer with depth (kill_weights: areas 13-22, then 23+),
-## and never a Common (build 1).
+## and never a Common in a story level (build 1; a mode keeps v3's).
 
 const SLOTS := ["weapon", "candle", "coat", "boots", "charm"]
 # The slots in play: what drops (kills, bosses, sigil rewards) and what the
@@ -226,6 +226,12 @@ const KILL_WEIGHTS := {
 }
 const DUSK_DEEP_WEIGHTS := [[13, {"common": 0.0, "magic": 76.0, "rare": 22.0, "legendary": 2.0}],
 		[23, {"common": 0.0, "magic": 70.0, "rare": 27.0, "legendary": 3.0}]]
+# A challenge mode's Dusk kill keeps v3's weights (Build 1's Dusk loot was
+# for the story levels; Combat.MODE_DUSK_DROP keeps its drop rate): v2's to
+# area 12, richer from 13 and 23, Commons and all.
+const MODE_DUSK_KILL := {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5}
+const MODE_DUSK_DEEP := [[13, {"common": 55.0, "magic": 34.0, "rare": 10.0, "legendary": 1.0}],
+		[23, {"common": 50.0, "magic": 35.0, "rare": 13.5, "legendary": 1.5}]]
 
 
 static func tier_of(ilvl: int) -> int:
@@ -547,14 +553,17 @@ static func describe(stat_or_affix: String, v: float) -> String:
 	return stat
 
 
-static func kill_weights(area: int, diff_id: String) -> Dictionary:
+static func kill_weights(area: int, diff_id: String, story := true) -> Dictionary:
 	## The rarity weights of an ordinary kill's drop at this area (spec §8.1):
 	## Dusk rolls no Commons and gets richer with depth (80 / 19 / 1 Blessed /
 	## Rare / Legendary to area 12, 76 / 22 / 2 from 13, 70 / 27 / 3 from 23);
+	## a mode's Dusk (story false) keeps v3's (MODE_DUSK_KILL, MODE_DUSK_DEEP);
 	## Nightfall and Witching are v2's.
 	var w: Dictionary = KILL_WEIGHTS.get(diff_id, KILL_WEIGHTS["dusk"])
 	if diff_id == "dusk" or not KILL_WEIGHTS.has(diff_id):
-		for row in DUSK_DEEP_WEIGHTS:
+		if not story:
+			w = MODE_DUSK_KILL
+		for row in (DUSK_DEEP_WEIGHTS if story else MODE_DUSK_DEEP):
 			if area >= int(row[0]):
 				w = row[1]
 	return w.duplicate()

@@ -38,7 +38,9 @@ ring them again.
   Omens, Dreads, and a Guttered Pool of spilled embers you can win back. Dusk
   stays gentle in Worlds 1-2 and pushes back from World 3 (Combat.DUSK_TEETH):
   altars heal 40%, the monsters killed come back after a snuff, Anointed come
-  about twice as often, and Hushlings hunt in twos and threes.
+  about twice as often, and Hushlings hunt in twos and threes. These and the
+  Dusk kill drops are the story's: the challenge modes (the Descent, the
+  Waxworks, the Trials) keep Dusk as it was before.
 - **Illustrated story scenes** between the worlds, with portraits and voices.
   Waxby is the hero's name until you give him your own at the oath (up to 12
   letters; Rename on the Sheet's Stats tab changes it). Any keeper who carries

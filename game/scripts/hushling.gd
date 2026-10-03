@@ -21,7 +21,8 @@ extends "res://scripts/elites.gd"
 ## Packs: 2-3 on Dusk (Build 1: Dusk pushes back from World 3), 3-5 on
 ## Nightfall and Witching (the first of each placed pack brings the rest,
 ## and brings them back up to size after every relight where the World
-## respawns the placed ones; an Anointed first brings them too).
+## respawns the placed ones; an Anointed first brings them too). A
+## challenge mode's Dusk keeps v3's: none (MODE_PACKS).
 ## Witching: they lunge twice. The 6-1 Dread is the Hush-a-Bye, one at x1.8.
 
 const HK := preload("res://scripts/hush_kind.gd")
@@ -46,6 +47,10 @@ const TUNE := {
 	"flee": 90.0,                 # px/s out of a light that came on round it
 	"dread_scale": 1.8,           # the Hush-a-Bye
 }
+# A challenge mode (world.mode) keeps Dusk as it was before Build 1, whose
+# Dusk packs were for the story levels: no packs. Nightfall and Witching
+# keep TUNE's.
+const MODE_PACKS := {"pack_min": {"dusk": 0}, "pack_max": {"dusk": 0}}
 # Its blows at area 1 (TUNE's), for test_progression's share-cap scan (PR's ask).
 const MOVES := {"lunge": TUNE["lunge"]}
 const FRAMES := ["hushling_idle1", "hushling_idle2", "hushling_crouch", "hushling_lunge", "hushling_blink", "hushling_pop"]
@@ -80,6 +85,18 @@ func _init() -> void:
 
 func k(n: String) -> float:
 	return HK.pick(TUNE, HK.diff_of(self), n)
+
+
+func pack_rule(n: String) -> int:
+	## TUNE's pack_min / pack_max on this World's difficulty; in a mode, its
+	## Dusk (or a difficulty that reads Dusk's) is MODE_PACKS' instead.
+	var m = world.get("mode") if world != null else null
+	if m != null and MODE_PACKS.has(n):
+		var d := HK.diff_of(self)
+		var key := d if (TUNE[n] as Dictionary).has(d) else "dusk"
+		if (MODE_PACKS[n] as Dictionary).has(key):
+			return int(MODE_PACKS[n][key])
+	return int(k(n))
 
 
 func _ready() -> void:
@@ -252,11 +269,11 @@ func _start_lunge() -> void:
 func _bring_pack() -> void:
 	## The first Hushling of each placed pack (the leftmost within
 	## pack_tiles on its floor) brings the pack up to pack_min-pack_max (2-3
-	## on Dusk, 3-5 deeper): on its first think, and again after each
-	## relight (HK.relit), counting the extras it brought that still live,
-	## so a pack is never bigger than the rule. A Dread or a Warden (a
-	## one-off) brings none.
-	var lo := int(k("pack_min"))
+	## on Dusk, 3-5 deeper; none on a mode's Dusk: pack_rule): on its first
+	## think, and again after each relight (HK.relit), counting the extras it
+	## brought that still live, so a pack is never bigger than the rule. A
+	## Dread or a Warden (a one-off) brings none.
+	var lo := pack_rule("pack_min")
 	if lo <= 0 or copy or tier == "dread" or tier == "warden" or world == null or pack_of.x >= 0:
 		return
 	var cell: Vector2i = spawn.get("cell", Vector2i(-1, -1))
@@ -271,7 +288,7 @@ func _bring_pack() -> void:
 			if c.x < cell.x:
 				return   # not the pack's first
 			pack += 1
-	var hi := int(k("pack_max"))
+	var hi := pack_rule("pack_max")
 	var want := lo + posmod(hash(cell), hi - lo + 1)
 	var have := HK.pack_count(world, kind, cell)
 	var again := have > 0 or respawned or t > 0.1   # topping up after a snuff: they come back as respawns do

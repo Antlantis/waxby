@@ -822,7 +822,7 @@ func elite_rules() -> Dictionary:
 	## merged with the mode's (elites.gd reads it).
 	var out := {}
 	if _combat_has("elite_rules"):
-		out = (Combat as Script).call("elite_rules", diff, world_n)
+		out = (Combat as Script).call("elite_rules", diff, world_n, mode == null)   # (a mode keeps v3's Dusk rows)
 	else:
 		var d := Combat.diff(diff)
 		out = {"anoint": float(d.get("anoint", 0.0)), "max_anoint": int(d.get("max_anoint", 0)),
@@ -1526,9 +1526,10 @@ func drop_item(at: Vector2, source := "kill", tier := "", slot_want := "") -> vo
 	## difficulty, class weapons only for the hero's calling. A mode may stop
 	## drops (allows "loot") or lean the rarities (loot(): rare, legend).
 	## An ordinary kill's rarities are Items.kill_weights(area, diff) when
-	## it's there (Dusk richer from area 13; v2's table below that and on
-	## Nightfall and Witching). slot_want (a Dread's gift: Game.gift_slot)
-	## picks the slot, else a live slot at random.
+	## it's there (Dusk richer from area 13, no Commons in a story level; a
+	## mode's Dusk keeps v3's; v2's table on Nightfall and Witching).
+	## slot_want (a Dread's gift: Game.gift_slot) picks the slot, else a live
+	## slot at random.
 	if not allows("loot"):
 		return
 	var h: Dictionary = Game.hero()
@@ -1537,7 +1538,7 @@ func drop_item(at: Vector2, source := "kill", tier := "", slot_want := "") -> vo
 		key = tier if tier != "" else diff
 	var weights: Dictionary = DROP_WEIGHTS.get(key, DROP_WEIGHTS[diff])
 	if source == "kill" and tier == "" and (Items as Script).has_method("kill_weights"):
-		weights = (Items as Script).call("kill_weights", area, diff)
+		weights = (Items as Script).call("kill_weights", area, diff, mode == null)
 	if mode != null:
 		var lt: Dictionary = mode.loot()
 		if lt.has("rare") or lt.has("legend"):
@@ -3572,9 +3573,7 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 			var p := _add_pickup("ember", at)
 			p["loose"] = true
 			p["vel"] = Vector2(randf_range(-110, 110), randf_range(-380, -220))
-	var chance: float = e.item_chance * float(Combat.diff(diff)["drop"]) * (0.5 if e.respawned else 1.0)
-	if mode != null:
-		chance *= float(mode.loot().get("drop", 1.0))   # the Descent's deeper drops (§10.1 loot().drop)
+	var chance := kill_item_chance(e)
 	if e.tier == "anointed":
 		drop_item(at, "anointed")
 	elif e.tier == "dread":
@@ -3592,6 +3591,17 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 		drop_item(at, "kill")
 	if rng.randf() < e.relic_chance and not e.respawned:
 		_drop_relic(at, false)
+
+
+func kill_item_chance(e: Node2D) -> float:
+	## An ordinary kill's chance of an item: its item_chance x the
+	## difficulty's (Combat.kill_drop: Dusk's 0.5 in a story level, a mode's
+	## Dusk keeps v3's 1.0), halved for a respawned monster, x a mode's
+	## loot().drop (the Descent's deeper drops, §10.1).
+	var chance: float = e.item_chance * Combat.kill_drop(diff, mode == null) * (0.5 if e.respawned else 1.0)
+	if mode != null:
+		chance *= float(mode.loot().get("drop", 1.0))
+	return chance
 
 
 func boss_defeated(b: Node2D, at: Vector2) -> void:

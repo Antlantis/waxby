@@ -1187,6 +1187,38 @@ func _test_hushling() -> void:
 	_step(w3, 2)
 	_check(_only(w3, "hushling").size() == 3, "Dusk: a placed three is a pack already, and brings none (%d)" % _only(w3, "hushling").size())
 	await _done(w3)
+	# A challenge mode keeps Dusk as it was before Build 1 (its packs were the
+	# story's): a lone Hushling in a mode's World on Dusk brings none, as v3's
+	# 0/0; on Nightfall it brings its 3-5 as ever.
+	var ModeScript: GDScript = load("res://scripts/modes/mode.gd")
+	for df in ["dusk", "nightfall"]:
+		var lv = LevelData.new()
+		lv.parse("title: t\nsubtitle: t\narea: 28\n---\n%s" % "\n".join(_rows(60, {Vector2i(30, 12): "n"})))
+		lv.id = "mode-hush"
+		lv.world = 6
+		game.reset()
+		var md = ModeScript.new()
+		md.mode_diff = df
+		md.headless = true
+		var wm: Node2D = WorldScript.new()
+		wm.setup(lv, true)
+		wm.mode = md
+		md.world = wm
+		root.add_child(wm)
+		await process_frame
+		wm.test_pad = {}
+		_sturdy(wm)
+		for e in wm.enemies:
+			e.active = true
+		_step(wm, 2)
+		# (Counted by the extras a leader brought: a mode may anoint the one
+		# placed, and an Omen's copy is no pack.)
+		var pm := _only(wm, "hushling").filter(func(e): return (e.get("pack_of") as Vector2i).x >= 0).size() + 1
+		if df == "dusk":
+			_check(wm.diff == "dusk" and pm == 1 and not wm.respawns_here(), "a mode's Dusk: a lone Hushling brings no pack (%d)" % pm)
+		else:
+			_check(wm.diff == "nightfall" and pm >= 3 and pm <= 5, "a mode's Nightfall: a lone Hushling still brings its 3-5 (%d)" % pm)
+		await _done(wm)
 	var ww := await _world(_rows(60), "", "witching", 6)
 	_sturdy(ww)
 	_settle(ww, Vector2(20 * TILE, 13 * TILE))

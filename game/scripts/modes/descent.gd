@@ -972,8 +972,10 @@ func tells_mult() -> float:
 
 
 func elite_rules() -> Dictionary:
+	## The room's world's elites (Combat.elite_rules as a mode: v3's Dusk
+	## rows, not Build 1's story ones) ramped by depth.
 	var wn := int(built.get("world", 1))
-	var base: Dictionary = Combat.elite_rules(mode_diff, wn)
+	var base: Dictionary = Combat.elite_rules(mode_diff, wn, false)
 	return Data.elite_rules(base, int(run["depth"]), _hush_level("anointed"))
 
 

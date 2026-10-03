@@ -28,6 +28,7 @@ const Cosmetics := preload("res://scripts/modes/cosmetics.gd")
 const Rooms := preload("res://scripts/modes/rooms.gd")
 const Data := preload("res://scripts/modes/descent_data.gd")
 const TrialData := preload("res://scripts/modes/trial_data.gd")
+const Items := preload("res://scripts/items.gd")
 const TILE := 32
 const DT := 1.0 / 120.0
 const BIOMES := ["cathedral", "tallow"]
@@ -79,6 +80,7 @@ func _initialize() -> void:
 	_test_ramp()
 	await _test_descent_world()
 	await _test_descent_rules()
+	await _test_mode_dusk()
 	await _test_glimmers()
 	await _test_glimmer_card()
 	await _test_landing_once()
@@ -746,6 +748,92 @@ func _test_descent_rules() -> void:
 			break
 	if el != null:
 		_check(float(el.tell(0.35)) >= 0.30 - 1e-6, "the 0.30 s tell floor holds (%.3f)" % float(el.tell(0.35)))
+	w.queue_free()
+	await process_frame
+
+
+func _test_mode_dusk() -> void:
+	## Build 1's Dusk (about twice the Anointed from World 3 with a second
+	## Omen, half the kill drops and no Commons, Hushlings in packs) is the
+	## story's: a mode keeps the numbers from before it. The Descent reads
+	## the elite rows by its room's world, so a W3-W6 room plays v3's.
+	## (The Hushling packs: test_monsters4.)
+	var v3 := {1: [0.06, 2, 1, 0.0], 2: [0.06, 2, 1, 0.0], 3: [0.07, 2, 1, 0.0],
+			4: [0.08, 3, 1, 0.0], 5: [0.09, 3, 1, 0.35], 6: [0.10, 3, 1, 0.50]}
+	for wn in v3:
+		var row: Array = v3[wn]
+		var r: Dictionary = Combat.elite_rules("dusk", wn, false)
+		_check(absf(float(r["anoint"]) - float(row[0])) < 1e-6 and int(r["max_anoint"]) == int(row[1]) and int(r["omens"]) == int(row[2])
+				and absf(float(r["second_omen"]) - float(row[3])) < 1e-6, "a mode's Dusk in World %d keeps v3's elites %s (%s)" % [wn, row, r])
+	_check(Combat.elite_rules("dusk", 5) != Combat.elite_rules("dusk", 5, false), "(a story level's World 5 row is Build 1's: %s)" % [Combat.elite_rules("dusk", 5)])
+	_check(Combat.elite_rules("nightfall", 5, false) == Combat.elite_rules("nightfall", 5) and Combat.elite_rules("witching", 6, false) == Combat.elite_rules("witching", 6),
+			"Nightfall's and Witching's elites are the same in a mode")
+	_fresh()
+	var m = _descent("knight", "dusk", 7, 31)
+	var w := _mode_world(m, m.level_data())
+	await process_frame
+	var wn0 := int(w.world_n)
+	for wn in v3:
+		var row: Array = v3[wn]
+		m.built["world"] = wn
+		w.world_n = wn
+		var want := Data.elite_rules({"anoint": float(row[0]), "max_anoint": int(row[1]), "omens": int(row[2])}, 7)
+		var got: Dictionary = m.elite_rules()
+		var seen: Dictionary = w.elite_rules()
+		_check(got == want, "the Descent at depth 7 in a World %d room: v3's row, ramped (%s; want %s)" % [wn, got, want])
+		_check(absf(float(seen["anoint"]) - float(want["anoint"])) < 1e-6 and int(seen["max_anoint"]) == int(want["max_anoint"])
+				and absf(float(seen["second_omen"]) - float(row[3])) < 1e-6, "and its World rolls them, with v3's second Omen at %.2f (%s)" % [row[3], seen])
+	m.built["world"] = wn0
+	w.world_n = wn0
+	# Kill drops: v3's rate and rarities in a mode; Build 1's in a story level.
+	_check(Combat.kill_drop("dusk", false) == 1.0 and Combat.kill_drop("dusk") == 0.5, "a Dusk kill's item chance x1.0 in a mode (x0.5 in a story level)")
+	_check(Combat.kill_drop("nightfall", false) == Combat.kill_drop("nightfall") and Combat.kill_drop("witching", false) == Combat.kill_drop("witching"),
+			"Nightfall's and Witching's are the same in a mode")
+	var old12 := {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5}
+	var old13 := {"common": 55.0, "magic": 34.0, "rare": 10.0, "legendary": 1.0}
+	var old23 := {"common": 50.0, "magic": 35.0, "rare": 13.5, "legendary": 1.5}
+	var weights_ok := true
+	for a in [1, 6, 12]:
+		weights_ok = weights_ok and Items.kill_weights(a, "dusk", false) == old12
+	for a in [13, 18, 22]:
+		weights_ok = weights_ok and Items.kill_weights(a, "dusk", false) == old13
+	for a in [23, 31, 45, 60]:
+		weights_ok = weights_ok and Items.kill_weights(a, "dusk", false) == old23
+	_check(weights_ok, "a mode's Dusk kill keeps v3's rarities: 60/32/7.5/0.5, 55/34/10/1 from area 13, 50/35/13.5/1.5 from 23")
+	_check(float(Items.kill_weights(29, "dusk")["common"]) == 0.0 and Items.kill_weights(40, "nightfall", false) == Items.kill_weights(40, "nightfall"),
+			"(a story level's Dusk rolls no Commons; Nightfall is the same in both)")
+	# In the Descent's World on Dusk: the chance its kills read, and what they roll.
+	var en: Node2D = null
+	for e in w.enemies:
+		if e.alive and e.ordinary and not e.respawned and float(e.item_chance) > 0.0 and e.tier == "":
+			en = e
+			break
+	_check(en != null, "the depth has an ordinary monster")
+	if en != null:
+		var deeper := float(m.loot().get("drop", 1.0))
+		_check(absf(w.kill_item_chance(en) - float(en.item_chance) * deeper) < 1e-6,
+				"a Descent kill on Dusk: its item chance x1.0 x the depth's %.2f (%.4f)" % [deeper, w.kill_item_chance(en)])
+		w.mode = null
+		_check(absf(w.kill_item_chance(en) - float(en.item_chance) * 0.5) < 1e-6, "(the same World as a story level: x0.5)")
+		w.mode = m
+	var rolled := {}
+	var n0: int = w.pickups.size()
+	for i in 200:
+		w.drop_item(Vector2(200, 200), "kill")
+	for pk in w.pickups.slice(n0):
+		if pk["kind"] == "item":
+			rolled[pk["rarity"]] = int(rolled.get(pk["rarity"], 0)) + 1
+	_check(int(rolled.get("common", 0)) >= 50, "a Descent kill on Dusk still rolls Commons, about half (%s of 200)" % [rolled])
+	w.mode = null
+	rolled = {}
+	n0 = w.pickups.size()
+	for i in 200:
+		w.drop_item(Vector2(200, 200), "kill")
+	for pk in w.pickups.slice(n0):
+		if pk["kind"] == "item":
+			rolled[pk["rarity"]] = int(rolled.get(pk["rarity"], 0)) + 1
+	_check(not rolled.has("common") and not rolled.is_empty(), "(as a story level: never a Common: %s)" % [rolled])
+	w.mode = m
 	w.queue_free()
 	await process_frame
 

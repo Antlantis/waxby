@@ -1057,7 +1057,8 @@ static func roll_omens(k: String, diff_id: String, world_n: int, r: RandomNumber
 	## An elite's Omens (contract §6.2: roll_omens(kind, diff, world, rng)).
 	## How many: omen_span(diff) (a mode's rules.omens may raise the most, and
 	## rules.omens_min the least); on
-	## Dusk one more at rules.second_omen (Combat.elite_rules: W5 35%, W6 50%).
+	## Dusk one more at rules.second_omen (Combat.elite_rules: 20-60% from W3
+	## in a story level; a mode's v3 rows, W5 35%, W6 50%).
 	## A fixed count takes no roll, and W1-W2 take no second-Omen roll, so a
 	## seed picks the same Omens there as ever. Never more than MAX_OMENS.
 	var span := omen_span(diff_id)
