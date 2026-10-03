@@ -851,6 +851,12 @@ func _test_barks() -> void:
 			"first_pool", "first_douse", "low_flame", "skill_point", "tollgrave_angry", "snuffer_angry", "snuffer_dark",
 			"nightfall", "level_up", "first_hurt", "level_up_8", "level_up_16", "level_up_24"]:
 		_check(Story.BARKS.has(k), "the '%s' bark world.gd and the HUD fire exists" % k)
+	# skill_point names the point and both places to spend it: an altar's
+	# Rites (rites.gd) and the Sheet. No bare "it" with nothing before it.
+	var sp := str(Story.BARKS["skill_point"][1])
+	var sp_words := Array(sp.to_lower().replace(",", " ").replace(".", " ").split(" ", false))
+	_check(sp_words.has("point") and sp_words.has("altar") and sp_words.has("sheet") and not sp_words.has("it")
+			and sp.length() <= Story.MAX_LINE, "skill_point says what to spend and where: '%s'" % sp)
 	# A level-up that opens a tier has its own line for each calling, in the
 	# bark's own format, heard every time it comes (once a hero, at 8, 16, 24).
 	for t in [8, 16, 24]:

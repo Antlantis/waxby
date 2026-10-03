@@ -2728,10 +2728,12 @@ var _sign_left := -100.0        # ...and the _t he was last by it
 func _read_signs() -> void:
 	## The sign Wick stands by puts its text in the HUD's slot, and the last
 	## one keeps it there SIGN_LINGER s after he walks on, so a sign reads on
-	## the run. While a title card or the level-up card keeps the slot from
-	## drawing (hud.slot_blocked: a level's first sign is under its title),
-	## the linger waits, so its SIGN_LINGER s start once the slot is free. A
-	## board he has stood by stops glinting (sign_view.gd, this visit only).
+	## the run. While the slot can't draw it (hud.hint_held: a title card or
+	## the level-up card is up, or a message has the slot: a level's first
+	## sign is under its title, then under the barks queued behind it, like
+	## 3-1's first_vine and beat_3_1), the linger waits, so its SIGN_LINGER s
+	## start once the slot is free. A board he has stood by stops glinting
+	## (sign_view.gd, this visit only).
 	var near := ""
 	for s in signs:
 		if absf(player.position.x - s["pos"].x) < SIGN_REACH and absf(player.position.y - s["pos"].y) < 60.0:
@@ -2744,7 +2746,7 @@ func _read_signs() -> void:
 		_sign_left = _t
 	elif _sign_text != "" and _t - _sign_left < SIGN_LINGER:
 		near = _sign_text
-		if hud and hud.has_method("slot_blocked") and hud.slot_blocked():
+		if hud and hud.has_method("hint_held") and hud.hint_held():
 			_sign_left = _t
 	if hud:
 		hud.show_hint(near)

@@ -309,7 +309,7 @@ LEVELS.append({
     'id': '3-1', 'name': 'The Bramble Gate', 'area': 13, 'theme': 'orchard', 'music': 'orchard',
     'dread': 'Mister Mandrake|rootling|Twinned,Sporebound',
     'story_start': 'beat_3_1',
-    'hints': ['On a vine, thumb up to climb. Arrow and jump to leap',
+    'hints': ['On a vine, slide up to climb. Arrow and jump to leap',
               'Here lies Brother Pim. He kept the soup warm.'],
     'sections': [BG_START, BG_CLIMB, BG_LEAP, BG_ALTAR, BG_GROVE, BG_TRELLIS, BG_ALTAR2, BG_MOUNDS, BG_CELLAR,
                  BG_ALTAR3, BG_DREAD, BG_BELL],

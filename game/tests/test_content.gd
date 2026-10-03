@@ -1956,6 +1956,11 @@ func _test_sign_reading() -> void:
 	## reads on the run. The next sign's text takes over at once. Each
 	## board's painted flame glints until he has stood by it once this visit;
 	## nothing is saved, so the next visit's boards glint again.
+	# (A phone's view for the HUDs below: headless the root has no size, and
+	# the HUD's see-through areas came out with negative sizes every frame.)
+	var was := root.size
+	root.size = Vector2i(844, 390)
+	root.content_scale_size = Vector2i(844, 390)
 	var SignView = load("res://scripts/sign_view.gd")
 	var rows := _rows(60, {Vector2i(20, 12): "@", Vector2i(26, 12): "@"})
 	var w := await _world(rows, "hints: First board|Second board\n")
@@ -2028,6 +2033,87 @@ func _test_sign_reading() -> void:
 	_check(titled >= 2.5 and w3.player.position.x > w3.signs[0]["pos"].x + 200.0, "(the title card held the slot %.1f s, and he ran on past the sign)" % titled)
 	_check(drawn >= 1.9, "the first sign's text still shows %.1f s after the title card (it ran out under it before)" % drawn)
 	await _done(w3)
+	# The same first sign with messages queued under the title (3-1: the
+	# beat's barks and first_vine wait for its card): they take the slot
+	# first, the sign's text never flashes up for the frame between the card
+	# and them (hud.hint_held), and its SIGN_LINGER s wait for them too, so it
+	# reads once, in full, after them (it ran out under them before).
+	var w4 := await _world(_rows(60, {Vector2i(7, 12): "@"}), "hints: Wax-ice is slick\n")
+	var hud4 = load("res://scripts/hud.gd").new()
+	hud4.world = w4
+	hud4.story = null
+	hud4._story_checked = true
+	w4.hud = hud4
+	w4.add_child(hud4)
+	await process_frame
+	hud4.title_card("t", "t")
+	var stretches := []   # the length of each stretch the sign's text draws
+	var was_on := false
+	var msg_time := 0.0
+	var sx: float = w4.signs[0]["pos"].x
+	for i in int(14.0 / DT):
+		_step(w4, 1, {"right": true} if w4.player.position.x < sx + 200.0 else {})
+		if i == int(1.0 / DT):
+			hud4.toast("A first note under the title", "and its line")
+			hud4.toast("A second note", "behind it")
+		hud4._process(DT)
+		if not hud4._msg.is_empty():
+			msg_time += DT
+		var on: bool = hud4._hint == "Wax-ice is slick" and hud4.hint_showing()
+		if on and not was_on:
+			stretches.append(0.0)
+		if on:
+			stretches[-1] += DT
+		was_on = on
+	_check(msg_time >= 4.5 and w4.player.position.x > sx + 150.0, "(the notes held the slot %.1f s after the card, and he ran on past the sign)" % msg_time)
+	_check(stretches.size() == 1 and float(stretches[0]) >= 1.9,
+			"the first sign's text shows once, in full, after the notes queued under the title: no lone frame before them %s" % [stretches])
+	await _done(w4)
+	await _test_31_vine_sign()
+	root.size = was
+	root.content_scale_size = was
+
+
+func _test_31_vine_sign() -> void:
+	## 3-1's one control sign stands by the first vine, under the level's
+	## title card; first_vine and beat_3_1's two barks queue behind the card.
+	## Run right from the start, its text still reads SIGN_LINGER s once
+	## they're done, and it names the climb as the thumb tip's card does
+	## (world.TIPS "tip:climb": "Slide up to climb"), not a third way.
+	var Cutscene = load("res://scripts/cutscene.gd")
+	var Story = load("res://scripts/story.gd")
+	var w := await _level_world("3-1")
+	var hud = load("res://scripts/hud.gd").new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	await process_frame
+	var vine_sign := ""
+	for s in w.signs:
+		if str(s["text"]).begins_with("On a vine"):
+			vine_sign = str(s["text"])
+	var climb: String = str(WorldScript.TIPS["tip:climb"][0]).to_lower()
+	_check(vine_sign.to_lower().contains(climb), "3-1's vine sign names the climb as the tip card does ('%s' in '%s')" % [climb, vine_sign])
+	hud.title_card("Act", str(w.level.title))
+	# (as cutscene.gd plays the beat: an overlay with no shots queues its barks)
+	var beat: Dictionary = Story.scene("beat_3_1")
+	Cutscene.queue_barks(w, beat["barks"], float(beat["bark_delay"]))
+	var heard := {}
+	var drawn := 0.0
+	for i in int(20.0 / DT):
+		_step(w, 1, {"right": true})
+		hud._process(DT)
+		for c in w.get_children():
+			if c.name == "StoryBarks":
+				c.step(DT)
+		if not hud._msg.is_empty():
+			heard[str(hud._msg.get("key", ""))] = true
+		if hud._hint == vine_sign and hud.hint_showing():
+			drawn += DT
+	_check(heard.has("bark:first_vine") and heard.has("bark:beat_3_1_a") and heard.has("bark:beat_3_1_b"),
+			"(first_vine and beat_3_1's barks took the slot after the card: %s)" % [heard.keys()])
+	_check(drawn >= 1.9, "3-1: run on from the start, the vine sign still reads %.1f s after the title and the barks (0.01 s before)" % drawn)
+	await _done(w)
 
 
 func _test_hang_heights() -> void:

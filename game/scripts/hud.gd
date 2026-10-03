@@ -864,6 +864,20 @@ func slot_blocked() -> bool:
 	return not _title.is_empty() or not _lvl.is_empty()
 
 
+func hint_held() -> bool:
+	## A sign's hint can't draw now: the slot is blocked, a message has it,
+	## or one waits to take it on the next step (_step_messages runs before a
+	## title card goes, so a bark queued under the title shows a frame late:
+	## the hint never flashes up for that frame). world._read_signs holds a
+	## sign's linger while this is true, so its text reads after the bark.
+	return slot_blocked() or not _msg.is_empty() or not _msgs.is_empty()
+
+
+func hint_showing() -> bool:
+	## The slot draws the sign's hint now (_draw_slot; tests).
+	return _hint_alpha > 0.0 and _hint != "" and not hint_held()
+
+
 func boss_alpha() -> float:
 	## How much of the boss bar shows (tests): none while it steps aside,
 	## see-through while he's behind it.
@@ -1800,7 +1814,7 @@ func _draw_slot(ci: Control) -> void:
 			_:
 				_draw_note(ci, _msg, a, slide, boss_on)
 		return
-	if _hint_alpha > 0.0 and _hint != "":
+	if hint_showing():
 		var ha := _hint_alpha * see("msg")
 		var tw := UI.text_width(_hint, 15, "body", 600)
 		var r := msg_rect(tw + 36.0, boss_on)
