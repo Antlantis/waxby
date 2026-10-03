@@ -3,8 +3,9 @@ extends Control
 ## and one button under them. The Descent's landing offers its Glimmers on
 ## it (mode_hud.glimmer_card: two cards, "Walk on · +20 embers"), a lit altar
 ## in a story level its Altar Rites (world.offer_choice, rites.gd: up to three
-## skills, "Later"), and the results screen the same Rites; the bosses' boons
-## come next.
+## skills, "Later"), the results screen the same Rites, and a boss's first
+## kill his boon (world.open_boon: two or three Legendaries, and no button: a
+## prize is taken, not put off).
 ##
 ## An offer is a card: {name, text, glyph, sub, new} (and col, the glyph's
 ## colour, EMBER by default; any other keys are the caller's). new puts a gold
@@ -13,12 +14,14 @@ extends Control
 ## 200 x 150, 16 px apart, centred (3 x 200 + 2 x 16 = 632 px: inside the
 ## 844 px glass between the island's insets). They sit under the HUD's top
 ## band (hud.title_rect, where a title card or the level-up card shows) and
-## the heading.
+## the heading. A card's text is three lines at most: 13 px, down to 11 for a
+## long one (fit_text), a number kept with its unit ("1.5 s").
 ##
-## open(offers, opts) shows it, opts {heading, later (the button's words),
-## pick: Callable(i), pair}. A card tapped calls pick(i), the button pick(-1);
-## the caller closes it (close()) and lets go of whatever it paused. A full
-## rect over its layer, it takes every touch while it's open and none after.
+## open(offers, opts) shows it, opts {heading, later (the button's words; ""
+## for none), pick: Callable(i), pair}. A card tapped calls pick(i), the
+## button pick(-1); the caller closes it (close()) and lets go of whatever it
+## paused. A full rect over its layer, it takes every touch while it's open
+## and none after.
 
 const UI := preload("res://scripts/ui.gd")
 
@@ -30,6 +33,8 @@ const PAIR_W := 220.0             # the Descent's two Glimmers
 const PAIR_H := 140.0
 const PAIR_GAP := 24.0
 const FILL := Color("241a33")
+const TEXT_LINES := 3             # a card's text: at most this many lines...
+const TEXT_SIZES := [13, 12, 11]  # ...at the first of these sizes that holds it
 
 var world: Node = null            # the level under it: its HUD's top band sets the heading's height
 var offers: Array = []
@@ -40,6 +45,7 @@ var _pick: Callable
 var _t := 0.0
 var _buttons: Array = []
 var _later_btn: Button = null
+static var _units: RegEx = null   # a number and its unit (fit_text keeps them together)
 
 
 func _ready() -> void:
@@ -65,10 +71,11 @@ func open(p_offers: Array, opts := {}) -> void:
 	for i in offers.size():
 		var k := i
 		_flat_button(rs[i], func(): choose(k))
-	_later_btn = UI.make_button(later, false, func(): choose(-1), "click", 15)
-	_later_btn.custom_minimum_size = Vector2(200, 40)
-	add_child(_later_btn)
-	_buttons.append(_later_btn)
+	if later != "":
+		_later_btn = UI.make_button(later, false, func(): choose(-1), "click", 15)
+		_later_btn.custom_minimum_size = Vector2(200, 40)
+		add_child(_later_btn)
+		_buttons.append(_later_btn)
 	_layout_buttons()
 	queue_redraw()
 
@@ -129,6 +136,22 @@ func heading_y() -> float:
 func rects() -> Array:
 	## Where each card is (the pair's two slots, or one per offer).
 	return layout(_safe(), heading_y() + 12.0, offers.size(), pair)
+
+
+static func fit_text(text: String, w: float) -> Dictionary:
+	## A card's text as drawn: {size, lines}, the first of TEXT_SIZES at which
+	## it wraps to TEXT_LINES or fewer in w (else the smallest), a number and
+	## the unit after it kept on one line ("1.5 s", "90 px").
+	if _units == null:
+		_units = RegEx.new()
+		_units.compile("(\\d) (s|px)\\b")
+	var glued := _units.sub(text, "$1\u00a0$2", true)
+	var lines: Array = []
+	for fs in TEXT_SIZES:
+		lines = UI.wrap(glued, w, fs)
+		if lines.size() <= TEXT_LINES:
+			return {"size": fs, "lines": lines}
+	return {"size": TEXT_SIZES[TEXT_SIZES.size() - 1], "lines": lines}
 
 
 static func layout(s: Rect2, top: float, n: int, two_up := false) -> Array:
@@ -212,15 +235,19 @@ func _draw_offer(o: Dictionary, r: Rect2) -> void:
 				UI.text(self, rr.position + Vector2(0, 96.0 + i * 15.0), str(two[i]), 13, UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, rr.size.x)
 		UI.text(self, rr.position + Vector2(0, 128.0 if long else 124.0), sub, 12, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, rr.size.x)
 	else:
-		# A skill: its mark, its name, what it does (up to three lines of 13,
-		# centred between the name and the rank line) and the rank line.
+		# A skill or a Legendary: its mark, its name, what it does (up to
+		# three lines, fit_text, centred between the name and the rank line)
+		# and the line under.
 		UI.glyph(self, str(o.get("glyph", "star")), rr.position + Vector2(rr.size.x * 0.5, 32.0), 28.0, col)
 		var w := rr.size.x - 16.0
 		UI.text(self, rr.position + Vector2(8.0, 70.0), name, UI.fit_size(name, w, 18, 13, "title", 700), UI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, w, "title", 700)
-		var lines := UI.wrap(text, w, 13)
-		var n := mini(lines.size(), 3)
+		var fit := fit_text(text, w)
+		var fs := int(fit["size"])
+		var lh := fs + 3.0
+		var lines: Array = fit["lines"]
+		var n := mini(lines.size(), TEXT_LINES)
 		for i in n:
-			UI.text(self, rr.position + Vector2(8.0, 92.0 + (3 - n) * 8.0 + i * 16.0), str(lines[i]), 13, UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, w)
+			UI.text(self, rr.position + Vector2(8.0, 92.0 + (TEXT_LINES - n) * lh * 0.5 + i * lh), str(lines[i]), fs, UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, w)
 		UI.text(self, rr.position + Vector2(8.0, rr.size.y - 10.0), sub, UI.fit_size(sub, w, 11, 9, "body", 700), UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, w, "body", 700)
 	if bool(o.get("new", false)):
 		# NEW: a gold tag on its shoulder.

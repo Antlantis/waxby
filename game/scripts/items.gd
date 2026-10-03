@@ -207,6 +207,9 @@ const LEGENDS := {
 # the Twin Wick for the flame's thief).
 const WORLD_LEGENDS := {1: ["tollbreaker"], 2: ["twin_wick"], 3: ["rootbound", "marrow_lantern"], 4: ["escapement", "hoarfrost"],
 		5: ["prismglass", "leadlight"], 6: ["hushbane", "last_candle"]}
+# A boss's boon (his first kill, chosen on the choice card: boon_legends):
+# his signature then others, this many at most.
+const BOON_MAX := 3
 const SECRET_PRIZES := {"1-S": "hymnal", "2-S": "deep_chalice", "3-S": "gravebloom", "4-S": "hour_hand",
 		"5-S": "saints_lens", "6-S": "hollins_ember"}
 # What a Dusk kill rolls (spec §8.1), richer from area 13 and 23. Build 1:
@@ -649,3 +652,28 @@ static func world_legends(world: int) -> Array:
 		if LEGENDS.has(id):
 			out.append(id)
 	return out
+
+
+static func boon_legends(world: int, cls: String, area: int, owned: Array, found: Array, rng: RandomNumberGenerator, n := BOON_MAX) -> Array:
+	## A boss's boon (his first kill on a difficulty, a player at the
+	## controls: world.gd open_boon): the Legendaries offered on the choice
+	## card, n at most. His signature first (world_legends: W1-W2's one,
+	## W3-W6's pair; a calling's charm only its own), then others the hero
+	## doesn't hold (owned: worn or carried) that may roll here
+	## (legal_legends: the live slots, min_area reached, a secret one once
+	## found), never another boss's signature, drawn at random. Fewer than
+	## two is no choice: the boss drops his prize as before.
+	var out: Array = []
+	for id in world_legends(world):
+		if not (LEGENDS[id] as Dictionary).has("cls") or LEGENDS[id]["cls"] == cls:
+			out.append(id)
+	var signed := {}
+	for w in WORLD_LEGENDS:
+		for id in WORLD_LEGENDS[w]:
+			signed[id] = true
+	var rest: Array = legal_legends(cls, area, found, live_slots(area)).filter(func(id): return not signed.has(id) and not owned.has(id))
+	while out.size() < n and not rest.is_empty():
+		var k := rng.randi() % rest.size()
+		out.append(rest[k])
+		rest.remove_at(k)
+	return out.slice(0, n)

@@ -6,7 +6,8 @@ extends SceneTree
 ## pickups, spikes, pits and altars do what they should; the save keeps what
 ## it should. Build 1: pure down held a moment on a ledge drops through it
 ## (never on solid floor, never a down carried onto it), and a controller's
-## d-pad, stick and buttons reach the actions.
+## d-pad, stick and buttons reach the actions; a boss's first kill, a
+## player's, offers his prize on the choice card (the Boss Boons).
 ##
 ##     godot --headless --path game --script res://tests/test_core.gd
 
@@ -84,6 +85,7 @@ func _initialize() -> void:
 	await _test_p0_review()
 	await _test_wave1_wiring()
 	await _test_loot_build1()
+	await _test_boss_boons()
 	_test_relics_and_save()
 	print("test_core: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -3202,6 +3204,207 @@ func _test_loot_build1() -> void:
 	hud.free()
 	w.queue_free()
 	await process_frame
+
+
+# ---------------------------------------------------------------- build 1: the Boss Boons
+
+const STUB_BOON_HUD := """extends CanvasLayer
+var said := []
+var busy := false
+func show_pickup(it, chips, where) -> void:
+	said.append(["show_pickup", where])
+func power_card(it) -> void:
+	said.append(["power_card", str(it.get("uid", ""))])
+func level_up(n: int) -> void:
+	said.append(["level_up", n])
+func toast(t: String, s: String) -> void:
+	pass
+func show_hint(t: String) -> void:
+	pass
+func bark(k: String) -> void:
+	pass
+func bump_embers() -> void:
+	pass
+func boss_bar(i) -> void:
+	pass
+func title_showing() -> bool:
+	return false
+func top_card_showing() -> bool:
+	return busy
+"""
+
+
+func _as_player(w: Node2D) -> CanvasLayer:
+	## A headless test World played as a player's is: a display, a HUD (a
+	## stub), Input's pad (no test pad), so a choice may stop it.
+	var hud: CanvasLayer = _stub(STUB_BOON_HUD)
+	w.hud = hud
+	w.headless = false
+	w.no_display = false
+	w.test_pad = null
+	return hud
+
+
+func _kill_boss(w: Node2D, b: Node2D) -> void:
+	## His killing blow in a stuck window (_test_boss_after's), then his fall
+	## to boss_defeated (1.2 s) and its hitstop.
+	b.phase = 3
+	b.hp = 1.0
+	b.state = "stuck"
+	w.player.invuln = 100.0
+	w.deal(b, 1.0, {"flat": 99999.0})
+	for i in int(1.5 / DT):
+		w.tick(DT)
+
+
+func _test_boss_boons() -> void:
+	## A boss's first kill on a difficulty, a player at the controls: his
+	## prize is chosen on the choice card (world.open_boon), not dropped: two
+	## or three Legendaries, his signature first, each naming its power, and
+	## no Later. It opens once his fall has settled (BOON_WAIT, the level-up
+	## card's time), and a pick goes through the pickup's own path (worn,
+	## its New power moment) and only then counts as given. A second kill
+	## drops as before; so does a first kill under the --autoplay bot (or on
+	## a route, a scripted pad, headless, in a mode). A bell rung first holds
+	## the level's end until the boon is chosen. Every Legendary's power fits
+	## its card.
+	var auto = game.setting("auto_equip")
+	game.set_setting("auto_equip", true)
+	var boss_firsts := func(w: Node2D) -> Array: return w.pickups.filter(func(p): return p["kind"] == "item" and bool(p.get("boss_first", false)))
+	# Tollgrave's first kill, a player's: the boon.
+	var w := _world_as("1-4", "knight")
+	await process_frame
+	w.set_physics_process(false)
+	var b := _wake_boss(w)
+	var hud := _as_player(w)
+	_check(w.boon_block() == "", "a player's first kill may offer the boon (%s)" % w.boon_block())
+	var embers0: int = w.pickups.filter(func(p): return p["kind"] == "ember").size()
+	_kill_boss(w, b)
+	_check(not b.alive and not w._boon.is_empty() and boss_firsts.call(w).is_empty(), "he falls: his boon waits, and no prize drops")
+	_check(w.pickups.filter(func(p): return p["kind"] == "ember").size() - embers0 >= int(b.embers), "his embers are paid all the same (%d)" % int(b.embers))
+	hud.busy = true
+	for i in int(1.5 / DT):
+		w.tick(DT)
+	_check(not w._boon.is_empty() and (w.choice == null or not w.choice.is_open()), "it waits while the level-up card shows")
+	hud.busy = false
+	w.tick(DT)
+	_check(w.choice != null and w.choice.is_open() and w.paused and w._boon.is_empty(), "then the boon opens over the paused level")
+	var offers: Array = w.choice.offers if w.choice != null else []
+	var ids: Array = offers.map(func(o): return str(o["id"]))
+	_check(offers.size() == 3 and ids[0] == "tollbreaker" and ids.count("tollbreaker") == 1, "three Legendaries, his signature first (%s)" % [ids])
+	var named := true
+	for o in offers:
+		var l: Dictionary = Items.LEGENDS[o["id"]]
+		named = named and str(o["name"]) == str(l["name"]) and str(o["text"]) == str(l["text"]) and o["item"] is Dictionary and str(o["item"]["legend"]) == str(o["id"])
+	_check(named, "each card names its Legendary and its power")
+	_check(w.choice.heading.begins_with("Old Tollgrave") and w.choice.button_rect() == Rect2() and str(offers[0]["sub"]).contains("Old Tollgrave's own"),
+			"his name on the heading and on his own card, and no Later (%s)" % w.choice.heading)
+	_check(not game.level_record("1-4").get("boss_first", false), "(not given yet)")
+	var prize: Dictionary = offers[0]["item"]
+	w.choice.choose(0)
+	var h: Dictionary = game.hero()
+	_check(not w.paused and not w.choice.is_open(), "a pick closes it and play goes on")
+	_check(str(h["equip"]["weapon"].get("uid", "")) == str(prize["uid"]) and w.items_found.has(prize), "the pick is worn at once, over a piece that isn't a Legendary")
+	_check(hud.said.has(["power_card", str(prize["uid"])]) and is_equal_approx(w.hitstop, w.LEGEND_FREEZE), "with its New power moment (the freeze, the held card)")
+	_check(game.level_record("1-4").get("boss_first", false), "and now the first kill counts as given")
+	# A second kill drops as before.
+	var n0: int = w.pickups.filter(func(p): return p["kind"] == "item").size()
+	w.boss_defeated(b, b.center())
+	var dropped: int = w.pickups.filter(func(p): return p["kind"] == "item").size() - n0
+	for i in int(1.5 / DT):
+		w.tick(DT)
+	_check(w._boon.is_empty() and not w.choice.is_open() and dropped == 3 and boss_firsts.call(w).is_empty(),
+			"a second kill: no boon, his three drops as before (%d)" % dropped)
+	# Why not: only a player's story level.
+	var whys := {}
+	for flag in ["autoplay", "route", "scripted", "headless"]:
+		match flag:
+			"autoplay":
+				w.autoplay = true
+			"route":
+				w.no_monsters = true
+			"scripted":
+				w.test_pad = {}
+			"headless":
+				w.no_display = true
+		whys[flag] = w.boon_block()
+		w.autoplay = false
+		w.no_monsters = false
+		w.test_pad = null
+		w.no_display = false
+	_check(whys == {"autoplay": "autoplay", "route": "route", "scripted": "scripted", "headless": "headless"}, "never under the bot, on a route, a scripted pad or headless (%s)" % [whys])
+	for id in Items.world_legends(1) + ["dawnsliver", "gutterlight", "ossuary_coat", "thornsole", "cinderstep", "first_dawn"]:
+		(h["satchel"] as Array).append(Items.make(str(Items.LEGENDS[id]["slot"]), "knight", 4, "legendary", RandomNumberGenerator.new(), id))
+	_check(w.boon_block() == "no choice", "every other one held: no choice, so it drops (%s)" % w.boon_block())
+	h["satchel"] = []
+	w.headless = true
+	w.hud = null
+	hud.free()
+	w.queue_free()
+	await process_frame
+	# Under the --autoplay bot the Snuffer's first kill drops his prize, as before.
+	w = _world_as("2-4", "knight")
+	await process_frame
+	w.set_physics_process(false)
+	b = _wake_boss(w)
+	hud = _as_player(w)
+	w.autoplay = true
+	_kill_boss(w, b)
+	for i in int(1.5 / DT):
+		w.tick(DT)
+	var got: Array = boss_firsts.call(w)
+	_check(w._boon.is_empty() and w.choice == null and got.size() == 1 and str(got[0]["item"]["legend"]) == "twin_wick",
+			"under the bot: no card, his signature drops where he fell (%s)" % [got.map(func(p): return p["item"]["legend"])])
+	w.autoplay = false
+	# A bell rung before the boon opens holds the level's end for it.
+	game.level_record("2-4")["boss_first"] = false
+	var done := [false]
+	w.finished.connect(func(_r): done[0] = true)
+	w.boss_defeated(b, b.center())
+	w.add_bell(w.player.position)
+	for i in int(0.5 / DT):
+		w.tick(DT)
+	_check(w.state == "clear" and w.clear_time == 0.0 and not w._boon.is_empty(), "the bell rings first: the level's end waits for the boon")
+	for i in int(1.0 / DT):
+		w.tick(DT)
+	_check(w.choice != null and w.choice.is_open(), "which opens over the rung bell")
+	w.choice.choose(1)
+	_check(game.level_record("2-4").get("boss_first", false), "a pick of another than his own counts too")
+	var Playlog = load("res://scripts/playlog.gd")
+	var kept_path: String = Playlog.path
+	Playlog.path = "user://test_core_boon_playlog.json"
+	for i in int(4.0 / DT):
+		w.tick(DT)
+	_check(done[0], "then the level ends as it does")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Playlog.path))
+	Playlog.path = kept_path
+	w.headless = true
+	w.hud = null
+	hud.free()
+	w.queue_free()
+	await process_frame
+	# World 3's boss: his pair, then one other.
+	w = _world_as("3-4", "witch")
+	await process_frame
+	var cards: Array = w.boon_offers("Mother Gravebough")
+	_check(cards.size() == 3 and cards.slice(0, 2).map(func(o): return o["id"]) == Items.world_legends(3) and not Items.world_legends(3).has(cards[2]["id"])
+			and str(cards[1]["sub"]) == "Candle · Mother Gravebough's own", "Gravebough's boon: her pair, then one other (%s)" % [cards.map(func(o): return o["id"])])
+	_check(w.whose("The Tinker of Hours") == "The Tinker's" and w.whose("The Hush") == "The Hush's" and w.whose("") == "the boss's",
+			"a boss's name as an owner: The Tinker's (of Hours), The Hush's, the boss's")
+	w.queue_free()
+	await process_frame
+	# Every Legendary's power fits a card: three lines at most.
+	var CC = load("res://scripts/choice_card.gd")
+	var w_text: float = (CC.layout(Rect2(0, 0, 844, 390), 100.0, 3)[0] as Rect2).size.x - 16.0
+	var long := []
+	for id in Items.LEGENDS:
+		var fit: Dictionary = CC.fit_text(str(Items.LEGENDS[id]["text"]), w_text)
+		if (fit["lines"] as Array).size() > CC.TEXT_LINES:
+			long.append(id)
+	_check(long.is_empty(), "every Legendary's power fits its card in %d lines (%s)" % [CC.TEXT_LINES, long])
+	var lc: Dictionary = CC.fit_text(str(Items.LEGENDS["last_candle"]["text"]), w_text)
+	_check(int(lc["size"]) < 13 and (lc["lines"] as Array).all(func(l): return not str(l).begins_with("s.")), "a long one a size smaller, its numbers kept with their units (%s)" % [lc["lines"]])
+	game.set_setting("auto_equip", auto)
 
 
 # ---------------------------------------------------------------- wave 1's W0 wiring

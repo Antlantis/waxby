@@ -17,8 +17,10 @@ ring them again.
 - **Levels and loot:** XP to level 30, skill points, gear with affixes and
   Legendaries, a relic codex with a belt of 2 to 4 slots, and the Chandler's
   shop. A lit altar with a skill point waiting offers three skills (the Altar
-  Rites). Dusk kills drop half as often and never a Common; a Legendary taken
-  is worn over a piece that isn't one, and announced.
+  Rites). A boss's first kill on a difficulty lets you choose his prize: his
+  signature Legendary or one or two others you don't hold (the Boss Boons).
+  Dusk kills drop half as often and never a Common; a Legendary taken is worn
+  over a piece that isn't one, and announced.
 - **Four worlds of four levels** so far (v3 builds toward six), each ending
   in a boss:
   - World 1, the Sunken Cathedral: the Nave, the Crypt Stair, the Burning
@@ -87,8 +89,10 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
   scripts/hud.gd  touch_controls.gd  title_screen.gd  map_screen.gd  hero_screen.gd (+ *_panel.gd)
   scripts/chandler_screen.gd  keeper_screen.gd  pause_menu.gd  results_screen.gd  settings.gd
   scripts/choice_card.gd  the one choice card over a paused game: up to three cards and a button
-                          (the Descent's Glimmers, the Altar Rites); rites.gd the Altar Rites: a
-                          lit altar with a skill point waiting offers three skills to learn there
+                          (the Descent's Glimmers, the Altar Rites, a boss's boon); rites.gd the
+                          Altar Rites: a lit altar with a skill point waiting offers three skills
+                          to learn there; the Boss Boons (world.gd open_boon, Items.boon_legends):
+                          a boss's first kill offers his signature Legendary and others to choose
   scripts/glow.gd         everything bright, drawn above the dark
   shaders/darkness.gdshader  the dark: multiplies the screen, warm in hard bands near lights
   scripts/sfx.gd          Sfx autoload: every sound synthesized (cached after first boot), music;

@@ -19,7 +19,8 @@ extends SceneTree
 ## level registry; the v2 -> v3 migration (a fixture and the owner's own
 ## saves, copies only) and every new Game API. Build 1's loot: no Dusk
 ## Commons, half the kill drops, the boss signature pieces, one relic of each
-## rarity on the shelf, embers_spent and legendaries_worn for the playlog.
+## rarity on the shelf, embers_spent and legendaries_worn for the playlog; the
+## Boss Boons' offer (his signature, then others the hero doesn't hold).
 ##
 ##     godot --headless --path game --script res://tests/test_progression.gd
 
@@ -104,6 +105,7 @@ func _initialize() -> void:
 	_test_legends_p1()
 	_test_relics_p1()
 	_test_loot_build1()
+	_test_boss_boons()
 	_test_deep_tree()
 	_test_registry()
 	_test_migration()
@@ -2143,6 +2145,57 @@ func _test_loot_build1() -> void:
 	(h["satchel"] as Array).append(carried)
 	_check(Playlog.legends_worn([worn, carried, plain], h) == 1 and Playlog.legends_worn([], h) == 0,
 			"legendaries_worn: of the items found, the Legendaries worn (1)")
+
+
+func _test_boss_boons() -> void:
+	## A boss's boon (Items.boon_legends, world.gd open_boon): at most three
+	## Legendaries, his signature first (W1-W2's one, W3-W6's pair), then
+	## others the hero doesn't hold that may roll at his area (a calling's
+	## charm only its own, a secret one once found), never another boss's
+	## signature, none twice. With every other one held, his signature alone
+	## (no choice: the World drops his prize as before).
+	var signed := {}
+	for w in Items.WORLD_LEGENDS:
+		for id in Items.WORLD_LEGENDS[w]:
+			signed[id] = true
+	var ok := true
+	var bad := []
+	for w in range(1, 7):
+		var area := int(game.AREAS["%d-4" % w])
+		var sig := Items.world_legends(w)
+		for cls in ["knight", "witch", "runner", "founder", "sexton"]:
+			for s in 20:
+				var rng := RandomNumberGenerator.new()
+				rng.seed = 7000 + s
+				var ids := Items.boon_legends(w, cls, area, [], [], rng)
+				var legal := Items.legal_legends(cls, area, [], Items.live_slots(area))
+				var good: bool = ids.size() == Items.BOON_MAX and ids.slice(0, sig.size()) == sig
+				for id in ids.slice(sig.size()):
+					var l: Dictionary = Items.LEGENDS[id]
+					good = good and legal.has(id) and not signed.has(id) and ids.count(id) == 1 and (not l.has("cls") or l["cls"] == cls) and not l.get("secret", false)
+				if not good:
+					ok = false
+					bad.append([w, cls, ids])
+	_check(ok and Items.BOON_MAX == 3, "every boss, every calling: his signature first, then others legal at his area, none another's, three in all (%s)" % [bad.slice(0, 3)])
+	var r := RandomNumberGenerator.new()
+	r.seed = 5
+	var first := Items.boon_legends(1, "knight", 6, [], [], r)
+	var held: Array = first.slice(1)
+	r.seed = 5
+	var again := Items.boon_legends(1, "knight", 6, held, [], r)
+	_check(again[0] == "tollbreaker" and not again.slice(1).any(func(id): return held.has(id)), "the others are ones he doesn't hold (%s, then %s)" % [first, again])
+	var all_others: Array = Items.legal_legends("knight", 6, [], Items.live_slots(6)).filter(func(id): return not signed.has(id))
+	_check(Items.boon_legends(1, "knight", 6, all_others, [], r) == ["tollbreaker"] and Items.boon_legends(3, "knight", 17, Items.legal_legends("knight", 17), [], r) == Items.world_legends(3),
+			"every other one held: his signature alone (Tollbreaker: no choice; World 3's pair still is one)")
+	var hymnal_seen := false
+	var hymnal_hidden := true
+	for s in 200:
+		r.seed = 9000 + s
+		hymnal_seen = hymnal_seen or Items.boon_legends(1, "knight", 6, [], ["hymnal"], r).has("hymnal")
+		r.seed = 9000 + s
+		hymnal_hidden = hymnal_hidden and not Items.boon_legends(1, "knight", 6, [], [], r).has("hymnal")
+	_check(hymnal_seen and hymnal_hidden, "a secret prize is offered only once found")
+	_check(Items.boon_legends(4, "witch", 22, [], [], r, 2) == Items.world_legends(4), "n caps it (two: the pair)")
 
 
 # ---------------------------------------------------------------- v3: the tree

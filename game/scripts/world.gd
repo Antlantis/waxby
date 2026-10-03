@@ -126,6 +126,7 @@ const ChoiceCard := preload("res://scripts/choice_card.gd")
 const Rites := preload("res://scripts/rites.gd")
 const RITES_CLEAR := 200.0       # an altar's Rites open with no monster awake this near (px)...
 const RITES_LEASH := 480.0       # ...waiting for it only while he's this near the altar
+const BOON_WAIT := 1.0           # s of play after a boss's fall before his boon opens (his drops land first)
 # Dims that aren't floored (scripted boss moves: Swallow the Light, the finale's give).
 const DIM_EXEMPT := "script:"
 const DROP_WEIGHTS := {
@@ -239,6 +240,7 @@ var _heart_t := 0.0
 var _lowpass_on := false
 var rng := RandomNumberGenerator.new()
 var headless := false           # tests: no HUD, no touch, no sounds needed
+var no_display := DisplayServer.get_name() == "headless"   # no screen at all (a --headless run): no choice stops play (player_block)
 var test_pad = null             # tests feed a pad Dictionary here instead of Input
 var autoplay := false           # a bot at the controls (debug: main's --autoplay)
 var play_beats := false         # debug (main's --story): the bot's level plays its beats over the level, as a player's does
@@ -292,6 +294,9 @@ var _opened: Array = []         # the reliquaries opened ([x, y])
 var choice: Control = null      # choice_card.gd over the level (made the first time one is offered)
 var _rites_altar := -1          # the altar whose Rites wait to open (-1: none)
 var _rites_wait := 0.0          # s they've waited on a title card going
+# The Boss Boons: a boss's first kill offers his prize on the same card
+# (open_boon), once his fall has settled (_tick_boon).
+var _boon := {}                 # {at, who, t, wait}: a boss's boon waiting to open ({}: none)
 
 
 func setup(p_level: RefCounted, p_headless := false) -> void:
@@ -1798,6 +1803,8 @@ func tick(dt: float) -> void:
 		features.touch(player)
 	if _rites_altar >= 0 or (choice != null and choice.is_open()):
 		_tick_rites(dt)
+	if not _boon.is_empty():
+		_tick_boon(dt)
 	_update_dead(dt)
 	_update_clear(dt)
 	_update_camera(dt)
@@ -2769,11 +2776,22 @@ func _light_altar(a: Dictionary) -> void:
 
 func rites_block() -> String:
 	## Why a lit altar can't offer its Rites ("" = it can): only a story
-	## level played by a player, with a skill point waiting. Never in a mode
-	## (the Descent's landing has its Glimmers) or a feel lab, under the
+	## level played by a player (player_block), with a skill point waiting.
+	var why := player_block()
+	if why != "":
+		return why
+	if int(Game.hero().get("points", 0)) <= 0 or Rites.picks(Game.hero()).is_empty():
+		return "no points"
+	return ""
+
+
+func player_block() -> String:
+	## Why no choice may stop this level ("" = one may: the Rites, a boss's
+	## boon): only a story level played by a player. Never in a mode (the
+	## Descent's landing has its Glimmers) or a feel lab, under the
 	## --autoplay bot, a golden route's recording or replay (no_monsters,
 	## on_pad), a scripted pad (tests, shots) or headless (a World made so,
-	## or no display at all).
+	## or no display at all: no_display).
 	if mode != null:
 		return "mode"
 	if is_lab():
@@ -2784,12 +2802,10 @@ func rites_block() -> String:
 		return "route"
 	if test_pad != null:
 		return "scripted"
-	if headless or DisplayServer.get_name() == "headless":
+	if headless or no_display:
 		return "headless"
 	if hud == null:
 		return "no hud"
-	if int(Game.hero().get("points", 0)) <= 0 or Rites.picks(Game.hero()).is_empty():
-		return "no points"
 	return ""
 
 
@@ -2906,6 +2922,131 @@ func _hold_touch(on: bool) -> void:
 	if touch.has_method("release_all"):
 		touch.release_all()
 	touch.set_process_input(not on)
+
+
+# ---------------------------------------------------------------- the Boss Boons
+
+func boon_block() -> String:
+	## Why a boss's first kill can't offer his boon ("" = it can): a player
+	## at the controls of a story level (player_block, as for the Rites) and
+	## a choice to make (boon_ids: two at least). Else his prize drops as it
+	## always did (_boss_prize). Later kills drop as they always did.
+	var why := player_block()
+	if why != "":
+		return why
+	if boon_ids(RandomNumberGenerator.new()).size() < 2:
+		return "no choice"
+	return ""
+
+
+func boon_ids(r: RandomNumberGenerator = null) -> Array:
+	## The Legendaries this level's boss offers the hero now
+	## (Items.boon_legends): his signature first, then others the hero
+	## doesn't hold; r draws the others (the World's rng by default).
+	var k := _legends_known()
+	return Items.boon_legends(world_n, str(Game.hero()["cls"]), area, k["held"], k["found"], r if r != null else rng)
+
+
+func _legends_known() -> Dictionary:
+	## {held: the Legendaries the hero wears or carries, found: every one
+	## picked up in this save}.
+	var held: Array = []
+	var found: Array = []
+	var gs = _game()
+	if gs != null:
+		(gs.get_script() as Script).call("_legends_held", gs.hero(), held)
+		if gs.has_method("legends_found"):
+			found = gs.legends_found()
+	return {"held": held, "found": found}
+
+
+func boon_offers(who := "") -> Array:
+	## boon_ids() as choice cards, each Legendary made now at the prize's
+	## item level (area + 2, as _boss_prize's): {id, item, name, text (its
+	## power), glyph (its slot's), col (Legendary gold), sub ("Weapon · Old
+	## Tollgrave's own" for his signature, "· you have one" for one the hero
+	## holds), new (never found in this save)}.
+	var h: Dictionary = Game.hero()
+	var k := _legends_known()
+	var signed := Items.world_legends(world_n)
+	var out: Array = []
+	for id in boon_ids():
+		var slot := str(Items.LEGENDS[id]["slot"])
+		var it := Items.make(slot, h["cls"], area + 2, "legendary", rng, id)
+		var sub := slot.capitalize()
+		if (k["held"] as Array).has(id):
+			sub += " · you have one"
+		elif signed.has(id):
+			sub += " · %s own" % whose(who)
+		out.append({"id": id, "item": it, "name": str(it["name"]), "text": Items.key_line(it), "glyph": UI.slot_glyph(slot),
+				"col": UI.rarity_color("legendary"), "sub": sub, "new": not (k["found"] as Array).has(id)})
+	return out
+
+
+func _tick_boon(dt: float) -> void:
+	## A boss's boon waiting: it opens once his fall has settled (BOON_WAIT
+	## of play, no monster awake near, the level-up card his XP brought had
+	## its time, a title card cut short as for the Rites). A bell rung first
+	## (the Saint's and the Hush's come down at his feet) holds the level's
+	## end for it (_update_clear). Snuffed first, it waits for the relight.
+	## A choice, a story beat or the pause holding the World goes first. No
+	## player left to ask (a test's pad, a route), or no choice: the prize
+	## drops as before.
+	if paused or (choice != null and choice.is_open()):
+		return
+	var at: Vector2 = _boon["at"]
+	if player_block() != "":
+		_boon = {}
+		_boss_prize(at)
+		return
+	if state == "dead" or not player.alive:
+		return   # (snuffed: it opens after the relight)
+	_boon["t"] = float(_boon["t"]) + dt
+	if float(_boon["t"]) < BOON_WAIT or time_stopped() or (state == "play" and foes_near()):
+		return
+	if hud.has_method("title_showing") and hud.title_showing() and float(_boon["wait"]) < 0.5:
+		_boon["wait"] = float(_boon["wait"]) + dt
+		if hud.has_method("cut_title"):
+			hud.cut_title()
+		return
+	if hud.has_method("top_card_showing") and hud.top_card_showing() and not hud.title_showing():
+		return   # (the level-up card, or a title card waiting behind it)
+	var who := str(_boon.get("who", ""))
+	_boon = {}
+	if not open_boon(who):
+		_boss_prize(at)
+
+
+func open_boon(who := "") -> bool:
+	## The boss's boon on the choice card: two or three Legendaries, his
+	## signature first (boon_offers), each naming its power, and no button
+	## (a prize is taken, not put off). False with no choice to make (the
+	## caller drops his prize as before).
+	var cards := boon_offers(who)
+	if cards.size() < 2:
+		return false
+	var heading := ("%s prize · choose one" % whose(who)) if who != "" else "Choose a prize"
+	return offer_choice(cards, {"heading": heading, "later": "", "pick": func(i): _boon_picked(cards, i)})
+
+
+static func whose(who: String) -> String:
+	## A boss's name as an owner, short of its " of ...": "Old Tollgrave's",
+	## "The Tinker's" (the Tinker of Hours); "the boss's" with no name.
+	return (who.get_slice(" of ", 0) if who != "" else "the boss") + "'s"
+
+
+func _boon_picked(cards: Array, i: int) -> void:
+	## A boon chosen (a stray -1 takes the first, his signature): it's his at
+	## once through the pickup's own path (_collect, _take_item: worn over a
+	## piece that isn't a Legendary with auto-equip, its New power moment;
+	## with the satchel full it waits at his feet and asks, as any pickup
+	## does), and the first kill counts once it's taken (_mark_boss_first).
+	if cards.is_empty():
+		return
+	var c: Dictionary = cards[i] if i >= 0 and i < cards.size() else cards[0]
+	var p := place_item(c["item"], player.center(), Vector2(0, -160.0))
+	p["boss_first"] = true
+	_collect(p)
 
 
 # ---------------------------------------------------------------- the altar snapshot
@@ -3085,8 +3226,8 @@ func _update_clear(dt: float) -> void:
 		b["vel"] *= exp(-dt * 0.9)
 		b["swing"] += b["vel"] * dt
 		b["sprite"].rotation = b["swing"] * 0.35
-	if state != "clear":
-		return
+	if state != "clear" or not _boon.is_empty():
+		return   # (a boss's boon still to choose holds the level's end: _tick_boon)
 	clear_time += dt
 	if clear_time > 0.4 and player.on_floor and fmod(clear_time, 0.7) < dt:
 		player.velocity.y = -300.0
@@ -3315,8 +3456,8 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 
 func boss_defeated(b: Node2D, at: Vector2) -> void:
 	## The boss drops his prize (a first kill on this difficulty: a
-	## Legendary) and the bell comes down to ring. A rush boss (configured
-	## with rush) pays no drops: the seals pay.
+	## Legendary, a player's to choose: his boon) and the bell comes down to
+	## ring. A rush boss (configured with rush) pays no drops: the seals pay.
 	if _boss_opts.get("rush", false) or not allows("loot"):
 		shake = 8.0
 		_haptic(60)
@@ -3328,25 +3469,16 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 		return
 	var first: bool = not Game.level_record(level_id).get("boss_first", false)
 	if first:
-		# The first-kill prize counts as given only once it's picked up
+		# The first-kill prize counts as given only once it's taken
 		# (_mark_boss_first): a snuff, a quit or a Restart before then
-		# leaves it to drop again.
-		var h: Dictionary = Game.hero()
-		var slot := _pick_slot()
-		# A world's boss drops one of its pair (Items.world_legends: W3-W6's
-		# two, Tollgrave's and the Snuffer's one) in the pair's own slot; a
-		# world without one picks as v2 did.
-		var pair: Array = Items.world_legends(world_n).filter(func(id):
-			return not (Items.LEGENDS[id] as Dictionary).has("cls") or Items.LEGENDS[id]["cls"] == h["cls"])
-		var legend := ""
-		if pair.is_empty():
-			legend = _pick_legend(slot, h["cls"])
+		# leaves it to come again. A player chooses it once his fall has
+		# settled (the Boss Boons: _tick_boon, open_boon); with no player
+		# to ask (headless, the bot, a golden route) it drops as before.
+		if boon_block() == "":
+			var who = b.get("boss_name") if b != null else null
+			_boon = {"at": at, "who": str(who) if who != null else "", "t": 0.0, "wait": 0.0}
 		else:
-			legend = _pick_legend(slot, h["cls"], pair)
-			slot = str(Items.LEGENDS[legend]["slot"])
-		var it := Items.make(slot, h["cls"], area + 2, "legendary" if legend != "" else "rare", rng, legend)
-		var p := place_item(it, at, Vector2(0, -380.0))
-		p["boss_first"] = true
+			_boss_prize(at)
 	else:
 		drop_item(at, "boss")
 	drop_item(at + Vector2(-16, -10), "boss")
@@ -3360,6 +3492,28 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 		hud.boss_bar({})
 	if _has_sfx():
 		Sfx.stop_music(1.0)
+
+
+func _boss_prize(at: Vector2) -> Dictionary:
+	## A boss's first-kill prize, dropped where he fell (no player to choose
+	## it: open_boon's fallback): one of his world's signature pieces
+	## (Items.world_legends: W3-W6's pair, Tollgrave's and the Snuffer's
+	## one) in its own slot; a world without one picks as v2 did. Its pickup,
+	## marked boss_first.
+	var h: Dictionary = Game.hero()
+	var slot := _pick_slot()
+	var pair: Array = Items.world_legends(world_n).filter(func(id):
+		return not (Items.LEGENDS[id] as Dictionary).has("cls") or Items.LEGENDS[id]["cls"] == h["cls"])
+	var legend := ""
+	if pair.is_empty():
+		legend = _pick_legend(slot, h["cls"])
+	else:
+		legend = _pick_legend(slot, h["cls"], pair)
+		slot = str(Items.LEGENDS[legend]["slot"])
+	var it := Items.make(slot, h["cls"], area + 2, "legendary" if legend != "" else "rare", rng, legend)
+	var p := place_item(it, at, Vector2(0, -380.0))
+	p["boss_first"] = true
+	return p
 
 
 func _pay_boss_embers(b: Node2D, at: Vector2) -> void:
