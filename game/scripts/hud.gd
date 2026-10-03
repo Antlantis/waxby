@@ -52,6 +52,11 @@ extends CanvasLayer
 ## The level badge reads 40 with a gold "✦N" under it once Candlemarks land
 ## (its ring fills toward the next one), and the sigil row hides in a level
 ## with no sigils. The candle's flame takes the hero's palette (world.hero_flame).
+## A gold "+" sits on the badge's shoulder while a skill point waits (the
+## next altar offers its Rites; the Sheet opens on Skills). The level-up card
+## says what the levels gained gave ("+9% damage · +10% life · +1 skill
+## point") and, under it, what just opened or what the next unlock is
+## (stats_panel.unlock_at).
 
 const UI := preload("res://scripts/ui.gd")
 const Relics := preload("res://scripts/relics.gd")
@@ -59,6 +64,8 @@ const Items := preload("res://scripts/items.gd")
 const Classes := preload("res://scripts/classes.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const Progression := preload("res://scripts/progression.gd")
+const Combat := preload("res://scripts/combat.gd")
+const StatsPanel := preload("res://scripts/stats_panel.gd")
 
 const MSG_TIME := 2.5
 const PRI := {"pickup": 4, "elite": 3, "bark": 2, "toast": 1}
@@ -84,6 +91,7 @@ const DIM_RING_IN_V2 := true
 const SEG_MARK := Vector2(4.5, 7.0)   # a segmented boss bar's phase mark: half its width and height (the bar's frame is 14 tall)
 const TITLE_CUT := 0.12          # a title card a level-up cuts short fades out this fast, then the level-up comes in
 const LEVEL_TIME := 2.2
+const LEVEL_LINE_W := 380.0      # the level-up card's two small lines fit this wide (under the left block, clear of the sigils)
 const CARD_TOP := 25.0           # a title card starts this far under the safe area's top (its wide name clears the life bar)...
 const LEVEL_TOP := 17.0          # ...and the narrower level-up card this far: both end 101 px down, 6 over the flame of a hero on world.gd's feet line
 const SEE_THROUGH := 0.3          # what the boss bar, a card or a message keeps of itself while he's behind it (see)
@@ -130,7 +138,8 @@ var _elites := {}                 # instance id -> _t announced
 
 # Cards.
 var _title := {}                  # {sub, title, t}
-var _lvl := {}                    # {n, t, points}
+var _lvl := {}                    # {n, t, points, from, line (the gains), next (opened or next)}
+var _points := 0                  # skill points waiting (the badge's "+")
 var _card := {}                   # {kind: item|relic, t, tap_left, ...}
 var card_fits := true             # whether the item card's status line fit when last drawn (tests)
 var card_line := ""               # the item card's status line when last drawn (tests)
@@ -461,9 +470,11 @@ func boss_bar(info: Dictionary) -> void:
 
 
 func level_up(n: int) -> void:
-	## "Level up / Level n", what the levels gained bring (skill points, or
-	## Vigil ranks once the tree is full) and a belt slot when one opens.
-	## Several levels at once (a boss) say it once, for all of them.
+	## "Level up / Level n", what the levels gained bring (their damage and
+	## life, skill points, or Vigil ranks once the tree is full, a belt slot
+	## when one opens) and under it what they opened (a tier, a root rank)
+	## or else the next unlock and its level. Several levels at once (a
+	## boss) say it once, for all of them.
 	var pts := 0
 	var g := _game()
 	if g:
@@ -473,13 +484,14 @@ func level_up(n: int) -> void:
 	if not _lvl.is_empty():
 		from = mini(int(_lvl.get("from", from)), from)
 	var gained := maxi(n - from, 1)
-	var line := ""
+	var line := gains_line(from, n)
 	if pts > 0:
-		line = "+%d skill point%s" % [mini(gained, pts), "" if mini(gained, pts) == 1 else "s"]
+		line += " · +%d skill point%s" % [mini(gained, pts), "" if mini(gained, pts) == 1 else "s"]
 	elif g:
-		line = "+%d Vigil rank%s" % [gained, "" if gained == 1 else "s"]
+		line += " · +%d Vigil rank%s" % [gained, "" if gained == 1 else "s"]
 	if Progression.belt_slots(n) > Progression.belt_slots(from):
-		line += ("  ·  " if line != "" else "") + "a new belt slot"
+		line += " · a new belt slot"
+	var nxt := unlock_line(_cls(), from, n)
 	var start := 0.0
 	if not _title.is_empty():
 		if float(_title["t"]) < 0.0:
@@ -494,7 +506,37 @@ func level_up(n: int) -> void:
 				_cardq.push_front({"id": str(_title.get("id", "")), "title": str(_title["title"]), "body": str(_title.get("body", ""))})
 			_title["t"] = maxf(_title["t"], tt - TITLE_CUT)
 			start = -(tt - float(_title["t"]))
-	_lvl = {"n": n, "t": start, "points": pts, "from": from, "line": line}
+	_lvl = {"n": n, "t": start, "points": pts, "from": from, "line": line, "next": nxt}
+
+
+static func gains_line(from: int, n: int) -> String:
+	## What levels from+1..n add to every hero: "+9% damage · +10% life"
+	## (Combat's 1.09 and 1.10 a level; "+19% damage · +21% life" for two).
+	var d := roundi((Combat.p_dmg(n) / Combat.p_dmg(from) - 1.0) * 100.0)
+	var l := roundi((Combat.p_hp(n) / Combat.p_hp(from) - 1.0) * 100.0)
+	return "+%d%% damage · +%d%% life" % [d, l]
+
+
+static func unlock_line(cls: String, from: int, n: int) -> Dictionary:
+	## The level-up card's second line: {text, now}. What levels from+1..n
+	## opened (a tier before a root rank; a belt slot is in the first line),
+	## now true: "Now open: the capstones (Tier 3)"; else the next unlock,
+	## "Next at level 10: a relic belt slot (4)" (stats_panel's).
+	var opened := ""
+	for l in range(from + 1, n + 1):
+		var what := StatsPanel.unlock_at(cls, l, true)
+		if what == "":
+			continue
+		if opened == "" or what.contains("Tier") or what.contains("capstone"):
+			opened = what
+	if opened != "":
+		return {"text": "Now open: %s" % opened, "now": true}
+	var at := StatsPanel.next_unlock_level(cls, n)
+	if at > 0:
+		return {"text": "Next at level %d: %s" % [at, StatsPanel.unlock_at(cls, at)], "now": false}
+	if n >= Progression.CAP:
+		return {"text": "Candlemarks from here: +1% damage and life each", "now": false}
+	return {}
 
 
 func xp_tick() -> void:
@@ -715,6 +757,18 @@ func layout() -> Dictionary:
 	return out
 
 
+func points_pip_rect(L := {}) -> Rect2:
+	## The badge's gold "+" while a skill point waits: on its upper right
+	## shoulder, inside the safe area and the left block's wash.
+	var b: Rect2 = (L if not L.is_empty() else layout())["badge"]
+	return Rect2(b.get_center() + Vector2(11.0, -8.0) - Vector2(6.5, 6.5), Vector2(13.0, 13.0))
+
+
+func points_waiting() -> int:
+	## The skill points the badge's "+" stands for (0: none showing).
+	return _points
+
+
 func _sigils_rect() -> Rect2:
 	var s := _safe()
 	return Rect2(s.end.x - 50.0 - 3 * 25.0, s.position.y + 9.0, 3 * 25.0, 22.0)
@@ -906,6 +960,8 @@ func _process(dt: float) -> void:
 		_marks_seen = marks
 		_xp_shown = move_toward(_xp_shown, _ring_frac(xp), dt * 1.5)
 	_xp_glow = maxf(_xp_glow - dt * 2.0, 0.0)
+	var g := _game()
+	_points = int(g.hero().get("points", 0)) if g != null and not (g.has_method("borrowing") and g.borrowing()) else 0
 	_ember_bump = maxf(_ember_bump - dt * 5.0, 0.0)
 	_bank_flash = maxf(_bank_flash - dt * 0.8, 0.0)
 	if world != null and world.get("embers_carried") != null:
@@ -1280,6 +1336,13 @@ func _draw_life(ci: Control, L: Dictionary, f: float) -> void:
 	ci.draw_circle(bc, ring - 2.2, Color("2a1f38"))
 	var lvl := str(_xp_level)
 	UI.text(ci, Vector2(bc.x - 14.0, bc.y + 4.5), lvl, 13 if lvl.length() < 2 else 12, UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, 28.0, "body", 800)
+	if _points > 0:
+		# A skill point waiting: a gold "+" on the badge's shoulder.
+		var pr := points_pip_rect(L)
+		var k := 1.0 + 0.06 * sin(_t * 4.0)
+		ci.draw_circle(pr.get_center(), pr.size.x * 0.5 * k, UI.INK)
+		ci.draw_circle(pr.get_center(), (pr.size.x * 0.5 - 1.3) * k, UI.GOLD)
+		UI.glyph(ci, "plus", pr.get_center(), 8.5, UI.INK)
 	# Past level 40: "✦3", the Candlemarks, under the badge.
 	var mk := mini(_marks_seen, _marks())
 	if mk > 0:
@@ -1864,13 +1927,21 @@ func _draw_level_up(ci: Control, vs: Vector2) -> void:
 			var d := Vector2(cos(ang), sin(ang))
 			ci.draw_line(c + Vector2(0, 14) + d * rr * 0.8, c + Vector2(0, 14) + d * (rr * 0.8 + 10.0), Color(1.0, 0.9, 0.55, (1.0 - ring) * 0.8), 2.0)
 	var pop := 1.0 + 0.35 * exp(-tt * 9.0) * cos(tt * 18.0)
-	UI.text(ci, Vector2(0, c.y - 16.0), "Level up", 20, Color(UI.GOLD.lerp(UI.CREAM, 0.3), a), HORIZONTAL_ALIGNMENT_CENTER, vs.x, "body", 700, 6)
-	ci.draw_set_transform(c + Vector2(0, 26.0), 0.0, Vector2(pop, pop))
-	UI.text(ci, Vector2(-vs.x * 0.5, 0.0), "Level %d" % int(_lvl["n"]), 42, Color(UI.GOLD, a), HORIZONTAL_ALIGNMENT_CENTER, vs.x, "title", 700, 8)
+	# Four lines in level_rect's 84 px: "Level up", "Level n", the gains, and
+	# what opened (gold) or the next unlock.
+	UI.text(ci, Vector2(0, c.y - 18.0), "Level up", 16, Color(UI.GOLD.lerp(UI.CREAM, 0.3), a), HORIZONTAL_ALIGNMENT_CENTER, vs.x, "body", 700, 5)
+	ci.draw_set_transform(c + Vector2(0, 17.0), 0.0, Vector2(pop, pop))
+	UI.text(ci, Vector2(-vs.x * 0.5, 0.0), "Level %d" % int(_lvl["n"]), 36, Color(UI.GOLD, a), HORIZONTAL_ALIGNMENT_CENTER, vs.x, "title", 700, 7)
 	ci.draw_set_transform(Vector2.ZERO)
+	var w := LEVEL_LINE_W
 	var line := str(_lvl.get("line", ""))
 	if line != "":
-		UI.text(ci, Vector2(0, c.y + 47.0), line, 14, Color(UI.CREAM, a), HORIZONTAL_ALIGNMENT_CENTER, vs.x, "body", 700, 4)
+		UI.text(ci, Vector2(vs.x * 0.5 - w * 0.5, c.y + 34.0), line, UI.fit_size(line, w, 13, 10, "body", 700), Color(UI.CREAM, a), HORIZONTAL_ALIGNMENT_CENTER, w, "body", 700, 4)
+	var nx: Dictionary = _lvl.get("next", {})
+	var nt := str(nx.get("text", ""))
+	if nt != "":
+		var col: Color = UI.GOLD if bool(nx.get("now", false)) else UI.MUTED.lerp(UI.CREAM, 0.4)
+		UI.text(ci, Vector2(vs.x * 0.5 - w * 0.5, c.y + 49.0), nt, UI.fit_size(nt, w, 12, 10, "body", 700), Color(col, a), HORIZONTAL_ALIGNMENT_CENTER, w, "body", 700, 4)
 
 
 func _draw_card(ci: Control) -> void:

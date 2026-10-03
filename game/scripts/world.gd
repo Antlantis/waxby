@@ -121,6 +121,10 @@ const WORLD_LIGHTS := "res://scripts/world_lights.gd"   # W0-render's packer and
 const AMBIENT := "res://scripts/ambient.gd"              # W0-render's motes (when it's there)
 const EDGE_LINES := "res://scripts/edge_lines.gd"        # W0-render's readability lines (when it's there)
 const STORY := "res://scripts/story.gd"
+const ChoiceCard := preload("res://scripts/choice_card.gd")
+const Rites := preload("res://scripts/rites.gd")
+const RITES_CLEAR := 200.0       # an altar's Rites open with no monster awake this near (px)...
+const RITES_LEASH := 480.0       # ...waiting for it only while he's this near the altar
 # Dims that aren't floored (scripted boss moves: Swallow the Light, the finale's give).
 const DIM_EXEMPT := "script:"
 const DROP_WEIGHTS := {
@@ -281,6 +285,11 @@ var resume := {}                # {level, diff, altar, time, sigils, embers_carr
 var _killed: Array = []         # level.entities indices of the placed monsters killed so far
 var _taken: Array = []          # ...and of the placed embers and wax taken
 var _opened: Array = []         # the reliquaries opened ([x, y])
+# The Altar Rites (rites.gd): an altar lit with a skill point waiting offers
+# skills on the choice card (offer_choice), at once or once the area clears.
+var choice: Control = null      # choice_card.gd over the level (made the first time one is offered)
+var _rites_altar := -1          # the altar whose Rites wait to open (-1: none)
+var _rites_wait := 0.0          # s they've waited on a title card going
 
 
 func setup(p_level: RefCounted, p_headless := false) -> void:
@@ -1468,11 +1477,13 @@ func gain_xp(n: int, at: Vector2) -> void:
 		hud.xp_tick()
 	if gained > 0:
 		levels_gained += gained
-		_level_up(at)
+		_level_up(at, gained)
 
 
-func _level_up(_at: Vector2) -> void:
-	## Level up: a pillar of light, a shove, a heal, the new numbers.
+func _level_up(_at: Vector2, gained := 1) -> void:
+	## Level up: a pillar of light, a shove, a heal, the new numbers. A level
+	## that opens a tier (the capstones at 8, Deep at 16, Mastery at 24) has
+	## its own bark, level_up_<n>, pointing at it.
 	apply_hero()
 	player.heal_pct(0.20)
 	player.res = player.res_max
@@ -1487,9 +1498,16 @@ func _level_up(_at: Vector2) -> void:
 		if e.alive and e.active and e != boss and e.center().distance_to(player.center()) < 90.0:
 			e.apply_status("stun", 0.6)
 			e.velocity.x = 220.0 * signf(e.position.x - player.position.x)
+	var lv := int(Game.hero()["level"])
 	if hud:
-		hud.level_up(int(Game.hero()["level"]))
-	bark("level_up")
+		hud.level_up(lv)
+	var key := "level_up"
+	for t in [5, 4, 3]:
+		var at := int(Classes.GATES[t]["level"])
+		if lv - gained < at and lv >= at and _bark_exists("level_up_%d" % at):
+			key = "level_up_%d" % at
+			break
+	bark(key)
 	if int(Game.hero()["points"]) > 0:
 		bark("skill_point")
 
@@ -1775,6 +1793,8 @@ func tick(dt: float) -> void:
 		_touch_pickups()
 		_touch_world()
 		features.touch(player)
+	if _rites_altar >= 0 or (choice != null and choice.is_open()):
+		_tick_rites(dt)
 	_update_dead(dt)
 	_update_clear(dt)
 	_update_camera(dt)
@@ -2673,6 +2693,150 @@ func _light_altar(a: Dictionary) -> void:
 		hud.toast("Altar lit", "Your flame will return here")
 	bark("first_altar")
 	_write_suspend(a)
+	_altar_rites(a)
+
+
+# ---------------------------------------------------------------- the Altar Rites
+
+func rites_block() -> String:
+	## Why a lit altar can't offer its Rites ("" = it can): only a story
+	## level played by a player, with a skill point waiting. Never in a mode
+	## (the Descent's landing has its Glimmers) or a feel lab, under the
+	## --autoplay bot, a golden route's recording or replay (no_monsters,
+	## on_pad), a scripted pad (tests, shots) or headless (a World made so,
+	## or no display at all).
+	if mode != null:
+		return "mode"
+	if is_lab():
+		return "lab"
+	if autoplay:
+		return "autoplay"
+	if no_monsters or on_pad.is_valid():
+		return "route"
+	if test_pad != null:
+		return "scripted"
+	if headless or DisplayServer.get_name() == "headless":
+		return "headless"
+	if hud == null:
+		return "no hud"
+	if int(Game.hero().get("points", 0)) <= 0 or Rites.picks(Game.hero()).is_empty():
+		return "no points"
+	return ""
+
+
+func foes_near(r := RITES_CLEAR) -> bool:
+	## A monster awake within r px of Waxby, or a boss awake anywhere (one
+	## asleep in his arena, or a mimic, doesn't count).
+	for e in enemies:
+		if not e.alive or not e.active or str(e.get("state")) == "sleep":
+			continue
+		if e == boss or e.center().distance_to(player.center()) < r:
+			return true
+	return false
+
+
+func _altar_rites(a: Dictionary) -> void:
+	## An altar lit with a skill point waiting: its Rites wait for a tick
+	## that may open them (_tick_rites; the next one, if the area is clear).
+	if rites_block() == "":
+		_rites_altar = altars.find(a)
+		_rites_wait = 0.0
+
+
+func _tick_rites(dt: float) -> void:
+	## The waiting Rites open once he stands in play with no monster awake
+	## near and the top band clear: a title card is cut short (at most 0.5 s,
+	## as the Descent's landing does), the level-up card has its 2.2 s. Gone
+	## past RITES_LEASH from the altar first (or the point spent), the next
+	## altar asks instead. A choice up holds the World (as the Descent holds
+	## it under its Glimmers), and a story beat that took the World this
+	## very tick goes first.
+	if choice != null and choice.is_open():
+		paused = true
+		return
+	if paused:
+		return
+	var a: Dictionary = altars[_rites_altar] if _rites_altar < altars.size() else {}
+	if a.is_empty() or rites_block() != "" or state != "play" or not player.alive \
+			or player.position.distance_to(a["pos"]) > RITES_LEASH:
+		_rites_altar = -1
+		return
+	if not player.on_floor or hitstop > 0.0 or time_stopped() or foes_near():
+		return
+	if hud.has_method("title_showing") and hud.title_showing() and _rites_wait < 0.5:
+		_rites_wait += dt
+		if hud.has_method("cut_title"):
+			hud.cut_title()
+		return
+	if hud.has_method("top_card_showing") and hud.top_card_showing() and not hud.title_showing():
+		return   # (the level-up card, or a title card waiting behind it)
+	_rites_altar = -1
+	open_rites()
+
+
+func open_rites() -> bool:
+	## The Rites on the choice card: up to three skills Waxby can learn now
+	## (rites.gd), or Later (the point keeps: the next altar asks again, or
+	## the Sheet). A pick learns it at once: the pillar, the sound, a toast.
+	var cards := Rites.offers(Game.hero())
+	return offer_choice(cards, {"heading": Rites.heading(Game.hero()), "later": "Later", "pick": func(i): _rite_picked(cards, i)})
+
+
+func _rite_picked(cards: Array, i: int) -> void:
+	if i < 0 or i >= cards.size():
+		return
+	var id := str(cards[i].get("id", ""))
+	if not Game.buy_skill(id):
+		return
+	apply_hero()
+	_sfx("glimmer")
+	_haptic(30)
+	if glow:
+		glow.burst(player.center(), 28, Color("ffd84a"), 200.0, 0.8, -60.0, 2.6)
+		glow.pillar(player.position)
+	if hud:
+		hud.toast(str(cards[i].get("name", "")), Rites.learned(Game.hero(), id))
+
+
+func offer_choice(offers: Array, opts: Dictionary) -> bool:
+	## A choice over the paused level, on the choice card (choice_card.gd;
+	## opts as its open(): heading, later, pick, pair). pick(i) is called once
+	## the card is down and play is back (i = -1: the button). The touch
+	## controls let go of every press they held and take no touch while it's
+	## up, so nothing held runs on after it. Never on a headless World; the
+	## caller says when a player is there to ask (rites_block). False when
+	## nothing was asked.
+	if headless or offers.is_empty() or (choice != null and choice.is_open()):
+		return false
+	if choice == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 7   # over the HUD (5) and the touch controls (6), under pause (10)
+		add_child(layer)
+		choice = ChoiceCard.new()
+		choice.world = self
+		layer.add_child(choice)
+	paused = true
+	_hold_touch(true)
+	var then: Callable = opts.get("pick", Callable())
+	var o := opts.duplicate()
+	o["pick"] = func(i: int) -> void:
+		choice.close()
+		_hold_touch(false)
+		paused = false
+		if then.is_valid():
+			then.call(i)
+	choice.open(offers, o)
+	return true
+
+
+func _hold_touch(on: bool) -> void:
+	## The touch controls under a choice: every held press let go, and no
+	## touch taken while it's up (on); live again after, holding nothing.
+	if touch == null:
+		return
+	if touch.has_method("release_all"):
+		touch.release_all()
+	touch.set_process_input(not on)
 
 
 # ---------------------------------------------------------------- the altar snapshot

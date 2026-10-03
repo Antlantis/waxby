@@ -81,6 +81,9 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
   scripts/tales_screen.gd the Tales: every scene seen, replayed (opened from the title and the saves)
   scripts/hud.gd  touch_controls.gd  title_screen.gd  map_screen.gd  hero_screen.gd (+ *_panel.gd)
   scripts/chandler_screen.gd  keeper_screen.gd  pause_menu.gd  results_screen.gd  settings.gd
+  scripts/choice_card.gd  the one choice card over a paused game: up to three cards and a button
+                          (the Descent's Glimmers, the Altar Rites); rites.gd the Altar Rites: a
+                          lit altar with a skill point waiting offers three skills to learn there
   scripts/glow.gd         everything bright, drawn above the dark
   shaders/darkness.gdshader  the dark: multiplies the screen, warm in hard bands near lights
   scripts/sfx.gd          Sfx autoload: every sound synthesized (cached after first boot), music;

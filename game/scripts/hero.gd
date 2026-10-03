@@ -44,6 +44,12 @@ const XP_PCT_CAP := 0.50
 const EMBER_PCT_CAP := 1.00
 const FLASK_PCT_CAP := 0.50
 const FLASK_ADD_CAP := 2          # Game.flask_charges holds the total to 3
+# The flame grows with the tree: x(1 + this) for each of its big tiers (a
+# capstone, a Deep node, a Mastery node) the hero owns any of, +24% at most.
+# Only its look: the flame is drawn from flame_scale (glow.gd), and its height
+# is also the life gauge, so it stays modest; the light is light_radius's.
+const FLAME_TIER := 0.08
+const FLAME_TIERS := [3, 4, 5]
 # A hero's look (the modes' cosmetics; cosmetics.gd reads it with these defaults).
 const LOOK_DEFAULT := {"flame": "tallow", "trim": "", "trim_color": "calling", "glow": ""}
 # Relics that change numbers (the rest are rules the world checks with
@@ -126,11 +132,14 @@ static func stats(hero: Dictionary, relics_on: Array = [], diff_id := "dusk") ->
 	# Skills: every node's rank, and the stat it feeds.
 	var skills: Dictionary = hero.get("skills", {})
 	var ranks := {}
+	var big := {}                     # the big tiers owned (FLAME_TIERS)
 	for n in Classes.tree(cls):
 		var r: int = int(skills.get(n["id"], 1 if n["branch"] == -1 else 0))
 		ranks[n["id"]] = r
 		if r <= 0:
 			continue
+		if FLAME_TIERS.has(int(n["tier"])):
+			big[int(n["tier"])] = true
 		if str(n["flag"]) != "":
 			s["flags"][n["flag"]] = true
 		if str(n["stat"]) != "":
@@ -140,6 +149,7 @@ static func stats(hero: Dictionary, relics_on: Array = [], diff_id := "dusk") ->
 				v /= 100.0   # the tree's numbers are percents; extra resource is a count
 			_apply(s, acc, n["stat"], v)
 	s["ranks"] = ranks
+	s["flame_scale"] = float(s["flame_scale"]) * (1.0 + FLAME_TIER * big.size())
 	# Gear: implicits, affixes, Legendary powers.
 	var equip: Dictionary = hero.get("equip", {})
 	for slot in Items.SLOTS:

@@ -1013,11 +1013,13 @@ func _back_to_map(_a = null) -> void:
 	show_map(_map_focus)
 
 
-func _open(path: String) -> Node:
-	## One of the map's screens, with its way back.
+func _open(path: String, props := {}) -> Node:
+	## One of the map's screens, with its way back (props set on it first).
 	if not ResourceLoader.exists(path):
 		return null
 	var s: Node = load(path).new()
+	for k in props:
+		_set_if(s, k, props[k])
 	for sig in BACK_SIGNALS:
 		_hook(s, sig, _back_to_map)
 	_swap(s)
@@ -1050,7 +1052,8 @@ func _on_calling_picked(id, had: Array = []) -> void:
 
 
 func show_sheet(_a = null) -> void:
-	_open(HERO_SCREEN)
+	## The Sheet from the map: on Skills while a skill point waits.
+	_open(HERO_SCREEN, {"tab": "skills"} if int(Game.hero().get("points", 0)) > 0 else {})
 
 
 func show_chandler(_a = null) -> void:

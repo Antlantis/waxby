@@ -214,31 +214,56 @@ func satchel_line(h: Dictionary, g: Node) -> String:
 
 
 func _next_unlock(level: int) -> String:
-	## The next thing a level brings: a root rank, a belt slot, a tier (the
+	return next_unlock(_cls(), level)
+
+
+static func next_unlock(cls: String, level: int) -> String:
+	## The next thing a level brings a hero of this calling at this level
+	## (the Stats tab's Next line): a root rank, a belt slot, a tier (the
 	## deep tree's 4 and 5, the second capstone), Candlemarks past the cap.
+	for l in range(level + 1, Progression.CAP + 1):
+		var what := unlock_at(cls, l)
+		if what != "":
+			return "Level %d: %s." % [l, what]
+	if level >= Progression.CAP:
+		return "Every %d XP past level %d: a Candlemark, +1%% damage and life." % [Progression.MARK_XP, Progression.CAP]
+	return ""
+
+
+static func next_unlock_level(cls: String, level: int) -> int:
+	## The level next_unlock names (0: none before the cap).
+	for l in range(level + 1, Progression.CAP + 1):
+		if unlock_at(cls, l) != "":
+			return l
+	return 0
+
+
+static func unlock_at(cls: String, l: int, skip_belt := false) -> String:
+	## What reaching level l brings ("" when nothing): a relic belt slot,
+	## the capstones (L8), a root rank, the Deep and Mastery tiers (L16,
+	## L24), the other capstone (L30); the first of them when two land on
+	## one level (skip_belt: the first but a belt slot). The level-up card
+	## names it too (hud.level_up).
 	var root_name := ""
 	var deep := false
-	for n in Classes.tree(_cls()):
+	for n in Classes.tree(cls):
 		if n["branch"] == -1:
 			root_name = n["name"]
 		if int(n["tier"]) >= 4:
 			deep = true
 	var gate: Array = Classes.ROOT_GATE if deep else [0, 3, 6, 9, 12]
-	for l in range(level + 1, Progression.CAP + 1):
-		if Progression.belt_slots(l) > Progression.belt_slots(l - 1):
-			return "Level %d: a relic belt slot (%d)." % [l, Progression.belt_slots(l)]
-		if l == CAPSTONE_LEVEL:
-			return "Level %d: the capstones (Tier 3)." % l
-		var rank := gate.find(l)
-		if rank > 0:
-			return "Level %d: %s rank %d." % [l, root_name, rank + 1]
-		if deep:
-			if l == int(Classes.GATES[4]["level"]):
-				return "Level %d: the Deep nodes (Tier 4)." % l
-			if l == int(Classes.GATES[5]["level"]):
-				return "Level %d: the Mastery nodes (Tier 5)." % l
-			if l == Classes.SECOND_CAPSTONE:
-				return "Level %d: the other capstone." % l
-	if level >= Progression.CAP:
-		return "Every %d XP past level %d: a Candlemark, +1%% damage and life." % [Progression.MARK_XP, Progression.CAP]
+	if not skip_belt and Progression.belt_slots(l) > Progression.belt_slots(l - 1):
+		return "a relic belt slot (%d)" % Progression.belt_slots(l)
+	if l == CAPSTONE_LEVEL:
+		return "the capstones (Tier 3)"
+	var rank := gate.find(l)
+	if rank > 0:
+		return "%s rank %d" % [root_name, rank + 1]
+	if deep:
+		if l == int(Classes.GATES[4]["level"]):
+			return "the Deep nodes (Tier 4)"
+		if l == int(Classes.GATES[5]["level"]):
+			return "the Mastery nodes (Tier 5)"
+		if l == Classes.SECOND_CAPSTONE:
+			return "the other capstone"
 	return ""
