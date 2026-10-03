@@ -66,6 +66,7 @@ func _initialize() -> void:
 	await _test_seams()
 	await _test_v2_core()
 	await _test_ember_tally()
+	await _test_dusk_teeth()
 	_test_v3_format()
 	_test_v3_physics()
 	await _test_v3_world()
@@ -1225,6 +1226,103 @@ func _test_ember_tally() -> void:
 	w.queue_free()
 	await process_frame
 	game.data["difficulty"] = "dusk"
+
+
+func _test_dusk_teeth() -> void:
+	## Build 1, Dusk from World 3 (Combat.dusk_teeth): an altar heals 40%
+	## (50% in Worlds 1-2), and the ordinary monsters killed come back on a
+	## snuff (never in Worlds 1-2 on Dusk, nor in a mode), paying no embers;
+	## a stomp chain off one counts but pays nothing.
+	for id in ["1-1", "2-1", "3-1", "4-1"]:
+		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		game.reset()
+		var h: Dictionary = game.hero()
+		h["level"] = 20                          # (the altar's XP mustn't level him: a level-up heals too)
+		h["xp"] = Progression.total_to(20)
+		var w: Node2D = WorldScript.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await process_frame
+		var pl: Node2D = w.player
+		w.test_pad = {}
+		for i in 10:
+			w.tick(DT)
+		var late: bool = int(w.world_n) >= 3
+		_check(w.diff == "dusk" and w.respawns_here() == late, "%s on Dusk: monsters %s on a snuff" % [id, "come back" if late else "stay dead"])
+		w.mode = RefCounted.new()
+		_check(not w.respawns_here(), "%s on Dusk in a mode: they stay dead (the mode's own rules)" % id)
+		w.mode = null
+		# The altar: from a tenth of his life, 50% more (40% from World 3).
+		pl.hp = 0.1 * pl.max_hp
+		pl.reset_at(w.altars[0]["pos"])
+		w._touch_world()
+		var want := 0.1 + (0.40 if late else 0.50)
+		_check(bool(w.altars[0]["lit"]) and absf(pl.hp / pl.max_hp - want) < 0.01, "%s: lighting an altar heals to %.2f (%.2f)" % [id, want, pl.hp / pl.max_hp])
+		# A first-life Rattle stomped mid-chain pays its chain ember.
+		var fresh: Array = w.enemies.filter(func(e): return e.alive and e.kind == "skeleton" and e.stompable and not e.respawned)
+		if not fresh.is_empty():
+			_look_at(w, fresh[0])
+			var p0 := _ember_pickups(w, "pop")
+			w.chain = 1
+			var r0 := _drop_on(w, fresh[0])
+			_check(r0["stomped"] and _ember_pickups(w, "pop") == p0 + 1, "%s: a first-life Rattle stomped mid-chain pays a chain ember (%d)" % [id, _ember_pickups(w, "pop") - p0])
+		# Every ordinary monster dies.
+		for e in w.enemies.duplicate():
+			if e.alive and e.ordinary and e != w.boss:
+				w.deal(e, 1.0, {"flat": e.max_hp * 20.0, "no_hitstop": true})
+		var cells := {}
+		for sp in w.spawns:
+			if not w.enemies.any(func(e): return e.alive and e.spawn.get("cell", Vector2i(-9, -9)) == sp["cell"]):
+				cells[sp["cell"]] = true
+		_check(cells.size() > 0, "%s: %d of its %d spawn spots emptied" % [id, cells.size(), w.spawns.size()])
+		for i in int(1.0 / DT):
+			w.tick(DT)
+		# A snuff.
+		pl.invuln = 0.0
+		pl.hp = 0.2 * pl.max_hp
+		pl.take_damage(99999.0, pl.position.x + 5.0)
+		for i in int(2.0 / DT):
+			w.tick(DT)
+		var back: Array = w.enemies.filter(func(e): return e.alive and e.respawned and cells.has(e.spawn.get("cell", Vector2i(-9, -9))))
+		if not late:
+			_check(w.snuffs == 1 and w.state == "play" and back.is_empty(), "%s: after a snuff none comes back (%d)" % [id, back.size()])
+			w.queue_free()
+			await process_frame
+			continue
+		_check(w.snuffs == 1 and w.state == "play" and back.size() == cells.size(),
+				"%s: after a snuff every emptied spot's monster comes back (%d of %d)" % [id, back.size(), cells.size()])
+		# A respawned monster drops no embers when it dies; a chain stomp on
+		# one counts but pays nothing.
+		var rattles: Array = back.filter(func(e): return e.kind == "skeleton" and e.stompable)
+		_check(rattles.size() >= 2, "%s: Rattles came back to test with (%d)" % [id, rattles.size()])
+		if rattles.size() < 2:
+			w.queue_free()
+			await process_frame
+			continue
+		var loose0 := _ember_pickups(w, "loose")
+		var once: Node2D = rattles[0]
+		w.deal(once, 1.0, {"flat": once.max_hp * 20.0, "no_hitstop": true})
+		_check(not once.alive and _ember_pickups(w, "loose") == loose0, "%s: a respawned Rattle pays no embers when it dies" % id)
+		var stompy: Node2D = rattles[1]
+		_look_at(w, stompy)
+		var pop0 := _ember_pickups(w, "pop")
+		w.chain = 1
+		var r := _drop_on(w, stompy)
+		_check(r["stomped"] and w.chain == 2 and _ember_pickups(w, "pop") == pop0,
+				"%s: stomping a respawned Rattle mid-chain counts (chain %d) but pays no chain embers (%d)" % [id, w.chain, _ember_pickups(w, "pop") - pop0])
+		w.queue_free()
+		await process_frame
+
+
+func _look_at(w: Node2D, e: Node2D) -> void:
+	## The camera on e, so it's awake (monsters far off the view sleep).
+	w.cam = w.cam_on(e.position)
+	e.active = true
+
+
+func _ember_pickups(w: Node2D, flag: String) -> int:
+	## Ember pickups made with flag set: "loose" a kill's, "pop" a chain's.
+	return w.pickups.filter(func(p): return p["kind"] == "ember" and p.get(flag, false)).size()
 
 
 func _test_relics_and_save() -> void:

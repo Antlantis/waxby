@@ -8,7 +8,9 @@ extends SceneTree
 ##   - every script under scripts/ parses (a file that fails to parse fails);
 ##   - the v2 level files nobody retrofits are still v2's, byte for byte;
 ##   - no draw_circle / draw_colored_polygon / draw_polyline in the v3 drawing
-##     code (feature modules, painters, backdrop styles, ambient, edge lines).
+##     code (feature modules, painters, backdrop styles, ambient, edge lines);
+##   - both iOS presets open Documents to the Files app (the playlog), and the
+##     App Store one carries a TestFlight build number past the first.
 ##
 ##     godot --headless --path game --script res://tests/test_export.gd
 
@@ -44,6 +46,7 @@ func _initialize() -> void:
 	_test_scripts()
 	_test_v2_levels()
 	_test_no_polys()
+	_test_files_app()
 	print("test_export: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -202,3 +205,29 @@ func _test_no_polys() -> void:
 			if rx.search(code) != null:
 				hits.append(ln)
 		_check(hits.is_empty(), "%s draws no circles or polygons directly (lines %s)" % [f, hits])
+
+
+func _test_files_app() -> void:
+	## Documents (playlog.json, the saves) shows in the Files app on every
+	## build, TestFlight's too: Godot's own user_data options fill the
+	## template's LSSupportsOpeningDocumentsInPlace and UIFileSharingEnabled
+	## (the template always writes both, so the plist extras mustn't repeat
+	## them as false).
+	var cfg := ConfigFile.new()
+	_check(cfg.load(PRESETS) == OK, "export_presets.cfg loads")
+	var store := ""
+	for sec in cfg.get_sections():
+		if not (sec.begins_with("preset.") and sec.count(".") == 1) or str(cfg.get_value(sec, "platform", "")) != "iOS":
+			continue
+		var pname := str(cfg.get_value(sec, "name", ""))
+		var o := sec + ".options"
+		_check(bool(cfg.get_value(o, "user_data/accessible_from_files_app", false)), "%s: Documents opens in place (Files app)" % pname)
+		_check(bool(cfg.get_value(o, "user_data/accessible_from_itunes_sharing", false)), "%s: file sharing is on" % pname)
+		var extra := str(cfg.get_value(o, "application/additional_plist_content", ""))
+		for key in ["UIFileSharingEnabled", "LSSupportsOpeningDocumentsInPlace"]:
+			_check(not extra.contains(key), "%s: the plist extras leave %s to the option" % [pname, key])
+		if pname == "iOS App Store":
+			store = o
+	_check(store != "", "there is an iOS App Store preset")
+	var ver := str(cfg.get_value(store, "application/version", "")) if store != "" else ""
+	_check(ver.is_valid_int() and int(ver) >= 2, "the App Store build number is past TestFlight's first (%s)" % ver)

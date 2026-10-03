@@ -1128,9 +1128,33 @@ func _test_combat_v3() -> void:
 	var w5 := Combat.elite_rules("dusk", 5)
 	_check(is_equal_approx(float(er["anoint"]), float(Combat.DIFF["dusk"]["anoint"])) and int(er["max_anoint"]) == 2 and int(er["omens"]) == 1
 			and float(er["second_omen"]) == 0.0 and Combat.elite_rules("dusk", 2) == er, "Dusk Worlds 1-2's elites are v2's DIFF")
-	_check(is_equal_approx(float(Combat.elite_rules("dusk", 3)["anoint"]), 0.07) and int(Combat.elite_rules("dusk", 4)["max_anoint"]) == 3
-			and is_equal_approx(float(w5["second_omen"]), 0.35) and is_equal_approx(float(Combat.elite_rules("dusk", 6)["anoint"]), 0.10)
-			and is_equal_approx(float(Combat.elite_rules("dusk", 6)["second_omen"]), 0.50), "Dusk by world: 7 / 8 / 9 / 10%, max 3 from W4, a second Omen in W5 and W6")
+	# Build 1: Dusk pushes back from World 3 (about twice v3's chance).
+	var rows := {3: [0.12, 3, 0.2], 4: [0.14, 3, 0.3], 5: [0.16, 3, 0.5], 6: [0.18, 4, 0.6]}
+	var rows_ok := true
+	for wn in rows:
+		var r := Combat.elite_rules("dusk", wn)
+		var want: Array = rows[wn]
+		rows_ok = rows_ok and (is_equal_approx(float(r["anoint"]), float(want[0])) and int(r["max_anoint"]) == int(want[1])
+				and int(r["omens"]) == 1 and is_equal_approx(float(r["second_omen"]), float(want[2])))
+	_check(rows_ok and is_equal_approx(float(w5["second_omen"]), 0.5),
+			"Dusk by world: 12 / 14 / 16 / 18%, max 3 (4 in W6), a second Omen at 20 / 30 / 50 / 60% from W3")
+	var more := true
+	for wn in range(3, 7):
+		more = more and float(Combat.elite_rules("dusk", wn)["anoint"]) > float(Combat.elite_rules("dusk", wn - 1)["anoint"])
+	_check(more and float(Combat.elite_rules("dusk", 3)["anoint"]) >= 2.0 * float(er["anoint"]), "and each world from W3 more than the last, twice W1-W2's at least")
+	# Dusk with teeth: from World 3 altars heal 40% and ordinary monsters
+	# come back on a snuff; Worlds 1-2 (and world 0, a mode or a lab) keep
+	# the row's 50% and no respawn. Nightfall and Witching are their rows.
+	_check(is_equal_approx(float(Combat.DIFF["dusk"]["altar"]), 0.50) and not bool(Combat.DIFF["dusk"]["respawn"]), "the Dusk row itself is v2's (altars 50%, no respawn)")
+	var teeth := true
+	for wn in range(0, 7):
+		var late := wn >= 3
+		teeth = teeth and (Combat.dusk_teeth("dusk", wn) == late and Combat.respawns("dusk", wn) == late
+				and is_equal_approx(Combat.altar_heal("dusk", wn), 0.40 if late else 0.50))
+	_check(teeth, "Dusk from World 3: altars heal 40% and monsters respawn; Worlds 1-2 and modes heal 50%, none respawn")
+	_check(not Combat.dusk_teeth("nightfall", 5) and Combat.respawns("nightfall", 1) and Combat.respawns("witching", 6)
+			and is_equal_approx(Combat.altar_heal("nightfall", 5), 0.35) and is_equal_approx(Combat.altar_heal("witching", 1), 0.20),
+			"Nightfall and Witching keep their rows (35% / 20%, respawn everywhere)")
 	var n := Combat.elite_rules("nightfall", 6)
 	_check(is_equal_approx(float(n["anoint"]), 0.12) and int(n["max_anoint"]) == 3 and int(n["omens"]) == 2 and int(Combat.elite_rules("witching", 1)["max_anoint"]) == 4,
 			"Nightfall 12% / 3 / 2 Omens, Witching up to 4, in every world")

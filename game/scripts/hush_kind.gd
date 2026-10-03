@@ -178,6 +178,8 @@ static func relit(e) -> bool:
 	if int(sn) == seen or str(w.get("state")) != "play":
 		return false
 	e.set("_snuffs", int(sn))
+	if w.has_method("respawns_here"):
+		return bool(w.respawns_here())   # (Dusk from World 3 too)
 	return bool(Combat.diff(str(w.get("diff")))["respawn"])
 
 

@@ -51,8 +51,19 @@ const SHARE_CAPS := {"fodder": 0.30, "heavy": 0.36, "anointed": 0.40, "dread": 0
 
 # Elites on Dusk by world (spec §1.6): Anointed chance, most per level, Omens
 # each, and the chance of one more Omen. Nightfall and Witching use DIFF.
-const DUSK_ELITES := {1: [0.06, 2, 1, 0.0], 2: [0.06, 2, 1, 0.0], 3: [0.07, 2, 1, 0.0],
-		4: [0.08, 3, 1, 0.0], 5: [0.09, 3, 1, 0.35], 6: [0.10, 3, 1, 0.50]}
+# Build 1 (Dusk pushes back from World 3): W3-W6 about twice v3's chance, a
+# second Omen from W3 and a fourth Anointed in W6. W1-W2 stay v2's (the
+# Descent and v2 parity read them).
+const DUSK_ELITES := {1: [0.06, 2, 1, 0.0], 2: [0.06, 2, 1, 0.0], 3: [0.12, 3, 1, 0.2],
+		4: [0.14, 3, 1, 0.3], 5: [0.16, 3, 1, 0.5], 6: [0.18, 4, 1, 0.6]}
+
+# Dusk with teeth (Build 1, the author's ruling after his playtest): from
+# World 3 a Dusk altar heals DUSK_TEETH.altar, not the row's 0.50, and
+# ordinary monsters come back on a snuff as on Nightfall (half XP and loot,
+# no embers). Worlds 1-2 stay gentle; boss numbers are untouched. Story
+# levels only: world.gd passes world 0 for a mode or a feel lab.
+const DUSK_TEETH_FROM := 3
+const DUSK_TEETH := {"altar": 0.40, "respawn": true}
 
 # Embers are worth more deeper down (spec §8.2): DIFF.embers x (1 + (A-1)/6).
 # From EMBER_DEPTH_FROM; below it an ember is worth v2's DIFF.embers, so
@@ -130,6 +141,26 @@ static func elite_rules(diff_id: String, world: int) -> Dictionary:
 		var row: Array = DUSK_ELITES.get(clampi(world, 1, 6), DUSK_ELITES[1])
 		return {"anoint": float(row[0]), "max_anoint": int(row[1]), "omens": int(row[2]), "second_omen": float(row[3])}
 	return {"anoint": float(d["anoint"]), "max_anoint": int(d["max_anoint"]), "omens": int(d["omens"]), "second_omen": 0.0}
+
+
+static func dusk_teeth(diff_id: String, world: int) -> bool:
+	## Dusk from World 3 (DUSK_TEETH_FROM): altars heal less and ordinary
+	## monsters come back on a snuff. world is 0 for a mode or a feel lab.
+	return diff_id == "dusk" and world >= DUSK_TEETH_FROM
+
+
+static func altar_heal(diff_id: String, world: int) -> float:
+	## The share of max life lighting an altar heals (world.gd _light_altar):
+	## DIFF.altar, or DUSK_TEETH.altar on Dusk from World 3.
+	if dusk_teeth(diff_id, world):
+		return float(DUSK_TEETH["altar"])
+	return float(diff(diff_id)["altar"])
+
+
+static func respawns(diff_id: String, world: int) -> bool:
+	## Do ordinary monsters come back on a snuff (world.gd respawns_here)?
+	## DIFF.respawn (Nightfall, Witching), or Dusk from World 3.
+	return bool(diff(diff_id)["respawn"]) or (dusk_teeth(diff_id, world) and bool(DUSK_TEETH["respawn"]))
 
 
 static func ember_worth(area: int, diff_id: String) -> int:
