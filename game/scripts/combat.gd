@@ -11,9 +11,11 @@ extends RefCounted
 
 const DIFFS := ["dusk", "nightfall", "witching"]
 # "area0" and "per" replace v2's "offset" (0 / 10 / 20): area_level() below.
+# Dusk's "drop" (an ordinary kill's item chance) is 0.5 since build 1: half
+# as many kill drops, and none of them Commons (Items.KILL_WEIGHTS).
 const DIFF := {
 	"dusk": {"name": "Dusk", "area0": 1, "per": 1, "hp": 1.0, "dmg": 1.0, "tells": 1.0, "anoint": 0.06, "omens": 1,
-			"max_anoint": 2, "xp": 1.0, "embers": 1, "drop": 1.0, "light": 1.0, "pit": 0.33, "altar": 0.50,
+			"max_anoint": 2, "xp": 1.0, "embers": 1, "drop": 0.5, "light": 1.0, "pit": 0.33, "altar": 0.50,
 			"wax": 0.30, "flask": 0.40, "flask_charges": 1, "respawn": false, "invuln": 0.9, "douse_pct": 0.08},
 	"nightfall": {"name": "Nightfall", "area0": 30, "per": 3, "hp": 1.4, "dmg": 1.25, "tells": 0.85, "anoint": 0.12, "omens": 2,
 			"max_anoint": 3, "xp": 1.25, "embers": 2, "drop": 1.2, "light": 0.92, "pit": 0.38, "altar": 0.35,

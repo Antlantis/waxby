@@ -4,8 +4,9 @@ extends "res://scripts/elites.gd"
 ## pixel and it snores (within 3 tiles). Touching it, hitting it or bonking
 ## it from below wakes it with a 0.5 s tongue-out surprise (harmless); then
 ## it hops at Wick every 0.8 s (vy -420, vx +-150) and bites (34). A stomp
-## hurts it and stuns it for 0.6 s. It always drops an item (world: kind
-## "lidlurk") and 12 embers, and never comes back (ordinary = false).
+## hurts it and stuns it for 0.6 s. It always drops a relic (world.gd
+## _lidlurk_prize: an item once the codex is full, and in a mode the item
+## of kind "lidlurk") and 12 embers, and never comes back (ordinary = false).
 
 const SNORE_EVERY := 5.0
 const SNORE_LEN := 0.6

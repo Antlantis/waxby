@@ -29,7 +29,8 @@ extends RefCounted
 ## then from their world down). Their powers are fx numbers for world.gd and
 ## the kits (stats.flags), or stats hero.gd applies itself.
 ##
-## Dusk kills roll richer with depth (kill_weights: areas 13-22, then 23+).
+## Dusk kills roll richer with depth (kill_weights: areas 13-22, then 23+),
+## and never a Common (build 1).
 
 const SLOTS := ["weapon", "candle", "coat", "boots", "charm"]
 # The slots in play: what drops (kills, bosses, sigil rewards) and what the
@@ -201,21 +202,27 @@ const LEGENDS := {
 		"text": "Once per altar, a snuffing blow leaves you at 1 life, burning white, untouchable 2 s.",
 		"fx": {"hollin_invuln": 2.0}},
 }
-# The bosses' pairs and the secret prizes:
-const WORLD_LEGENDS := {3: ["rootbound", "marrow_lantern"], 4: ["escapement", "hoarfrost"],
+# The bosses' pairs and the secret prizes. Tollgrave and the Snuffer give
+# their signature piece (build 1: one each, Tollbreaker for the bell's boss,
+# the Twin Wick for the flame's thief).
+const WORLD_LEGENDS := {1: ["tollbreaker"], 2: ["twin_wick"], 3: ["rootbound", "marrow_lantern"], 4: ["escapement", "hoarfrost"],
 		5: ["prismglass", "leadlight"], 6: ["hushbane", "last_candle"]}
 const SECRET_PRIZES := {"1-S": "hymnal", "2-S": "deep_chalice", "3-S": "gravebloom", "4-S": "hour_hand",
 		"5-S": "saints_lens", "6-S": "hollins_ember"}
-# What a Dusk kill rolls (spec §8.1): v2's to area 12, richer from 13 and 23.
-# Nightfall and Witching (and every other source: Anointed, Dread, boss,
-# Lidlurk, gold) keep v2's tables in world.gd.
+# What a Dusk kill rolls (spec §8.1), richer from area 13 and 23. Build 1:
+# no Commons on Dusk (they only melted on touch), the rest in v2's proportion
+# (80 / 19 / 1, 76 / 22 / 2, 70 / 27 / 3), and half as many drops
+# (Combat.DIFF.dusk.drop 0.5), so a kill gives a Legendary as often as
+# before and a Blessed or Rare a little more often. Nightfall and Witching
+# (and every other source: Anointed, Dread, boss, Lidlurk, gold) keep v2's
+# tables in world.gd.
 const KILL_WEIGHTS := {
-	"dusk": {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5},
+	"dusk": {"common": 0.0, "magic": 80.0, "rare": 19.0, "legendary": 1.0},
 	"nightfall": {"common": 45.0, "magic": 40.0, "rare": 13.0, "legendary": 2.0},
 	"witching": {"common": 30.0, "magic": 45.0, "rare": 21.0, "legendary": 4.0},
 }
-const DUSK_DEEP_WEIGHTS := [[13, {"common": 55.0, "magic": 34.0, "rare": 10.0, "legendary": 1.0}],
-		[23, {"common": 50.0, "magic": 35.0, "rare": 13.5, "legendary": 1.5}]]
+const DUSK_DEEP_WEIGHTS := [[13, {"common": 0.0, "magic": 76.0, "rare": 22.0, "legendary": 2.0}],
+		[23, {"common": 0.0, "magic": 70.0, "rare": 27.0, "legendary": 3.0}]]
 
 
 static func tier_of(ilvl: int) -> int:
@@ -539,8 +546,9 @@ static func describe(stat_or_affix: String, v: float) -> String:
 
 static func kill_weights(area: int, diff_id: String) -> Dictionary:
 	## The rarity weights of an ordinary kill's drop at this area (spec §8.1):
-	## Dusk gets richer with depth (55 / 34 / 10 / 1 from area 13, 50 / 35 /
-	## 13.5 / 1.5 from 23; v2's below); Nightfall and Witching are v2's.
+	## Dusk rolls no Commons and gets richer with depth (80 / 19 / 1 Blessed /
+	## Rare / Legendary to area 12, 76 / 22 / 2 from 13, 70 / 27 / 3 from 23);
+	## Nightfall and Witching are v2's.
 	var w: Dictionary = KILL_WEIGHTS.get(diff_id, KILL_WEIGHTS["dusk"])
 	if diff_id == "dusk" or not KILL_WEIGHTS.has(diff_id):
 		for row in DUSK_DEEP_WEIGHTS:
@@ -634,8 +642,8 @@ static func legal_legends(cls: String, area: int, found: Array = [], slots: Arra
 
 
 static func world_legends(world: int) -> Array:
-	## A world's boss pair (its boss's first kill per difficulty drops one),
-	## those in LEGENDS so far.
+	## A world's boss pair (its boss's first kill per difficulty drops one;
+	## Worlds 1-2 have one signature piece), those in LEGENDS so far.
 	var out: Array = []
 	for id in WORLD_LEGENDS.get(world, []):
 		if LEGENDS.has(id):

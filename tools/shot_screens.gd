@@ -495,6 +495,24 @@ func _set_cards() -> void:
 	await _wait(0.500)
 	await _shot("card_legendary")
 	hud._card = {}
+	# Build 1: a Legendary worn on pickup is a "New power" card (world.gd's
+	# moment: power_card), its power large and the chips small; and one into
+	# the satchel.
+	var dawn: Dictionary = Items.make("weapon", "knight", 7, "legendary", _rng, "dawnsliver")
+	game.equip(dawn)
+	hud.show_pickup(dawn, {"dmg": -6.0, "life": 0.0}, "equipped")
+	hud.power_card(dawn)
+	await _wait(0.500)
+	await _shot("card_power")
+	hud._card = {}
+	var gutter: Dictionary = Items.make("candle", "knight", 7, "legendary", _rng, "gutterlight")
+	game.add_item(gutter)
+	hud.show_pickup(gutter, {"dmg": 0.0, "life": -3.0}, "satchel")
+	hud.power_card(gutter)
+	await _wait(0.500)
+	await _shot("card_power_satchel")
+	hud._card = {}
+	game.equip(worn)
 	# Full (a satchel of 16): wearing it melts the old one, so the first tap
 	# (a touch, as the touch layer sends it) only asks; the second wears it.
 	while (h["satchel"] as Array).size() < game.SATCHEL_MAX:

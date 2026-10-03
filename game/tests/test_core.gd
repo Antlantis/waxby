@@ -78,6 +78,7 @@ func _initialize() -> void:
 	await _test_p0_integration()
 	await _test_p0_review()
 	await _test_wave1_wiring()
+	await _test_loot_build1()
 	_test_relics_and_save()
 	print("test_core: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -2523,8 +2524,8 @@ func _test_p0_integration() -> void:
 		got[w._pick_legend("coat", "knight", pool)] = true
 	_check(got.size() == 2 and got.has("a_legend") and got.has("b_legend"), "a boss's first kill picks among its world's pair")
 	_check(w.PREFER_UNOWNED, "the unowned preference is on since the wave-1 merge (decisions.md: on with Phase 1)")
-	_check((load("res://scripts/items.gd") as Script).call("world_legends", 1).is_empty() and (load("res://scripts/items.gd") as Script).call("world_legends", 2).is_empty(),
-			"W1-W2 bosses have no pair (their first kills pick as v2)")
+	_check((load("res://scripts/items.gd") as Script).call("world_legends", 1) == ["tollbreaker"] and (load("res://scripts/items.gd") as Script).call("world_legends", 2) == ["twin_wick"],
+			"W1-W2 bosses have one signature piece each (build 1: Tollbreaker, the Twin Wick)")
 	# The audio a level leaves behind: reset on leaving and on a respawn.
 	var sx: Node = _stub(STUB_SFX)
 	sx.stopped = true
@@ -2817,6 +2818,184 @@ func filter_damage(amount: float, _h: Dictionary) -> float:
 	var mt: Node = M.new()
 	_check(mt.has_method("show_tales"), "main has the Tales route (tales from the title and saves screens)")
 	mt.free()
+
+
+# ---------------------------------------------------------------- build 1: loot
+
+const STUB_LOOT_HUD := """extends CanvasLayer
+var said := []
+func show_pickup(it, chips, where) -> void:
+	said.append(["show_pickup", where])
+func power_card(it) -> void:
+	said.append(["power_card", str(it.get("uid", ""))])
+func bark(k: String) -> void:
+	pass
+func bump_embers() -> void:
+	pass
+func boss_bar(i) -> void:
+	pass
+func cards() -> int:
+	return said.filter(func(s): return s[0] == "power_card").size()
+"""
+
+
+func _test_loot_build1() -> void:
+	## Build 1's loot slice in the World: a boss pays his embers (with his
+	## drops only); Tollgrave's and the Snuffer's first kills give their
+	## signature piece; the vault's Lidlurk pays a relic (a gold-table item
+	## once the codex is full; a mode's Lidlurk its item, a lab's nothing); a
+	## Legendary is worn over a piece that isn't one with auto-equip on (not
+	## when that would melt the worn piece), its moment only for a player
+	## (never headless, under --autoplay, or on a golden route); the playlog
+	## line's loot and ember fields, embers_spent cleared once it's written.
+	var count_embers := func(w: Node2D) -> int: return w.pickups.filter(func(p): return p["kind"] == "ember" and not p["taken"]).size()
+	for row in [["1-4", "tollbreaker", 30], ["2-4", "twin_wick", 50]]:
+		var bw := _world_as(str(row[0]), "knight")
+		await process_frame
+		bw.set_physics_process(false)
+		var b: Node2D = bw.boss
+		_check(b != null and int(b.embers) == int(row[2]), "%s: the boss carries %d embers" % [row[0], row[2]])
+		if b != null:
+			var n0: int = count_embers.call(bw)
+			bw.boss_defeated(b, b.center())
+			var paid: int = count_embers.call(bw) - n0
+			var loose: int = bw.pickups.filter(func(p): return p["kind"] == "ember" and p["loose"]).size()
+			_check(paid == int(b.embers) and loose >= paid, "%s: he pays them, %d loose embers where he fell (never paid before build 1)" % [row[0], paid])
+			var prize := ""
+			for p in bw.pickups:
+				if p["kind"] == "item" and bool(p.get("boss_first", false)):
+					prize = str(p["item"].get("legend", ""))
+			_check(prize == str(row[1]), "%s: his first kill gives his signature piece (%s)" % [row[0], prize])
+		bw.queue_free()
+		await process_frame
+	# The vault's Lidlurk.
+	var w := _world_as("1-1", "knight")
+	await process_frame
+	w.set_physics_process(false)
+	var loot_of := func(x: Node2D) -> Array: return x.pickups.filter(func(p): return p["kind"] == "relic" or p["kind"] == "item")
+	var lid: Node2D = null
+	for e in w.enemies:
+		if e.kind == "lidlurk":
+			lid = e
+	_check(lid != null, "1-1's vault has its Lidlurk")
+	if lid != null:
+		var k0: int = loot_of.call(w).size()
+		w._on_enemy_died(lid, "slash")
+		var got: Array = loot_of.call(w).slice(k0)
+		_check(got.size() == 1 and got[0]["kind"] == "relic" and str(got[0]["rarity"]) != "common",
+				"the vault's Lidlurk pays a relic, at least a Blessed (%s)" % [got.map(func(p): return [p["kind"], p["rarity"]])])
+		game.data["relics"] = Relics.ids().duplicate()
+		k0 = loot_of.call(w).size()
+		w._on_enemy_died(lid, "slash")
+		got = loot_of.call(w).slice(k0)
+		_check(got.size() == 1 and got[0]["kind"] == "item" and str(got[0]["rarity"]) in ["rare", "legendary"],
+				"with every relic found, a gold-table item instead (%s)" % [got.map(func(p): return [p["kind"], p["rarity"]])])
+		game.data["relics"] = []
+	w.queue_free()
+	await process_frame
+	for row in [["mode", "1-1"], ["lab", "lab-0"]]:
+		var mw: Node2D = _mode_world(_stub(STUB_MODE)) if row[0] == "mode" else _world(str(row[1]))
+		await process_frame
+		mw.set_physics_process(false)
+		var ml: Node2D = null
+		for e in mw.enemies:
+			if e.kind == "lidlurk":
+				ml = e
+		if ml != null:
+			var k0: int = loot_of.call(mw).size()
+			mw._on_enemy_died(ml, "slash")
+			var kinds: Array = loot_of.call(mw).slice(k0).map(func(p): return p["kind"])
+			_check(kinds == (["item"] if row[0] == "mode" else []), "a %s's Lidlurk: %s (%s)" % [row[0], "its item, no relic" if row[0] == "mode" else "nothing kept", kinds])
+		else:
+			_check(false, "(%s has a Lidlurk)" % row[1])
+		mw.queue_free()
+		await process_frame
+	# A Legendary is worn over a piece that isn't one.
+	w = _world_as("1-1", "knight")
+	await process_frame
+	w.set_physics_process(false)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	var auto = game.setting("auto_equip")
+	game.set_setting("auto_equip", true)
+	var h: Dictionary = game.hero()
+	var in_satchel := func(it: Dictionary) -> bool: return (h["satchel"] as Array).any(func(o): return o is Dictionary and str(o.get("uid", "")) == str(it["uid"]))
+	var worn := func(slot: String) -> String: return str(h["equip"][slot].get("uid", "")) if h["equip"].get(slot) is Dictionary else ""
+	var strong := Items.make("weapon", "knight", 30, "rare", rng)
+	game.equip(strong)
+	w.apply_hero()
+	var dawn := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
+	var chips := Hero.compare(h, "weapon", dawn, h.get("belt", []), "dusk")
+	_check(float(chips["dmg"]) < 0.0, "(the Legendary reads weaker on the chips: %.0f%% DMG)" % float(chips["dmg"]))
+	_check(w._take_item(dawn) == "equipped" and worn.call("weapon") == str(dawn["uid"]) and in_satchel.call(strong),
+			"a Legendary is worn over a piece that isn't one, whatever its chips; the old one waits in the satchel")
+	_check(w.hitstop <= 0.0, "headless: no freeze")
+	game.equip(Items.make("weapon", "knight", 30, "legendary", rng, "tollbreaker"))
+	var weak := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
+	_check(w._take_item(weak) == "satchel" and worn.call("weapon") != str(weak["uid"]), "over a Legendary the chips decide: a weaker one goes to the satchel")
+	game.equip(strong)
+	game.set_setting("auto_equip", false)
+	var off := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
+	_check(w._take_item(off) == "satchel" and worn.call("weapon") == str(strong["uid"]), "auto-equip off: the Legendary waits in the satchel")
+	game.set_setting("auto_equip", true)
+	while (h["satchel"] as Array).size() < int(game.SATCHEL_MAX):
+		(h["satchel"] as Array).append(Items.make("coat", "knight", 1, "magic", rng))
+	var full := Items.make("weapon", "knight", 1, "legendary", rng, "dawnsliver")
+	_check(w._take_item(full) == "full" and worn.call("weapon") == str(strong["uid"]),
+			"the satchel full: a Legendary that would melt the worn piece isn't worn by itself (its card asks)")
+	h["satchel"] = []
+	# Its moment: a player's only.
+	var hud: CanvasLayer = _stub(STUB_LOOT_HUD)
+	w.hud = hud
+	w.headless = false
+	w.test_pad = null
+	w.hitstop = 0.0
+	var lit := Items.make("candle", "knight", 1, "legendary", rng, "gutterlight")
+	_check(w._take_item(lit) == "equipped" and is_equal_approx(w.hitstop, w.LEGEND_FREEZE) and hud.said.has(["power_card", str(lit["uid"])]),
+			"a player's Legendary: the world stops %.2f s and the HUD holds its New power card" % w.hitstop)
+	game.set_setting("auto_equip", false)
+	w.hitstop = 0.0
+	var later := Items.make("boots", "knight", 1, "legendary", rng, "thornsole")
+	_check(w._take_item(later) == "satchel" and w.hitstop > 0.0 and hud.cards() == 2, "one into the satchel has its moment too")
+	for flag in ["autoplay", "no_monsters", "test_pad", "headless"]:
+		w.hitstop = 0.0
+		match flag:
+			"autoplay":
+				w.autoplay = true
+			"no_monsters":
+				w.no_monsters = true
+			"test_pad":
+				w.test_pad = {}
+			"headless":
+				w.headless = true
+		var quiet := Items.make("boots", "knight", 1, "legendary", rng, "cinderstep")
+		_check(w._take_item(quiet) == "satchel" and w.hitstop <= 0.0 and hud.cards() == 2, "%s: a Legendary has no moment (no freeze, no held card)" % flag)
+		w.autoplay = false
+		w.no_monsters = false
+		w.test_pad = null
+		w.headless = false
+	game.set_setting("auto_equip", auto)
+	# The playlog's line: its loot and embers, and embers_spent cleared once written.
+	var Playlog = load("res://scripts/playlog.gd")
+	w.embers_got = 17
+	var line: Dictionary = Playlog.entry(w, false, {})
+	_check(int(line.get("items_found", -1)) == w.items_found.size() and int(line.get("legendaries_worn", -1)) == 1
+			and int(line.get("relics_found", -1)) == w.relics_found.size() and int(line.get("embers_earned", -1)) == 17 and line.has("embers_spent"),
+			"the playlog line has items_found, legendaries_worn, relics_found, embers_earned, embers_spent (%s)" % [line])
+	var kept_path: String = Playlog.path
+	Playlog.path = "user://test_core_playlog.json"
+	game.embers_spent = 42
+	w._log(false)
+	var all = JSON.parse_string(FileAccess.get_file_as_string(Playlog.path))
+	_check(all is Array and int(all[all.size() - 1].get("embers_spent", -1)) == 42 and game.embers_spent == 0,
+			"_log writes embers_spent (42) and clears it for the next line (%d)" % game.embers_spent)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Playlog.path))
+	Playlog.path = kept_path
+	w.headless = true
+	w.hud = null
+	hud.free()
+	w.queue_free()
+	await process_frame
 
 
 # ---------------------------------------------------------------- wave 1's W0 wiring

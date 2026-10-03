@@ -24,7 +24,8 @@ extends CanvasLayer
 ##   bottom      the pickup card between the thumbs: tap it within 3 s to undo
 ##               an auto-equip or to wear what went to the satchel (a
 ##               second tap when wearing it melts the worn piece for good);
-##               a touch just off a thumb button stays the button's
+##               a touch just off a thumb button stays the button's. A
+##               Legendary's is a "New power" card held 5 s (power_card)
 ##   edges       a warm vignette that beats under 25% life
 ## Everything timed (the slot, the cards, a card's tap window) holds while
 ## the level is paused, by the pause menu or a story beat played over it.
@@ -64,6 +65,7 @@ const MSG_TIME := 2.5
 const PRI := {"pickup": 4, "elite": 3, "bark": 2, "toast": 1}
 const STALE := {"pickup": 8.0, "elite": 4.0, "bark": 9.0, "toast": 6.0}   # a queued message older than this is dropped
 const CARD_TAP := 3.0            # seconds a pickup card takes a tap
+const CARD_POWER := 5.0          # seconds a Legendary's "New power" card holds (power_card)
 # A touch this close to a thumb button's centre stays the button's, over the
 # card too: within 2.0 x an arrow's radius (a thumb swinging in for "right"
 # lands well past its ring), within 1.6 x attack's, jump's and the Special's.
@@ -415,6 +417,21 @@ func show_pickup(it: Dictionary, chips: Dictionary, where: String) -> void:
 			card["tap_left"] = 0.0
 			card["end"] = 2.8
 	_cards.append(card)
+
+
+func power_card(it: Dictionary, secs := CARD_POWER) -> void:
+	## A Legendary just taken (world.gd _legend_moment): the card show_pickup
+	## queued for it becomes a "New power" card, its power large and the
+	## chips small, held secs (its tap window stays CARD_TAP), and it doesn't
+	## give way early to the cards behind it.
+	var uid := str(it.get("uid", "-"))
+	for c in _cards + ([_card] if not _card.is_empty() else []):
+		if c.get("kind") == "item" and str(c["item"].get("uid", "")) == uid:
+			c["power"] = true
+			c["hold"] = secs
+			if c.has("end"):
+				c["end"] = maxf(float(c["end"]), secs)
+			return
 
 
 func _melted(card: Dictionary, melt: Dictionary) -> void:
@@ -1035,7 +1052,7 @@ func _step_cards(dt: float) -> void:
 		if not _cards.is_empty() and _card["t"] > 1.6 and not bool(_card.get("armed", false)):
 			_card["tap_left"] = 0.0
 		if float(_card["tap_left"]) <= 0.0 and not _card.has("end"):
-			_card["end"] = _card["t"] + 0.4
+			_card["end"] = maxf(_card["t"] + 0.4, float(_card.get("hold", 0.0)))   # (a "New power" holds)
 	else:
 		if not _card.has("end"):
 			_card["end"] = 3.2
@@ -1928,6 +1945,14 @@ func _draw_card(ci: Control) -> void:
 			scol = UI.BAD
 		_:
 			opts = ["In your satchel · tap to wear" if tap else "In your satchel"]
+	# A Legendary's moment (power_card): "New power" heads it.
+	var power: bool = bool(_card.get("power", false)) and where in ["equipped", "satchel"]
+	if power:
+		if where == "equipped":
+			opts = opts.map(func(o): return str(o).replace("Equipped", "New power")) + ["New power"]
+		else:
+			opts = ["New power · tap to wear" if tap else "New power · in your satchel", "New power"]
+		scol = UI.GOLD
 	if tap and bool(_card.get("armed", false)) and where != "equipped":
 		# The first tap asked: wearing it melts the worn piece for good.
 		opts = ["Tap again to wear · old one melts", "Tap again · old one melts"]
@@ -1939,20 +1964,25 @@ func _draw_card(ci: Control) -> void:
 	card_line = status
 	# What it does: one line, or (a Legendary's power) two, the card's lines
 	# closing up to make room.
-	var kl := card_key_lines(Items.key_line(it), w)
+	var kl := card_power_lines(Items.key_line(it), w) if power else card_key_lines(Items.key_line(it), w)
 	var two: bool = (kl["lines"] as Array).size() > 1
-	# Baselines: status, name, the key line(s); then the chips' top.
+	# Baselines: status, name, the key line(s); then the chips' top. A "New
+	# power" gives the power the room (13 or 12 px, 14 apart), the chips the
+	# least.
 	var ys: Array = [16.0, 36.0, 50.0, 67.0] if two else [18.0, 39.0, 55.0, 62.0]
+	if power:
+		ys = [15.0, 33.0, 49.0, 69.0 if two else 56.0]
 	UI.text(ci, Vector2(x, r.position.y + ys[0]), status, fs, Color(scol, a), HORIZONTAL_ALIGNMENT_LEFT, w, "body", 800)
 	var name := str(it.get("name", ""))
-	UI.text(ci, Vector2(x, r.position.y + ys[1]), name, UI.fit_size(name, w, 19, 13, "title", 700), Color(col, a), HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700)
+	UI.text(ci, Vector2(x, r.position.y + ys[1]), name, UI.fit_size(name, w, 17 if power else 19, 13, "title", 700), Color(col, a), HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700)
 	var ksz := int(kl["size"])
 	for i in (kl["lines"] as Array).size():
-		UI.text(ci, Vector2(x, r.position.y + ys[2] + i * 12.0), str(kl["lines"][i]), ksz, Color(UI.CREAM, 0.9 * a), HORIZONTAL_ALIGNMENT_LEFT, w)
+		UI.text(ci, Vector2(x, r.position.y + ys[2] + i * (14.0 if power else 12.0)), str(kl["lines"][i]), ksz,
+				Color(UI.CREAM, (1.0 if power else 0.9) * a), HORIZONTAL_ALIGNMENT_LEFT, w)
 	var chips: Dictionary = _card["chips"]
 	var cx := x
 	var chip_y: float = r.position.y + ys[3]
-	var csz := 10 if two else 11
+	var csz := 9 if power else (10 if two else 11)
 	cx += UI.chip(ci, Vector2(cx, chip_y), "DMG", float(chips.get("dmg", 0.0)), csz, a) + 6.0
 	UI.chip(ci, Vector2(cx, chip_y), "LIFE", float(chips.get("life", 0.0)), csz, a)
 	# How long the tap still counts.
@@ -1960,6 +1990,19 @@ func _draw_card(ci: Control) -> void:
 		var k := float(_card["tap_left"]) / CARD_TAP
 		var y := r.end.y - 4.0
 		ci.draw_line(Vector2(r.position.x + 14.0, y), Vector2(r.position.x + 14.0 + (r.size.x - 28.0) * k, y), Color(scol, 0.7 * a), 2.0)
+
+
+static func card_power_lines(key: String, w: float) -> Dictionary:
+	## {lines, size}: a "New power" card's power, large: one or two lines at
+	## 13 or 12 px; longer than that, as card_key_lines.
+	for sz in [13, 12]:
+		var lines := UI.wrap(key, w, sz)
+		var fits := true
+		for l in lines:
+			fits = fits and UI.text_width(str(l), sz) <= w
+		if lines.size() <= 2 and fits:
+			return {"lines": lines, "size": sz}
+	return card_key_lines(key, w)
 
 
 static func card_key_lines(key: String, w: float) -> Dictionary:

@@ -144,11 +144,24 @@ static func _weight(r: Dictionary, favor: int) -> float:
 
 
 static func for_sale(owned: Array, n := 3, max_world := 99) -> Array:
-	## What the Chandler has on his shelf: the cheapest relics not yet owned,
-	## from the worlds up to max_world.
-	var out := []
+	## What the Chandler has on his shelf, from the worlds up to max_world:
+	## the cheapest relic not yet owned of each rarity, the cheapest rarities
+	## first (in World 1 Tallow Heart, Rook Feather and Saint's Knuckle), so
+	## there's always one worth saving for. With fewer rarities left than n,
+	## the cheapest of the rest fill the shelf. Cheapest first on the shelf.
+	var left := []
 	for rar in RARITY_ORDER:
 		for r in every():
-			if r["rarity"] == rar and not owned.has(r["id"]) and int(r.get("world", 1)) <= max_world and out.size() < n:
-				out.append(r)
-	return out
+			if r["rarity"] == rar and not owned.has(r["id"]) and int(r.get("world", 1)) <= max_world:
+				left.append(r)
+	var picks := []
+	for rar in RARITY_ORDER:
+		for r in left:
+			if r["rarity"] == rar:
+				picks.append(r["id"])
+				break
+	for r in left:
+		if not picks.has(r["id"]):
+			picks.append(r["id"])
+	picks = picks.slice(0, maxi(n, 0))
+	return left.filter(func(r): return picks.has(r["id"]))
