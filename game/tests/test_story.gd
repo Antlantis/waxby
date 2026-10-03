@@ -2933,7 +2933,9 @@ func _test_v3_script() -> void:
 			"1-S", "2-S", "3-S", "4-S", "5-S", "6-S"]:
 		_check(not Story.after_line(id, "knight").is_empty(), "the after-line for %s" % id)
 		var ins: Array = Story.INSCRIPTIONS.get(id, [])
-		_check(ins.size() == (1 if id.ends_with("-S") else 2), "%s has its inscriptions" % id)
+		# One a level at most since the sign cut (4-2 has none); a secret's epitaph.
+		_check((ins.size() == 1) if id.ends_with("-S") else (ins.size() <= 1), "%s has its inscription (%d)" % [id, ins.size()])
+		_check(Story.INSCRIPTIONS.has(id), "%s is in INSCRIPTIONS" % id)
 		for t in ins:
 			_check(str(t).length() <= Story.MAX_SIGN, "%s's sign fits in %d: %s" % [id, Story.MAX_SIGN, t])
 			if id.begins_with("6-") and not id.ends_with("-S"):

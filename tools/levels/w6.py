@@ -16,8 +16,11 @@ outside that; the tide starts 10 tiles behind and rubber-bands. Stone every
 wall sconces (`c` gives no light here): the lights are the Vigil candles,
 the lantern posts, the altars and the tolls.
 
-The signs: each section's teaching sign (spec 3.7.3), and each level's two
-inscriptions (story.gd INSCRIPTIONS, the Hush's whispers) where it's quiet.
+The signs (after the sign cut): a teaching sign only for what no bark says
+(6-1's Hushlings, 6-2's shadow, the Hush's rule in 6-4; the floats, buoys,
+grasps and candles teach themselves by deep.gd's first-time barks), and each
+level's one inscription (story.gd INSCRIPTIONS, the Hush's whisper) where
+it's quiet.
 """
 from common import block, join, x_of, T_OPEN
 
@@ -53,7 +56,7 @@ BS_START = block('''
  9|................................
 10|.......................o.o.o....
 11|.........C......................
-12|..P..@..###::..@...J::::::::::..
+12|..P.....###::......J::::::::::..
 13|################################
 14|################################
 ''')
@@ -74,7 +77,7 @@ BS_FLOATS = block('''
  8|........................
  9|........................
 10|.....o..o...o...........
-11|.@......................
+11|........................
 12|.####&&:&&:.........s.s.
 13|###########::&&:&:######
 14|###########:::::::######
@@ -114,7 +117,7 @@ BS_ALTAR = block('''
  9|..............
 10|..............
 11|..............
-12|...K....@.....
+12|...K..........
 13|##############
 14|##############
 ''')
@@ -332,7 +335,7 @@ BS_BELL = block('''
  9|..................................
 10|............=============.........
 11|..................3...............
-12|.@..L......L..............n@.E....
+12|....L......L..............n..E....
 13|#############:&:&:&:f:&::#########
 14|#############::::::::::::#########
 ''')
@@ -340,14 +343,8 @@ BS_BELL = block('''
 LEVELS.append({
     'id': '6-1', 'name': 'The Black Shore', 'area': 28, 'theme': 'stillshore', 'music': 'hushdeep',
     'dread': 'The Hush-a-Bye|hushling|Twinned,Hushed', 'story_start': 'beat_6_1',
-    'hints': ['Old candles of lost Wicks. Light them',
-              'Toll a buoy. The water stills for a breath',
-              "Floats sink under you. Don't stand still",
-              'Hushlings fear the lanterns. Stay near light',
-              'it was so quiet before you.',
-              'no one comes here. why did you?',
-              'Hit the stitched face before it swallows',
-              'Ring the bell'],
+    'hints': ["Hushlings won't enter lantern light. Stay near one",
+              'no one comes here. why did you?'],
     'sections': [BS_START, BS_FLOATS, BS_HUSH, BS_ALTAR, BS_WADE, BS_CANDLES, BS_ALTAR2, BS_JAWS, BS_HELMS,
                  BS_ALTAR3, BS_REEDS, BS_VAULT, BS_ALTAR4, BS_DREAD, BS_BELL],
 })
@@ -379,7 +376,7 @@ DR_START = block('''
  9|......................
 10|...........o.o.o......
 11|......................
-12|..P..@................
+12|..P...................
 13|#########J::&:&::#####
 14|#########::::::::#####
 ''')
@@ -417,7 +414,7 @@ DR_GRASP = block('''
  9|........................
 10|...........o............
 11|........................
-12|..@................n.n.n
+12|...................n.n.n
 13|#########:H:&&:#########
 14|#########::::::#########
 ''')
@@ -435,7 +432,7 @@ DR_ALTAR = block('''
  9|..............
 10|..............
 11|..............
-12|...K.....@....
+12|...K..........
 13|##############
 14|##############
 ''')
@@ -538,7 +535,7 @@ DR_SILVER = block('''
  9|..................#......#
 10|...........===....#....==#
 11|..................F......#
-12|..........@.......F..S.n.#
+12|..................F..S.n.#
 13|####:&&:&:##J:::::########
 14|####::::::##::::::########
 ''')
@@ -659,7 +656,7 @@ DR_BELL = block('''
  9|..................................
 10|..................................
 11|..................................
-12|.@..........n..................@E.
+12|............n...................E.
 13|###:7:###::##J:::#:&::&:f&:#J::###
 14|###:::###::##::::#:::::::::#:::###
 ''')
@@ -667,14 +664,8 @@ DR_BELL = block('''
 LEVELS.append({
     'id': '6-2', 'name': 'The Drowned Bells', 'area': 29, 'theme': 'drownbell', 'music': 'hushdeep',
     'dread': 'The Stitched Choir|stillmaw|Warded,Hushed', 'secret': '6-S', 'story_start': 'beat_6_2',
-    'hints': ['Buoys still deep water too',
-              'Ripples mean hands. Step away',
-              'every light that comes here goes out.',
-              'Your shadow does what you did. Keep moving',
-              'One bell down here still rings',
-              'i remember a song. i do not remember how it went.',
-              'Watch the lure. The lake goes still first',
-              'Ring the bell'],
+    'hints': ['Your shadow copies you a moment later. Keep moving',
+              'i remember a song. i do not remember how it went.'],
     'sections': [DR_START, DR_STILL, DR_GRASP, DR_ALTAR, DR_CHAIN, DR_UNWICK, DR_ALTAR2, DR_TOLLGLASS, DR_SILVER,
                  DR_ALTAR3, DR_BELFRY, DR_VAULT, DR_ALTAR4, DR_DREAD, DR_BELL],
 })
@@ -710,7 +701,7 @@ LQ_START = block('''
  9|........................
 10|........................
 11|..........C.............
-12|..P..@...###....@.J:::::
+12|..P......###....@.J:::::
 13|########################
 14|########################
 ''')
@@ -829,7 +820,7 @@ LQ_VAULT = block('''
  9|.....##...........#...
 10|....###...........#...
 11|...####...........F...
-12|.@s####....M...2..F.n.
+12|..s####....M...2..F.n.
 13|######################
 14|######################
 ''')
@@ -953,7 +944,7 @@ LQ_BELL = block('''
  9|................................
 10|.....============...............
 11|...........3....................
-12|...6..................@.E...n...
+12|...6....................E...n...
 13|#####:&:&:f&:&:&:###############
 14|#####::::::::::::###############
  Z|.....;;;;;;;;;;;;...............
@@ -963,10 +954,7 @@ LEVELS.append({
     'id': '6-3', 'name': 'The Long Quiet', 'area': 30, 'theme': 'hushquiet', 'music': 'hushdeep',
     'dread': 'The Long Shadow|unwick|Swift,Warded', 'story_start': 'beat_6_3',
     'chase': [((LQ_ALTAR, 3), (LQ_ALTAR2, 3)), ((LQ_ALTAR3, 3), (LQ_ALTAR4, 3))],
-    'hints': ['Something vast is waking. When it comes, run',
-              'i ate the bells. they tasted of nothing.',
-              'i am always, always hungry.',
-              'Ring the bell'],
+    'hints': ['i ate the bells. they tasted of nothing.'],
     'sections': [LQ_START, LQ_DARK, LQ_ALTAR, LQ_CHASE1, LQ_ALTAR2, LQ_NAVE, LQ_VAULT, LQ_ALTAR3, LQ_CHASE2,
                  LQ_ALTAR4, LQ_DREAD, LQ_SHALLOWS, LQ_BELL],
 })
@@ -997,7 +985,7 @@ HH_ORCHARD = block('''
  9|..........{...{...{...........
 10|..........{...{...{...........
 11|..............................
-12|..P..@..r.............*..C.n..
+12|..P.....r.............*..C.n..
 13|#########^^^^^^^^^^^##########
 14|##############################
 ''')
@@ -1038,7 +1026,7 @@ HH_ALTAR = block('''
  9|..............
 10|..............
 11|..............
-12|.........@.K..
+12|...........K..
 13|##############
 14|##############
 ''')
@@ -1126,9 +1114,7 @@ LEVELS.append({
     'id': '6-4', 'name': 'The Heart of the Hush', 'area': 31, 'theme': 'husheye', 'music': 'hushdeep',
     'boss': 'hush', 'boss_music': 'hush_final',
     'story_start': 'beat_6_4', 'story_boss': 'boss_6_before', 'story_end': 'boss_6_after',
-    'hints': ['It remembers every place you rang',
-              'come closer.',
-              'closer.',
-              'Ring the sunken bells'],
+    'hints': ['come closer. closer.',
+              'Ring a sunken bell. Its peal lets you hit the Hush'],
     'sections': [HH_ORCHARD, HH_CARILLON, HH_ALTAR, HH_SANCTUM, HH_DEEP, HH_DOOR, T_OPEN, Z_ARENA],
 })

@@ -57,10 +57,11 @@ MIRROR = {'<': '>', '>': '<', 'O': 'Q', 'Q': 'O'}
 MIRROR_OVERLAY = {'(': ')', ')': '(', '[': ']', ']': '['}
 
 # The sign budget (check_sign_budget): 1-1 at most 4 signs, every other
-# level at most 3, so the count can't creep back. Off until the sign-cut
-# commit turns it on: most of today's levels have 5-11 (the cuts and the
-# rewritten lines wait for the author's review), and on, write() fails them.
-SIGN_BUDGET = False
+# level at most 3, so the count can't creep back (the feel labs are free).
+# The sign cut took the campaign from 165 signs to 41: a sign stays only
+# where it teaches what no bark, beat or tell says there, plus a boss's rule
+# at its door and a lore line at most (the author's review).
+SIGN_BUDGET = True
 
 # Where written headers go when an entry doesn't give its own order.
 HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'boss', 'boss_music', 'dread', 'warden',

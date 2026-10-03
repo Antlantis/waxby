@@ -65,14 +65,13 @@ const SPEC := {
 	"6-3": {"width": 360, "altars": [59, 133, 199, 275], "theme": "hushquiet", "area": 30, "chase": [[59, 133], [199, 275]]},
 	"6-4": {"width": 196, "altars": [71, 147], "theme": "husheye", "area": 31, "boss": "hush"},   # (altars at 71 and 147: the door altar within 8 tiles of the arena, test_content, and W6 checkpoints 78 apart at most; spec x 63 and 139)
 }
+# The teaching signs left by the sign cut (the floats, buoys, grasps and
+# candles teach themselves by deep.gd's first-time barks).
 const SIGNS := {
-	"6-1": ["Old candles of lost Wicks. Light them", "Toll a buoy. The water stills for a breath",
-			"Floats sink under you. Don't stand still", "Hushlings fear the lanterns. Stay near light",
-			"Hit the stitched face before it swallows", "Ring the bell"],
-	"6-2": ["Buoys still deep water too", "Ripples mean hands. Step away", "Your shadow does what you did. Keep moving",
-			"One bell down here still rings", "Watch the lure. The lake goes still first", "Ring the bell"],
-	"6-3": ["Something vast is waking. When it comes, run", "Ring the bell"],
-	"6-4": ["It remembers every place you rang", "Ring the sunken bells"],
+	"6-1": ["Hushlings won't enter lantern light. Stay near one"],
+	"6-2": ["Your shadow copies you a moment later. Keep moving"],
+	"6-3": [],
+	"6-4": ["Ring a sunken bell. Its peal lets you hit the Hush"],
 }
 const MAX_GAP := 78          # W6: tiles between checkpoints
 const STONE_EVERY := 14
@@ -919,7 +918,8 @@ func _test_layout(lv: RefCounted) -> void:
 	_check(chase == sp.get("chase", []), "%s: chase ranges %s (%s)" % [id, sp.get("chase", []), chase])
 	for r in chase:
 		_check(altars.has(r[0]) and altars.has(r[1]), "%s: each chase runs altar to altar (%s)" % [id, r])
-	# Signs: the teaching signs and the two inscriptions (the Hush's, lowercase).
+	# Signs: the teaching signs and the inscription (the Hush's, lowercase),
+	# and nothing else.
 	var hints := Array(lv.hints)
 	for s in SIGNS[id]:
 		_check(hints.has(s), "%s has the sign '%s'" % [id, s])
@@ -927,6 +927,7 @@ func _test_layout(lv: RefCounted) -> void:
 	var ins: Array = (Story.get_script_constant_map().get("INSCRIPTIONS", {}) as Dictionary).get(id, [])
 	for s in ins:
 		_check(hints.has(s), "%s carries its inscription '%s'" % [id, s])
+	_check(ins.size() == 1 and hints.size() == SIGNS[id].size() + ins.size(), "%s: its signs and no others %s" % [id, hints])
 	_check(lv.count("sconce") == 0, "%s: no wall sconces (in W6 `c` gives no light)" % id)
 	_check(lv.count("sign") == hints.size(), "%s: a sign for every hint" % id)
 	# Every Hollin how-to the level fires exists (the barks are story.gd's).
@@ -1019,7 +1020,8 @@ func _test_layout(lv: RefCounted) -> void:
 		_check(s3.x >= 0 and tight, "%s: sigil 3 at the end of a star route of one-tile floats" % id)
 	_check(lv.count("sigil") == 3, "%s: three sigils" % id)
 	# Safe first (spec §0.3): the first float line over shallow water, the
-	# first buoy in a shallow pool, both with a sign within 12 tiles before.
+	# first buoy in a shallow pool, each taught alone (by deep.gd's first-time
+	# barks since the sign cut).
 	if id == "6-1":
 		var first_f := Vector2i(9999, 0)
 		var first_b := Vector2i(9999, 0)
@@ -1031,7 +1033,6 @@ func _test_layout(lv: RefCounted) -> void:
 				first_b = c
 		_check(not lv.is_deep(first_f.x, first_f.y), "6-1: the first float is over shallow water")
 		_check(not lv.is_deep(first_b.x, first_b.y), "6-1: the first buoy stands in a shallow pool")
-		_check(_sign_before(lv, first_f.x, 12) and _sign_before(lv, first_b.x, 12), "6-1: a sign within 12 tiles before each")
 		_check(_threat_free(lv, first_f.x, 8) and _threat_free(lv, first_b.x, 8), "6-1: no monster within 8 tiles of either")
 		_check(int(lv.hush_cols.size()) >= 2, "6-1: two Hush zones (taught, then twisted)")
 	if id == "6-2":
@@ -1039,15 +1040,7 @@ func _test_layout(lv: RefCounted) -> void:
 		for e in lv.entities:
 			if e["kind"] == "grasp" and (e["cell"] as Vector2i).x < first_g.x:
 				first_g = e["cell"]
-		_check(first_g.x < 9999 and _sign_before(lv, first_g.x, 12) and _threat_free(lv, first_g.x, 8), "6-2: the first grasp is taught alone, with a sign")
-
-
-func _sign_before(lv: RefCounted, x: int, within: int) -> bool:
-	for e in lv.entities:
-		var c: Vector2i = e["cell"]
-		if e["kind"] == "sign" and c.x <= x and x - c.x <= within:
-			return true
-	return false
+		_check(first_g.x < 9999 and _threat_free(lv, first_g.x, 8), "6-2: the first grasp is taught alone")
 
 
 func _threat_free(lv: RefCounted, x: int, within: int) -> bool:

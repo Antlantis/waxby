@@ -8,17 +8,18 @@ extends SceneTree
 ##   header: until then "skipped") names it back, ids exact.
 ## - The retrofits: 1-3 keeps every x before B_ROOF (and B_BELL is v2's, 30
 ##   on); 2-2 keeps its width and all but C2_LANTERNS' columns 26-37 and the
-##   new sign. Every built exit (1-3, 2-2 and whichever of 3-3, 4-2, 5-3, 6-2
+##   exit sign's column (both as v2 drew them less the signs the sign cut
+##   took). Every built exit (1-3, 2-2 and whichever of 3-3, 4-2, 5-3, 6-2
 ##   carry their secret: header) hides one silver bell whose false stone
-##   secrets.gd finds (the F bordering its attic), with its world's sign
-##   within 12 tiles.
+##   secrets.gd finds (the F bordering its attic); no sign points at it (its
+##   world's secret_hint bark does, every visit).
 ## - Every secret level: 250 x 15, the gilt theme, music secret, its area,
 ##   a Warden of a known kind with two Omens, a secret prize, three sigils,
 ##   no Dread and no Lidlurk, 5-10 monsters at the spec's threat per 100
 ##   tiles, three altars (about x 67, 141, 205) with the start, altars and
 ##   bell at most 75 tiles apart, the Warden room last with the D, the grave
-##   candle's floor and the S in it, the old Wicks' sign first and the Lost
-##   Wick's inscription; a Gustling Warden placed by gustling.gd's rule;
+##   candle's floor and the S in it, the Lost Wick's inscription its only
+##   sign; a Gustling Warden placed by gustling.gd's rule;
 ##   every anoint: cell holds a monster.
 ## - The bot's way to each silver bell: up to the Warden's door (past it is
 ##   the fight's arena) at most 4 jumps in a row without stone over a pit (a
@@ -51,20 +52,17 @@ const ReachSearch := preload("res://scripts/reach_search.gd")
 const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
 const TILE := 32
 const DT := 1.0 / 120.0
-const OLD_WICKS := "The old Wicks came this way. So can you"
-# v2's 1-3 (sha256 of the rows, padded with air): its first 174 columns (to
+# v2's 1-3 (sha256 of the rows, padded with air), less the signs the sign cut
+# took (and with the moth sign moved to B_GLIDE): its first 174 columns (to
 # the end of B_ORGAN), and B_BELL's 32 (v2's 174-205, now 204-235).
-const V2_13_BEFORE := "b84eb5601fec786673b76069d9b4aa5f451f47b9fff77e56b5f1fe715d7f29b4"
-const V2_13_BELL := "8006a4e4b36b429217934ea0cc763e27ee5096fab0983fb737c28e1c95916143"
-# v2's 2-2 with x 203 (the new sign) and 206-217 (C2_LANTERNS 26-37) masked.
-const V2_22_MASKED := "ca7b16c077e3cf13bf4926469fdf05c435eec63102944b3f093fee0f08312b35"
+const V2_13_BEFORE := "39f5c8fe695fc5e05da9ef777a3bbc60792eee5d2c2d94873ebed602bbb51f7a"
+const V2_13_BELL := "1ea1853ca8bad2f6a081c784951b0ccbc4484afc424039731496e690c85fde0f"
+# v2's 2-2, less the cut signs, with x 203 (the exit sign's, cut) and 206-217
+# (C2_LANTERNS 26-37) masked.
+const V2_22_MASKED := "2b6685fbb3148d2ed3137e50e24bb25b7caed33e74ca0e9f47fc22b21c02a0a4"
 # Spec §3.4.5-§3.7.5 and §3.8: each secret level's threat per 100 tiles (its
 # monsters' EnemyKinds costs, the Warden aside).
 const THREAT := {"1-S": 5.6, "2-S": 3.8, "3-S": 4.4, "4-S": 5.2, "5-S": 2.8, "6-S": 4.1}
-# Spec §3.9: each world's exit sign.
-const EXIT_SIGNS := {1: "Silver light, where no light should be", 2: "The guild counted lamps. Three, then up",
-		3: "These spores rise. Where to?", 4: "The mainspring is wound from above", 5: "A lamp that lights nothing?",
-		6: "One bell down here still rings"}
 const CALLINGS := ["knight", "witch", "runner", "founder", "sexton"]
 const SecretsScript := preload("res://scripts/features/secrets.gd")
 const ALTARS_AT := [67, 141, 205]
@@ -394,8 +392,12 @@ func _test_retrofits() -> void:
 
 func _exit_rules(lv: RefCounted, secret: String) -> void:
 	## A built exit: one silver bell, the false stone secrets.gd finds for it
-	## (the F bordering its attic, as in play), its world's sign within 12.
+	## (the F bordering its attic, as in play), and its world's hint bark,
+	## said every visit (no sign points at it since the sign cut).
 	_check(str(lv.secret) == secret, "%s: secret: %s" % [lv.id, secret])
+	var Story = load("res://scripts/story.gd")
+	var hint := "secret_hint_%d" % int(lv.world)
+	_check(Story.BARKS.has(hint) and Story.bark_every(hint), "%s: its hint bark %s plays every visit" % [lv.id, hint])
 	var bells := _ents(lv, "silver_bell")
 	_check(bells.size() == 1, "%s: one silver bell" % lv.id)
 	if bells.is_empty():
@@ -404,18 +406,6 @@ func _exit_rules(lv: RefCounted, secret: String) -> void:
 	var nook: Array = SecretsScript.nook_of(lv, c)
 	var seal: Array = SecretsScript.seal_of(lv, c, nook)
 	_check(not seal.is_empty(), "%s: the silver bell at %s has its false stone (%s; its attic %d cells)" % [lv.id, c, seal, nook.size()])
-	var sign: String = EXIT_SIGNS.get(int(lv.world), "")
-	var best := 999
-	for e in _ents(lv, "sign"):
-		if str(e["text"]) != sign:
-			continue
-		# Within 12 tiles of the bell or of the false stone that hides it.
-		var d := absi(e["cell"].x - c.x)
-		for q in seal:
-			d = mini(d, absi(e["cell"].x - (q as Vector2i).x))
-		best = mini(best, d)
-	_check(best <= 12, "%s: its sign \"%s\" stands within 12 tiles of the bell or its false stone (%s)" % [lv.id, sign,
-			"none" if best == 999 else "%d tiles" % best])
 
 
 func _test_exits() -> void:
@@ -497,10 +487,10 @@ func _test_level_rules(lv: RefCounted) -> void:
 				else:
 					other += 1
 	_check(door >= 3, "%s: the room's door is in its left wall (%d cells)" % [id, door])
-	# Signs: the old Wicks' first, the Lost Wick's inscription.
+	# Signs: the Lost Wick's inscription, and no other since the sign cut
+	# (first_secret opens every secret level).
 	var signs := _ents(lv, "sign")
-	signs.sort_custom(func(a, b): return a["cell"].x < b["cell"].x)
-	_check(not signs.is_empty() and str(signs[0]["text"]) == OLD_WICKS, "%s: its first sign: \"%s\"" % [id, OLD_WICKS])
+	_check(signs.size() == 1, "%s: one sign (%d)" % [id, signs.size()])
 	var Story = load("res://scripts/story.gd")
 	var ins: Array = (Story.INSCRIPTIONS as Dictionary).get(id, [])
 	var has_ins := false

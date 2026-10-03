@@ -8,7 +8,8 @@ there yet is skipped, so a partial build still writes what it has.
 
 World 1 (the Sunken Cathedral) keeps its v1 layouts with the v2 retrofit;
 World 2 (the Tallow Deep) its four v2 levels: both are written byte for byte
-as v2 wrote them (tests/test_export.gd holds their checksums).
+as v2 wrote them, less the signs the sign cut took (tests/test_export.gd
+holds their checksums).
 The reachability bot in tests/test_core.gd must reach every sigil and bell;
 tests/test_content.gd runs it again with the waxfalls on.
 

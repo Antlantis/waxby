@@ -1142,7 +1142,7 @@ const BARKS := {
 	"boss_3_a":   ["taper:faint", "Follow her heart, sprout. It blooms where she can't guard it."],     # the rule hint
 	"rootmother_p2": ["rootmother:wrath", "Mine! Every bone in this garden is MINE!", "every"],       # boss_phase
 	"rootmother_p3": ["taper:faint", "She's letting go, sprout. Help her let go.", "every"],         # boss_phase
-	"first_vine":  ["hollin:grin", "Vines! Grab on, climb up or down, jump off. They'll hold you."],  # orchard.gd
+	"first_vine":  ["hollin:grin", "Vines! Hold jump to climb. Arrow and jump to leap off."],  # orchard.gd
 	"first_spore": ["hollin:worried", "Spores drink light! Your flame shrinks in the cloud. Get out."],
 	# ---- World 4
 	"beat_4_1_a": ["hollin:grin", "Brr! I can feel the cold through your smoke. Keep moving, keep warm."],
@@ -1205,16 +1205,17 @@ const BARKS := {
 	"lost_wick_4": ["rook", "Rooks raised me. I never learned stairs. You won't need them either."],
 	"lost_wick_5": ["solder", "I leaded every pane of her window. Every one still holds. So will you."],
 	"lost_wick_6": ["abbess", "I stamped once, and the Hush flinched. Stamp once for me."],
-	# The optional exit hints (spec §3.9), near each odd sight.
-	"secret_hint_1": ["taper:warm", "Is that moonlight? We're under a hill, sprout."],
-	"secret_hint_2": ["waxley:shifty", "My guild's vault? Above the third lamp. Knock hard."],
-	"secret_hint_3": ["taper:faint", "Spores don't fall up. Something above is breathing."],
-	"secret_hint_4": ["hollin:grin", "The steam's going up. Clocks wind from the top, you know."],
-	"secret_hint_5": ["hollin:grin", "A lamp with nothing to light? Light it anyway."],
-	"secret_hint_6": ["hollin:worried", "That one isn't drowned. Listen. It's still ringing."],
+	# The optional exit hints (spec §3.9), near each odd sight: every visit
+	# (secrets.gd says each once a visit, until its secret is found).
+	"secret_hint_1": ["taper:warm", "Is that moonlight? We're under a hill, sprout.", "every"],
+	"secret_hint_2": ["waxley:shifty", "My guild's vault? Above the third lamp. Knock hard.", "every"],
+	"secret_hint_3": ["taper:faint", "Spores don't fall up. Something above is breathing.", "every"],
+	"secret_hint_4": ["hollin:grin", "The steam's going up. Clocks wind from the top, you know.", "every"],
+	"secret_hint_5": ["hollin:grin", "A lamp with nothing to light? Light it anyway.", "every"],
+	"secret_hint_6": ["hollin:worried", "That one isn't drowned. Listen. It's still ringing.", "every"],
 	# Hers, in Hollin's voice, for a player back in 1-3 or 3-3 while she rests.
-	"secret_hint_1_hollin": ["hollin:grin", "Is that moonlight? We're under a hill, Wick!"],
-	"secret_hint_3_hollin": ["hollin:worried", "Spores don't fall up. Something up there is breathing."],
+	"secret_hint_1_hollin": ["hollin:grin", "Is that moonlight? We're under a hill, Wick!", "every"],
+	"secret_hint_3_hollin": ["hollin:worried", "Spores don't fall up. Something up there is breathing.", "every"],
 	# ---- The modes (modes/*.gd)
 	"descent_5":  ["hollin:grin", "Five rooms down. It's dreaming of the cathedral. I know this bit."],
 	"descent_10": ["hollin:worried", "Ten. The dreams get stranger from here. Mind your light."],
@@ -1304,24 +1305,26 @@ const MEDAL_LINES := {
 
 # The words on each level's signs (the story draft §3.10, the secrets' re-keyed
 # by spec §6.5.10), for the level streams to place in their hints, in x order.
-# W3 gravestones, W4 Tickwell's brass notes, W5 the windows, W6 the Hush.
+# W3 gravestones, W4 Tickwell's brass notes, W5 the windows, W6 the Hush. One
+# a level at most since the sign cut (the author's review: a lore line stands
+# where he stops anyway, and a later scene pays it off); 4-2 has none.
 const INSCRIPTIONS := {
-	"3-1": ["Here lies Brother Pim. He kept the soup warm.", "Here lies Sister Dell. Never dropped a candle. Once."],
-	"3-2": ["Here lies Old Hobb. Planted crooked. Grew anyway.", "Here lies Mother Yarrow's cat. A very good cat."],
-	"3-3": ["Here lies nobody yet. Mother Yarrow is patient.", "Here lies Brother Mott. Scared of the dark. Not now."],
-	"3-4": ["Here lies Mother Yarrow. She kept us all growing.", "Water the trees. — Y."],
-	"4-1": ["Wind at eleven. Oil at half past. NEVER be late. — T.", "Gear seven squeaks. It is not haunted. — T."],
-	"4-2": ["Whoever keeps borrowing my oil: I know. — T.", "The bells ring down. Mind your head. — T."],
-	"4-3": ["I was late. One minute. My fault. — T.", "If I hold the minute, it won't be. — T."],
-	"4-4": ["Hold it. Hold it. Hold it. — T.", "Tick."],
-	"5-1": ["Here the girl with the candle came down alone.", "She was very afraid."],
-	"5-2": ["She went anyway.", "She had a song, and no one to sing it to."],
-	"5-3": ["She sang, and the dark slept.", "They made her a saint. She would have hated that."],
-	"5-4": ["Every window needs a light behind it.", "This window is empty. Its saint walked off."],
-	"6-1": ["it was so quiet before you.", "no one comes here. why did you?"],
-	"6-2": ["every light that comes here goes out.", "i remember a song. i do not remember how it went."],
-	"6-3": ["i ate the bells. they tasted of nothing.", "i am always, always hungry."],
-	"6-4": ["come closer.", "closer."],
+	"3-1": ["Here lies Brother Pim. He kept the soup warm."],
+	"3-2": ["Here lies Old Hobb. Planted crooked. Grew anyway."],
+	"3-3": ["Here lies nobody yet. Mother Yarrow is patient."],
+	"3-4": ["Here lies Mother Yarrow. Water the trees."],
+	"4-1": ["Wind at eleven. Oil at half past. NEVER be late. — T."],
+	"4-2": [],
+	"4-3": ["I was one minute late. If I hold it, I never was. — T."],
+	"4-4": ["Hold it. Hold it. Hold it. — T."],
+	"5-1": ["A girl with a candle came down alone. She was afraid."],
+	"5-2": ["She went anyway, with a song and no one to sing it to."],
+	"5-3": ["She sang, and the dark slept."],
+	"5-4": ["They made her a saint. She would have hated that."],
+	"6-1": ["no one comes here. why did you?"],
+	"6-2": ["i remember a song. i do not remember how it went."],
+	"6-3": ["i ate the bells. they tasted of nothing."],
+	"6-4": ["come closer. closer."],
 	"1-S": ["Every dusk, a lamp. Every lamp, a little braver."],
 	"2-S": ["No credit. No refunds. No Wick left in the dark."],
 	"3-S": ["The first tree. Planted by a boy with a trowel."],

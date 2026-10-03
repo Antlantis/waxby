@@ -1,14 +1,14 @@
 """The six secret levels, 1-S to 6-S (spec §3.4.5, §3.5.5, §3.6.5, §3.7.5,
-§3.8, §3.9; WLS). Each is 250 tiles: a start with the old Wicks' sign, four
-of its world's verbs at their hardest (star-route tightness, but never more
-than 4 jumps without stone and stone every 14 tiles or less), three altars
-(about x 67, 141 and 205, the last at the Warden's door) and the Warden's
-room (34 wide, the last section): the door seals behind you, the Warden
-(header warden:, placed with D) has a boss bar, and when it falls the Lost
-Wick's grave candle lights, the prize appears on it and the silver bell (S)
-rises beside it (scripts/features/secrets.gd). The grave candle stands two
-tiles left of the S, on the same floor; the Lost Wick's inscription
-(story.gd INSCRIPTIONS) is the sign just before it.
+§3.8, §3.9; WLS). Each is 250 tiles: a start, four of its world's verbs at
+their hardest (star-route tightness, but never more than 4 jumps without
+stone and stone every 14 tiles or less), three altars (about x 67, 141 and
+205, the last at the Warden's door) and the Warden's room (34 wide, the last
+section): the door seals behind you, the Warden (header warden:, placed with
+D) has a boss bar, and when it falls the Lost Wick's grave candle lights, the
+prize appears on it and the silver bell (S) rises beside it
+(scripts/features/secrets.gd). The grave candle stands two tiles left of the
+S, on the same floor; the Lost Wick's inscription (story.gd INSCRIPTIONS) is
+the sign just before it, the level's only one (first_secret's bark opens it).
 
 Private headers read by features/secrets.gd: warden_room (the room's
 columns, its wall columns included: the door is every open cell of the two
@@ -23,8 +23,6 @@ to its own height; ice slides 134 px from a run; a gust pushes 120 px/s.
 from common import block, x_of
 
 LEVELS = []
-
-OLD_WICKS = 'The old Wicks came this way. So can you'
 
 
 def _room(rows, section):
@@ -67,7 +65,7 @@ RF_START = block('''
  9|....................
 10|..c.................
 11|...............#####
-12|.P...@.........#####
+12|.P.............#####
 13|####################
 14|####################
 ''')
@@ -236,7 +234,7 @@ RF_WARDEN = block('''
 _entry({
     'id': '1-S', 'name': 'The Roof of Evenbell', 'subtitle': '1-S', 'music': 'secret', 'theme': 'nave_gilt', 'area': 6,
     'warden': 'Deacon Thistle|thornback|Warded,Burning', 'secret_prize': 'hymnal',
-    'hints': [OLD_WICKS, 'Every dusk, a lamp. Every lamp, a little braver.'],
+    'hints': ['Every dusk, a lamp. Every lamp, a little braver.'],
     'sections': [RF_START, RF_SLATES, RF_ALTAR, RF_CHIMNEYS, RF_ROOST, RF_ALTAR2, RF_SPIRE, RF_WALTAR, RF_WARDEN],
 })
 
@@ -260,7 +258,7 @@ CV_START = block('''
  9|###.................
 10|###.................
 11|###.................
-12|###P.@..............
+12|###P................
 13|####################
 14|####################
 ''')
@@ -426,7 +424,7 @@ CV_WARDEN = block('''
 _entry({
     'id': '2-S', 'name': "The Chandlers' Vault", 'subtitle': '2-S', 'music': 'secret', 'theme': 'tallow_gilt', 'area': 12,
     'warden': 'The Empty Abbot|hollow_helm|Swift,Vengeful', 'secret_prize': 'deep_chalice',
-    'hints': [OLD_WICKS, 'No credit. No refunds. No Wick left in the dark.'],
+    'hints': ['No credit. No refunds. No Wick left in the dark.'],
     'sections': [CV_START, CV_RAFTS, CV_ALTAR, CV_FALLS, CV_LAMPS, CV_ALTAR2, CV_STRONGROOM, CV_WALTAR, CV_WARDEN],
 })
 
@@ -449,7 +447,7 @@ RC_START = block('''
  4|..................{.
  5|............o.....{.
  6|..........o.......{.
- 7|..P...@...........{.
+ 7|..P...............{.
  8|###############...{.
  9|###############...{.
 10|###############...{.
@@ -617,7 +615,7 @@ RC_WARDEN = block('''
 _entry({
     'id': '3-S', 'name': 'The Rootcrown', 'subtitle': '3-S', 'music': 'secret', 'theme': 'orchard_gilt', 'area': 17,
     'warden': 'Nine-Knuckle Nell|creepbone|Warded,Vengeful', 'secret_prize': 'gravebloom',
-    'hints': [OLD_WICKS, 'The first tree. Planted by a boy with a trowel.'],
+    'hints': ['The first tree. Planted by a boy with a trowel.'],
     'sections': [RC_START, RC_CHAIN, RC_ALTAR, RC_PODS, RC_KNOTS, RC_ALTAR2, RC_CROWN, RC_WALTAR, RC_WARDEN],
     'anoint_at': [(RC_CHAIN, 10, 8), (RC_KNOTS, 13, 7)],
 })
@@ -643,7 +641,7 @@ MS_START = block('''
  5|....................
  6|....................
  7|..........o.o.......
- 8|..P.@.....@.........
+ 8|..P.................
  9|########IIIIII######
 10|####################
 11|####################
@@ -808,7 +806,7 @@ _entry({
     'id': '4-S', 'name': 'The Mainspring', 'subtitle': '4-S', 'music': 'secret', 'theme': 'carillon_gilt', 'area': 22,
     'warden': 'Great-Aunt Hoot|hoarowl|Warded,Echoing', 'secret_prize': 'hour_hand',
     'cog_phase': {(MS_TEETH, 17): 0.25, (MS_TEETH, 25): 0.5},
-    'hints': [OLD_WICKS, 'Every jump on the tick', 'Rooks don\'t take stairs. Neither did he.'],
+    'hints': ['Rooks don\'t take stairs. Neither did he.'],
     'sections': [MS_START, MS_TEETH, MS_ALTAR, MS_SWINGS, MS_BELTS, MS_ALTAR2, MS_SPRING, MS_WALTAR, MS_WARDEN],
 })
 
@@ -833,7 +831,7 @@ RW_START = block('''
  5|....................
  6|....................
  7|............o.o.....
- 8|..P..@..............
+ 8|..P.................
  9|####################
 10|####################
 11|####################
@@ -999,7 +997,7 @@ RW_WARDEN = block('''
 _entry({
     'id': '5-S', 'name': 'The Rose Window', 'subtitle': '5-S', 'music': 'secret', 'theme': 'sanctum_gilt', 'area': 27,
     'warden': 'Cherub Blusterby|gustling|Swift,Glassed', 'secret_prize': 'saints_lens',
-    'hints': [OLD_WICKS, 'Lead holds glass. Glass holds light. Hold on.'],
+    'hints': ['Lead holds glass. Glass holds light. Hold on.'],
     'sections': [RW_START, RW_TRACERY, RW_ALTAR, RW_LAMPS, RW_PETALS, RW_ALTAR2, RW_EYE, RW_WALTAR, RW_WARDEN],
 })
 
@@ -1027,7 +1025,7 @@ LM_START = block('''
  8|....................
  9|....................
 10|............o.o.....
-11|..P..@..............
+11|..P.................
 12|####################
 13|####################
 14|####################
@@ -1189,6 +1187,6 @@ LM_WARDEN = block('''
 _entry({
     'id': '6-S', 'name': 'The Lightless Mile', 'subtitle': '6-S', 'music': 'secret', 'theme': 'hushdeep_gilt', 'area': 31,
     'warden': 'Old Lampgullet|lurecoil|Warded,Hushed', 'secret_prize': 'hollins_ember',
-    'hints': [OLD_WICKS, 'She stamped once. The Hush remembers.'],
+    'hints': ['She stamped once. The Hush remembers.'],
     'sections': [LM_START, LM_FLOATS, LM_ALTAR, LM_TOLLS, LM_GRASP, LM_ALTAR2, LM_MILE, LM_WALTAR, LM_WARDEN],
 })

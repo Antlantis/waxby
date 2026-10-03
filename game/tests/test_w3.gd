@@ -625,18 +625,13 @@ func _test_headers(levels: Dictionary) -> void:
 		if dreads.has(id):
 			_check(str(lv.headers.get("dread", "")) == dreads[id] and lv.count("dread") == 1, "%s: its Dread (%s)" % [id, dreads[id]])
 		_check(lv.count("sigil") == 3, "%s has three sigils" % id)
-		# The two inscriptions (story.gd), in x order among the hints.
+		# Its gravestone (story.gd's one inscription since the sign cut) on a sign.
 		var ins: Array = Story.INSCRIPTIONS.get(id, [])
-		var signs := []
+		var texts := []
 		for e in lv.entities:
 			if e["kind"] == "sign":
-				signs.append([e["cell"].x, str(e["text"])])
-		signs.sort_custom(func(a, b): return a[0] < b[0])
-		var texts: Array = signs.map(func(s): return s[1])
-		var at := []
-		for t in ins:
-			at.append(texts.find(t))
-		_check(ins.size() == 2 and not at.has(-1) and at[0] < at[1], "%s carries its two inscriptions in order (%s)" % [id, at])
+				texts.append(str(e["text"]))
+		_check(ins.size() == 1 and texts.has(ins[0]), "%s carries its inscription (%s)" % [id, ins])
 	var b = levels["3-4"]
 	_check(b.boss == "rootmother" and str(b.headers.get("boss_music", "")) == "rootmother"
 			and str(b.story.get("boss", "")) == "boss_3_before" and str(b.story.get("end", "")) == "boss_3_after",
@@ -902,7 +897,8 @@ func _test_secret_exit(lv: RefCounted) -> void:
 					sealed = false
 		_check(sealed and not rise_sign, "3-3 without 3-S: the attic and its crack are plain stone, and no sign speaks of rising spores")
 		return
-	_check(rise_sign, "with 3-S built, the sign by the updraft asks where the spores go")
+	# No sign points at it since the sign cut: secret_hint_3 says it, near the sight.
+	_check(not rise_sign, "with 3-S built, no sign asks where the spores go (the bark does)")
 	var c: Vector2i = bell[0]["cell"] if bell.size() == 1 else ATTIC
 	_check(c == ATTIC and lv.tile(c.x, c.y) == LevelData.AIR, "the attic is at %s" % [c])
 	var crack := 0
