@@ -4,7 +4,8 @@ extends SceneTree
 # its plinth's candle lit), on a fresh save (no hero yet); then the map's
 # Callings screen with a card open, which names the ease the same way. Then
 # the name: the oath's entry under Taper's question (name_entry), the same
-# with a phone's keyboard up (a stand-in grey block 210 high: name_kb), the
+# with a phone's keyboard up (a stand-in grey block 210 high over the box:
+# name_kb, where the entry's heading still asks), the
 # welcome that says the name given (name_welcome), and the Sheet's Rename
 # (sheet_rename, sheet_named).
 #   godot --path game --resolution 1266x585 --script res://../tools/shot_story_oath.gd -- <out_dir> [notch]

@@ -25,6 +25,7 @@ const PANEL_W := 520.0
 const PANEL_H := 124.0
 const TOP := 34.0              # the panel's top under the safe top: under a scene's letterbox (28)
 const PAD := 16.0
+const PROMPT_Y := 28.0         # the prompt's baseline in the panel (the oath's: Taper's question)
 const FIELD_Y := 40.0          # the field's row in the panel
 const FIELD_H := 44.0          # (a thumb tall: UI.TAP_H and more)
 const KEY_GAP := 8.0           # the panel's bottom to the keyboard's top, at least
@@ -236,7 +237,7 @@ func _draw() -> void:
 	var P := panel_rect()
 	UI.panel(self, P, Color(accent, 0.85), Color(UI.PANEL, 0.97), 14.0)
 	var tw := P.size.x - PAD * 2.0
-	UI.text(self, Vector2(P.position.x, P.position.y + 28.0), prompt, UI.fit_size(prompt, tw, 20, 14, "title", 700), UI.GOLD,
+	UI.text(self, Vector2(P.position.x, P.position.y + PROMPT_Y), prompt, UI.fit_size(prompt, tw, 20, 14, "title", 700), UI.GOLD,
 			HORIZONTAL_ALIGNMENT_CENTER, P.size.x, "title", 700, 4)
 	var hint := HINT % Story.NAME_MAX
 	UI.text(self, Vector2(P.position.x, P.end.y - 13.0), hint, UI.fit_size(hint, tw, 11, 9, "body", 700), UI.MUTED,

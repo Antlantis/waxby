@@ -404,6 +404,57 @@ func _fresh_hero(level := 1, cls := "knight") -> void:
 
 # ---------------------------------------------------------------- layout
 
+func _name_plates() -> void:
+	## The hero's own name on the map's pill and the Sheet's top-bar plate,
+	## his calling and level beside it while they fit (at the phone's own
+	## 844 x 390, "Ash" keeps both); the longest name a player can give, at
+	## the level cap with points waiting, still fits: the pill clear of the
+	## bells, their chips and the buttons, the plate's words inside it (cut
+	## short only where nothing else fits).
+	var wide := root.content_scale_size.x >= 844
+	for named in ["Ash", "WWWWWWWWWWWW"]:
+		_fresh_hero(7)
+		if named.length() > 3:
+			game.add_xp(Progression.total_to(Progression.CAP))
+		game.set_hero_name(named)
+		var lv := int(game.hero()["level"])
+		_check(game.hero_name() == named and (named == "Ash" or int(game.hero().get("points", 0)) > 0), "(%s at Lv %d)" % [named, lv])
+		var m = load("res://scripts/map_screen.gd").new()
+		root.add_child(m)
+		await _frames(2)
+		var pw: Dictionary = m.pill_words()
+		var pr: Rect2 = m.pill_rect()
+		var said := str(pw["name"])
+		_check(said == named or (said.ends_with("…") and named.begins_with(said.trim_suffix("…"))), "the map's pill names him: %s" % [pw])
+		_check(str(pw["sub"]) in ["Candleknight Lv %d" % lv, "Lv %d" % lv, ""] and int(pw["size"]) >= 10, "and his calling and level while they fit: %s" % [pw])
+		if named == "Ash" and wide:
+			_check(pw["sub"] == "Candleknight Lv 7", "at the phone's own width, 'Ash' keeps his calling on the pill")
+		_inside(pr, "map hero plate, '%s'" % named)
+		for r in m.bell_rects():
+			_apart(r, pr, "map bell and '%s's plate" % named)
+		for d in Combat.DIFFS:
+			var cr: Rect2 = m.chip_rect(d)
+			if cr.has_area():
+				_apart(cr, pr, "%s chip and '%s's plate" % [d, named])
+		for b in _buttons(m, []):
+			_apart(pr, b.get_global_rect(), "'%s's plate and button '%s'" % [named, b.text])
+		m.queue_free()
+		var h = load("res://scripts/hero_screen.gd").new()
+		root.add_child(h)
+		await _frames(2)
+		var pl: Dictionary = h.plate_words()
+		said = str(pl["name"])
+		var used: float = 30.0 + UI.text_width(said, pl["size"], "title", 700) + UI.text_width(pl["lvl"], 15, "body", 700)
+		_check(said == named or (said.ends_with("…") and named.begins_with(said.trim_suffix("…"))), "the Sheet's plate names him: %s" % [pl])
+		_check(str(pl["lvl"]) in ["Candleknight · Level %d" % lv, "Level %d" % lv, ""] and int(pl["size"]) >= 11, "and his calling and level while they fit: %s" % [pl])
+		_check(used <= h.plate_rect().size.x + 0.5, "its words fit the plate (%.0f of %.0f)" % [used, h.plate_rect().size.x])
+		if named == "Ash" and wide:
+			_check(pl["lvl"] == "Candleknight · Level 7", "at the phone's own width, 'Ash' keeps his calling on the plate")
+		h.queue_free()
+		await _frames(1)
+	_fresh_hero(7)
+
+
 func _test_hud_layout() -> void:
 	var w := _stub_world()
 	root.add_child(w)
@@ -717,6 +768,7 @@ func _test_screen_layouts() -> void:
 				for r in h.panel.slot_rects() + h.panel.codex_rects():
 					_inside(_local(r, h.panel), "belt tile")
 	h.queue_free()
+	await _name_plates()
 	# Pause, on its own.
 	var pm = load("res://scripts/pause_menu.gd").new()
 	root.add_child(pm)

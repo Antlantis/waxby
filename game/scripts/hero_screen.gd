@@ -8,7 +8,8 @@ extends Control
 ## once that panel is in the build. At level 30, with one capstone owned, the
 ## Skills tab plays the bark second_capstone over the Sheet, once a save.
 ## The Stats tab's Rename opens the oath's name entry (name_entry.gd) over
-## the Sheet: the name given is the save's, every calling's.
+## the Sheet: the name given is the save's, every calling's. The top bar's
+## name plate says it, his calling and level beside it.
 
 signal back
 signal changed
@@ -18,6 +19,7 @@ const Classes := preload("res://scripts/classes.gd")
 const NameEntry := preload("res://scripts/name_entry.gd")
 const TABS := ["stats", "skills", "gear", "belt", "look"]
 const BAR_H := 46.0               # the top bar: Back, the name plate, the tabs
+const PLATE_MIN := 16             # the plate's name never smaller beside his calling (else the calling goes)
 const TAB_NAME := {"stats": "Stats", "skills": "Skills", "gear": "Gear", "belt": "Belt", "look": "Look"}
 const PANEL_PATH := {"stats": "res://scripts/stats_panel.gd", "skills": "res://scripts/skills_panel.gd",
 		"gear": "res://scripts/gear_panel.gd", "belt": "res://scripts/belt_panel.gd",
@@ -322,14 +324,44 @@ func _draw() -> void:
 	var cy := s.position.y + 2.0 + UI.TAP_H * 0.5
 	draw_circle(Vector2(x + 8.0, cy), 6.0, col)
 	draw_arc(Vector2(x + 8.0, cy), 8.0, 0, TAU, 20, Color(UI.INK, 0.9), 2.0)
-	var name := str(Classes.info(cls)["name"])
-	var lvl := "Level %d" % int(h.get("level", 1))
-	var room := P.size.x - 30.0 - UI.text_width(lvl, 15, "body", 700)
-	var size := UI.fit_size(name, room, 21, 13, "title", 700)
-	UI.text(self, Vector2(x + 22.0, cy + 7.0), name, size, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700, 4)
-	var nw := UI.text_width(name, size, "title", 700)
-	UI.text(self, Vector2(x + 30.0 + nw, cy + 6.0), lvl, 15, UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 700)
+	var pw := plate_words()
+	UI.text(self, Vector2(x + 22.0, cy + 7.0), pw["name"], pw["size"], UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700, 4)
+	var nw := UI.text_width(pw["name"], pw["size"], "title", 700)
+	UI.text(self, Vector2(x + 30.0 + nw, cy + 6.0), pw["lvl"], 15, UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 700)
 	draw_line(Vector2(s.position.x, s.position.y + BAR_H), Vector2(s.end.x, s.position.y + BAR_H), Color(UI.PANEL_EDGE, 0.5), 1.0)
+
+
+func hero_name() -> String:
+	## The hero's own name (the save's; Waxby with no Game).
+	var g := get_node_or_null("/root/Game")
+	return str(g.hero_name()) if g != null and g.has_method("hero_name") else "Waxby"
+
+
+func plate_words() -> Dictionary:
+	## The name plate's words: {name: his own, size, lvl: "Candleknight ·
+	## Level 9"}, shrunk to fit: the name from 21 down to 16 beside his
+	## calling; a longer one (or a narrow screen) leaves just "Level 9" (the
+	## Stats tab names the calling) down to 13, then the name alone down to
+	## 11, cut short ("Bartholo…") only if it still doesn't fit.
+	var h := _hero()
+	var room := plate_rect().size.x - 30.0
+	var nm := hero_name()
+	var level := "Level %d" % int(h.get("level", 1))
+	var tries := [["%s · %s" % [Classes.info(str(h.get("cls", "knight")))["name"], level], PLATE_MIN], [level, 13], ["", 11]]
+	var lvl := ""
+	var size := 11
+	var r := room
+	for t in tries:
+		lvl = t[0]
+		r = room - UI.text_width(lvl, 15, "body", 700)
+		size = UI.fit_size(nm, r, 21, t[1], "title", 700)
+		if UI.text_width(nm, size, "title", 700) <= r:
+			break
+	if UI.text_width(nm, size, "title", 700) > r:
+		while nm.length() > 1 and UI.text_width(nm + "…", size, "title", 700) > r:
+			nm = nm.substr(0, nm.length() - 1)
+		nm = nm.strip_edges() + "…"
+	return {"name": nm, "size": size, "lvl": lvl}
 
 
 func plate_rect() -> Rect2:

@@ -33,9 +33,10 @@ extends CanvasLayer
 ## Mother Taper rests, a scene in Story.REST_SUBS plays Hollin's instead.
 ##
 ## The oath's choose_name: Mother Taper's question stays up while the name
-## entry (name_entry.gd) asks the hero's name, and the save keeps what's
-## given; the hero's name plate is blank until then. Where nobody types
-## (headless, stepped by hand, --autoplay) it answers Waxby at once.
+## entry (name_entry.gd) asks the hero's name under the cue's own prompt (on
+## a phone the keyboard covers the box, never the entry), and the save keeps
+## what's given; the hero's name plate is blank until then. Where nobody
+## types (headless, stepped by hand, --autoplay) it answers Waxby at once.
 
 signal done
 signal need_class
@@ -2025,9 +2026,10 @@ func name_is_instant() -> bool:
 
 
 func _open_namer(prompt: String) -> bool:
-	## choose_name: the entry over the shot, Mother Taper's question still up
-	## under it, holding Waxby to start from; true while it waits. Where
-	## nobody types, Waxby at once (and false: the scene goes straight on).
+	## choose_name: the entry over the shot, headed by the cue's prompt (a
+	## phone's keyboard covers the box, where Mother Taper's question stays
+	## up), holding Waxby to start from; true while it waits. Where nobody
+	## types, Waxby at once (and false: the scene goes straight on).
 	var g := _g()
 	if name_is_instant():
 		if g != null and g.has_method("set_hero_name"):

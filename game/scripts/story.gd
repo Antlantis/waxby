@@ -79,8 +79,9 @@ const LOST_WICKS := {1: "lamplighter", 2: "oldchandler", 3: "gardenboy", 4: "roo
 # Every cue and the parameters it needs (optional ones are left out: a card's
 # "at", top|mid|low, else it goes wherever no one is standing; an sfx's
 # "vol"; a chain's "snuff"; a hold's "nudge" and "nudge_at"; a chooser's
-# "prompt"). choose_name asks the hero's name (the oath's entry; the line
-# before it, the question, stays up while it's asked).
+# "prompt", and the name entry's). choose_name asks the hero's name (the
+# oath's entry: the line before it, the question, stays up under it, and the
+# cue's "prompt" heads the entry, where a phone's keyboard can't cover it).
 const CUES := {
 	"wait": ["t"], "cam": ["to", "t"], "snuff": ["light"], "ignite": ["light"], "light": ["light", "r", "t"],
 	"chain": ["lights", "gap"], "fig": ["fig", "t"], "pose": ["fig", "frame"], "walk": ["to", "t"],
@@ -148,7 +149,7 @@ const SCENES_W1 := {
 	# Choose, Taper's reaction, the lighting and the hero's oath; then the
 	# name (Taper asks, the player answers in the entry; the hero's plate is
 	# blank till then), the title explained (any keeper who carries the flame
-	# is a Wick) and the send-off. No spire, no iris.
+	# is a Wick) as she welcomes him by it, and the send-off. No spire, no iris.
 	"oath": {"music": "story", "shots": [
 		{"panel": "callings", "in": "fade",
 		 "lights_off": ["plinth_knight", "plinth_founder", "plinth_witch", "plinth_runner", "plinth_sexton"],
@@ -163,8 +164,8 @@ const SCENES_W1 := {
 			{"do": "wait", "t": 0.6},
 			["wick:happy", "@oath"],
 			{"do": "mood", "mood": ""},
-			["taper:warm", "And what do they call you, sprout?"],
-			{"do": "choose_name"},
+			["taper:warm", "Tell the flame your name, sprout."],
+			{"do": "choose_name", "prompt": "Tell the flame your name"},
 			["taper:proud", "Carry the flame and you're a Wick. Every keeper is. Welcome, {hero}."],
 			["taper:warm", "Now go and ring the bells, sprout. Give Evenbell its breath back."],
 			# On the floor under the hero, clear of his flame whatever his calling.
@@ -798,7 +799,7 @@ const SCENES_W6 := {
 			["tickwell:kind", "Seven o'clock exactly. And breakfast is late. Typical."],
 			["waxley:shifty", "About all those free candles. Small misunderstanding. Invoice to follow."],
 		]},
-		# Close on the two of them. The only time anyone says his name.
+		# Close on the two of them: Mother Taper calls him by his name, not sprout.
 		{"panel": "homecoming", "in": "cut",
 		 "figs": {"tollgrave": "tollgrave_stand", "taper": "taper_stand", "hollin": "hollin_warm",
 				  "waxley": "waxley_pack", "tickwell": "tickwell"},
@@ -1098,7 +1099,7 @@ const CLASS_LINES := {
 		"knight": ["happy", "Thank you, Mother. The Vigil stands."],
 		"founder": ["happy", "Thank you. Is it supper now? It feels like supper."],
 		"witch": ["happy", "You said my name! Say it again. Louder."],
-		"runner": ["happy", "You know my name? ...Nobody ever uses my name."],
+		"runner": ["happy", "You remembered my name? ...I thought I'd always be sprout."],
 		"sexton": ["happy", "My name. I'll keep it somewhere safe."]},
 	"waxworks_won": {  # Waxley, when a calling beats one of his casts (the draft's trial_won)
 		"knight": "A Candleknight on my podium! Here. Polish it yourself.",

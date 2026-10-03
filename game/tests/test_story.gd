@@ -33,7 +33,8 @@ extends SceneTree
 ## The hero's own name (the save's): the rules a name keeps to; the name
 ## plate, {hero}, a bark's plate and the cast roll say it; the oath asks it
 ## after his first words (his plate blank till then) with Taper's question
-## kept up, and her welcome says it; nobody to type (stepped by hand,
+## kept up and asked again in the entry's heading (a phone's keyboard covers
+## the box), and her welcome says it; nobody to type (stepped by hand,
 ## headless, --autoplay): Waxby at once and no entry; the entry filters what's
 ## typed, falls back to Waxby, keeps above a phone's keyboard at 844 x 390;
 ## Skip goes on to the entry with his flame lit. Every line fits in 80 with
@@ -480,7 +481,8 @@ func _test_hero_name() -> void:
 	_check(DisplayServer.get_name() != "headless" or plain.name_is_instant(), "headless: instant")
 	plain.free()
 	# The entry, asked for real: after his first words (a blank plate), with
-	# Taper's question kept up; it starts at Waxby and takes the keys.
+	# Taper's question kept up and the cue's prompt heading the entry; it
+	# starts at Waxby and takes the keys.
 	game.reset()
 	cs = _play("oath", false)
 	cs.name_instant = false
@@ -496,7 +498,8 @@ func _test_hero_name() -> void:
 		return
 	_check(e.field.text == "Waxby" and e.field.max_length == Story.NAME_MAX, "it holds Waxby to start, %d letters at most" % Story.NAME_MAX)
 	_check(e.field.has_focus(), "its field has the keys (a phone's keyboard comes up)")
-	_check(str(cs._line.get("text", "")) == "And what do they call you, sprout?" and float(cs._box_goal) > 0.5, "Taper's question stays up under it")
+	_check(str(cs._line.get("text", "")) == "Tell the flame your name, sprout." and float(cs._box_goal) > 0.5, "Taper's question stays up under it")
+	_check(e.prompt == "Tell the flame your name", "and the entry asks it in its own heading, which a phone's keyboard can't cover: '%s'" % e.prompt)
 	_check(not cs._pill_visible(), "no Skip pill while it asks")
 	cs.tap()
 	for i in 30:
@@ -568,6 +571,8 @@ func _test_hero_name() -> void:
 		var F: Rect2 = e.field.get_global_rect()
 		var C: Rect2 = e.confirm_btn.get_global_rect()
 		_check(F.position.y >= 0.0 and F.end.y <= vs.y - kb and C.end.y <= vs.y - kb, "a %d-high keyboard: the field and Confirm above it (%s, %s)" % [kb, F, C])
+		var P: Rect2 = e.panel_rect()
+		_check(P.position.y >= 0.0 and P.position.y + e.PROMPT_Y < F.position.y, "and the heading, her question, on the screen over the field (%s)" % P)
 		_check(F.position.x >= safe.position.x and C.end.x <= safe.end.x, "and inside the safe area")
 	cs.queue_free()
 	await process_frame
@@ -632,7 +637,7 @@ func _test_decisions() -> void:
 				asked = str(b[1])
 			else:
 				after_name.append(str(b[0]) + " " + str(b[1]))
-	_check(asked == "And what do they call you, sprout?", "Taper asks his name: %s" % asked)
+	_check(asked == "Tell the flame your name, sprout.", "Taper asks his name: %s" % asked)
 	_check(after_name == ["name", "taper:proud Carry the flame and you're a Wick. Every keeper is. Welcome, {hero}.",
 			"taper:warm Now go and ring the bells, sprout. Give Evenbell its breath back."],
 			"then the title, once, in her words, with his name, and the send-off: %s" % [after_name])

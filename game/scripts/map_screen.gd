@@ -4,7 +4,8 @@ extends Control
 ## and, where the level has one, its Dread's skull (lit once beaten). Along
 ## the top: back to the title, the difficulty bells (Dusk, Nightfall,
 ## Witching Hour, the deeper two with their "Lv 30+" / "Lv 40+" chips) and
-## who's playing (calling and level, a gold "+" while skill points wait).
+## who's playing (his own name, then his calling and level, a gold "+" while
+## skill points wait).
 ## Along the bottom: Callings · Sheet · Chandler (· Challenges) and Play.
 ## World tabs appear once World 2 is open: one per world in the build (six
 ## in v3), each in its world's accent with its emblem (art/ui/world_<n>.svg),
@@ -58,6 +59,8 @@ const WARN_ID := "nightfall_warning"
 const NOTE_TIME := 2.6            # a locked bell's or tab's note: long enough to read
 const SECRET_R := 18.0            # a secret's medallion
 const SECRET_AT := Vector2(64.0, -40.0)   # from its exit level's medallion
+const PILL_GAP := 24.0            # the hero pill's least room from the last bell (its Lv chip sits in it)
+const PILL_NAME_MIN := 12         # the pill's name never smaller beside his calling (else the calling goes)
 
 var focus := 0                    # a global index into Game.LEVELS
 var focus_secret := ""            # a secret level picked instead ("1-S"), or ""
@@ -308,10 +311,39 @@ func bell_rects() -> Array:
 func pill_rect() -> Rect2:
 	## Who's playing, top right (tap: the Sheet).
 	var s := UI.safe_rect(get_viewport())
-	var h: Dictionary = Game.hero()
-	var name := str(Classes.info(str(h["cls"]))["name"])
-	var w := 44.0 + UI.text_width(name, 15, "title", 700) + UI.text_width("Lv %d" % int(h["level"]), 13, "body", 800) + (26.0 if int(h.get("points", 0)) > 0 else 0.0)
+	var w: float = pill_words()["w"]
 	return Rect2(s.end.x - w, s.position.y + 2.0, w, UI.TAP_H)
+
+
+func pill_words() -> Dictionary:
+	## The hero pill's words: {name: his own, size, sub: "Candleknight Lv 9",
+	## w: the pill's width}, kept clear of the difficulty bells and their
+	## chips: the name from 15 down to 12 beside his calling; a longer one
+	## (or a narrow screen) leaves just "Lv 9" (the Sheet says the rest), then
+	## the name alone, down to 10, cut short ("Bartholo…") only if it still
+	## doesn't fit.
+	var s := UI.safe_rect(get_viewport())
+	var h: Dictionary = Game.hero()
+	var lv := "Lv %d" % int(h["level"])
+	var pad := 44.0 + (26.0 if int(h.get("points", 0)) > 0 else 0.0)
+	var room: float = s.end.x - (bell_rects()[-1].end.x + PILL_GAP) - pad
+	var nm := Game.hero_name()
+	var tries := [["%s %s" % [Classes.info(str(h["cls"]))["name"], lv], PILL_NAME_MIN], [lv, 10], ["", 10]]
+	var sub := ""
+	var size := 10
+	var r := room
+	for t in tries:
+		sub = t[0]
+		r = room - UI.text_width(sub, 13, "body", 800)
+		size = UI.fit_size(nm, r, 15, t[1], "title", 700)
+		if UI.text_width(nm, size, "title", 700) <= r:
+			break
+	if UI.text_width(nm, size, "title", 700) > r:
+		while nm.length() > 1 and UI.text_width(nm + "…", size, "title", 700) > r:
+			nm = nm.substr(0, nm.length() - 1)
+		nm = nm.strip_edges() + "…"
+	var w := pad + UI.text_width(nm, size, "title", 700) + UI.text_width(sub, 13, "body", 800)
+	return {"name": nm, "size": size, "sub": sub, "w": w}
 
 
 func purse_rect() -> Rect2:
@@ -950,10 +982,10 @@ func _draw_pill() -> void:
 	var c := Vector2(r.position.x + 17.0, r.get_center().y)
 	draw_circle(c, 8.0, UI.INK)
 	draw_circle(c, 6.5, col)
-	var name := str(Classes.info(cls)["name"])
-	UI.text(self, Vector2(r.position.x + 32.0, r.get_center().y + 6.0), name, 15, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700)
-	var nx := r.position.x + 38.0 + UI.text_width(name, 15, "title", 700)
-	UI.text(self, Vector2(nx, r.get_center().y + 5.0), "Lv %d" % int(h["level"]), 13, UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 800)
+	var pw := pill_words()
+	UI.text(self, Vector2(r.position.x + 32.0, r.get_center().y + 6.0), pw["name"], pw["size"], UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700)
+	var nx := r.position.x + 38.0 + UI.text_width(pw["name"], pw["size"], "title", 700)
+	UI.text(self, Vector2(nx, r.get_center().y + 5.0), pw["sub"], 13, UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 800)
 	if int(h.get("points", 0)) > 0:
 		var p := Vector2(r.end.x - 15.0, r.get_center().y)
 		var pulse := 1.0 + 0.1 * sin(_t * 5.0)
