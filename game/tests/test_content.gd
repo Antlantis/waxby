@@ -81,6 +81,7 @@ func _initialize() -> void:
 	await _test_snuffer_seams()
 	_test_level_rules()
 	await _test_tutorial_signs()
+	await _test_sign_reading()
 	_test_hang_heights()
 	_test_star_routes()
 	_test_bot_with_waxfalls()
@@ -1828,7 +1829,8 @@ func _test_tutorial_signs() -> void:
 	## player never learns the button is called Aegis). Just before the
 	## first altar stands the flask's sign (a drink is a hold, and altars
 	## refill it). In every level the signs stand 4 tiles apart or more, so
-	## each hint shows on its own (a sign shows within 44 px), and every
+	## each hint shows on its own (a sign shows within world.SIGN_REACH,
+	## 64 px, so two signs' reach never overlaps), and every
 	## hint, filled for every calling, fits the phone's message slot at
 	## 13 px or more (the HUD shrinks a long one from 15 down to 11).
 	var EK = load("res://scripts/enemy_kinds.gd")
@@ -1938,6 +1940,63 @@ func _test_tutorial_signs() -> void:
 				"the Special's sign says each calling's own line %s" % [tips])
 	else:
 		print("  (the Special's sign shows {special_tip} until classes.gd gains sign_tip and world.gd fills it)")
+
+
+func _test_sign_reading() -> void:
+	## A sign reads from SIGN_REACH (64 px) either side of its post, not v2's
+	## 44, and its text stays in the HUD's slot SIGN_LINGER (2 s) after he
+	## walks on, then fades as before (show_hint and _hint_alpha), so it
+	## reads on the run. The next sign's text takes over at once. Each
+	## board's painted flame glints until he has stood by it once this visit;
+	## nothing is saved, so the next visit's boards glint again.
+	var SignView = load("res://scripts/sign_view.gd")
+	var rows := _rows(60, {Vector2i(20, 12): "@", Vector2i(26, 12): "@"})
+	var w := await _world(rows, "hints: First board|Second board\n")
+	var hud = load("res://scripts/hud.gd").new()
+	hud.world = w
+	hud.story = null
+	hud._story_checked = true
+	w.hud = hud
+	w.add_child(hud)
+	await process_frame
+	_check(WorldScript.SIGN_REACH == 64.0 and WorldScript.SIGN_LINGER == 2.0, "a sign reads from 64 px and lingers 2 s")
+	_check(w.signs.size() == 2, "(both signs built: %d)" % w.signs.size())
+	var a: Node2D = w.signs[0]["node"]
+	var b: Node2D = w.signs[1]["node"]
+	_check(a.glinting() and b.glinting(), "a board not yet read glints")
+	_check(SignView.glint_at(SignView.GLINT_LEN * 0.5) > 0.9 and SignView.glint_at(SignView.GLINT_LEN + 0.1) == 0.0
+			and SignView.glint_at(SignView.GLINT_EVERY + SignView.GLINT_LEN * 0.5) > 0.9, "its glint comes and goes every %.1f s" % SignView.GLINT_EVERY)
+	var floor_y: float = w.signs[0]["pos"].y
+	var ax: float = w.signs[0]["pos"].x
+	var bx: float = w.signs[1]["pos"].x
+	var saved := var_to_str(game.data)
+	# 54 px short of the first sign: past v2's 44, inside the 64.
+	w.player.position = Vector2(ax - 54.0, floor_y)
+	w.player.velocity = Vector2.ZERO
+	_step(w, 1)
+	_check(hud._hint_on and hud._hint == "First board", "54 px from a sign its text is up (%s '%s')" % [hud._hint_on, hud._hint])
+	_check(not a.glinting() and a.read and b.glinting(), "the board he stood by stops glinting; the other still glints")
+	# Walked on, 100 px past it: the text stays 2 s, then goes.
+	w.player.position = Vector2(ax + 100.0, floor_y)
+	_step(w, int(1.9 / DT))
+	_check(hud._hint_on and hud._hint == "First board", "1.9 s after he walks on, it is still up")
+	_step(w, int(0.2 / DT))
+	_check(not hud._hint_on, "2.1 s after, it goes")
+	for i in 30:
+		hud._process(1.0 / 60.0)
+	_check(hud._hint_alpha == 0.0 and hud._hint == "", "and fades out as before (alpha %.2f)" % hud._hint_alpha)
+	# Lingering, the next sign takes over at once.
+	w.player.position = Vector2(ax, floor_y)
+	_step(w, 1)
+	w.player.position = Vector2(bx - 60.0, floor_y)
+	_step(w, 1)
+	_check(hud._hint == "Second board" and b.read, "the next sign's text replaces a lingering one at once")
+	_check(var_to_str(game.data) == saved, "reading the signs writes nothing to the save")
+	await _done(w)
+	# A new visit: its boards glint again.
+	var w2 := await _world(rows, "hints: First board|Second board\n")
+	_check(w2.signs.size() == 2 and w2.signs[0]["node"].glinting() and w2.signs[1]["node"].glinting(), "the next visit's boards glint again")
+	await _done(w2)
 
 
 func _test_hang_heights() -> void:

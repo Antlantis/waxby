@@ -50,8 +50,10 @@ extends "res://scripts/features/feature.gd"
 ##
 ## Every beat pulses the lamps and the gears' hubs (a muted phone's twin of
 ## the tick). The first-time barks (first_ice, first_rime, first_belt,
-## first_gear, first_pendulum, first_swing) fire at the teaching sign, or on
-## the next landing on stone, never mid-jump, and at most one every BARK_GAP s.
+## first_gear, first_pendulum, first_swing) fire at the teaching sign (or
+## BARK_LEAD tiles before the feature where none stands), or on the next
+## landing on stone, never mid-jump, never in a mode, and at most one every
+## BARK_GAP s (two due at once: the one whose spot he passed last).
 ## Props from art/props (gear_l, cog_tooth, swing_ledge, belt_teeth,
 ## pendulum_bob, pendulum_pivot, icicle_hang/_crack/_fall) when they exist,
 ## code-drawn stand-ins until then. The ice, rime and belt bodies are the
@@ -104,7 +106,8 @@ const BARK_GAP := 8.0             # s between two barks (spec 3.1 rule 9)...
 const SIGN_GAP := 3.0             # ...or this, for one said at its own sign
 const BARKS := {"ice": "first_ice", "rime": "first_rime", "belt": "first_belt", "cog": "first_gear",
 		"weight": "first_pendulum", "swing": "first_swing"}
-const SIGN_BEFORE := 12          # tiles: a sign this far before a feature's first cell teaches it
+const SIGN_BEFORE := 12          # tiles: a sign this far before a feature's first cell teaches it...
+const BARK_LEAD := 6             # ...else its bark is said this far before it
 const STORY := "res://scripts/story.gd"
 const PIVOT_BOSSES := ["tinker"]  # a boss whose arena's Y is its own pendulum
 const PULSE := 0.18              # s a beat's pulse lasts
@@ -145,7 +148,7 @@ var _squeak := false
 var _beat := -1
 var _on_beat := false
 var _arena := {}
-var _bark_at := {}               # feature -> {first: x, sign: x or -1, done: bool}
+var _bark_at := {}               # feature -> {first: x, sign: x (its sign's, or BARK_LEAD before first), done: bool}
 var _bark_t := -100.0
 var _tb := TriBatch.new()
 var _gb := TriBatch.new()
@@ -238,7 +241,9 @@ func build(w: Node, lv: RefCounted) -> void:
 				if lv.tile(x, y) == LevelData.FALSE_STONE and not LevelData.is_solid(lv.tile(x, y + 1)):
 					vents.append({"cell": Vector2i(x, y), "p": Vector2((x + 0.5) * TILE, (y + 1) * TILE), "hiss": 0.0})
 	# The first-time barks: at the teaching sign before each feature's first
-	# cell, else on the next stone landing near it.
+	# cell, or BARK_LEAD tiles before it where no sign stands, else on the
+	# next stone landing past that. A feature met again in a later level is
+	# skipped by its bark heard already (_heard), not by a missing sign.
 	var signs := []
 	for e in lv.entities:
 		if e["kind"] == "sign":
@@ -249,10 +254,7 @@ func build(w: Node, lv: RefCounted) -> void:
 		for sx in signs:
 			if sx <= fx + 2 and sx >= fx - SIGN_BEFORE and sx > best:
 				best = sx
-		# Only where a sign teaches it: a feature met again later (no sign)
-		# was taught already.
-		if best >= 0:
-			_bark_at[f] = {"first": fx, "sign": best, "done": false}
+		_bark_at[f] = {"first": fx, "sign": best if best >= 0 else maxi(fx - BARK_LEAD, 0), "done": false}
 
 
 func _first(d: Dictionary, what: String, x: int) -> void:
@@ -494,6 +496,8 @@ func _step_sounds(dt: float, pl: Node2D) -> void:
 
 
 func _step_barks(pl: Node2D) -> void:
+	if world.get("mode") != null:
+		return   # a mode's rooms teach nothing (as deep.gd's _bark)
 	if _bark_at.is_empty() or not pl.alive or not pl.on_floor or pl.riding != null or bool(pl.get("climbing")):
 		return
 	var since := ftime() - _bark_t
@@ -502,6 +506,7 @@ func _step_barks(pl: Node2D) -> void:
 	var px: float = pl.position.x
 	var under: int = level.tile(floori(px / TILE), floori((pl.position.y + 1.0) / TILE))
 	var stone := LevelData.is_safe(under) and not LevelData.is_slick(under)
+	var pick := ""
 	for f in _bark_at:
 		var b: Dictionary = _bark_at[f]
 		if b["done"]:
@@ -510,17 +515,21 @@ func _step_barks(pl: Node2D) -> void:
 		if _heard(key):
 			b["done"] = true   # heard in an earlier level: nothing to wait for
 			continue
-		# At its sign (where he reads it), or else once the gap has passed.
+		# At its sign (where he reads it) or its BARK_LEAD spot, or else
+		# once the gap has passed.
 		var at_sign: bool = absf(px - (int(b["sign"]) + 0.5) * TILE) < 44.0
 		if not at_sign and since < BARK_GAP:
 			continue
 		# Passed the sign in the air: the next landing on stone past it.
 		var past: bool = stone and px > (int(b["sign"]) + 0.5) * TILE and px < (int(b["first"]) + 40) * TILE
-		if at_sign or past:
-			b["done"] = true
-			_bark_t = ftime()
-			world.bark(key)
-			return
+		# Two due on one landing: the one whose spot he passed last (what's
+		# just ahead of him), not one he has already crossed.
+		if (at_sign or past) and (pick == "" or int(b["sign"]) > int(_bark_at[pick]["sign"])):
+			pick = f
+	if pick != "":
+		_bark_at[pick]["done"] = true
+		_bark_t = ftime()
+		world.bark(BARKS[pick])
 
 
 func _heard(key: String) -> bool:

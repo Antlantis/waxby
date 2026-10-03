@@ -146,6 +146,8 @@ func _initialize() -> void:
 	await _set_view(Vector2i(847, 390), true)
 	await _test_message_slot()
 	_no_errors("message_slot")
+	await _test_message_time()
+	_no_errors("message_time")
 	await _test_barks()
 	_no_errors("barks")
 	await _test_hud_paused()
@@ -829,6 +831,74 @@ func _test_message_slot() -> void:
 	hud.relic_found("rook_feather")
 	hud.toast("Rook Feather", "Put it on your belt at an altar")
 	_check(hud._msgs.is_empty() and hud._cards.size() == 1, "the relic card, not a toast too")
+	w.queue_free()
+	await _frames(2)
+
+
+func _test_message_time() -> void:
+	## A message holds the slot by its length: 1 s and 0.05 s a character,
+	## 2.5 s at least and 5 s at most (msg_time), set once in _push and used
+	## by the slot's timer, its fade and a cut-in alike.
+	_where = "message time"
+	_fresh_hero(1)
+	var w := _stub_world()
+	root.add_child(w)
+	var hud = HudScript.new()
+	hud.world = w
+	hud.story = _stub_story()
+	hud._story_checked = true
+	w.add_child(hud)
+	await _frames(1)
+	var long := "Ice holds nothing still. Let go of the arrow early and slide to a stop."   # 71 characters
+	_check(is_equal_approx(HudScript.msg_time({"kind": "bark", "text": "Short."}), HudScript.MSG_TIME), "a short line keeps the 2.5 s")
+	_check(is_equal_approx(HudScript.msg_time({"kind": "bark", "text": long}), 1.0 + 0.05 * long.length()), "a %d-character bark holds %.2f s" % [long.length(), 1.0 + 0.05 * long.length()])
+	_check(is_equal_approx(HudScript.msg_time({"kind": "bark", "text": long + " " + long}), HudScript.MSG_MAX), "a very long one stops at 5 s")
+	var note := {"kind": "toast", "title": "A title of forty characters, give or take", "sub": "and a line under it for the rest"}
+	_check(is_equal_approx(HudScript.msg_time(note), 1.0 + 0.05 * (str(note["title"]) + " " + str(note["sub"])).length()),
+			"a note counts its title and its line")
+	# Through the slot: the long bark shows its own time, then a short toast its 2.5 s.
+	hud._push({"kind": "bark", "key": "bark:long", "text": long, "who": "taper"})
+	hud.toast("Altar lit", "")
+	var shown := {}
+	var gone := {}
+	var faded_late := false
+	for i in 10 * 60:
+		hud._process(1.0 / 60.0)
+		var k := str(hud._msg.get("kind", ""))
+		if k != "" and not shown.has(k):
+			shown[k] = i / 60.0
+		for was in shown:
+			if not gone.has(was) and k != was:
+				gone[was] = i / 60.0
+		# Still fully up a second past the old 2.5 s (the fade reads its own time).
+		if k == "bark" and absf(i / 60.0 - 3.5) < 0.01:
+			var t := float(hud._msg["t"])
+			faded_late = clampf((float(hud._msg["dur"]) - t) * 3.5, 0.0, 1.0) >= 1.0
+	var want := 1.0 + 0.05 * long.length()
+	_check(absf(float(gone.get("bark", 0.0)) - float(shown.get("bark", 0.0)) - want) < 0.05,
+			"the long bark holds the slot %.2f s (%.2f)" % [want, float(gone.get("bark", 0.0)) - float(shown.get("bark", 0.0))])
+	_check(faded_late, "and is still fully up at 3.5 s (its fade waits for its own end)")
+	_check(absf(float(gone.get("toast", 0.0)) - float(shown.get("toast", 0.0)) - HudScript.MSG_TIME) < 0.05,
+			"the short toast after it holds 2.5 s (%.2f)" % (float(gone.get("toast", 0.0)) - float(shown.get("toast", 0.0))))
+	# A pickup cuts a long message short once it's been read, at its own end less 0.3 s.
+	hud._msg = {}
+	hud._msgs.clear()
+	hud._push({"kind": "bark", "key": "bark:long2", "text": long, "who": "taper"})
+	hud._process(0.02)
+	hud._process(1.5)
+	hud.sigil_found(1, [true, true, false])
+	hud._process(0.05)
+	_check(str(hud._msg.get("kind", "")) == "bark" and absf(float(hud._msg["t"]) - (want - 0.3)) < 0.06,
+			"a pickup cuts a long bark to its last 0.3 s (t %.2f of %.2f)" % [float(hud._msg.get("t", 0.0)), want])
+	hud._process(0.35)
+	_check(str(hud._msg.get("kind", "")) == "pickup", "then the pickup shows")
+	# A message put in by hand (no _push) keeps the old 2.5 s.
+	hud._msgs.clear()
+	hud._msg = {"kind": "toast", "title": "By hand", "sub": "", "pri": 1, "t": 0.0}
+	hud._process(2.45)
+	_check(not hud._msg.is_empty(), "(one put in by hand is up at 2.45 s)")
+	hud._process(0.1)
+	_check(hud._msg.is_empty(), "and gone at 2.55 s: MSG_TIME")
 	w.queue_free()
 	await _frames(2)
 
