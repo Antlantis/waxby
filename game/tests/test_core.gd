@@ -4,7 +4,9 @@ extends SceneTree
 ## every level's bell and all three sigils (so nothing's out of reach); the
 ## World runs every level headless without errors; stomps, the sword, bonks,
 ## pickups, spikes, pits and altars do what they should; the save keeps what
-## it should.
+## it should. Build 1: pure down held a moment on a ledge drops through it
+## (never on solid floor, never a down carried onto it), and a controller's
+## d-pad, stick and buttons reach the actions.
 ##
 ##     godot --headless --path game --script res://tests/test_core.gd
 
@@ -54,11 +56,13 @@ func _initialize() -> void:
 		return
 	_test_levels_parse()
 	_test_feel()
+	_test_hold_drop()
 	if OS.get_environment("WAXBY_FAST") == "" and OS.get_environment("WAXBY_NOBOT") == "":
 		_test_reachability()
 	else:
 		print("  (reachability bot skipped here)")
 	await _test_world_smoke()
+	_test_pad_bindings()   # (after a frame: Game's _ready sets the actions up)
 	await _test_interactions()
 	await _test_boss()
 	await _test_boss_fair()
@@ -296,6 +300,110 @@ func _test_feel() -> void:
 	p = _player_on(cc, Vector2(10 * TILE - 6.0, ground))
 	r = _run(p, {"jump": true, "jump_pressed": true}, 1.0, true)
 	_check(ground - r["top"] > 3.0 * TILE, "a jump clipping a ceiling corner slides round it (%.1f px)" % (ground - r["top"]))
+
+
+func _test_hold_drop() -> void:
+	## Build 1's lit thumb pad: pure down held DROP_HOLD (0.15 s) on a ledge
+	## drops through it, and down + jump still drops at once. Down with left
+	## or right, down on solid floor, and a down carried onto a ledge (out of
+	## the air, or off a vine's slide) don't; a vine still climbs on up.
+	var lines := []
+	for y in 13:
+		var row := ".".repeat(40)
+		if y >= 3 and y <= 8:
+			row = row.substr(0, 30) + "{" + row.substr(31)
+		if y == 9:
+			row = "...." + "=".repeat(20) + "...." + "=".repeat(5) + "......."
+		lines.append(row)
+	var lv := _rows(lines)
+	var top := 9.0 * TILE
+	var ground := 13.0 * TILE
+	var p := _player_on(lv, Vector2(12.0 * TILE, top))
+	_steps(p, {}, 0.1)
+	_check(p.on_floor and absf(p.position.y - top) < 0.01, "(he stands on the ledge: y %.0f)" % p.position.y)
+	_steps(p, {"down": true}, 0.1)
+	_check(p.on_floor and absf(p.position.y - top) < 0.01, "pure down held 0.1 s on a ledge: still on it")
+	_steps(p, {"down": true}, 0.08)
+	_check(not p.on_floor and p.position.y > top, "held past %.2f s: down through it (y %.0f)" % [p.DROP_HOLD, p.position.y])
+	_steps(p, {"down": true}, 1.0)
+	_check(p.on_floor and absf(p.position.y - ground) < 0.01, "and on down to the floor under it (y %.0f)" % p.position.y)
+	_steps(p, {}, 0.05)
+	_steps(p, {"down": true}, 1.0)
+	_check(p.on_floor and absf(p.position.y - ground) < 0.01 and absf(p.velocity.x) < 0.01, "down held on solid floor does nothing new")
+	# Down with a way held is a diagonal: he runs along the ledge, on it.
+	p.reset_at(Vector2(6.0 * TILE, top))
+	_steps(p, {}, 0.1)
+	_steps(p, {"down": true, "right": true}, 0.5)
+	_check(p.on_floor and absf(p.position.y - top) < 0.01 and p.position.x > 7.0 * TILE, "down + right on a ledge runs along it (x %.0f)" % p.position.x)
+	# Down + jump drops at once, as before.
+	p.reset_at(Vector2(12.0 * TILE, top))
+	_steps(p, {}, 0.1)
+	p.pad = {"down": true, "jump": true, "jump_pressed": true}
+	p.step(DT)
+	_check(not p.on_floor and p.drop_through > 0.0 and p.velocity.y >= 0.0, "down + jump on a ledge still drops through it at once")
+	# Down held from the air onto the ledge waits to be let go.
+	p.reset_at(Vector2(12.0 * TILE, top - 64.0))
+	_steps(p, {"down": true}, 0.8)
+	_check(p.on_floor and absf(p.position.y - top) < 0.01, "a down held as he lands on a ledge keeps him on it (y %.0f)" % p.position.y)
+	_steps(p, {}, 1.0 / 60.0)
+	_steps(p, {"down": true}, 0.2)
+	_check(not p.on_floor and p.position.y > top, "let go and held again: down through it")
+	p.free()
+	# Sliding down a vine onto a ledge across it: he stays on the ledge.
+	var v := _on_vine(lv, 30, 5.5 * TILE)
+	_steps(v, {"down": true}, 1.2)
+	_check(not v.climbing and v.on_floor and absf(v.position.y - top) < 0.01, "a slide down a vine onto a ledge stays on it, down still held (y %.0f)" % v.position.y)
+	v.free()
+	var c := _on_vine(lv, 30, 7.5 * TILE)
+	var y0: float = c.position.y
+	_steps(c, {"up": true}, 0.3)
+	_check(c.climbing and c.position.y < y0 - 30.0, "up on a vine still climbs (%.0f px)" % (y0 - c.position.y))
+	c.free()
+
+
+func _test_pad_bindings() -> void:
+	## Game._setup_input: a controller's d-pad and left stick (a 0.4 dead
+	## zone) move the four ways, A / X / Y / the shoulders / Menu are jump,
+	## attack, the Special, the flask, a pickup and pause, on any controller;
+	## the Up arrow is "up" (a climb that never leaps) and W still jumps.
+	if game == null:
+		return
+	var buttons := [[JOY_BUTTON_A, "jump"], [JOY_BUTTON_X, "attack"], [JOY_BUTTON_Y, "special"], [JOY_BUTTON_LEFT_SHOULDER, "flask"],
+			[JOY_BUTTON_RIGHT_SHOULDER, "equip"], [JOY_BUTTON_START, "pause"], [JOY_BUTTON_DPAD_LEFT, "left"],
+			[JOY_BUTTON_DPAD_RIGHT, "right"], [JOY_BUTTON_DPAD_UP, "up"], [JOY_BUTTON_DPAD_DOWN, "down"]]
+	for b in buttons:
+		for dev in [0, 1]:
+			var ev := InputEventJoypadButton.new()
+			ev.device = dev
+			ev.button_index = b[0]
+			ev.pressed = true
+			_check(ev.is_action_pressed(b[1]), "controller %d's button %d is %s" % [dev, b[0], b[1]])
+	var bb := InputEventJoypadButton.new()
+	bb.button_index = JOY_BUTTON_B
+	bb.pressed = true
+	_check(not bb.is_action_pressed("jump") and not bb.is_action_pressed("attack"), "B is neither jump nor attack")
+	for s in [[JOY_AXIS_LEFT_X, -1.0, "left"], [JOY_AXIS_LEFT_X, 1.0, "right"], [JOY_AXIS_LEFT_Y, -1.0, "up"], [JOY_AXIS_LEFT_Y, 1.0, "down"]]:
+		var ev := InputEventJoypadMotion.new()
+		ev.axis = s[0]
+		_check(is_equal_approx(InputMap.action_get_deadzone(s[2]), 0.4), "%s's dead zone is 0.4" % s[2])
+		ev.axis_value = s[1] * 0.5
+		_check(ev.is_action_pressed(s[2]), "the left stick half way holds %s" % s[2])
+		ev.axis_value = s[1] * 0.3
+		_check(not ev.is_action_pressed(s[2]), "inside the dead zone it doesn't (%s)" % s[2])
+		ev.axis_value = -s[1] * 0.5
+		_check(not ev.is_action_pressed(s[2]), "nor the other way (%s)" % s[2])
+	var key := func(k: int) -> InputEventKey:
+		var ev := InputEventKey.new()
+		ev.physical_keycode = k
+		ev.pressed = true
+		return ev
+	var up: InputEventKey = key.call(KEY_UP)
+	_check(up.is_action_pressed("up") and not up.is_action_pressed("jump"), "the Up arrow is up (it climbs a vine, never leaps), not jump")
+	for k in [KEY_SPACE, KEY_Z, KEY_W]:
+		var ev: InputEventKey = key.call(k)
+		_check(ev.is_action_pressed("jump") and not ev.is_action_pressed("up"), "%s still jumps" % OS.get_keycode_string(k))
+	var dn: InputEventKey = key.call(KEY_DOWN)
+	_check(dn.is_action_pressed("down"), "the Down arrow is down")
 
 
 # ---------------------------------------------------------------- reachability

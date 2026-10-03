@@ -3,10 +3,18 @@ extends CanvasLayer
 ## Flask above them, the jump, the attack and the calling's Special under the
 ## right, pause up in the corner. Several fingers at once; a finger can slide
 ## between left and right without lifting, and sliding the left thumb down
-## holds "down" (to drop through a ledge), up holds "up" (v3: on a vine it
-## climbs, as holding jump does; elsewhere it does nothing). They press the
-## same input actions the keyboard does ("up" is made here if the game has
-## no such action).
+## holds "down" (held a moment on a ledge it drops through, as down + jump
+## does), up holds "up" (v3: on a vine it climbs, as holding jump does;
+## elsewhere it does nothing). They press the same input actions the
+## keyboard does ("up" is made here if the game has no such action).
+##
+## The lit thumb pad (build 1): down and up count from where the thumb
+## landed (SLIDE, less where the glass below is shorter: slide_need), a
+## slide within SNAP degrees of straight down or up lets go of left and
+## right (slide_dirs: 8 ways from one thumb), and each switches on with a
+## tick under the thumb (haptics allowing). While a move touch is down,
+## chevrons mark where its down and up begin, lit while held; with none, a
+## small up/down tick sits in the gap between the arrows (slide_hint).
 ##
 ## A new touch is tested in this order: pause, the flask (a 0.2 s hold, so a
 ## thumb landing high doesn't drink; never from a touch that began as a
@@ -30,7 +38,11 @@ const UI := preload("res://scripts/ui.gd")
 const FLASK_HOLD := 0.2
 const FLASK_BADGE_R := 9.0
 const SCALES := [0.9, 1.0, 1.1]
-const SLIDE := 34.0               # px the left thumb slides down (down) or up (up) from where it landed
+const SLIDE := 26.0               # px the left thumb slides down (down) or up (up) from where it landed
+const SLIDE_ROOM := 6.0           # down never asks for more than the glass below the landing point, less this...
+const SLIDE_MIN := 8.0            # ...nor for less than this, however low the thumb lands
+const SNAP := 25.0                # degrees: a slide this near straight down or up holds no left or right
+const BUZZ_MS := 8                # the tick under the thumb as down or up switches on
 
 var hud: Node = null              # the HUD for pickup-card taps (else the parent World's)
 var _view: Control
@@ -46,6 +58,7 @@ var _points := 0                  # unspent skill points: a gold "+" on pause
 var _poll := 0.0
 var _t := 0.0
 var _flask_flash := 0.0
+var buzzes := 0                   # the ticks asked for as down or up switched on (tests read it)
 
 
 func _ready() -> void:
@@ -196,22 +209,48 @@ func _hud() -> Node:
 	return null
 
 
+static func slide_need(start_y: float, bottom: float) -> float:
+	## How far below where it landed the left thumb slides to hold down:
+	## SLIDE, or less where the glass below is shorter (a thumb landing low on
+	## an arrow still has room), never under SLIDE_MIN. bottom is the glass's
+	## bottom edge (the view's, not the safe area's).
+	return clampf(bottom - start_y - SLIDE_ROOM, SLIDE_MIN, SLIDE)
+
+
+static func slide_dirs(start: Vector2, pos: Vector2, mid: float, bottom: float) -> Dictionary:
+	## What one move touch holds: left or right by where the thumb is against
+	## the arrows' midpoint (6 px either side holds neither), down or up by
+	## how far it has slid from where it landed (slide_need below, SLIDE
+	## above). A slide within SNAP degrees of straight down or up lets go of
+	## left and right; a slanted one keeps the diagonal.
+	var out := {"left": pos.x < mid - 6.0, "right": pos.x > mid + 6.0, "down": false, "up": false}
+	var d := pos - start
+	if d.y > slide_need(start.y, bottom):
+		out["down"] = true
+	elif -d.y > SLIDE:
+		out["up"] = true
+	if (out["down"] or out["up"]) and absf(d.x) <= absf(d.y) * tan(deg_to_rad(SNAP)):
+		out["left"] = false
+		out["right"] = false
+	return out
+
+
+func _glass_bottom() -> float:
+	return _view.get_size().y
+
+
 func _refresh() -> void:
 	var L := layout()
 	var want := {"left": false, "right": false, "down": false, "up": false, "jump": false, "attack": false, "special": false, "flask": false}
 	var mid: float = (L["left"].x + L["right"].x) * 0.5
+	var bottom := _glass_bottom()
 	for t in _touches.values():
 		match t["role"]:
 			"move":
-				var p: Vector2 = t["pos"]
-				if p.x < mid - 6.0:
-					want["left"] = true
-				elif p.x > mid + 6.0:
-					want["right"] = true
-				if p.y - t["start"].y > SLIDE:
-					want["down"] = true
-				elif t["start"].y - p.y > SLIDE:
-					want["up"] = true
+				var held := slide_dirs(t["start"], t["pos"], mid, bottom)
+				for d in held:
+					if held[d]:
+						want[d] = true
 			"jump":
 				want["jump"] = true
 			"attack":
@@ -221,6 +260,9 @@ func _refresh() -> void:
 			"flask":
 				if t["fired"]:
 					want["flask"] = true
+	# Nothing is pressed under the thumb, so a slide is felt as it counts.
+	if (want["down"] and not _pressed["down"]) or (want["up"] and not _pressed["up"]):
+		_buzz()
 	for action in want:
 		if want[action] != _pressed[action]:
 			_pressed[action] = want[action]
@@ -231,6 +273,16 @@ func _refresh() -> void:
 			else:
 				Input.action_release(action)
 	_view.queue_redraw()
+
+
+func _buzz() -> void:
+	## The BUZZ_MS tick as down or up switches on (the haptics setting off:
+	## none). The World's own buzzes are world._haptic.
+	var g := get_node_or_null("/root/Game")
+	if g == null or not g.haptics:
+		return
+	buzzes += 1
+	Input.vibrate_handheld(BUZZ_MS)
 
 
 func is_down(action: String) -> bool:
@@ -303,7 +355,58 @@ func _draw_controls() -> void:
 	_button(L["jump"], L["r_jump"], "btn_jump", _pressed["jump"] or Input.is_action_pressed("jump"))
 	_draw_special(L["special"], L["r_special"], _pressed["special"] or Input.is_action_pressed("special"))
 	_draw_flask(L["flask"], L["r_flask"])
+	_draw_slides(L)
 	_draw_pause(L["pause"], L["r_pause"])
+
+
+static func chevron(c: Vector2, dir: int, w: float, h: float) -> PackedVector2Array:
+	## A chevron's three points round c, w either side and h tall, pointing
+	## up (dir -1) or down (1).
+	var e := h * 0.5 * dir
+	return PackedVector2Array([c + Vector2(-w, -e), c + Vector2(0, e), c + Vector2(w, -e)])
+
+
+static func slide_hint(L: Dictionary) -> Dictionary:
+	## The idle up/down tick: two small chevrons in the gap between the
+	## arrows, just over and under their row, clear of both discs at any
+	## button size ({up, down, w, h, width}).
+	var k: float = float(L["r_move"]) / 44.0
+	var c: Vector2 = (L["left"] + L["right"]) * 0.5
+	return {"up": c + Vector2(0, -13.0 * k), "down": c + Vector2(0, 13.0 * k), "w": 4.5 * k, "h": 3.0 * k, "width": 2.0 * k}
+
+
+func _draw_slides(L: Dictionary) -> void:
+	## Down and up made visible. While a move touch is down: a faint chevron
+	## where its slide down begins to count and one where its slide up does
+	## (they're measured from where it landed, so they go with the thumb,
+	## not on fixed spots), each lit while held, and a soft dot under the
+	## thumb. With no move touch, the small up/down tick between the arrows
+	## (a hint only: a touch there is a move like any other; a key or a
+	## pad's down or up lights it).
+	var k := button_scale
+	var mid: float = (L["left"].x + L["right"].x) * 0.5
+	var bottom := _glass_bottom()
+	var moving := false
+	for t in _touches.values():
+		if t["role"] != "move":
+			continue
+		moving = true
+		var s: Vector2 = t["start"]
+		var held := slide_dirs(s, t["pos"], mid, bottom)
+		for dir in [-1, 1]:
+			var on: bool = held["up" if dir < 0 else "down"]
+			var c := Vector2(s.x, s.y - SLIDE) if dir < 0 else Vector2(s.x, s.y + slide_need(s.y, bottom))
+			if on:
+				_view.draw_circle(c, 14.0 * k, Color(1.0, 0.85, 0.6, 0.30))
+			_view.draw_polyline(chevron(c, dir, 10.0 * k, 6.0 * k), Color(1, 1, 1, 0.95 if on else 0.3), 3.0 * k, true)
+		_view.draw_circle(t["pos"], 9.0 * k, Color(1, 1, 1, 0.14))
+	if moving:
+		return
+	var h := slide_hint(L)
+	for dir in [-1, 1]:
+		var action := "up" if dir < 0 else "down"
+		var on := InputMap.has_action(action) and Input.is_action_pressed(action)
+		_view.draw_polyline(chevron(h[action], dir, h["w"], h["h"]), Color(1, 1, 1, 0.9 if on else 0.4), h["width"], true)
 
 
 func _button(c: Vector2, r: float, icon: String, down: bool) -> void:

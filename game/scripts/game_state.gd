@@ -247,13 +247,27 @@ func reset() -> void:
 func _setup_input() -> void:
 	var keys := {
 		"left": [KEY_LEFT, KEY_A], "right": [KEY_RIGHT, KEY_D], "down": [KEY_DOWN, KEY_S],
-		"jump": [KEY_SPACE, KEY_Z, KEY_UP, KEY_W, KEY_K], "attack": [KEY_X, KEY_J, KEY_SHIFT],
+		"jump": [KEY_SPACE, KEY_Z, KEY_W, KEY_K], "attack": [KEY_X, KEY_J, KEY_SHIFT],
 		"special": [KEY_C, KEY_L, KEY_E], "flask": [KEY_Q, KEY_TAB], "equip": [KEY_R, KEY_ENTER],
 		"pause": [KEY_ESCAPE, KEY_P],
 		# v3: climbing on a vine (the left pad's slide up; touch_controls sets
-		# it). No keys: KEY_UP stays jump, and held jump climbs anyway.
-		"up": [],
+		# it too). The arrows are the four ways, as a pad's are: the Up arrow
+		# climbs without ever leaping off (a fresh jump with a way held does),
+		# and Space, Z and W jump.
+		"up": [KEY_UP],
 	}
+	# A game controller (MFi, Xbox, PlayStation; every one connected): the
+	# d-pad and the left stick move, A jumps, X attacks, Y is the Special,
+	# the left shoulder drinks the flask, the right one takes a pickup,
+	# Menu pauses. The map runs on these actions too (the other screens are
+	# taps).
+	var buttons := {
+		"left": [JOY_BUTTON_DPAD_LEFT], "right": [JOY_BUTTON_DPAD_RIGHT], "up": [JOY_BUTTON_DPAD_UP], "down": [JOY_BUTTON_DPAD_DOWN],
+		"jump": [JOY_BUTTON_A], "attack": [JOY_BUTTON_X], "special": [JOY_BUTTON_Y],
+		"flask": [JOY_BUTTON_LEFT_SHOULDER], "equip": [JOY_BUTTON_RIGHT_SHOULDER], "pause": [JOY_BUTTON_START],
+	}
+	const STICK_DEAD := 0.4   # the stick's dead zone (a worn stick drifts); keys and touch press at full strength
+	var stick := {"left": [JOY_AXIS_LEFT_X, -1.0], "right": [JOY_AXIS_LEFT_X, 1.0], "up": [JOY_AXIS_LEFT_Y, -1.0], "down": [JOY_AXIS_LEFT_Y, 1.0]}
 	for action in keys:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.2)
@@ -261,6 +275,18 @@ func _setup_input() -> void:
 			var ev := InputEventKey.new()
 			ev.physical_keycode = k
 			InputMap.action_add_event(action, ev)
+		for b in buttons.get(action, []):
+			var ev := InputEventJoypadButton.new()
+			ev.device = -1   # any controller
+			ev.button_index = b
+			InputMap.action_add_event(action, ev)
+		if stick.has(action):
+			var ev := InputEventJoypadMotion.new()
+			ev.device = -1
+			ev.axis = stick[action][0]
+			ev.axis_value = stick[action][1]
+			InputMap.action_add_event(action, ev)
+			InputMap.action_set_deadzone(action, STICK_DEAD)
 
 
 # ---------------------------------------------------------------- save file

@@ -83,6 +83,7 @@ const STOMP_BOUNCE_HELD := 560.0
 const ATTACK_ACTIVE := 0.13
 const ATTACK_COOLDOWN := 0.28
 const ATTACK_BUFFER := 0.1        # an attack pressed this soon before the cooldown ends still swings
+const DROP_HOLD := 0.15           # pure down (no left or right) held this long on a ledge drops through it
 const INVULN := 0.9
 const KNOCKBACK := Vector2(210, -300)
 const CORNER_NUDGE := 9.0         # px of ceiling corner a jump slides round
@@ -145,6 +146,7 @@ var _cooldown := 0.0
 var _coyote := 0.0
 var _buffer := 0.0
 var _attack_buffer := 0.0         # a press held for a moment (hitstop stretches a cooldown)
+var _down_t := 0.0                # pure down held standing (DROP_HOLD); -1 while a down held from the air or a vine waits to be let go
 var _jump_held := false
 var _air_jumps := 0
 var _fall_peak := 0.0             # fastest fall since leaving the ground (for the landing thump)
@@ -306,6 +308,15 @@ func step(dt: float) -> void:
 			attack_time = -1.0
 	_lock_t = maxf(_lock_t - dt, 0.0)
 	_leap_t = maxf(_leap_t - dt, 0.0)
+	# Hold-to-drop counts only a down pressed while standing: one held on
+	# from a vine's slide or out of the air (a drop through the ledge above)
+	# waits to be let go, so it never carries him on through the next ledge.
+	if not down:
+		_down_t = 0.0
+	elif not on_floor or climbing:
+		_down_t = -1.0
+	elif _down_t >= 0.0:
+		_down_t = 0.0 if left or right else _down_t + dt
 
 	# A Ledge Grab's haul owns the motion while it lasts.
 	if ledge_t >= 0.0:
@@ -396,10 +407,7 @@ func step(dt: float) -> void:
 	if _buffer > 0.0:
 		if down and on_floor and _on_ledge_only():
 			# Down + jump on a ledge drops through it.
-			drop_through = 0.22
-			_buffer = 0.0
-			on_floor = false
-			position.y += 2.0
+			_drop_through()
 		elif _coyote > 0.0:
 			_jump(JUMP_SPEED, false)
 		elif quirk == "cling" and (clinging != 0 or _cling_grace > 0.0):
@@ -409,6 +417,10 @@ func step(dt: float) -> void:
 			_jump(DOUBLE_JUMP_SPEED, true)
 		elif jump_pressed and kit != null and kit.air_jump():
 			_buffer = 0.0
+	elif _down_t >= DROP_HOLD and on_floor and _on_ledge_only():
+		# So does pure down held a moment (the lit thumb pad's slide down; on
+		# solid floor it does nothing).
+		_drop_through()
 
 	# Gravity, heavier once the jump is let go, lighter at the apex (a vine
 	# leap's first LEAP_HOLD falls as if jump were held, and then as if it
@@ -965,6 +977,19 @@ func jump_held() -> bool:
 func falling_onto(r: Rect2) -> bool:
 	## Coming down on top of r: moving down with the feet in its upper part.
 	return velocity.y > -40.0 and position.y <= r.position.y + minf(r.size.y * 0.55, 14.0) + velocity.y * (1.0 / 60.0)
+
+
+func _drop_through() -> void:
+	## Down through the ledge under him (down + jump, or pure down held).
+	drop_through = 0.22
+	_buffer = 0.0
+	on_floor = false
+	position.y += 2.0
+
+
+func on_ledge() -> bool:
+	## Standing on a ledge he could drop through (the World's one-time card).
+	return on_floor and _on_ledge_only()
 
 
 func _on_ledge_only() -> bool:

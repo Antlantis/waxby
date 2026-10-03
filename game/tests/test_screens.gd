@@ -8,7 +8,12 @@ extends SceneTree
 ## on a real World, and its message slot keeps its priorities. The touch
 ## layer tests pause, flask, card, then move/right; a tap on the flask never
 ## moves, a touch that began as a move never drinks, and a held flask really
-## drinks in a level; a thumb slid off the flask runs. Only an item card
+## drinks in a level; a thumb slid off the flask runs. The lit thumb pad
+## (build 1): down and up count 26 px from where the thumb landed (less low
+## on the glass), a steep slide is pure down or up, each switches on with a
+## tick (haptics allowing), its idle tick sits clear of the discs, and its
+## one-time cards (the first ledge, the first vine) come once a save and
+## never for the bot, headless or a fed pad. Only an item card
 ## in its tap window takes a touch, and never one just off a thumb button
 ## (attack, the right arrow); a tap that would melt the worn piece asks
 ## first. The life numbers are never cut and stay clear of the flame at any
@@ -153,6 +158,10 @@ func _initialize() -> void:
 	_no_errors("touch_roles")
 	await _test_flask_slide()
 	_no_errors("flask_slide")
+	await _test_thumb_pad()
+	_no_errors("thumb_pad")
+	await _test_thumb_tips()
+	_no_errors("thumb_tips")
 	await _test_card_claims()
 	_no_errors("card_claims")
 	await _test_card_rest()
@@ -598,6 +607,19 @@ func _test_touch_layout() -> void:
 		# The Special sits clear of jump and attack, above them.
 		_check((T["special"] as Vector2).distance_to(T["jump"]) > 100.0 * k, "special is well clear of jump ×%.1f" % k)
 		_check(T["special"].y < T["attack"].y and T["special"].y < T["jump"].y, "special is above jump and attack ×%.1f" % k)
+		# The idle up/down tick sits in the gap between the arrows, its strokes
+		# clear of both discs and the flask.
+		var h: Dictionary = TouchScript.slide_hint(T)
+		for dir in [-1, 1]:
+			var pts: PackedVector2Array = TouchScript.chevron(h["up" if dir < 0 else "down"], dir, h["w"], h["h"])
+			for b in ["left", "right", "flask"]:
+				var c: Vector2 = T[b]
+				var rb: float = T["r_move" if b != "flask" else "r_flask"]
+				var near := INF
+				for i in 2:
+					near = minf(near, c.distance_to(Geometry2D.get_closest_point_to_segment(c, pts[i], pts[i + 1])))
+				_check(near > rb + float(h["width"]) * 0.5 + 0.5, "the idle %s tick ×%.1f is clear of the %s disc (%.1f px off its rim)" % ["up" if dir < 0 else "down", k, b, near - rb])
+			_inside(Rect2(pts[0], Vector2.ZERO).expand(pts[1]).expand(pts[2]), "the idle tick ×%.1f" % k)
 
 
 func _test_screen_layouts() -> void:
@@ -1584,6 +1606,187 @@ func _test_flask_slide() -> void:
 	touch.release_all()
 	touch.queue_free()
 	await _frames(2)
+
+
+func _test_thumb_pad() -> void:
+	## Build 1's lit thumb pad: down counts once the thumb is SLIDE (26 px)
+	## below where it landed (less where the glass below is shorter), up
+	## SLIDE above. A slide within SNAP (25 degrees) of straight down or up
+	## lets go of left and right; a slanted one keeps the diagonal. Each
+	## switches on with one tick (none with haptics off). The chevrons and
+	## the idle tick draw.
+	_where = "thumb pad"
+	_fresh_hero(1)
+	var touch = TouchScript.new()
+	root.add_child(touch)
+	await _frames(1)
+	var L: Dictionary = touch.layout()
+	var bottom: float = touch._glass_bottom()
+	var a: Vector2 = L["left"]
+	_check(is_equal_approx(TouchScript.SLIDE, 26.0), "the slide is 26 px (it was 34)")
+	_check(is_equal_approx(TouchScript.slide_need(a.y, bottom), TouchScript.SLIDE),
+			"landing on the arrows' row, down needs the whole slide (%.0f px of glass below)" % (bottom - a.y))
+	_check(is_equal_approx(TouchScript.slide_need(bottom - 20.0, bottom), 14.0), "landing 20 px over the glass's edge, it needs 14")
+	_check(is_equal_approx(TouchScript.slide_need(bottom - 3.0, bottom), TouchScript.SLIDE_MIN), "and never less than %.0f" % TouchScript.SLIDE_MIN)
+	game.set_setting("haptics", true)
+	# Straight down from the left arrow: nothing at 25 px, pure down past 26.
+	var b0: int = touch.buzzes
+	touch._begin(0, a)
+	_check(touch.is_down("left") and not touch.is_down("down"), "the thumb lands on the left arrow: left")
+	var at := func(off: Vector2) -> void:
+		touch._touches[0]["pos"] = a + off
+		touch._refresh()
+	at.call(Vector2(0, 25))
+	_check(touch.is_down("left") and not touch.is_down("down"), "25 px down: still only left")
+	_check(touch.buzzes == b0, "(no tick yet)")
+	at.call(Vector2(0, 27))
+	_check(touch.is_down("down") and not touch.is_down("left") and not touch.is_down("right"), "27 px straight down: pure down (left let go)")
+	_check(Input.is_action_pressed("down") and not Input.is_action_pressed("left"), "(the actions follow)")
+	_check(touch.buzzes == b0 + 1, "one tick as down switches on (%d)" % (touch.buzzes - b0))
+	at.call(Vector2(8, 34))
+	_check(touch.is_down("down") and not touch.is_down("left") and touch.buzzes == b0 + 1, "a steep slide (13 degrees off) stays pure down, with no second tick")
+	at.call(Vector2(-17, 40))
+	_check(touch.is_down("down") and not touch.is_down("left"), "23 degrees off straight down: still pure down")
+	at.call(Vector2(-21, 40))
+	_check(touch.is_down("down") and touch.is_down("left"), "28 degrees off: the diagonal, down and left")
+	at.call(Vector2(-30, 30))
+	_check(touch.is_down("down") and touch.is_down("left"), "a 45 degree slide keeps the diagonal")
+	at.call(Vector2(0, 10))
+	_check(touch.is_down("left") and not touch.is_down("down"), "back up near where it landed: left again")
+	at.call(Vector2(0, -27))
+	_check(touch.is_down("up") and not touch.is_down("down") and not touch.is_down("left"), "27 px straight up: pure up")
+	_check(touch.buzzes == b0 + 2, "with its own tick (%d)" % (touch.buzzes - b0))
+	at.call(Vector2(-24, -30))
+	_check(touch.is_down("up") and touch.is_down("left"), "slanted up keeps the diagonal")
+	at.call(Vector2(0, -20))
+	_check(touch.is_down("left") and not touch.is_down("up"), "20 px up: no up")
+	# The chevrons draw while the thumb is down (and with nothing held).
+	at.call(Vector2(0, 30))
+	touch._view.queue_redraw()
+	await _frames(2)
+	touch._end(0)
+	_check(not touch.is_down("down") and not touch.is_down("left"), "let go: nothing held")
+	# A thumb landing low on the glass: down at its room less 6 px.
+	var low := Vector2(a.x, bottom - 18.0)
+	touch._begin(1, low)
+	touch._touches[1]["pos"] = low + Vector2(0, 13)
+	touch._refresh()
+	_check(touch.is_down("down"), "a thumb landing 18 px over the glass's edge holds down 13 px lower (it needs %.0f)" % TouchScript.slide_need(low.y, bottom))
+	touch._end(1)
+	# Haptics off: no tick.
+	game.set_setting("haptics", false)
+	var b1: int = touch.buzzes
+	touch._begin(2, a)
+	touch._touches[2]["pos"] = a + Vector2(0, 30)
+	touch._refresh()
+	_check(touch.is_down("down") and touch.buzzes == b1, "haptics off: down, without the tick")
+	touch._end(2)
+	game.set_setting("haptics", true)
+	# The idle tick (no move touch), lit by a key's down.
+	Input.action_press("down")
+	touch._view.queue_redraw()
+	await _frames(2)
+	Input.action_release("down")
+	touch.release_all()
+	touch.queue_free()
+	await _frames(2)
+
+
+func _tip_shown(hud, id: String) -> Dictionary:
+	## The card with this id, queued or up in the top band ({} when neither).
+	for c in hud._cardq:
+		if str(c["id"]) == id:
+			return c
+	return hud._title if str(hud._title.get("id", "")) == id else {}
+
+
+func _test_thumb_tips() -> void:
+	## The lit thumb pad's one-time cards: "Slide your thumb down to drop"
+	## the first time Waxby stands on a ledge, "Slide up to climb" the first
+	## time he catches a vine, once a save (Game.seen); never for the
+	## autoplay bot, headless, or a pad a test or a golden route feeds (a
+	## replay, or the recorder's on_pad). Their words fit the band at 12 px
+	## or more at every size.
+	_where = "thumb tips"
+	var lines := []
+	for y in 15:
+		var row := ".".repeat(40)
+		if y >= 4 and y <= 10:
+			row = row.substr(0, 30) + "{" + row.substr(31)
+		if y == 9:
+			row = "...." + "=".repeat(10) + row.substr(14)
+		if y >= 13:
+			row = "#".repeat(40)
+		lines.append(row)
+	lines[12] = "P" + lines[12].substr(1)
+	var lv = LevelData.new()
+	lv.parse("title: t\nsubtitle: t\n---\n" + "\n".join(lines))
+	for case in ["player", "again", "autoplay", "headless", "test pad", "route recorder"]:
+		_fresh_hero(3)
+		if case == "again":
+			game.mark_seen("tip:drop")
+			game.mark_seen("tip:climb")
+		var w = WorldScript.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await _frames(1)
+		w.set_physics_process(false)   # (ticked here)
+		var hud = HudScript.new()
+		hud.world = w
+		hud.story = _stub_story()
+		hud._story_checked = true
+		w.hud = hud
+		w.add_child(hud)
+		await _frames(1)
+		w.headless = case == "headless"
+		w.autoplay = case == "autoplay"
+		w.test_pad = {} if case == "test pad" else null
+		if case == "route recorder":
+			w.on_pad = func(_pad: Dictionary) -> void: pass
+		# On the ledge.
+		w.player.reset_at(Vector2(8.5 * 32.0, 9.0 * 32.0))
+		for i in 12:
+			w.tick(DT)
+		var on_ledge: bool = w.player.on_ledge()
+		var drop := _tip_shown(hud, "tip:drop")
+		# On the vine.
+		w.player.reset_at(Vector2(30.5 * 32.0, 7.0 * 32.0))
+		w.player.grab_vine(30, 1.0)
+		for i in 6:
+			w.tick(DT)
+		var climbing: bool = w.player.climbing
+		var climb := _tip_shown(hud, "tip:climb")
+		_check(on_ledge and climbing, "%s: (he stood on the ledge, then hung on the vine)" % case)
+		if case == "player":
+			_check(str(drop.get("title", "")) == "Slide your thumb down to drop" and game.seen("tip:drop"),
+					"on his first ledge: \"Slide your thumb down to drop\", marked seen (%s)" % [drop])
+			_check(str(climb.get("title", "")) == "Slide up to climb" and game.seen("tip:climb"),
+					"on his first vine: \"Slide up to climb\", marked seen (%s)" % [climb])
+		elif case == "again":
+			_check(drop.is_empty() and climb.is_empty(), "seen once: never again")
+		else:
+			_check(drop.is_empty() and climb.is_empty() and not game.seen("tip:drop") and not game.seen("tip:climb"),
+					"%s: no card, nothing marked" % case)
+		w.headless = true   # (leaving writes nothing)
+		w.queue_free()
+		await _frames(1)
+	for size in SIZES:
+		await _set_view(size, true)
+		var sw := _stub_world()
+		root.add_child(sw)
+		var hud = HudScript.new()
+		hud.world = sw
+		sw.add_child(hud)
+		await _frames(1)
+		for id in WorldScript.TIPS:
+			var t: Array = WorldScript.TIPS[id]
+			var r: Rect2 = hud.band_card_rect(str(t[0]), str(t[1]))
+			var fs: int = UI.fit_size(str(t[1]), r.size.x - 24.0, 14, 10)
+			_check(fs >= 12, "%s's words fit the band at %d px (%d wide)" % [id, fs, size.x])
+		sw.queue_free()
+		await _frames(1)
+	await _set_view(Vector2i(847, 390), true)
+	_where = "thumb tips"
 
 
 func _test_card_claims() -> void:

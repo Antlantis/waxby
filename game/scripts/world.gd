@@ -228,6 +228,7 @@ var _basics := 0                # basic attacks so far (Dawnsliver: every 3rd)
 var _knuckle_shots := 0         # hero shots so far (the Saint's Knuckle: every 3rd pierces)
 var owls_eye := false           # the Owl's Eye is worn: glow twinkles sigils, false stone, mimics
 var _hurt_barked := false       # the first-hurt bark was asked for in this level
+var _tips_done := false         # both thumb tips (TIPS) are seen in this save
 var _trail_t := 0.0
 var _heart_t := 0.0
 var _lowpass_on := false
@@ -1732,6 +1733,7 @@ func tick(dt: float) -> void:
 		chain = 0
 	if playing:
 		_after_player_moved()
+		_thumb_tips()
 		if player.stats.get("legends", {}).has("cinderstep") and player.on_floor and absf(player.velocity.x) > 60.0:
 			_trail_t -= dt
 			if _trail_t <= 0.0:
@@ -3459,6 +3461,31 @@ func _first_hurt_bark() -> void:
 	if not is_inside_tree() or Game.seen("bark:first_hurt"):
 		return
 	bark("first_hurt")
+
+
+# The lit thumb pad's one-time cards (Game.seen keeps them, once a save):
+# id -> [title, words].
+const TIPS := {
+	"tip:drop": ["Slide your thumb down to drop", "Hold it a moment on a ledge, or slide down and jump"],
+	"tip:climb": ["Slide up to climb", "Left thumb up the vine; jump with an arrow held leaps off"],
+}
+
+
+func _thumb_tips() -> void:
+	## The thumb's down and up, taught where they first matter: the first time
+	## Waxby stands on a ledge he could drop through, and the first time he
+	## catches a vine. Only for a player at the glass: never headless, for the
+	## bot or a pad a test or a golden route feeds (replayed or recorded), in
+	## a mode or the feel lab (it writes nothing).
+	if _tips_done or headless or autoplay or test_pad != null or on_pad.is_valid() or mode != null or is_lab() or hud == null:
+		return
+	var id := "tip:climb" if player.climbing else ("tip:drop" if player.on_ledge() else "")
+	if id == "":
+		return
+	if not Game.seen(id):
+		card(id, str(TIPS[id][0]), str(TIPS[id][1]))
+		Game.mark_seen(id)
+	_tips_done = Game.seen("tip:drop") and Game.seen("tip:climb")
 
 
 func _on_snuffed() -> void:
