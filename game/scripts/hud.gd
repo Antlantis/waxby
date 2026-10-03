@@ -618,8 +618,10 @@ func bark(key: String) -> void:
 		var f := UI.hero_face(cls, "happy" if mood == "" else mood)
 		face = f["tex"]
 		uv = f["uv"]
+	# (with no face drawn, the speaker's initial: the hero's own name's for his)
+	var nm := str(line.get("name", ""))
 	_push({"kind": "bark", "key": "bark:" + key, "text": str(line["text"]), "who": who, "tex": face, "uv": uv,
-			"col": UI.speaker_color(who, cls)})
+			"col": UI.speaker_color(who, cls), "letter": (nm if nm != "" else who).substr(0, 1).to_upper()})
 
 
 # ---------------------------------------------------------------- touch -> HUD
@@ -1840,7 +1842,7 @@ func _draw_bark(ci: Control, m: Dictionary, a: float, slide: float, boss_on: boo
 	var col: Color = m.get("col", UI.GOLD)
 	UI.panel(ci, r, Color(col, 0.8 * a), Color(UI.PANEL, 0.93 * a))
 	var c := Vector2(r.position.x + 24.0, r.get_center().y)
-	var letter := str(m.get("who", "?")).substr(0, 1).to_upper()
+	var letter := str(m.get("letter", str(m.get("who", "?")).substr(0, 1).to_upper()))
 	UI.portrait(ci, c, 17.0, m.get("tex"), col, a, m.get("uv", Rect2(0, 0, 1, 1)), letter)
 	var x := r.position.x + 50.0
 	var w := r.end.x - x - 12.0

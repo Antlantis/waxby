@@ -20,7 +20,8 @@ extends SceneTree
 ## life, 2- to 5-digit. Barks follow story.gd's once / every
 ## rule, and the HUD's clocks hold while the level is paused. The Sheet buys
 ## a skill and respecs, equips from the satchel, salvages, and edits the belt
-## only where it may. Real taps (sent through Input, as a phone sends them)
+## only where it may; its Stats tab names the hero and renames him (the
+## oath's name entry: Confirm, Cancel, Escape, above a phone's keyboard). Real taps (sent through Input, as a phone sends them)
 ## do one thing each on the belt, the keeper, the map and the Sheet. The
 ## keeper hosted by the oath scene hides its Back and backdrop; the map says
 ## when a world's tab opens. With the satchel full, a pickup is never lost
@@ -176,6 +177,8 @@ func _initialize() -> void:
 	_no_errors("flask_drinks")
 	await _test_skills()
 	_no_errors("skills")
+	await _test_rename()
+	_no_errors("rename")
 	await _test_gear()
 	_no_errors("gear")
 	await _test_belt()
@@ -2143,6 +2146,93 @@ func _test_skills() -> void:
 	_check(int(game.hero()["points"]) == pts and (game.hero()["skills"] as Dictionary).is_empty(), "respec gives every point back")
 	h.queue_free()
 	await _frames(2)
+
+
+func _test_rename() -> void:
+	## The Stats tab names the hero by his own name, and Rename renames him:
+	## the oath's name entry over the Sheet, holding the name he has, its
+	## field, Cancel and Confirm a thumb tall, in the safe area and above a
+	## phone's keyboard. Confirm (or Return) keeps the new name in the save
+	## (every calling's); Cancel and Escape leave it, and the Sheet open; what
+	## a name can't hold doesn't land, and nothing fit to keep is Waxby.
+	_where = "rename"
+	_fresh_hero(5, "founder")
+	var h = await _sheet("stats")
+	var p = h.panel
+	_check(p.hero_name() == "Waxby", "before he's named, the Stats tab calls him Waxby (%s)" % p.hero_name())
+	var rb: Button = p._rename
+	_check(rb != null and rb.visible and rb.text == "Rename" and rb.size.y >= UI.TAP_H - 0.5, "a Rename button, a thumb tall")
+	var L: Rect2 = p._left_rect()
+	var rr := Rect2(rb.position, rb.size)
+	_check(rr.position.y >= L.position.y + 64.0 and rr.end.y <= L.position.y + p.LEVEL_Y - 16.0 and rr.position.x >= L.position.x + 90.0
+			and rr.end.x <= L.end.x, "under his name and calling, clear of the face and the level line (%s in %s)" % [rr, L])
+	rb.pressed.emit()
+	await _frames(2)
+	_check(h.renaming(), "Rename opens the name entry")
+	var e = h.name_entry()
+	_check(e != null and e.get_script().resource_path == "res://scripts/name_entry.gd" and e.get_parent() == h, "the oath's own entry, over the Sheet")
+	if e == null:
+		h.queue_free()
+		return
+	_check(e.field.text == "Waxby" and e.can_cancel and e.cancel_btn != null and e.field.has_focus(), "holding Waxby, with a Cancel, the field taking the keys")
+	_buttons_ok(e, "rename entry")
+	_inside(e.field.get_global_rect(), "rename field")
+	var vs := Vector2(root.content_scale_size)
+	for kb in [0.0, 200.0, 250.0]:
+		e.keyboard_override = kb
+		e._layout()
+		for c in [e.field, e.cancel_btn, e.confirm_btn]:
+			_check((c as Control).get_global_rect().end.y <= vs.y - kb, "a %d-high keyboard: %s stays above it" % [kb, c.name])
+	e.field.text = "Ember-Lou9"
+	e.field.text_changed.emit("Ember-Lou9")
+	_check(e.field.text == "Ember-Lou", "a digit doesn't land (%s)" % e.field.text)
+	e.confirm_btn.pressed.emit()
+	await _frames(1)
+	_check(game.hero_name() == "Ember-Lou" and not h.renaming(), "Confirm: he's Ember-Lou (%s)" % game.hero_name())
+	_check(p.hero_name() == "Ember-Lou", "and the Stats tab says so")
+	var disk = JSON.parse_string(FileAccess.get_file_as_string(game.save_path))
+	_check(disk is Dictionary and str(disk.get("hero_name", "")) == "Ember-Lou", "the save holds it")
+	game.new_hero("witch")
+	_check(game.hero_name() == "Ember-Lou", "one name for every calling of the save")
+	game.set_hero("founder")
+	# Cancel leaves it.
+	rb.pressed.emit()
+	await _frames(2)
+	e = h.name_entry()
+	_check(e.field.text == "Ember-Lou", "the entry starts from the name he has")
+	e.field.text = "Nope"
+	e.cancel_btn.pressed.emit()
+	await _frames(1)
+	_check(game.hero_name() == "Ember-Lou" and not h.renaming(), "Cancel leaves it")
+	# Escape cancels, and the Sheet stays open.
+	var backs := [0]
+	h.back.connect(func(): backs[0] += 1)
+	rb.pressed.emit()
+	await _frames(2)
+	e = h.name_entry()
+	e.field.text = "Nope"
+	var esc := InputEventKey.new()
+	esc.keycode = KEY_ESCAPE
+	esc.physical_keycode = KEY_ESCAPE
+	esc.pressed = true
+	Input.parse_input_event(esc)
+	await _frames(2)
+	var up: InputEventKey = esc.duplicate()
+	up.pressed = false
+	Input.parse_input_event(up)
+	await _frames(2)
+	_check(not h.renaming() and game.hero_name() == "Ember-Lou" and backs[0] == 0, "Escape cancels the entry, not the Sheet (backs %d)" % backs[0])
+	# Nothing fit to keep: Waxby. Return confirms.
+	rb.pressed.emit()
+	await _frames(2)
+	e = h.name_entry()
+	e.field.text = "  "
+	e.field.text_submitted.emit("  ")
+	await _frames(1)
+	_check(game.hero_name() == "Waxby" and not h.renaming(), "an empty name (Return) is Waxby (%s)" % game.hero_name())
+	h.queue_free()
+	await _frames(1)
+	game.reset()
 
 
 func _test_gear() -> void:

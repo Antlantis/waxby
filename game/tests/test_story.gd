@@ -21,13 +21,23 @@ extends SceneTree
 ## v3 (spec §6, workstreams.md ST): every scene set; the chain (boss_2_after
 ## -> the_pull, boss_6_after -> homecoming -> lullaby; ending and
 ## post_credits gone); a v2 save gets the_pull on its next map and
-## homecoming after 6-4; the Hush always lowercase; the hero's name said
-## once; openers of at most 5 lines; the hold (headless, and held by hand:
+## homecoming after 6-4; the Hush always lowercase; the hero's name always
+## {hero} (never "Waxby" outright), said at the oath and in homecoming;
+## openers of at most 5 lines; the hold (headless, and held by hand:
 ## released halfway it pauses); if / unless shots; Mother Taper's state
 ## across seen sets and REST_SUBS; "off" lights and lights_on, with W1-W2's
 ## lights as they were before E6 (a snapshot); no scene on a string-surgery
 ## shader (darkness_lit.gdshader); tints on v3 panels only; the new motes;
 ## the credits then the cast roll; a Tales replay changes nothing.
+##
+## The hero's own name (the save's): the rules a name keeps to; the name
+## plate, {hero}, a bark's plate and the cast roll say it; the oath asks it
+## after his first words (his plate blank till then) with Taper's question
+## kept up, and her welcome says it; nobody to type (stepped by hand,
+## headless, --autoplay): Waxby at once and no entry; the entry filters what's
+## typed, falls back to Waxby, keeps above a phone's keyboard at 844 x 390;
+## Skip goes on to the entry with his flame lit. Every line fits in 80 with
+## a name NAME_MAX long in it too.
 ##
 ##     godot --headless --path game --script res://tests/test_story.gd
 
@@ -81,6 +91,8 @@ const MAIN_SCENES := ["intro", "oath", "meet_waxley", "new_calling"]
 # A stand-in 6-4 for the finale's flow (the level streams haven't built it
 # yet): 1-1's rows under the Hush's story_end.
 const STUB_64 := "user://test_story_stub_6-4.txt"
+# The longest name the entry lets through (Story.NAME_MAX), its widest letter.
+const LONGEST_NAME := "WWWWWWWWWWWW"
 
 var Cutscene: GDScript        # loaded at run time, after the autoloads
 var game: Node
@@ -114,6 +126,7 @@ func _initialize() -> void:
 	_test_scene_ids()
 	_test_slots_and_lines()
 	_test_speakers_and_cues()
+	await _test_hero_name()
 	_test_decisions()
 	_test_stage_covers_script()
 	_test_art_manifest()
@@ -316,12 +329,16 @@ func _test_slots_and_lines() -> void:
 		_check(Story.CLASS_LINES.has(slot), "@%s is written" % slot)
 	var longest := Story.longest_calling()
 	_check(longest == "Candleknight", "the longest calling name is Candleknight (%s)" % longest)
+	# The longest name a player can give, filled in as the longest calling is.
+	_check(LONGEST_NAME.length() == Story.NAME_MAX and Story.clean_name(LONGEST_NAME) == LONGEST_NAME, "the longest name is %d letters" % Story.NAME_MAX)
+	game.reset()
+	game.set_hero_name(LONGEST_NAME)
 	var worst := 0
 	for pair in _lines_raw():
 		var b: Array = pair[1]
 		var raw: String = b[1]
 		if not raw.begins_with("@"):
-			var filled := raw.replace("{calling}", longest)
+			var filled := raw.replace("{calling}", longest).replace("{hero}", LONGEST_NAME)
 			worst = maxi(worst, filled.length())
 			_check(filled.length() <= Story.MAX_LINE, "%s fits in 80: '%s' (%d)" % [pair[0], filled, filled.length()])
 		for cls in ids:
@@ -336,7 +353,8 @@ func _test_slots_and_lines() -> void:
 			_check(t.length() <= Story.MAX_LINE, "@%s/%s fits in 80 (%d)" % [slot, cls, t.length()])
 	for c in Story.CREDITS:
 		_check(str(c[0]).length() <= Story.MAX_LINE, "the credit '%s' fits" % c[0])
-	print("  longest line: %d characters" % worst)
+	game.reset()
+	print("  longest line: %d characters (a %d-letter name in it)" % [worst, Story.NAME_MAX])
 
 
 func _test_speakers_and_cues() -> void:
@@ -372,6 +390,217 @@ func _test_speakers_and_cues() -> void:
 					_check(b.has(p), "%s: '%s' has its %s" % [id, cue, p])
 
 
+func _oath_to_name(cs: Node, cls := "runner", steps := 4000) -> Dictionary:
+	## Plays an oath (its entry not instant) up to the name entry: the
+	## calling picked, the lines tapped through. {steps, plate: the hero's
+	## name plate on his first words}.
+	var plate := "?"
+	var n := 0
+	while not cs.finished and cs.waiting != "name" and n < steps:
+		if cs.waiting == "class":
+			cs.pick(cls)
+		elif cs.waiting == "line" and str(cs._line.get("who", "")) == "wick":
+			plate = str(cs._line["sp"]["name"])
+		if n % 10 == 9:
+			cs.tap()
+		cs.advance(DT)
+		n += 1
+	return {"steps": n, "plate": plate}
+
+
+func _on_disk() -> Dictionary:
+	var p = JSON.parse_string(FileAccess.get_file_as_string(game.save_path)) if FileAccess.file_exists(game.save_path) else null
+	return p if p is Dictionary else {}
+
+
+func _test_hero_name() -> void:
+	# The rules a name keeps to (Story.clean_name; the entry's as it's typed).
+	for c in [["  Ash  ", "Ash"], ["", "Waxby"], ["   ", "Waxby"], ["!!!", "Waxby"], ["--''", "Waxby"], ["Ash1", "Ash"],
+			["A   B", "A B"], ["O’Neil", "O'Neil"], ["Mary–Kate", "Mary-Kate"], ["Zoë", "Zoë"], ["Ash🔥", "Ash"], ["_Ash_", "Ash"],
+			["Bartholomew the Bold", "Bartholomew"], ["Mary-Kate O'Neil", "Mary-Kate O'"], [42, "Waxby"], [null, "Waxby"],
+			["Rene\u0301e", "Rene\u0301e"], ["\u0301Ash", "Ash"], ["A \u0301B", "A B"], ["王小明", "王小明"]]:
+		_check(Story.clean_name(c[0]) == c[1], "the name %s keeps as '%s' (%s)" % [JSON.stringify(c[0]), c[1], Story.clean_name(c[0])])
+	_check(Story.name_typed("Ash ") == "Ash " and Story.name_typed(" Ash") == "Ash", "while it's typed a space may end it, never start it")
+	_check(Story.name_typed("ABCDEFGHIJKLMNOP").length() == Story.NAME_MAX, "and it stops at %d" % Story.NAME_MAX)
+	# The name plate, {hero}, a bark's plate and the cast roll say the save's name.
+	game.reset()
+	game.new_hero("witch")
+	_check(Story.hero_name() == "Waxby" and Story.speaker("wick", "witch")["name"] == "Waxby", "no name given: Waxby")
+	game.set_hero_name("Ash")
+	_check(Story.hero_name() == "Ash" and Story.speaker("wick", "witch")["name"] == "Ash", "the hero's name plate says his name")
+	_check(Story.CAST["wick"]["name"] == Story.HERO_NAME and Story.speaker("taper", "witch")["name"] == "Mother Taper", "(and no one else's changes)")
+	_check(Story.fill("Well done, {hero}.", "witch") == "Well done, Ash." and Story.fill("the {calling}", "witch") == "the Taperwitch", "{hero} is his name")
+	var hc := ""
+	for l in Story.lines_of("homecoming", "witch"):
+		if l["who"] == "taper" and str(l["text"]).begins_with("Well done"):
+			hc = l["text"]
+	_check(hc == "Well done, Ash.", "homecoming: %s" % hc)
+	var wick_bark := ""
+	for k in Story.BARKS:
+		if str(Story.BARKS[k][0]).get_slice(":", 0) == "wick":
+			wick_bark = k
+			break
+	_check(wick_bark != "" and str(Story.bark_line(wick_bark, "witch").get("name", "")) == "Ash", "a bark of his carries his plate (%s)" % wick_bark)
+	_check(str(Story.bark_line("first_hurt", "witch").get("name", "")) != "Ash", "(and Taper's, hers)")
+	var cc := _play("intro", false)
+	var cast: Array = cc.cast_layout(0)
+	_check(not cast.is_empty() and str(cast[0]["who"]) == "wick" and str(cast[0]["name"]) == "Ash", "the cast roll names him Ash")
+	cc.queue_free()
+	if ResourceLoader.exists("res://scripts/modes/cosmetics.gd"):
+		var Cos = load("res://scripts/modes/cosmetics.gd")
+		var ending: Array = Cos.ids_for("story:homecoming")
+		var said := str(Cos.source_text(str(ending[0]))) if not ending.is_empty() else ""
+		_check(said == "See Ash home", "the ending's flame on the Look tab: \"%s\"" % said)
+	await process_frame
+	# Nobody to type (stepped by hand, as the tests and the shot tools do;
+	# headless; --autoplay): the oath answers Waxby at once, no entry shows.
+	game.reset()
+	game.set_hero_name("Ash")
+	var cs := _play("oath", false)
+	_check(cs.name_is_instant(), "stepped by hand, the entry answers itself")
+	var showed := false
+	for i in 4000:
+		if cs.finished:
+			break
+		showed = showed or cs.waiting == "name"
+		if cs.waiting == "class":
+			cs.pick("knight")
+		elif i % 10 == 9:
+			cs.tap()
+		cs.advance(DT)
+	_check(cs.finished and not showed and game.hero_name() == "Waxby", "the oath goes through: no entry, and the hero is Waxby (%s)" % game.hero_name())
+	await process_frame
+	var auto: Node = Cutscene.make("oath", func(): pass)
+	auto.auto_advance = true
+	_check(auto.name_is_instant(), "--autoplay (its lines going by themselves): instant")
+	auto.name_instant = false
+	_check(not auto.name_is_instant(), "and name_instant says so outright")
+	auto.free()
+	var plain: Node = Cutscene.new()
+	_check(DisplayServer.get_name() != "headless" or plain.name_is_instant(), "headless: instant")
+	plain.free()
+	# The entry, asked for real: after his first words (a blank plate), with
+	# Taper's question kept up; it starts at Waxby and takes the keys.
+	game.reset()
+	cs = _play("oath", false)
+	cs.name_instant = false
+	var got := _oath_to_name(cs)
+	_check(cs.waiting == "name" and cs.naming(), "the oath asks his name (%d steps)" % got["steps"])
+	_check(got["plate"] == "", "his first words, with no name yet, have a blank plate ('%s')" % got["plate"])
+	_check(game.has_hero("runner") and game.hero_name() == "Waxby", "(the calling made; still Waxby)")
+	await process_frame
+	var e: Control = cs.name_entry()
+	_check(e != null and e.get_script().resource_path == "res://scripts/name_entry.gd" and e.is_inside_tree(), "the name entry is up")
+	if e == null:
+		cs.queue_free()
+		return
+	_check(e.field.text == "Waxby" and e.field.max_length == Story.NAME_MAX, "it holds Waxby to start, %d letters at most" % Story.NAME_MAX)
+	_check(e.field.has_focus(), "its field has the keys (a phone's keyboard comes up)")
+	_check(str(cs._line.get("text", "")) == "And what do they call you, sprout?" and float(cs._box_goal) > 0.5, "Taper's question stays up under it")
+	_check(not cs._pill_visible(), "no Skip pill while it asks")
+	cs.tap()
+	for i in 30:
+		cs.advance(DT)
+	_check(cs.waiting == "name", "a tap or a wait doesn't get past it")
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_Z
+	ev.physical_keycode = KEY_Z
+	ev.pressed = true
+	cs._input(ev)
+	_check(cs.waiting == "name" and not root.is_input_handled(), "Z (jump) is a letter there: the scene leaves it to the field")
+	# What's typed: what a name can't hold doesn't land.
+	e.field.text = "Ash7!"
+	e.field.text_changed.emit("Ash7!")
+	_check(e.field.text == "Ash", "typed 'Ash7!', the field keeps 'Ash' (%s)" % e.field.text)
+	e.field.text = "O’Ne il"
+	e.field.text_changed.emit("O’Ne il")
+	_check(e.field.text == "O'Ne il", "a phone's curly apostrophe is a plain one (%s)" % e.field.text)
+	e.field.text = "Ash"
+	e.confirm_btn.pressed.emit()
+	_check(game.hero_name() == "Ash" and not cs.naming() and cs.waiting != "name", "Confirm: he's Ash, and the oath goes on")
+	_check(str(_on_disk().get("hero_name", "")) == "Ash", "the save holds it")
+	var welcome := ""
+	var n := 0
+	while not cs.finished and n < 4000:
+		if cs.waiting == "line" and str(cs._line.get("text", "")).begins_with("Carry the flame"):
+			welcome = str(cs._line["text"])
+		if n % 10 == 9:
+			cs.tap()
+		cs.advance(DT)
+		n += 1
+	_check(welcome == "Carry the flame and you're a Wick. Every keeper is. Welcome, Ash.", "Taper's welcome: %s" % welcome)
+	_check(cs.finished and game.seen("oath"), "the oath ends")
+	await process_frame
+	# Nothing fit to keep falls back to Waxby; Return confirms.
+	for typed in ["   ", "!!7", ""]:
+		game.reset()
+		cs = _play("oath", false)
+		cs.name_instant = false
+		_oath_to_name(cs)
+		await process_frame
+		e = cs.name_entry()
+		e.field.text = typed
+		e.field.text_submitted.emit(typed)
+		_check(game.hero_name() == "Waxby" and cs.waiting != "name", "'%s' given (Return): Waxby" % typed)
+		_check(not cs.name_hero("Ash") and game.hero_name() == "Waxby", "(answered once only)")
+		cs.queue_free()
+		await process_frame
+	# At the phone's 844 x 390, the field and Confirm stay in sight above a
+	# keyboard of any height a phone gives one; with none, it sits high.
+	game.reset()
+	cs = _play("oath", false)
+	cs.name_instant = false
+	_oath_to_name(cs)
+	await process_frame
+	e = cs.name_entry()
+	var vs: Vector2 = root.get_visible_rect().size
+	_check(vs.is_equal_approx(Vector2(844, 390)), "(the phone's own shape: %s)" % vs)
+	e.keyboard_override = 0.0
+	e._layout()
+	_check(e.panel_rect().position.y < vs.y / 3.0 and e.field.get_global_rect().end.y <= vs.y * 0.4,
+			"no keyboard: the entry sits high (%s)" % e.panel_rect())
+	_check(e.confirm_btn.size.y >= UI.TAP_H - 0.5 and e.field.size.y >= UI.TAP_H - 0.5, "Confirm and the field are a thumb tall")
+	_check(not e.confirm_btn.get_global_rect().intersects(e.field.get_global_rect()), "side by side, apart")
+	var safe := UI.safe_rect(root)
+	for kb in [160.0, 200.0, 230.0, 270.0]:
+		e.keyboard_override = kb
+		e._layout()
+		var F: Rect2 = e.field.get_global_rect()
+		var C: Rect2 = e.confirm_btn.get_global_rect()
+		_check(F.position.y >= 0.0 and F.end.y <= vs.y - kb and C.end.y <= vs.y - kb, "a %d-high keyboard: the field and Confirm above it (%s, %s)" % [kb, F, C])
+		_check(F.position.x >= safe.position.x and C.end.x <= safe.end.x, "and inside the safe area")
+	cs.queue_free()
+	await process_frame
+	# Skip after the calling: on to the entry, his flame lit as the cues it
+	# skipped would have left it; Skip again waits; named, the rest skips.
+	game.reset()
+	cs = _play("oath", false)
+	cs.name_instant = false
+	n = 0
+	while cs.waiting != "class" and n < 600:
+		cs.advance(DT)
+		n += 1
+	cs.pick("sexton")
+	for i in 20:
+		cs.advance(DT)
+	cs.skip()
+	for i in 5:
+		cs.advance(DT)
+	_check(cs.waiting == "name" and cs.naming(), "Skip after the calling goes on to the name entry (%s)" % cs.waiting)
+	_check(cs._lights.has("actor") and float(cs._lights["actor"]["k"]) > 0.9, "his flame lit, as the ignite it skipped would have")
+	cs.skip()
+	_check(cs.waiting == "name", "Skip again: the name is still asked")
+	_check(cs.name_hero("  Wren ") and game.hero_name() == "Wren", "named Wren")
+	cs.skip()
+	n = 0
+	while not cs.finished and n < 200:
+		cs.advance(DT)
+		n += 1
+	_check(cs.finished and game.seen("oath") and game.hero_name() == "Wren", "then the rest of the oath skips")
+	game.reset()
+	await process_frame
+
+
 func _test_decisions() -> void:
 	## decisions.md's story rules, as written into the script.
 	_check(Story.CAST["wick"]["name"] == "Waxby", "the hero's name plate says Waxby")
@@ -380,16 +609,33 @@ func _test_decisions() -> void:
 	for l in intro:
 		for noun in ["Lanternfold", "Vigil", "Undercandle"]:
 			_check(not l["text"].contains(noun), "the intro saves '%s' for later: %s" % [noun, l["text"]])
-	# The oath: choose, Taper's reaction, the lighting, then two lines. No spire, no iris.
+	# The oath: choose, Taper's reaction, the lighting, his oath; then Taper
+	# asks his name, the name, the title explained, the send-off. No spire,
+	# no iris.
 	var seq := []
 	for shot in Story.scene("oath")["shots"]:
 		_check(str(shot.get("panel", "")) != "spire", "the oath has no spire shot")
 		for b in shot["beats"]:
 			if Story.is_line(b):
 				seq.append("line")
-			elif b.get("do", "") in ["choose_class", "ignite", "iris"]:
+			elif b.get("do", "") in ["choose_class", "ignite", "iris", "choose_name"]:
 				seq.append(b["do"])
-	_check(seq == ["choose_class", "line", "ignite", "line", "line"], "the oath is choose, react, ignite, two lines: %s" % [seq])
+	_check(seq == ["choose_class", "line", "ignite", "line", "line", "choose_name", "line", "line"],
+			"the oath is choose, react, ignite, his oath, the question, the name, the title, the send-off: %s" % [seq])
+	var after_name := []
+	var asked := ""
+	for b in Story.scene("oath")["shots"][1]["beats"]:
+		if b is Dictionary and b.get("do", "") == "choose_name":
+			after_name.append("name")
+		elif Story.is_line(b):
+			if after_name.is_empty():
+				asked = str(b[1])
+			else:
+				after_name.append(str(b[0]) + " " + str(b[1]))
+	_check(asked == "And what do they call you, sprout?", "Taper asks his name: %s" % asked)
+	_check(after_name == ["name", "taper:proud Carry the flame and you're a Wick. Every keeper is. Welcome, {hero}.",
+			"taper:warm Now go and ring the bells, sprout. Give Evenbell its breath back."],
+			"then the title, once, in her words, with his name, and the send-off: %s" % [after_name])
 	var b11 := Story.scene("beat_1_1")
 	_check((b11.get("shots", []) as Array).is_empty() and (b11.get("barks", []) as Array).size() == 2, "beat_1_1 is two barks")
 	for id in ["beat_3_1", "beat_4_1", "beat_5_1", "beat_6_1"]:
@@ -2860,18 +3106,28 @@ func _test_v3_script() -> void:
 	for e in _all_scene_lines():
 		if str(e[2][0]).get_slice(":", 0) == "hush":
 			_check(str(e[2][1]) == str(e[2][1]).to_lower(), "%s: the Hush speaks in lowercase" % e[0])
-	# Nobody says his name until homecoming: "Waxby" / {hero} in one line only.
-	var named_lines := []
+	# His name is always {hero}, never "Waxby" outright (a name the player
+	# gave is the one said): Taper says it at the oath, as she welcomes him,
+	# and in homecoming. The title, a Wick, is explained once: at the oath.
+	var waxby_lines := []
+	var hero_lines := []
+	var title_lines := []
 	for pair in _lines_raw():
 		var raw := str(pair[1][1])
-		if raw.contains("Waxby") or raw.contains("{hero}"):
-			named_lines.append(pair[0])
-	for cls in Classes.ids():
-		for slot in Story.CLASS_LINES:
-			var t := str(Story.class_line(slot, cls)[1])
-			if t.contains("Waxby"):
-				named_lines.append("@%s/%s" % [slot, cls])
-	_check(named_lines == ["homecoming shot 2"], "the hero's name is said in one line, Taper's in homecoming: %s" % [named_lines])
+		if raw.contains("Waxby"):
+			waxby_lines.append(pair[0])
+		if raw.contains("{hero}"):
+			hero_lines.append(pair[0])
+		if raw.contains("you're a Wick"):
+			title_lines.append(pair[0])
+	for slot in Story.CLASS_LINES:
+		for cls in Story.CLASS_LINES[slot]:
+			var e = Story.CLASS_LINES[slot][cls]
+			if str(e[1] if e is Array else e).contains("Waxby"):
+				waxby_lines.append("@%s/%s" % [slot, cls])
+	_check(waxby_lines.is_empty(), "no line says Waxby outright, only {hero}: %s" % [waxby_lines])
+	_check(hero_lines.has("oath shot 1") and hero_lines.has("homecoming shot 2"), "Taper says his name at the oath and in homecoming: %s" % [hero_lines])
+	_check(title_lines == ["oath shot 1"], "the title is explained once, at the oath: %s" % [title_lines])
 	var said := ""
 	for l in Story.lines_of("homecoming", "witch"):
 		if l["who"] == "taper" and str(l["text"]).contains(Story.HERO_NAME):
@@ -3350,23 +3606,32 @@ func _test_replay() -> void:
 	## makes no hero; a boss beat marks no card; the scene still ends.
 	game.reset()
 	game.new_hero("founder")
+	game.set_hero_name("Ash")
 	for id in ["intro", "oath", "boss_1_before"]:
 		game.mark_seen(id)
 	var cs: Node = Cutscene.make("oath", _cb())
 	cs.replay = true
 	cs.manual = true
+	cs.name_instant = false   # (a player's replay: still no entry)
 	cs.follow_next = false
 	root.add_child(cs)
 	var asked := false
+	var named := false
+	var welcome := ""
 	for i in 4000:
 		if cs.finished:
 			break
 		asked = asked or cs.waiting == "class"
+		named = named or cs.waiting == "name"
+		if cs.waiting == "line" and str(cs._line.get("text", "")).begins_with("Carry the flame"):
+			welcome = str(cs._line["text"])
 		if i % 10 == 9:
 			cs.tap()
 		cs.advance(DT)
 	_check(cs.finished and not asked, "the oath replays without its chooser")
 	_check(game.heroes().size() == 1 and game.hero_id() == "founder", "and makes no hero")
+	_check(not named and game.hero_name() == "Ash", "and asks no name: he's still Ash (%s)" % game.hero_name())
+	_check(welcome.ends_with("Welcome, Ash."), "Taper's welcome says the name he has: %s" % welcome)
 	await process_frame
 	var bb: Node = Cutscene.make("boss_1_before", func(): pass)
 	bb.replay = true

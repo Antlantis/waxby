@@ -7,12 +7,15 @@ extends Control
 ## v3: a fifth tab, Look (the modes' look_panel.gd: flames and trims), shows
 ## once that panel is in the build. At level 30, with one capstone owned, the
 ## Skills tab plays the bark second_capstone over the Sheet, once a save.
+## The Stats tab's Rename opens the oath's name entry (name_entry.gd) over
+## the Sheet: the name given is the save's, every calling's.
 
 signal back
 signal changed
 
 const UI := preload("res://scripts/ui.gd")
 const Classes := preload("res://scripts/classes.gd")
+const NameEntry := preload("res://scripts/name_entry.gd")
 const TABS := ["stats", "skills", "gear", "belt", "look"]
 const BAR_H := 46.0               # the top bar: Back, the name plate, the tabs
 const TAB_NAME := {"stats": "Stats", "skills": "Skills", "gear": "Gear", "belt": "Belt", "look": "Look"}
@@ -34,6 +37,7 @@ var _back_btn: Button
 var _t := 0.0
 var _bark := {}                   # {who, name, text, col, tex, letter, t}
 var _bark_layer: Control          # over the panels: the bark draws here
+var _namer: Control = null        # the Rename's name entry, while it's up
 
 
 func _ready() -> void:
@@ -78,6 +82,42 @@ func open_tab(name: String) -> void:
 	_refresh_tabs()
 	if tab == "skills":
 		_capstone_bark()
+
+
+# ---------------------------------------------------------------- Rename
+
+func rename() -> void:
+	## The name entry over the Sheet, holding the name he has. Confirmed, the
+	## save keeps it (Game.set_hero_name); Cancel or Escape leaves it.
+	if _namer != null:
+		return
+	var g := get_node_or_null("/root/Game")
+	_namer = NameEntry.new()
+	_namer.name = "NameEntry"
+	if g != null and g.has_method("hero_name"):
+		_namer.start = str(g.hero_name())
+	_namer.can_cancel = true
+	_namer.accent = UI.class_color(str(_hero().get("cls", "knight")))
+	_namer.named.connect(func(n):
+		if g != null and g.has_method("set_hero_name"):
+			g.set_hero_name(n)
+		_close_namer())
+	_namer.cancelled.connect(_close_namer)
+	add_child(_namer)
+
+
+func renaming() -> bool:
+	return _namer != null
+
+
+func name_entry() -> Control:
+	return _namer
+
+
+func _close_namer() -> void:
+	if _namer != null:
+		_namer.queue_free()
+		_namer = null
 
 
 # ---------------------------------------------------------------- the two-capstone bark
@@ -301,6 +341,8 @@ func plate_rect() -> Rect2:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _namer != null:
+		return   # (the name entry has the keys: P is a letter there)
 	if event.is_action_pressed("pause"):
 		back.emit()
 		get_viewport().set_input_as_handled()

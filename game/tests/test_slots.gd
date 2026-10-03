@@ -13,7 +13,10 @@ extends SceneTree
 ## embers a level carries when the app is sent away are kept for the next
 ## load, per slot. Save v3: a v2 save migrates in any slot, each slot on its
 ## own (a v1 save only in slot 1), its v2 file kept as .v2; the owner's own
-## slots (copies) come through whole. Every file lives in user://test_slots/:
+## slots (copies) come through whole. The hero's own name: one a slot,
+## saved and read back there only; a save from before names (and the v1
+## migration, and junk in its place) is Waxby; the .bak and an erase's Undo
+## keep it; the cards say it. Every file lives in user://test_slots/:
 ## the real saves and settings are never read or written (checked byte for
 ## byte at the end).
 ##
@@ -98,6 +101,7 @@ func _initialize() -> void:
 	_test_owner_now()
 	_test_switch_reloads()
 	_test_v3_keys_per_slot()
+	_test_hero_names()
 	_test_unsaved_kept()
 	_test_erase_undo()
 	_test_start_over()
@@ -709,6 +713,84 @@ func _test_v3_keys_per_slot() -> void:
 	_check(_bytes(1) == b1 and _bytes(2) == b2, "and looking at them writes nothing")
 
 
+func _test_hero_names() -> void:
+	## One name a slot (Game.hero_name): given in one, saved and read back
+	## there, never in another; a save from before there were names, a v2
+	## save and slot 1's v1 migration are Waxby, and so is junk in its place;
+	## a save broken or erased comes back with its name (the .bak, the Undo);
+	## a new game there starts as Waxby again. The cards say it.
+	_fresh()
+	_make(1, "knight", 4, "", 10)
+	_check(game.hero_name() == "Waxby", "a new game's hero is Waxby till he's named (%s)" % game.hero_name())
+	_check(game.set_hero_name("  Ash  ") == "Ash" and game.hero_name() == "Ash", "named Ash (trimmed: %s)" % game.hero_name())
+	_check(str(_on_disk(1).get("hero_name", "")) == "Ash", "and slot 1's save holds it (%s)" % _on_disk(1).get("hero_name"))
+	_make(2, "witch", 3, "", 10)
+	_check(game.hero_name() == "Waxby", "slot 2's hero is Waxby: Ash stays in slot 1 (%s)" % game.hero_name())
+	game.set_hero_name("Bramble-Jo")
+	game.use_slot(1)
+	_check(game.hero_name() == "Ash", "slot 1 again: Ash (%s)" % game.hero_name())
+	game.use_slot(2)
+	_check(game.hero_name() == "Bramble-Jo", "slot 2 again: Bramble-Jo (%s)" % game.hero_name())
+	var s1: Dictionary = game.slot_summary(1)
+	var s2: Dictionary = game.slot_summary(2)
+	_check(str(s1.get("hero_name")) == "Ash" and str(s2.get("hero_name")) == "Bramble-Jo", "each card has its own name (%s, %s)" % [s1.get("hero_name"), s2.get("hero_name")])
+	_check(SavesS.who_line(s1) == "Ash · Candleknight Lv 4" and SavesS.who_line(s2) == "Bramble-Jo · Taperwitch Lv 3",
+			"the cards: %s; %s" % [SavesS.who_line(s1), SavesS.who_line(s2)])
+	_check(SavesS.who_line({"cls": ""}) == "No calling yet", "a card before the oath names no one")
+	var b1 := _bytes(1)
+	game.use_slot(1)
+	game.set_hero_name("Ash")
+	_check(_bytes(1) == b1, "the same name again writes nothing")
+	# A save from before names: no key. Waxby, on its card and played.
+	var d := _on_disk(1)
+	d.erase("hero_name")
+	_write(game.slot_path(1), JSON.stringify(d, "\t"))
+	game.use_slot(2)
+	_check(str(game.slot_summary(1).get("hero_name")) == "Waxby", "a save from before names: its card says Waxby")
+	game.use_slot(1)
+	_check(game.hero_name() == "Waxby" and game.has_hero("knight") and int(game.hero()["level"]) == 4, "played, it's Waxby, the rest as it was")
+	# Junk where the name goes: Waxby, or what of it a name may hold.
+	for junk in [[42, "Waxby"], ["", "Waxby"], ["  ", "Waxby"], ["!!!7", "Waxby"], ["--'", "Waxby"], [{"a": 1}, "Waxby"],
+			["Ash the Great and Terrible", "Ash the Grea"], ["Zoë", "Zoë"], ["O’Neil", "O'Neil"], ["R2-D2", "R-D"]]:
+		d["hero_name"] = junk[0]
+		_write(game.slot_path(1), JSON.stringify(d, "\t"))
+		game.load_save()
+		var want := str(junk[1])
+		_check(game.hero_name() == want, "a save holding %s as the name loads as '%s' (%s)" % [JSON.stringify(junk[0]), want, game.hero_name()])
+	# The broken save's backup, and an erase's Undo, keep the name.
+	game.set_hero_name("Wren")
+	game.add_embers(1)
+	game.save()   # (the backup holds Wren too)
+	_write(game.slot_path(1), "{\"version\": 3, \"hero_na")
+	game.use_slot(2)
+	_check(str(game.slot_summary(1).get("hero_name")) == "Wren", "slot 1 can't be read: its card shows the backup's name (%s)" % game.slot_summary(1).get("hero_name"))
+	game.use_slot(1)
+	_check(game.hero_name() == "Wren", "played, the backup's game is Wren's (%s)" % game.hero_name())
+	game.save()
+	game.save()
+	game.use_slot(2)
+	_check(game.erase_slot(1) and game.slot_summary(1).is_empty(), "(slot 1 erased)")
+	_check(game.restore_slot(1) and str(game.slot_summary(1).get("hero_name")) == "Wren", "its Undo brings Wren back")
+	game.use_slot(1)
+	_check(game.hero_name() == "Wren", "played: Wren")
+	game.new_game(1)
+	_check(game.hero_name() == "Waxby" and str(_on_disk(1).get("hero_name")) == "Waxby", "a new game in slot 1 starts as Waxby again")
+	game._purge_erased()
+	# A v2 save (any slot) and slot 1's v1 migration: Waxby.
+	var v2 := FileAccess.get_file_as_string(V2_FIXTURE)
+	if v2 != "":
+		_write(game.slot_path(3), v2)
+		_check(str(game.slot_summary(3).get("hero_name")) == "Waxby", "a v2 save's card: Waxby")
+		game.use_slot(3)
+		_check(game.hero_name() == "Waxby" and str(_on_disk(3).get("hero_name")) == "Waxby", "played, the v2 save migrates as Waxby's")
+	if FileAccess.file_exists(FIXTURE):
+		_write(game.slot_path(1), FileAccess.get_file_as_string(FIXTURE))
+		game.use_slot(1)
+		_check(game.veteran() == 4 and game.hero_name() == "Waxby" and str(_on_disk(1).get("hero_name")) == "Waxby",
+				"slot 1's v1 save migrates as Waxby's")
+	game._purge_erased()
+
+
 func _test_unsaved_kept() -> void:
 	## Embers picked up in a level left early wait in memory for the next
 	## save: switching slots writes them first, into their own slot only.
@@ -1179,10 +1261,11 @@ func _test_texts() -> void:
 	_make(2, "knight", 9, "2-2", 412)
 	var s: Control = SavesS.new()
 	root.add_child(s)
-	_check(s.loss_line(2) == "Erases Save 2: Candleknight Lv 9, 2-3", "what goes: %s" % s.loss_line(2))
+	_check(s.loss_line(2) == "Erases Save 2: Waxby, Candleknight Lv 9, 2-3", "what goes: %s" % s.loss_line(2))
 	_make(3, "runner", 4, "", 10, ["witch", "knight"])
+	game.set_hero_name("Ash")
 	s.refresh()
-	_check(s.loss_line(3) == "Erases Save 3: Sootrunner Lv 4 (+2 callings), 1-1", "with more callings: %s" % s.loss_line(3))
+	_check(s.loss_line(3) == "Erases Save 3: Ash, Sootrunner Lv 4 (+2 callings), 1-1", "with more callings, and a name: %s" % s.loss_line(3))
 	s.free()
 	# Last played, in local time (bias 0 here): Fri 25 Sep 2026, 14:05.
 	var now := int(Time.get_unix_time_from_datetime_string("2026-09-25T14:05:00"))

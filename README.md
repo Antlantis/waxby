@@ -38,6 +38,9 @@ ring them again.
   altars heal 40%, the monsters killed come back after a snuff, Anointed come
   about twice as often, and Hushlings hunt in twos and threes.
 - **Illustrated story scenes** between the worlds, with portraits and voices.
+  Waxby is the hero's name until you give him your own at the oath (up to 12
+  letters; Rename on the Sheet's Stats tab changes it). Any keeper who carries
+  the flame is a Wick, as Mother Taper tells him there.
 
 Every picture is drawn in code (Python-generated SVG) and every sound is
 synthesized. Nothing is borrowed.
@@ -85,6 +88,8 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
   scripts/level_data.gd   the ASCII level format and its legend (read this before editing a level)
   scripts/level_features.gd  braziers, lanterns, waxfalls, drip spouts, false stone
   scripts/story.gd        every story scene as data; cutscene.gd plays them, cutscene_stage.gd draws
+  scripts/name_entry.gd   the hero's name, asked for at the oath (the choose_name cue) and by the
+                          Sheet's Rename: the field, the phone's keyboard, the rules (Story.clean_name)
   scripts/tales_screen.gd the Tales: every scene seen, replayed (opened from the title and the saves)
   scripts/hud.gd  touch_controls.gd  title_screen.gd  map_screen.gd  hero_screen.gd (+ *_panel.gd)
   scripts/chandler_screen.gd  keeper_screen.gd  pause_menu.gd  results_screen.gd  settings.gd
@@ -209,8 +214,9 @@ menu's buttons and the other screens are still taps.
 
 ## Saves
 
-Three save slots, each a whole game of its own: callings, gear, embers,
-relics, unlocks and story seen. A tap on the title opens the saves
+Three save slots, each a whole game of its own: the hero's name, callings,
+gear, embers, relics, unlocks and story seen (a save from before names is
+Waxby's). A tap on the title opens the saves
 (scripts/saves_screen.gd). Tap a filled card to play on from the map, or an
 empty one for a new game (the intro, then the oath). A filled card's "..."
 offers **Start over** (erase it and begin again from the intro) and **Erase**

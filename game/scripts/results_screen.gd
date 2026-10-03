@@ -46,7 +46,7 @@ var _xp_from := 0
 var _xp_to := 0
 var _xp_level_seen := 0
 var _level_flash := 0.0
-var _after := {}                  # {who, mood, text, tex, uv}
+var _after := {}                  # {who, text, tex, col, name (the speaker's plate: the hero's own name for his)}
 var _item_icons := {}
 var _lost := {}                   # the Lost Wick's words: {name, text, tex, col} ({} off a secret level)
 var _marks_from := 0              # Candlemarks before the level (v3)
@@ -146,7 +146,8 @@ func _after_line() -> Dictionary:
 	var p := str(e.get("portrait", "")) if e is Dictionary else ""
 	if p == "" or not ResourceLoader.exists(p):
 		p = UI.portrait_path(who, mood, str(Game.hero()["cls"]))
-	return {"who": who, "text": text, "tex": UI.tex(UI.hud_face(p)) if p != "" else null, "col": UI.speaker_color(who)}
+	return {"who": who, "text": text, "tex": UI.tex(UI.hud_face(p)) if p != "" else null, "col": UI.speaker_color(who),
+			"name": str(e.get("name", "")) if e is Dictionary else ""}
 
 
 func _story_after(id: String):
@@ -572,5 +573,6 @@ func _draw_after(s: Rect2) -> void:
 	var w := tw + 58.0
 	var r := Rect2(s.get_center().x - w * 0.5, s.end.y - 88.0, w, 36.0)
 	var col: Color = _after["col"]
-	UI.portrait(self, Vector2(r.position.x + 18.0, r.get_center().y), 18.0, _after.get("tex"), col, a, Rect2(0, 0, 1, 1), str(_after["who"]).substr(0, 1).to_upper())
+	var nm := str(_after.get("name", ""))
+	UI.portrait(self, Vector2(r.position.x + 18.0, r.get_center().y), 18.0, _after.get("tex"), col, a, Rect2(0, 0, 1, 1), (nm if nm != "" else str(_after["who"])).substr(0, 1).to_upper())
 	UI.text(self, Vector2(r.position.x + 46.0, r.position.y + 24.0), text, size, Color(UI.CREAM, a), HORIZONTAL_ALIGNMENT_LEFT, -1, "italic", 600, 3)

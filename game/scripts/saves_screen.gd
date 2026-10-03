@@ -388,8 +388,8 @@ func _leave() -> void:
 
 
 func loss_line(n: int) -> String:
-	## "Erases Save 2: Candleknight Lv 9, 2-3": what a Start over or an Erase
-	## takes away.
+	## "Erases Save 2: Waxby, Candleknight Lv 9, 2-3": what a Start over or an
+	## Erase takes away (the hero by his own name).
 	var sm := summary(n)
 	if sm.get("bad", false):
 		return "Erases Save %d (it couldn't be read)" % n
@@ -397,7 +397,7 @@ func loss_line(n: int) -> String:
 	if int(sm.get("veteran", 0)) > 0:
 		parts.append("veteran")
 	if str(sm.get("cls", "")) != "":
-		var who := "%s Lv %d" % [sm["name"], int(sm["level"])]
+		var who := "%s, %s Lv %d" % [hero_of(sm), sm["name"], int(sm["level"])]
 		var more := int(sm.get("callings", 1)) - 1
 		if more > 0:
 			who += " (+%d calling%s)" % [more, "" if more == 1 else "s"]
@@ -410,6 +410,19 @@ func loss_line(n: int) -> String:
 		if int(sm.get("embers", 0)) > 0:
 			parts.append("%d embers" % int(sm["embers"]))
 	return "Erases Save %d: %s" % [n, ", ".join(parts)]
+
+
+static func hero_of(sm: Dictionary) -> String:
+	## A card's hero by his own name (Waxby for a summary from before names).
+	return str(sm.get("hero_name", "Waxby"))
+
+
+static func who_line(sm: Dictionary) -> String:
+	## A filled card's hero: "Waxby · Candleknight Lv 9", or "No calling yet"
+	## before the oath.
+	if str(sm.get("cls", "")) == "":
+		return "No calling yet"
+	return "%s · %s Lv %d" % [hero_of(sm), sm["name"], int(sm["level"])]
 
 
 func owes_note() -> String:
@@ -621,13 +634,13 @@ func _filled_card(c: Rect2, fc: Vector2, sm: Dictionary, cls: String, col: Color
 	var w := c.size.x
 	if cls != "":
 		var f: Dictionary = _faces.get(cls, {})
-		UI.portrait(self, fc, 33.0, f.get("tex"), col, 1.0, f.get("uv", Rect2(0, 0, 1, 1)), str(sm["name"]).substr(0, 1))
+		UI.portrait(self, fc, 33.0, f.get("tex"), col, 1.0, f.get("uv", Rect2(0, 0, 1, 1)), hero_of(sm).substr(0, 1))
 		var pf := _portrait_flame(cls)
 		if not pf.is_empty() and f.get("tex") != null and f.get("uv", Rect2(0, 0, 1, 1)) == Rect2(0, 0, 1, 1):
 			UI.flame(self, fc + (pf["uv"] - Vector2(0.5, 0.5)) * 2.0 * 32.0, float(pf["h"]) * 32.0 / 46.0, _t, float(sm["slot"]), false, 1.0)
 	else:
 		_candle(fc, true)    # sworn to nothing yet: a candle waits in the niche
-	var who := "%s · Lv %d" % [sm["name"], int(sm["level"])] if cls != "" else "No calling yet"
+	var who := who_line(sm)
 	UI.text(self, Vector2(x + 8.0, c.position.y + 180.0), who, UI.fit_size(who, w - 16.0, 19, 13, "title", 700), UI.GOLD if cls != "" else UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, w - 16.0, "title", 700, 4)
 	var far := "%s %s" % [sm.get("furthest", ""), sm.get("furthest_title", "")]
 	if cls == "" and int(sm.get("veteran", 0)) <= 0 and str(sm.get("furthest", "")) in ["", "1-1"]:
@@ -759,7 +772,7 @@ func _draw_menu() -> void:
 		var fc := P.position + Vector2(46.0, 48.0)
 		if cls != "":
 			var f: Dictionary = _faces.get(cls, {})
-			UI.portrait(m, fc, 25.0, f.get("tex"), col, 1.0, f.get("uv", Rect2(0, 0, 1, 1)), str(sm["name"]).substr(0, 1))
+			UI.portrait(m, fc, 25.0, f.get("tex"), col, 1.0, f.get("uv", Rect2(0, 0, 1, 1)), hero_of(sm).substr(0, 1))
 		else:
 			m.draw_circle(fc, 28.0, UI.INK)
 			m.draw_circle(fc, 25.0, Color("241b30"))
@@ -767,7 +780,7 @@ func _draw_menu() -> void:
 		UI.text(m, Vector2(P.position.x + 84.0, P.position.y + 46.0), "Save %d" % menu_slot, 26, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700, 4)
 		var what := "Couldn't be read"
 		if not sm.get("bad", false):
-			what = ("%s · Lv %d" % [sm["name"], int(sm["level"])] if cls != "" else "No calling yet") + "  ·  %s %s" % [sm.get("furthest", ""), sm.get("furthest_title", "")]
+			what = who_line(sm) + "  ·  %s %s" % [sm.get("furthest", ""), sm.get("furthest_title", "")]
 		var ww := P.size.x - 104.0
 		UI.text(m, Vector2(P.position.x + 84.0, P.position.y + 68.0), what.strip_edges(), UI.fit_size(what.strip_edges(), ww, 13, 10, "body", 700), UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, ww, "body", 700)
 		m.draw_line(Vector2(P.position.x + 18.0, P.position.y + 86.0), Vector2(P.end.x - 18.0, P.position.y + 86.0), Color(UI.PANEL_EDGE, 0.4), 1.0)

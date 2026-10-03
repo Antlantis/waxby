@@ -4,10 +4,11 @@
 # The safe area puts the phone's island inset on that side ("left" or
 # "right"; "both" as iOS reports it, "none" plain margins). Files are
 # <out_dir>/<W>x<H>_<safe>_<name>.png: empty (no saves yet), migrated (only
-# slot 1, a v1 save migrated), three (three callings), bad (a slot that
-# can't be read), menu (a card's "..." menu), hold (the hold-to-confirm half
-# held), undo (the Undo in the card just erased), hold_start_over (Start over
-# asked while that Undo waits: the warning), title (the title after a save).
+# slot 1, a v1 save migrated), three (three saves, slot 3's hero named
+# Bartholomew), bad (a slot that can't be read), menu (a card's "..." menu),
+# hold (the hold-to-confirm half held), undo (the Undo in the card just
+# erased), hold_start_over (Start over asked while that Undo waits: the
+# warning), title (the title after a save).
 # The shots keep their own saves and settings (user://shot_slots/), so no
 # real save is ever read or touched.
 extends SceneTree
@@ -190,6 +191,7 @@ func _set_three() -> void:
 	_slot(1, "knight", 9, "2-2", 412, [])
 	_played(1, 26 * 3600)
 	_slot(3, "runner", 14, "2-4", 1375, ["knight", "witch"], "1-2")
+	game.set_hero_name("Bartholomew")   # (a name as long as most get)
 	_played(3, 5 * 86400)
 	_slot(2, "witch", 4, "1-2", 96, [])
 	_played(2, 12 * 60)
