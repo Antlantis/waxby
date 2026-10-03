@@ -158,7 +158,7 @@ var crumbles := {}              # Vector2i -> {state, timer}
 var sconces: Array = []         # flame points
 var altars: Array = []          # {cell, pos, flame, lit, glow, sprite}
 var bells: Array = []           # {pos, rope: Rect2, sprite, beam, swing, rung}
-var signs: Array = []           # {pos, text}
+var signs: Array = []           # {pos, text, node}
 var shots: Array = []           # see spawn_shot
 var hazards: Array = []         # see add_hazard
 var bolts: Array = []           # old name kept empty: shots replaced them
@@ -2623,14 +2623,36 @@ func _touch_world() -> void:
 	if not pool.is_empty() and pr.grow(8.0).has_point(pool["pos"]):
 		_reclaim_pool()
 	# Signs.
-	var near := ""
-	for s in signs:
-		if absf(player.position.x - s["pos"].x) < 44.0 and absf(player.position.y - s["pos"].y) < 60.0:
-			near = s["text"]
-	if hud:
-		hud.show_hint(near)
+	_read_signs()
 	if player.life_frac() < 0.25:
 		bark("low_flame")
+
+
+const SIGN_REACH := 64.0        # px across a sign's post he reads it from (v2's 44: a run passed it in under half a second)
+const SIGN_LINGER := 2.0        # s the last sign's text stays up after he walks on (then the HUD's own fade)
+var _sign_text := ""            # the last sign read...
+var _sign_left := -100.0        # ...and the _t he was last by it
+
+
+func _read_signs() -> void:
+	## The sign Wick stands by puts its text in the HUD's slot, and the last
+	## one keeps it there SIGN_LINGER s after he walks on, so a sign reads on
+	## the run. A board he has stood by stops glinting (sign_view.gd, this
+	## visit only).
+	var near := ""
+	for s in signs:
+		if absf(player.position.x - s["pos"].x) < SIGN_REACH and absf(player.position.y - s["pos"].y) < 60.0:
+			near = s["text"]
+			var node = s.get("node")
+			if node != null and node.has_method("mark_read"):
+				node.mark_read()
+	if near != "":
+		_sign_text = near
+		_sign_left = _t
+	elif _sign_text != "" and _t - _sign_left < SIGN_LINGER:
+		near = _sign_text
+	if hud:
+		hud.show_hint(near)
 
 
 func _douse() -> void:
