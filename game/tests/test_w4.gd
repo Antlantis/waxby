@@ -40,7 +40,9 @@ extends SceneTree
 ## critical path is ridden in one, and no route stands still on ice within 5
 ## tiles of a pit's edge, and takes no hit (4-4's approach route is replayed
 ## here to the arena door, since its bell only comes with the Tinker); each
-## feature's first-time bark plays once as it's taught, never mid-jump.
+## feature's first-time bark plays once as it's taught, never mid-jump (and,
+## in a small level, BARK_LEAD tiles before a feature no sign teaches, never
+## in a mode).
 ##
 ##     godot --headless --path game --script res://tests/test_w4.gd
 
@@ -111,6 +113,7 @@ func _initialize() -> void:
 	await _test_swings()
 	await _test_clock()
 	await _test_boss_pivot()
+	await _test_bark_lead()
 	_test_level_checks()
 	await _test_arc_check()
 	var have := []
@@ -673,6 +676,89 @@ func _test_boss_pivot() -> void:
 	var cw = _cw(w)
 	_check(cw.weights.is_empty() and cw.boss_pivots.size() == 1, "a Y in a boss arena is the boss's own pivot, not a weight")
 	await _done(w)
+
+
+func _test_bark_lead() -> void:
+	## A feature's first-time bark with no teaching sign before it is said
+	## BARK_LEAD (6) tiles before its first cell, on stone; with a sign within
+	## SIGN_BEFORE, at the sign as before. Never in a mode (a mode's rooms
+	## teach nothing, as deep.gd's). Two due on one landing: the one whose
+	## spot he passed last first.
+	var CW: Dictionary = (load(CLOCKWORK) as Script).get_script_constant_map()
+	var lead := int(CW.get("BARK_LEAD", -1))
+	_check(lead == 6, "BARK_LEAD is 6 tiles (%d)" % lead)
+	var ice_row := "#".repeat(30) + "I".repeat(10) + "#".repeat(20)
+	for with_sign in [false, true]:
+		var lines := []
+		for y in 13:
+			lines.append("")
+		if with_sign:
+			lines[12] = ".".repeat(20) + "@"
+		lines.append(ice_row)
+		var lv := _level(lines, "hints: Ice\n" if with_sign else "", "lab-w4", 60)
+		var w := _world(lv)
+		await process_frame
+		var hud := _stub_hud()
+		hud.world = w
+		w.hud = hud
+		var spot := 20 if with_sign else 30 - lead
+		var plan: Dictionary = _cw(w)._bark_at.get("ice", {})
+		_check(int(plan.get("first", -1)) == 30 and int(plan.get("sign", -1)) == spot,
+				"%s: first_ice is planned at x %d (%s)" % ["a sign at 20" if with_sign else "no sign", spot, plan])
+		_stand(w, Vector2i(10, 12))
+		var said_x := -1.0
+		var on_floor := false
+		for i in int(4.0 / DT):
+			_ticks(w, 1, {"right": true})
+			for b in hud.said:
+				if b[0] == "first_ice" and said_x < 0.0:
+					said_x = float(b[2])
+					on_floor = bool(b[1])
+			if w.player.position.x > 32 * TILE:
+				break
+		var n: int = hud.said.filter(func(b): return b[0] == "first_ice").size()
+		_check(n == 1 and on_floor and absf(said_x - (spot + 0.5) * TILE) < 44.0,
+				"%s: first_ice said once, on the floor, at x %d (%d times, at %.0f px)" % ["a sign at 20" if with_sign else "no sign", spot, n, said_x])
+		await _done(w)
+	# In a mode: nothing, even standing on the spot; out of it, the bark.
+	var lines2 := []
+	for y in 13:
+		lines2.append("")
+	lines2.append(ice_row)
+	var w2 := _world(_level(lines2, "", "lab-w4", 60))
+	await process_frame
+	var hud2 := _stub_hud()
+	hud2.world = w2
+	w2.hud = hud2
+	_stand(w2, Vector2i(30 - lead, 12))
+	w2.mode = RefCounted.new()
+	_cw(w2)._step_barks(w2.player)
+	_check(hud2.said.is_empty(), "in a mode no first-time bark is said (%s)" % [hud2.said])
+	w2.mode = null
+	_cw(w2)._step_barks(w2.player)
+	_check(hud2.said.size() == 1 and hud2.said[0][0] == "first_ice", "out of one, on the same spot, it is (%s)" % [hud2.said])
+	await _done(w2)
+	# Two due on one landing (both spots passed in the air): the one just
+	# ahead of him (its spot passed last) first, the other at the next gap.
+	var lines3 := []
+	for y in 13:
+		lines3.append("")
+	lines3.append("#".repeat(12) + "I".repeat(8) + "#".repeat(20) + ">".repeat(6) + "#".repeat(14))
+	var w3 := _world(_level(lines3, "", "lab-w4", 60))
+	await process_frame
+	var hud3 := _stub_hud()
+	hud3.world = w3
+	w3.hud = hud3
+	_stand(w3, Vector2i(36, 12))
+	var cw3 = _cw(w3)
+	_check(int(cw3._bark_at.get("ice", {}).get("sign", -1)) == 12 - lead and int(cw3._bark_at.get("belt", {}).get("sign", -1)) == 40 - lead,
+			"(ice planned at %d, the belt at %d)" % [12 - lead, 40 - lead])
+	cw3._step_barks(w3.player)
+	cw3._bark_t = -100.0
+	cw3._step_barks(w3.player)
+	var keys: Array = hud3.said.map(func(b): return b[0])
+	_check(keys == ["first_belt", "first_ice"], "both due at once: the belt just ahead first, then the ice behind him (%s)" % [keys])
+	await _done(w3)
 
 
 # ---------------------------------------------------------------- the levels
