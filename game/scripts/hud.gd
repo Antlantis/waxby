@@ -11,7 +11,8 @@ extends CanvasLayer
 ##               so a sigil or a monster on a high ledge behind doesn't read
 ##               as part of the HUD
 ##   top centre  the boss bar, and under it ONE message slot, shown one at a
-##               time for 2.5 s by priority: pickup > elite > bark > toast. A
+##               time for 2.5-5 s (longer lines longer: msg_time) by
+##               priority: pickup > elite > bark > toast. A
 ##               sign's hint takes the slot when it's free. Messages wait
 ##               while a title card or the level-up card is up.
 ##   top band    title cards (a level, a Dread, a boss) and the level-up card,
@@ -60,7 +61,8 @@ const Classes := preload("res://scripts/classes.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const Progression := preload("res://scripts/progression.gd")
 
-const MSG_TIME := 2.5
+const MSG_TIME := 2.5            # a message's least time in the slot...
+const MSG_MAX := 5.0             # ...and its most: 1 s and 0.05 s a character between (msg_time)
 const PRI := {"pickup": 4, "elite": 3, "bark": 2, "toast": 1}
 const STALE := {"pickup": 8.0, "elite": 4.0, "bark": 9.0, "toast": 6.0}   # a queued message older than this is dropped
 const CARD_TAP := 3.0            # seconds a pickup card takes a tap
@@ -975,6 +977,7 @@ func _push(m: Dictionary) -> void:
 	m["pri"] = PRI.get(m["kind"], 1)
 	m["age"] = 0.0
 	m["t"] = 0.0
+	m["dur"] = msg_time(m)
 	var key: String = m.get("key", "")
 	if key != "":
 		if _msg.get("key", "-") == key:
@@ -986,6 +989,22 @@ func _push(m: Dictionary) -> void:
 	if _msgs.size() > 8:
 		_msgs.sort_custom(func(a, b): return a["pri"] > b["pri"] or (a["pri"] == b["pri"] and a["age"] > b["age"]))
 		_msgs.resize(8)
+
+
+static func msg_time(m: Dictionary) -> float:
+	## How long a message holds the slot: a longer line longer (1 s and
+	## 0.05 s a character, MSG_TIME to MSG_MAX), so a 70-character bark is
+	## read to its end. A bark by its line, a note by its title and line, an
+	## elite's plate by its name.
+	var words := str(m.get("text", ""))
+	if words == "":
+		words = (str(m.get("title", "")) + " " + str(m.get("sub", ""))).strip_edges()
+	return clampf(1.0 + 0.05 * words.length(), MSG_TIME, MSG_MAX)
+
+
+func _msg_dur() -> float:
+	## The showing message's time (one put in by hand, without _push: MSG_TIME).
+	return float(_msg.get("dur", MSG_TIME))
 
 
 func _next_msg() -> int:
@@ -1008,9 +1027,10 @@ func _step_messages(dt: float) -> void:
 		_msg["t"] += dt
 		# Something more important cuts this one short (once it's been read a bit).
 		var nb := _next_msg()
-		if nb >= 0 and _msgs[nb]["pri"] > _msg["pri"] and _msg["t"] > 0.8 and _msg["t"] < MSG_TIME - 0.3:
-			_msg["t"] = MSG_TIME - 0.3
-		if _msg["t"] >= MSG_TIME:
+		var dur := _msg_dur()
+		if nb >= 0 and _msgs[nb]["pri"] > _msg["pri"] and _msg["t"] > 0.8 and _msg["t"] < dur - 0.3:
+			_msg["t"] = dur - 0.3
+		if _msg["t"] >= dur:
 			_msg = {}
 	if _msg.is_empty():
 		var i := _next_msg()
@@ -1680,7 +1700,7 @@ func _draw_slot(ci: Control) -> void:
 	var boss_on := not _boss.is_empty()
 	if not _msg.is_empty():
 		var t := float(_msg["t"])
-		var a := clampf(t * 5.0, 0.0, 1.0) * clampf((MSG_TIME - t) * 3.5, 0.0, 1.0) * see("msg")
+		var a := clampf(t * 5.0, 0.0, 1.0) * clampf((_msg_dur() - t) * 3.5, 0.0, 1.0) * see("msg")
 		var slide := (1.0 - clampf(t * 5.0, 0.0, 1.0)) * -8.0
 		slot_drawn = {"on": ci, "kind": str(_msg["kind"]), "a": a, "frame": Engine.get_process_frames()}
 		match str(_msg["kind"]):
