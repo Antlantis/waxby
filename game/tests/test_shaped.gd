@@ -259,18 +259,20 @@ func _done(w: Node) -> void:
 # ---------------------------------------------------------------- the camera
 
 func _test_strip_heights() -> void:
-	## Every level file but the shape labs (both streams') is a strip (not
-	## tall), so no camera or bot rule of the shapes touches it.
+	## Every level file but the shape labs (both streams') and Build 2's
+	## redesigned levels (they declare their roles:; 3-2's tower, 3-3's
+	## bowl...) is a strip (not tall), so no camera or bot rule of the shapes
+	## touches it.
 	var tall := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if f.ends_with(".txt"):
 			var lv = LevelData.load_file("res://levels/" + f)
-			if lv.tall():
+			if lv.tall() and not lv.headers.has("roles"):
 				tall.append(lv.id)
 	tall.sort()
 	var want := (LABS + TOOL_LABS).filter(func(id): return _lab(id).height > LevelData.STRIP_ROWS)
 	want.sort()
-	_check(tall == want, "the tall level files are the shape labs' (%s)" % ", ".join(tall))
+	_check(tall == want, "the tall level files are the shape labs' and the redesigned levels' (%s)" % ", ".join(tall))
 	_check(_lab("lab-shape-tower").height == 36 and _lab("lab-shape-mirror").height == 15, "the tower is 36 rows (3-2's), the mirror a strip")
 
 
@@ -685,9 +687,9 @@ func _test_route_pad() -> void:
 		var g := _goal(lv)
 		if g.is_empty():
 			g = _goal(lv, "boss arena")
-		if not g.is_empty() and AutoBot.shaped(lv, g):
+		if not g.is_empty() and AutoBot.shaped(lv, g) and not lv.tall() and lv.facing > 0:
 			by.append(lv.id)
-	_check(by.is_empty(), "no level on the path goes by route (%s)" % ", ".join(by))
+	_check(by.is_empty(), "no strip on the path played left to right goes by route (%s)" % ", ".join(by))
 	for id in LABS + TOOL_LABS:
 		_check(AutoBot.shaped(_lab(id), _goal(_lab(id))), "%s goes by route" % id)
 	for spot in [["lab-shape-loop", 1], ["lab-shape-mirror", -1], ["lab-shape-tower", 1], ["lab-mirror", -1], ["lab-shapes", 1], ["1-1", 1]]:

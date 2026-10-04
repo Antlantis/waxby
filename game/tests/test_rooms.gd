@@ -271,6 +271,7 @@ func _test_rules() -> void:
 	## lab-shape-mirror's and lab-shape-decks', test_shaped.gd's: Build 2's
 	## shapes).
 	var with_rooms := []
+	var stray := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if not f.ends_with(".txt"):
 			continue
@@ -278,10 +279,12 @@ func _test_rules() -> void:
 		if str(lv.headers.get("room", "")) == "":
 			continue
 		with_rooms.append(str(lv.id))
+		if not str(lv.id).begins_with("lab-") and not lv.headers.has("roles"):
+			stray.append(str(lv.id))
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-")),
-			"only labs have rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	_check(with_rooms.has(LAB) and stray.is_empty(),
+			"only labs and Build 2's redesigned levels (they declare their roles:) have rooms: %s (not: %s)" % [with_rooms, stray])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.
@@ -301,8 +304,11 @@ func _test_rules() -> void:
 
 func _test_absent() -> void:
 	## No header, nothing changes: a level's monsters stay in the World's
-	## list, seen, and in its spawns.
-	for id in ["1-3", "3-3", "4-3", "5-3", "6-3"]:
+	## list, seen, and in its spawns (the X-3s and 1-3 until their redesigns
+	## give them a room: header, then an X-1).
+	var ids := ["1-3", "3-3", "4-3", "5-3", "6-3", "3-1", "4-1", "5-1", "6-1"].filter(func(id):
+			return str(LevelData.load_file("res://levels/%s.txt" % id).headers.get("room", "")) == "")
+	for id in ids.slice(0, 5):
 		var w := _world(id)
 		await process_frame
 		var n0: int = w.enemies.size()
