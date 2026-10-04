@@ -11,7 +11,8 @@ extends "res://scripts/elites.gd"
 ##
 ## Any hit while it's on its lane knocks it off: it falls, lies on its back
 ## dazed DAZED s (+50%), then crawls back to its lane at RETURN px/s and
-## climbs on again. A stomp kills it (fodder). Nightfall: lunge 128 px.
+## climbs on again. A stomp kills it (fodder). Nightfall (and an elite on
+## Dusk from World 3, behave_diff): lunge 128 px.
 ## Witching: two share a lane, out of step.
 
 const MOVES := {"lunge": 32.0, "touch": 28.0}
@@ -187,7 +188,7 @@ func think(dt: float, player: Node2D) -> void:
 			if timer <= 0.0:
 				state = "lunge"
 				move_id = "lunge"
-				_lunge_left = LUNGE if difficulty() == "dusk" else LUNGE_NF
+				_lunge_left = LUNGE if behave_diff() == "dusk" else LUNGE_NF
 				sfx("creep_snap", "bones", 1.0)
 				var span := _lunge_left
 				var y0 := position.y if _lunge_dir > 0 else position.y - span - size.y
@@ -416,7 +417,7 @@ func draw_glow(glow: Node2D) -> void:
 			var y := position.y - size.y * i / 8.0
 			pts.append(Vector2(position.x + sin(i * 1.2 + t * 12.0) * 5.0, y))
 		tb.polyline(pts, 1.6, Color(GLINT, 0.4 + 0.5 * k))
-		var reach := LUNGE if difficulty() == "dusk" else LUNGE_NF
+		var reach := LUNGE if behave_diff() == "dusk" else LUNGE_NF
 		var y0 := position.y - size.y if _lunge_dir < 0 else position.y
 		var y1 := clampf(y0 + _lunge_dir * reach, float(lane["top"]), float(lane["bottom"]))
 		tb.line(Vector2(position.x - 7.0, y0), Vector2(position.x - 7.0, y1), 1.2, Color(GLINT, 0.18 + 0.3 * k))

@@ -1,0 +1,25 @@
+title: The Elite Lab
+subtitle: lab-elites
+music: chapel
+theme: nave
+area: 13
+dread: Old Rime|frostbuckle|Swift
+elite_behave: nightfall
+anoint: 54,12:Swift:Brother Clatter; 120,12:Warded:Sir Pane; 200,12::The Hush Pup
+hints: The elite lab. Elites fight with their Nightfall moves here|Brother Clatter pounces twice. Watch for the second crouch|A plain Rattlehound pounces once|Sir Pane lunges farther. Stomp to break his motes|Old Rime, a Dread. His spike line runs 9 tiles|The Hush Pup brings a bigger pack|Ring the bell to finish
+---
+
+
+
+
+
+
+
+
+
+
+
+
+..P..........K........@.....@.........................m.............@.K........m..................@.....................l..............K.....@..................D.............@.........................n.............@.......E
+####################################################################################################################################################################################################################################
+####################################################################################################################################################################################################################################

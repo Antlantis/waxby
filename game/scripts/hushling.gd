@@ -84,7 +84,7 @@ func _init() -> void:
 
 
 func k(n: String) -> float:
-	return HK.pick(TUNE, HK.diff_of(self), n)
+	return HK.pick(TUNE, HK.behave_of(self), n)
 
 
 func pack_rule(n: String) -> int:
@@ -92,7 +92,7 @@ func pack_rule(n: String) -> int:
 	## Dusk (or a difficulty that reads Dusk's) is MODE_PACKS' instead.
 	var m = world.get("mode") if world != null else null
 	if m != null and MODE_PACKS.has(n):
-		var d := HK.diff_of(self)
+		var d := HK.behave_of(self)
 		var key := d if (TUNE[n] as Dictionary).has(d) else "dusk"
 		if (MODE_PACKS[n] as Dictionary).has(key):
 			return int(MODE_PACKS[n][key])

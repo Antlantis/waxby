@@ -10,6 +10,10 @@ extends SceneTree
 ## >= 0.40 s on Dusk, and the escape formula (0.35 + escape_px / 205) for
 ## each one Wick must move away from; >= its floor on Nightfall and Witching,
 ## Swift included. Then each kind's own rules, measured in a headless World.
+## Build 2 (elites.gd behave_diff, hush_kind behave_of): an Anointed or a
+## Dread on Dusk moves by its TUNE's Nightfall entries, every other number
+## (life, blows, tells) Dusk's; an Anointed Unwick's delay, an Anointed
+## Hushling's pack of 3-5 from an anoint: header.
 ## Numbers are provisional (W5-W6 lock after the W3/W4 playtests): the tests
 ## read TUNE, never copy it, except the spec's base values they pin.
 
@@ -84,6 +88,7 @@ func _initialize() -> void:
 	await _test_dreads()
 	await _test_as_elites()
 	await _test_elites_seeded()
+	await _test_behave_diff()
 	_test_levels()
 	for suffix in ["", ".bak", ".tmp"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_monsters4_save.json" + suffix))
@@ -1715,6 +1720,61 @@ func _test_as_elites() -> void:
 				_check(_only(w, k).size() == n0 + 2, "a Twinned %s splits in two" % k)
 				_step(w, int(1.0 / DT))
 			await _done(w)
+
+
+func _test_behave_diff() -> void:
+	## Build 2: on W5-W6 Dusk an Anointed (a Lurecoil: a Dread) picks its
+	## TUNE's per-difficulty entries as on Nightfall; a plain one as on Dusk;
+	## every plain number (life, blows, tells) the same for both.
+	for k in KINDS:
+		var wn := 6 if HK.is_w6(k) else 5
+		var lake: bool = k == "lurecoil"
+		var w := await _world(_lake_rows() if lake else _rows(60), "", "dusk", wn)
+		var cell := Vector2i(20, 13) if lake else (Vector2i(24, 12) if SPEC[k]["spawn"] == "floor" else Vector2i(24, 10))
+		var tier := "dread" if lake else "anointed"
+		var el := _spawn(w, k, cell, {"tier": tier, "name": "Test", "omens": []})
+		var pl := _spawn(w, k, cell + Vector2i(8 if lake else 12, 0))
+		_check(el != null and pl != null and HK.behave_of(el) == "nightfall" and HK.behave_of(pl) == "dusk", "%s: the %s moves as on Nightfall on W%d Dusk, a plain one as on Dusk" % [k, tier, wn])
+		if el == null or pl == null:
+			await _done(w)
+			continue
+		var tune := _tune(k)
+		var off := []
+		for n in tune:
+			var v = tune[n]
+			if v is Dictionary:
+				if not is_equal_approx(el.k(n), float(v.get("nightfall", v["dusk"]))) or not is_equal_approx(pl.k(n), float(v["dusk"])):
+					off.append(n)
+			elif (v is float or v is int) and not is_equal_approx(el.k(n), pl.k(n)):
+				off.append(n)
+		_check(off.is_empty(), "%s: its per-difficulty TUNE moves by Nightfall's, every other number Dusk's (%s)" % [k, off])
+		await _done(w)
+	# An Unwick promoted after its _ready (assign_elites) follows 0.85 s behind.
+	var w := await _world(_rows(60), "", "dusk", 6)
+	var uw := _spawn(w, "unwick", Vector2i(24, 12))
+	var d0: float = uw.delay
+	uw.make_elite("anointed", [])
+	_check(is_equal_approx(d0, 1.0) and is_equal_approx(uw.delay, 0.85), "an Unwick Anointed after its _ready follows 0.85 s behind, not 1.0 (%.2f, %.2f)" % [d0, uw.delay])
+	await _done(w)
+	# An anoint: header's Hushling brings a pack of 3-5 on Dusk; a plain
+	# one 2-3.
+	for forced in [true, false]:
+		var hd := "anoint: 30,12::The Hush Pup\n" if forced else ""
+		# (A plain room rerolls the seed till no random pick took it.)
+		w = await _world(_rows(60, {Vector2i(30, 12): "n"}), hd, "dusk", 6, "", forced)
+		_sturdy(w)
+		w.player.invuln = 1000.0
+		var lead: Array = _only(w, "hushling").filter(func(e): return e.spawn.get("cell", Vector2i(-1, -1)) == Vector2i(30, 12))
+		var tiered: bool = lead.size() == 1 and lead[0].tier == "anointed" and lead[0].elite_name == "The Hush Pup"
+		for e in w.enemies:
+			e.active = true
+		_step(w, 2)
+		var n := _only(w, "hushling").size()
+		if forced:
+			_check(tiered and n >= 3 and n <= 5, "the Hush Pup (anoint: 30,12::The Hush Pup) brings a pack of 3-5 on Dusk (%d)" % n)
+		else:
+			_check(n >= 2 and n <= 3, "a plain Hushling's pack on Dusk is 2-3 (%d)" % n)
+		await _done(w)
 
 
 func _test_elites_seeded() -> void:

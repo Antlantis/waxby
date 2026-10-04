@@ -23,6 +23,12 @@ extends SceneTree
 ##     second Omen of W3-W6 Dusk (Build 1's rows), W1-W2's picks unchanged
 ##   - the four new Omens (every echo drawn while it waits), the Warden
 ##     tier, the W3-W4 Dreads; eyes drawn at r >= 3 in the glow layer
+##   - Build 2: behave_diff (an Anointed or a Dread on Dusk from World 3
+##     moves as on Nightfall, every W3-W4 kind's switch, played out; its
+##     life, blows and tells Dusk's; never a Warden, a mode or W1-W2; the
+##     elite_behave: header); the anoint: header with Omens and a name in
+##     any level (parsed, checked against the pool, topped up, outside the
+##     max, the random picks 20 tiles off, its plate); lab-elites played
 
 const LevelData := preload("res://scripts/level_data.gd")
 const Combat := preload("res://scripts/combat.gd")
@@ -91,6 +97,11 @@ func _initialize() -> void:
 	await _test_new_omens()
 	await _test_wardens()
 	await _test_dreads()
+	await _test_behave_diff()
+	await _test_behave_moves()
+	_test_anoint_specs()
+	await _test_anoint_header()
+	await _test_elite_lab()
 	await _test_stand_in_draws()
 	for suffix in ["", ".bak", ".tmp"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path("user://test_monsters3_save.json" + suffix))
@@ -1701,6 +1712,331 @@ func _test_dreads() -> void:
 				_step(w, int(4.0 / DT))
 				var under: Array = halves.filter(func(e): return e.buried())
 				_check(under.size() == 2, "and the twins burrow separately (%d under)" % under.size())
+		await _done(w)
+
+
+# ---------------------------------------------------------------- Build 2: behave_diff
+
+func _test_behave_diff() -> void:
+	## The rule: an Anointed or a Dread on Dusk in a story level from World
+	## 3 moves as on Nightfall (elites.gd behave_diff); its difficulty(), so
+	## its life, blows and tells, stay Dusk's.
+	var w := await _world(_rows(60), "3-9")
+	var plain := _spawn(w, "rattlehound", Vector2i(14, 12))
+	var an := _spawn(w, "rattlehound", Vector2i(24, 12), {"tier": "anointed", "omens": ["Swift"]})
+	var dr := _spawn(w, "rattlehound", Vector2i(34, 12), {"tier": "dread", "name": "Test"})
+	var wd := _spawn(w, "rattlehound", Vector2i(44, 12), {"tier": "warden", "name": "Test"})
+	var got := [plain.behave_diff(), an.behave_diff(), dr.behave_diff(), wd.behave_diff()]
+	_check(got == ["dusk", "nightfall", "nightfall", "dusk"], "W3 Dusk: an Anointed and a Dread move as on Nightfall, a plain one and a Warden as on Dusk (%s)" % [got])
+	_check(an.difficulty() == "dusk" and an.by_diff(1, 2, 3) == 1 and an.by_behave(1, 2, 3) == 2, "its difficulty() is still Dusk: only by_behave reads Nightfall")
+	_check(absf(an.tell(0.55) - 0.55) < 0.001 and absf(an.tell(0.45, 0.40) - 0.45) < 0.001, "and the Swift Omen still leaves its Dusk tells whole (%.3f)" % an.tell(0.55))
+	w.mode = RefCounted.new()
+	_check(an.behave_diff() == "dusk" and dr.behave_diff() == "dusk", "in a mode, v3's Dusk")
+	w.mode = null
+	await _done(w)
+	# By world, by difficulty, by header.
+	var cases := [["1-9", "dusk", "", "dusk"], ["2-9", "dusk", "", "dusk"], ["2-S", "dusk", "", "dusk"], ["3-S", "dusk", "", "nightfall"],
+			["4-9", "dusk", "", "nightfall"], ["6-9", "dusk", "", "nightfall"], ["3-9", "nightfall", "", "nightfall"],
+			["3-9", "witching", "", "witching"], ["1-9", "dusk", "elite_behave: nightfall\n", "nightfall"],
+			["5-9", "dusk", "elite_behave: dusk\n", "dusk"], ["5-9", "witching", "elite_behave: dusk\n", "witching"]]
+	for c in cases:
+		w = await _world(_rows(40), c[0], c[1], c[2])
+		var e := _spawn(w, "rattlehound", Vector2i(20, 12), {"tier": "anointed", "omens": []})
+		_check(e.behave_diff() == c[3] and e.difficulty() == c[1], "%s on %s %s: an Anointed moves as on %s (%s)" % [c[0], c[1], str(c[2]).strip_edges(), c[3], e.behave_diff()])
+		await _done(w)
+	# Its numbers are Dusk's: the same life, blows and tells with the rule
+	# on (W3) as with it off (the header).
+	var nums := []
+	for hd in ["", "elite_behave: dusk\n"]:
+		w = await _world(_rows(40), "3-9", "dusk", hd)
+		var e := _spawn(w, "rattlehound", Vector2i(20, 12), {"tier": "anointed", "omens": []})
+		nums.append([e.max_hp, e.dmg("pounce"), e.tell(e.CROUCH), e.tell(e.CROUCH2)])
+		await _done(w)
+	_check(nums[0] == nums[1], "an Anointed's life, blows and tells are the same with the rule on and off (%s)" % [nums])
+	# A Twinned half has no tier: plain.
+	w = await _world(_rows(40), "3-9")
+	var tw := _spawn(w, "rattlehound", Vector2i(20, 12), {"tier": "anointed", "omens": ["Twinned"]})
+	_park(w, Vector2(5 * TILE, FLOOR_Y))
+	_safe(w)
+	w.deal(tw, 1.0, {"how": "skill", "flat": 99999.0})
+	_step(w, 3)
+	var halves: Array = w.enemies.filter(func(e): return e.alive and e.get("copy"))
+	_check(halves.size() == 2 and halves.all(func(e): return e.behave_diff() == "dusk"), "a Twinned Anointed's halves move as on Dusk")
+	await _done(w)
+
+
+func _test_behave_moves() -> void:
+	## Every W3-W4 switch, an elite against a plain one on W3-W4 Dusk.
+	# The Rattlehound: Nightfall's second pounce, 0.35 s after the first
+	# lands (its crouch a full tell); a plain one lands open 0.7 s.
+	for tier in ["anointed", ""]:
+		var w := await _world(_rows(60), "3-9")
+		var e := _spawn(w, "rattlehound", Vector2i(30, 12), {"tier": tier, "omens": []})
+		_park(w, Vector2(27 * TILE, FLOOR_Y))
+		_safe(w)
+		_until(w, func(): return e.state == "land", 4.0)
+		var gap := _until(w, func(): return e.state == "crouch", 0.6)
+		if tier == "anointed":
+			_check(absf(gap - 0.35) < 0.03 and e.tell_len >= 0.40 - 0.001, "an Anointed Rattlehound on Dusk pounces again 0.35 s after landing (%.2f), its crouch %.2f s" % [gap, e.tell_len])
+		else:
+			_check(gap < 0.0, "a plain one on Dusk lands open, no second pounce (%.2f)" % gap)
+		await _done(w)
+	# The Weepcap: clouds r 72 for 6 s.
+	var w := await _world(_rows(40), "3-9")
+	var cap := _spawn(w, "weepcap", Vector2i(14, 12), {"tier": "anointed", "omens": []})
+	_park(w, Vector2(11 * TILE, FLOOR_Y))
+	_safe(w)
+	_until(w, func(): return cap.clouds.size() > 0, 3.0)
+	_check(cap.clouds.size() > 0 and float(cap.clouds[0]["r"]) == 72.0 and float(cap.clouds[0]["life"]) == 6.0, "an Anointed Weepcap's clouds: r 72 for 6 s")
+	await _done(w)
+	# The Rootling: the mound follows at 110 (x1.15 Anointed).
+	w = await _world(_rows(40), "3-9")
+	var ro := _spawn(w, "rootling", Vector2i(24, 12), {"tier": "anointed", "omens": []})
+	_park(w, Vector2(19 * TILE, FLOOR_Y))
+	_safe(w)
+	var x0: float = ro.position.x
+	_step(w, 60)
+	var v := (x0 - ro.position.x) / 0.5
+	_check(v > 110.0 * 1.15 - 8.0 and v < 110.0 * 1.15 + 4.0, "an Anointed Rootling's mound follows at 110 x1.15 (%.0f)" % v)
+	await _done(w)
+	# The Creepbone: a 128 px lunge.
+	w = await _world(_creep_room(), "3-9")
+	var cb := _spawn(w, "creepbone", Vector2i(20, 10), {"tier": "anointed", "omens": []})
+	cb.position.y = 10.0 * TILE
+	cb.dir = -1
+	_park(w, Vector2(20 * TILE + 16, FLOOR_Y))
+	_safe(w)
+	_until(w, func(): return cb.state == "lunge", 3.0)
+	_check(cb.state == "lunge" and float(cb._lunge_left) > 100.0, "an Anointed Creepbone lunges 128 px, not 96 (%.0f left)" % float(cb._lunge_left))
+	await _done(w)
+	# The Tickwind: it charges at 330 (x1.15).
+	var rows := _rows(40)
+	for y in range(8, 13):
+		_put(rows, 8, y, "#")
+	w = await _world(rows, "4-9")
+	var tk := _spawn(w, "tickwind", Vector2i(20, 12), {"facing": -1, "tier": "anointed", "omens": []})
+	_park(w, Vector2(14 * TILE, FLOOR_Y))
+	_safe(w)
+	_until(w, func(): return tk.state == "charge", 2.0)
+	_park(w, Vector2(14 * TILE, FLOOR_Y - 200.0))
+	w.player.velocity = Vector2.ZERO
+	_safe(w)
+	x0 = tk.position.x
+	_step(w, 12)
+	_check(absf(x0 - tk.position.x) / 0.1 > 360.0, "an Anointed Tickwind charges at 330 x1.15 (%.0f)" % (absf(x0 - tk.position.x) / 0.1))
+	await _done(w)
+	# The Spurwheel (never Anointed; a Dread): 170 px/s, caught 0.85 s.
+	w = await _world(_rows(40), "4-9")
+	var sw_d := _spawn(w, "spurwheel", Vector2i(10, 12), {"tier": "dread", "name": "Test"})
+	var sw_p := _spawn(w, "spurwheel", Vector2i(30, 12))
+	_check(is_equal_approx(sw_d.roll_speed(), 170.0) and is_equal_approx(sw_d.caught_len(), 0.85), "a Dread Spurwheel rolls at 170 and is caught 0.85 s (%.0f, %.2f)" % [sw_d.roll_speed(), sw_d.caught_len()])
+	_check(is_equal_approx(sw_p.roll_speed(), 150.0) and is_equal_approx(sw_p.caught_len(), 1.0), "a plain one 150 and 1.0 s")
+	await _done(w)
+	# The Frostbuckle: a 9-tile line, rime back in 6 s.
+	w = await _world(_rows(40), "4-9")
+	var fb := _spawn(w, "frostbuckle", Vector2i(30, 12), {"facing": -1, "tier": "anointed", "omens": []})
+	_park(w, Vector2(25 * TILE, FLOOR_Y))
+	_safe(w)
+	_until(w, func(): return fb.state == "stomp", 3.0)
+	_check(fb.lines.size() == 1 and (fb.lines[0]["cells"] as Array).size() == 9, "an Anointed Frostbuckle's line runs 9 tiles")
+	await _done(w)
+	# The Hoarowl: it sweeps in 2.6 s (a period of 6.8 s, 7.6 plain); its
+	# meter is a tell and stays 0.60 s.
+	var perches := _owl_rows()
+	_put(perches, 30, 9, "#")
+	w = await _world(perches, "4-9")
+	var owl := _spawn(w, "hoarowl", Vector2i(20, 8), {"tier": "anointed", "omens": []})
+	var owl_p := _spawn(w, "hoarowl", Vector2i(30, 8))
+	var per := [_sweep_period(w, owl), _sweep_period(w, owl_p)]
+	_check(absf(per[0] - 6.8) < 0.05 and absf(per[1] - 7.6) < 0.05, "an Anointed Hoarowl sweeps on a 6.8 s period, a plain one 7.6 (%.2f, %.2f)" % per)
+	_check(is_equal_approx(owl.meter_time(), 0.60), "and its meter (a tell) fills in Dusk's 0.60 s (%.2f)" % owl.meter_time())
+	await _done(w)
+
+
+func _sweep_period(w: Node2D, owl: Node2D) -> float:
+	## The time between two upward crossings of straight down (90 degrees),
+	## read off the feature clock.
+	var keep: float = w.ftime
+	var ups := []
+	var last := -1.0
+	for i in 2000:
+		w.ftime = i * 0.01
+		var a: float = owl.sweep_angle()
+		if last >= 0.0 and last < 90.0 and a >= 90.0:
+			ups.append(i * 0.01)
+		last = a
+	w.ftime = keep
+	return ups[1] - ups[0] if ups.size() >= 2 else -1.0
+
+
+# ---------------------------------------------------------------- Build 2: the anoint: header
+
+func _test_anoint_specs() -> void:
+	## anoint: x,y[:Omen+Omen[:Name]]; ... (elites.gd anoint_specs).
+	var lv = LevelData.new()
+	lv.parse("title: t\nsubtitle: t\nanoint: 54,12:Swift:Brother Clatter; 120,7:warded+BURNING ; 7,3; bad; 9,9::The Hush Pup; 1,2:Nope+Swift; 3,4:Swift:Odd: Name\n---\n" + "\n".join(_rows(40)))
+	var s: Array = Elites.anoint_specs(lv)
+	var want := [[Vector2i(54, 12), ["Swift"], "Brother Clatter"], [Vector2i(120, 7), ["Warded", "Burning"], ""], [Vector2i(7, 3), [], ""],
+			[Vector2i(9, 9), [], "The Hush Pup"], [Vector2i(1, 2), ["Swift"], ""], [Vector2i(3, 4), ["Swift"], "Odd: Name"]]
+	var got := s.map(func(x): return [x["cell"], x["omens"], x["name"]])
+	_check(got == want, "anoint: parses cells, Omens (any case, unknown ones dropped) and names; a bad part is skipped (%s)" % [got])
+	var bare = LevelData.new()
+	bare.parse("title: t\nsubtitle: t\n---\n" + "\n".join(_rows(40)))
+	_check(Elites.anoint_specs(bare).is_empty(), "no anoint: header, nothing")
+	# The Omens: those its kind may carry here, topped up to the least.
+	var r := RandomNumberGenerator.new()
+	r.seed = 7
+	_check(Elites.forced_omens("rattlehound", ["Swift"], "dusk", 3, r) == ["Swift"], "Dusk: the header's Swift, alone")
+	_check(Elites.forced_omens("weepcap", ["Burning", "Warded"], "dusk", 3, r) == ["Warded"], "a Burning Weepcap (NEVER_ON) keeps only Warded")
+	var rolled: Array = Elites.forced_omens("rattlehound", ["Glassed"], "dusk", 3, r)
+	var pool: Array = Elites.omen_pool("rattlehound", "dusk", 3)
+	_check(not rolled.is_empty() and not rolled.has("Glassed") and rolled.all(func(o): return pool.has(o)), "Glassed in W3 (not its pool): rolled as the World would (%s)" % [rolled])
+	_check(not Elites.forced_omens("rattlehound", ["Echoing"], "dusk", 4, r).has("Echoing") and Elites.forced_omens("rattlehound", ["Echoing"], "nightfall", 4, r).has("Echoing"),
+			"W4's Echoing only from Nightfall")
+	var wt: Array = Elites.forced_omens("rattlehound", ["Swift"], "witching", 3, r)
+	_check(wt.size() == 2 and wt[0] == "Swift" and wt[1] != "Swift", "Witching: topped up to its two (%s)" % [wt])
+	_check(Elites.forced_omens("skeleton", ["Swift", "Warded", "Burning", "Twinned"], "dusk", 1, r).size() == Elites.MAX_OMENS, "never more than 3")
+
+
+func _test_anoint_header() -> void:
+	## The anoint: header in any level: its monsters Anointed every run with
+	## the header's Omens and name, outside pick_elites' max, the random
+	## picks 20 tiles off, never respawning; the plate names it.
+	var rows := _rows(200)
+	_put(rows, 30, 12, "m")
+	_put(rows, 40, 12, "s")
+	_put(rows, 50, 12, "p")
+	_put(rows, 60, 12, "s")            # 10 tiles from the Weepcap: never a random pick
+	for x in range(75, 190, 6):
+		_put(rows, x, 12, ["s", "r", "m", "j"][(x / 6) % 4])
+	var hd := "anoint: 30,12:Swift:Brother Clatter; 40,12; 50,12:Burning\n"
+	for run in 4:
+		var lv = LevelData.new()
+		lv.parse("title: t\nsubtitle: t\narea: 14\n" + hd + "---\n" + "\n".join(rows))
+		lv.id = "3-9"
+		lv.world = 3
+		game.reset()
+		game.data["difficulty"] = "dusk"
+		game.data["run_counter"] = run
+		var w: Node2D = WorldScript.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await process_frame
+		var at := func(c: Vector2i) -> Node2D:
+			for e in w.enemies:
+				if e.spawn.get("cell", Vector2i(-1, -1)) == c:
+					return e
+			return null
+		var hound: Node2D = at.call(Vector2i(30, 12))
+		var rattle: Node2D = at.call(Vector2i(40, 12))
+		var cap: Node2D = at.call(Vector2i(50, 12))
+		_check(hound != null and hound.tier == "anointed" and hound.omens == ["Swift"] and hound.elite_name == "Brother Clatter" and not hound.ordinary,
+				"run %d: Brother Clatter, an Anointed Rattlehound, Swift" % run)
+		_check(rattle != null and rattle.tier == "anointed" and not (rattle.omens as Array).is_empty() and rattle.elite_name == "Anointed Rattle",
+				"run %d: the plain cell's Rattle is Anointed with rolled Omens (%s)" % [run, rattle.omens if rattle else []])
+		_check(cap != null and cap.tier == "anointed" and not cap.has_omen("burning") and not (cap.omens as Array).is_empty(),
+				"run %d: a Burning Weepcap can't be: its Omens rolled (%s)" % [run, cap.omens if cap else []])
+		var spawn_cells: Array = w.spawns.map(func(sp): return sp["cell"])
+		_check(not spawn_cells.has(Vector2i(30, 12)) and not spawn_cells.has(Vector2i(40, 12)), "run %d: they never respawn" % run)
+		var picked: Array = w.enemies.filter(func(e): return e.tier == "anointed" and not [30, 40, 50].has(int(e.spawn["cell"].x)))
+		_check(picked.size() <= int(Combat.elite_rules("dusk", 3)["max_anoint"]), "run %d: the random picks keep their max (%d), the header's outside it" % [run, picked.size()])
+		if run == 0:
+			# Every candidate a sure pick (a stand-in rule): none within 20
+			# tiles of the header's, so never the Rattle at 60.
+			# (One the World's own pass took is tiered, and stays a pick.)
+			w.mode = StubRules.new()
+			var sure: Array = Elites.pick_elites(w, lv, w.rng).map(func(p): return int(p["enemy"].spawn["cell"].x))
+			w.mode = null
+			sure.append_array(picked.map(func(e): return int(e.spawn["cell"].x)))
+			_check(not sure.is_empty() and sure.all(func(x): return x - 50 >= 20), "the random picks stand 20 tiles off the header's (%s)" % [sure])
+		await _done(w)
+	# World 1 too, and the plate: its name, then what it is and its Omens.
+	rows = _rows(70)
+	_put(rows, 50, 12, "s")
+	var lv1 = LevelData.new()
+	lv1.parse("title: t\nsubtitle: t\narea: 3\nanoint: 50,12:Warded:Old Knuckles\n---\n" + "\n".join(rows))
+	lv1.id = "1-9"
+	lv1.world = 1
+	game.reset()
+	game.data["difficulty"] = "dusk"
+	var w1: Node2D = WorldScript.new()
+	w1.setup(lv1, true)
+	root.add_child(w1)
+	await process_frame
+	var hud = load("res://scripts/hud.gd").new()
+	hud.world = w1
+	w1.add_child(hud)
+	w1.hud = hud
+	await process_frame
+	var ok: Array = w1.enemies.filter(func(e): return e.tier == "anointed" and e.elite_name == "Old Knuckles" and e.omens == ["Warded"])
+	_check(ok.size() == 1 and not ok[0].active, "World 1: Old Knuckles, an Anointed Rattle, Warded (still asleep, off screen)")
+	_park(w1, Vector2(40 * TILE, FLOOR_Y))
+	_safe(w1)
+	_until(w1, func(): return ok.size() == 1 and ok[0].active, 2.0)
+	_step(w1, 2)
+	var plate := {}
+	for m in hud._msgs + [hud._msg]:
+		if str((m as Dictionary).get("kind", "")) == "elite":
+			plate = m
+	_check(str(plate.get("title", "")) == "Old Knuckles" and plate.get("omens", []) == ["Anointed Rattle", "Warded"],
+			"its plate as it wakes: 'Old Knuckles', over ANOINTED RATTLE · WARDED (%s, %s)" % [plate.get("title", ""), plate.get("omens", [])])
+	await _done(w1)
+
+
+class StubRules:
+	## A stand-in mode for pick_elites alone: every candidate a pick.
+	func elite_rules() -> Dictionary:
+		return {"anoint": 1.0, "max_anoint": 99}
+
+
+func _test_elite_lab() -> void:
+	## lab-elites (tools/levels/lab_elites.py): its three named Anointed and
+	## its Dread, every run, on Dusk with Nightfall's moves (elite_behave:
+	## nightfall in world 0); the plain hound by its altar never picked.
+	var path := "res://levels/lab-elites.txt"
+	_check(FileAccess.file_exists(path), "lab-elites.txt is written")
+	if not FileAccess.file_exists(path):
+		return
+	for run in 3:
+		var lv = LevelData.load_file(path)
+		game.reset()
+		game.data["difficulty"] = "dusk"
+		game.data["run_counter"] = run
+		var w: Node2D = WorldScript.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await process_frame
+		var named := {}
+		var plain: Array = []
+		for e in w.enemies:
+			if e.tier != "":
+				named[e.elite_name] = e
+			elif e.kind == "rattlehound":
+				plain.append(e)
+		var clatter: Node2D = named.get("Brother Clatter")
+		var pane: Node2D = named.get("Sir Pane")
+		var pup: Node2D = named.get("The Hush Pup")
+		var rime: Node2D = named.get("Old Rime")
+		_check(clatter != null and clatter.kind == "rattlehound" and clatter.omens == ["Swift"] and pane != null and pane.kind == "paneguard"
+				and pane.omens == ["Warded"] and pup != null and pup.kind == "hushling" and not (pup.omens as Array).is_empty()
+				and rime != null and rime.tier == "dread" and rime.kind == "frostbuckle", "run %d: the lab's Brother Clatter, Sir Pane, the Hush Pup and Old Rime (%s)" % [run, named.keys()])
+		_check(named.values().all(func(e): return e.behave_diff() == "nightfall" and e.difficulty() == "dusk"), "run %d: all four move as on Nightfall, on Dusk" % run)
+		_check(plain.size() == 1 and plain[0].behave_diff() == "dusk", "run %d: the plain hound by its altar is never picked, and moves as on Dusk" % run)
+		if run == 0 and clatter != null and pane != null and pup != null:
+			_check(is_equal_approx(pane.k("lunge_dist"), 150.0), "Sir Pane lunges 150 px")
+			# Brother Clatter pounces twice.
+			_park(w, Vector2(clatter.position.x - 3.0 * TILE, FLOOR_Y))
+			_safe(w)
+			_until(w, func(): return clatter.state == "land", 4.0)
+			var gap := _until(w, func(): return clatter.state == "crouch", 0.6)
+			_check(absf(gap - 0.35) < 0.03, "Brother Clatter pounces again 0.35 s after landing (%.2f)" % gap)
+			# The Hush Pup brings a pack of 3-5 (Dusk's own is 2-3).
+			_park(w, Vector2(pup.position.x - 6.0 * TILE, FLOOR_Y))
+			_safe(w)
+			_until(w, func(): return pup.active, 2.0)
+			_step(w, 3)
+			var pack: Array = w.enemies.filter(func(e): return e.kind == "hushling" and e.alive)
+			_check(pack.size() >= 3 and pack.size() <= 5, "the Hush Pup brings a pack of 3-5 (%d)" % pack.size())
 		await _done(w)
 
 

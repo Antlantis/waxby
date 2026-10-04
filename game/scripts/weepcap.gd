@@ -12,7 +12,8 @@ extends "res://scripts/elites.gd"
 ## Fire clears its clouds (a spark, a Flare, a fire patch, a Burning Omen's
 ## fire, a lit brazier within 8 px): the whoomph deals 0.6x basic to every
 ## monster inside, never to Wick. A burning Weepcap takes +50% fire damage;
-## a stomp deals 1.5x and cancels the inhale. Nightfall: clouds r 72 for 6 s.
+## a stomp deals 1.5x and cancels the inhale. Nightfall (and an elite on
+## Dusk from World 3, behave_diff): clouds r 72 for 6 s.
 ## Witching: two puffs, forward and back.
 
 const MOVES := {"burst": 18.0, "touch": 20.0}
@@ -137,8 +138,8 @@ func _puff(player: Node2D) -> void:
 
 
 func _cloud(p: Vector2) -> void:
-	var r := CLOUD_R_NF if difficulty() != "dusk" else CLOUD_R
-	var life := CLOUD_LIFE_NF if difficulty() != "dusk" else CLOUD_LIFE
+	var r := CLOUD_R_NF if behave_diff() != "dusk" else CLOUD_R
+	var life := CLOUD_LIFE_NF if behave_diff() != "dusk" else CLOUD_LIFE
 	clouds.append({"p": p, "r": r, "born": clock(), "life": life, "burnt": false})
 	if world != null and world.get("features") != null:
 		world.features.add_spores(p, r, life, self)

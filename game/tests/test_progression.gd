@@ -243,9 +243,24 @@ func _first_run_events(lv: RefCounted) -> Array:
 			if common == "" or int(kinds[k]) > int(kinds[common]):
 				common = k
 		ev.append([lv.width / 2, "anointed", common, 0.5])
+	# Build 2: an anoint: header's Anointed, in full (every run; outside the
+	# random half above).
+	for s in _anoint_specs(lv):
+		for e in lv.entities:
+			if e["cell"] == s["cell"] and Progression.BASE_XP.has(str(e["kind"])):
+				ev.append([int(s["cell"].x), "anointed", str(e["kind"]), 1.0])
 	ev.sort_custom(func(a, b): return a[0] < b[0])
 	ev.append([lv.width, "first_clear", "", 1.0])
 	return ev
+
+
+func _anoint_specs(lv: RefCounted) -> Array:
+	## The level's anoint: header (elites.gd anoint_specs: [{cell, omens,
+	## name}]), [] before Build 2's elites.gd.
+	var el = load("res://scripts/elites.gd")
+	if el == null or not (el as Script).get_script_method_list().any(func(m): return m["name"] == "anoint_specs"):
+		return []
+	return el.anoint_specs(lv)
 
 
 func _play(lv: RefCounted, xp: int) -> int:
@@ -640,6 +655,11 @@ func _level_cast(info: Dictionary, fx: Dictionary) -> Dictionary:
 		out["real"] = true
 		var el = load("res://scripts/elites.gd")
 		var ek = load("res://scripts/enemy_kinds.gd")
+		# Build 2: an anoint: header's cells are Anointed every run, whatever
+		# their ground (elites.gd anoint_specs).
+		var forced := {}
+		for s in _anoint_specs(lv):
+			forced[s["cell"]] = true
 		for e in lv.entities:
 			var k := str(e["kind"])
 			if k == "boss":
@@ -649,7 +669,7 @@ func _level_cast(info: Dictionary, fx: Dictionary) -> Dictionary:
 				# Could this one be anointed where it stands (elites.gd
 				# pick_elites' own test: safe_for)? PR's placement-aware row.
 				var flier: bool = str((ek.info(k) as Dictionary).get("spawn", "floor")) == "center"
-				if el != null and bool(el.safe_for(lv, e["cell"], k, flier)):
+				if el != null and (forced.has(e["cell"]) or bool(el.safe_for(lv, e["cell"], k, flier))):
 					out["safe"][k] = true
 		out["dread"] = str(lv.dread.get("kind", "")) if lv.dread is Dictionary else ""
 		var wd = lv.get("warden")

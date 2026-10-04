@@ -959,15 +959,48 @@ func _violet_flame(glow: Node2D, base: Vector2, h: float, col: Color) -> void:
 
 func assign_elites(rng: RandomNumberGenerator) -> void:
 	## Dreads (placed by 'D') and the Anointed picked here never count as
-	## fodder and never respawn.
+	## fodder and never respawn: first the anoint: header's (_anoint_forced),
+	## then the random picks (Elites.pick_elites).
 	for e in world.enemies:
 		if e.tier != "":
 			e.ordinary = false
+	_anoint_forced()
 	for pick in Elites.pick_elites(world, level, rng):
 		var en: Node2D = pick["enemy"]
 		en.make_elite("anointed", pick["omens"])
 		var cell = en.spawn.get("cell", Vector2i(-1, -1))
 		world.spawns = world.spawns.filter(func(sp): return sp["cell"] != cell)
+
+
+func _anoint_forced() -> void:
+	## The level's anoint: header (Elites.anoint_specs), any level: the
+	## monster placed at each cell is Anointed every run, with the header's
+	## Omens where its kind may carry them (Elites.forced_omens, else rolled
+	## as the World's would be) and its name on the plate. Outside
+	## pick_elites' max; it never respawns. The seed is the secrets' own
+	## (3-S's two roll what they always rolled).
+	var specs := Elites.anoint_specs(level)
+	if specs.is_empty():
+		return
+	var by_cell := {}
+	for s in specs:
+		by_cell[s["cell"]] = s
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("anoint|%s|%s" % [level.id, str(world.diff)])
+	var rules: Dictionary = world.elite_rules() if world.has_method("elite_rules") else {}
+	var wn = world.get("world_n")
+	for en in world.enemies:
+		if not is_instance_valid(en) or en.tier != "" or not en.has_method("make_elite") or en.get("copy"):
+			continue
+		var c = en.spawn.get("cell", Vector2i(-1, -1))
+		if not by_cell.has(c):
+			continue
+		var s: Dictionary = by_cell[c]
+		if str(s["name"]) != "":
+			en.elite_name = str(s["name"])
+		en.make_elite("anointed", Elites.forced_omens(en.kind, s["omens"], str(world.diff), int(wn) if wn != null else 0, r, rules))
+		var cc: Vector2i = c
+		world.spawns = world.spawns.filter(func(sp): return sp["cell"] != cc)
 
 
 # ---------------------------------------------------------------- the v3 queries

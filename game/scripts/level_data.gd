@@ -56,6 +56,10 @@ extends RefCounted
 ## story_end, par, tick, secret, secret_prize, gusts, hush, chase, cog_phase,
 ## weight_phase, rush. Every header, known or not, is also kept raw in
 ## `headers` (the modes' private keys: kind, tier, tags, deep, ...).
+## Build 2's elite keys, read from there (elites.gd), both optional: anoint
+## (`x,y[:Omen+Omen[:Name]]; ...`: the monsters placed there are Anointed
+## every run, in any level) and elite_behave (`nightfall` | `dusk`: turns
+## behave_diff on in any world, or off from World 3).
 
 const TILE := 32
 

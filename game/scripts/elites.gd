@@ -37,6 +37,18 @@ extends "res://scripts/enemy.gd"
 ## The statuses v3 adds here: "alerted" (a Hoarowl's alarm: speed x1.3 for 4 s,
 ## and a sleeping monster wakes; a tiny white "!").
 ##
+## Build 2: behave_diff() (by_behave, hush_kind's behave_of): an Anointed or
+## a Dread on Dusk in a story level from World 3 fights with its Nightfall
+## moves, its life, damage and tells still Dusk's. And a level's anoint:
+## header names monsters Anointed every run, in any level (anoint_specs):
+##   anoint: x,y[:Omen+Omen[:Name]]; x,y ...
+## each cell a placed monster's; its Omens checked against omen_pool (the
+## ones that don't fit dropped; none left, they're rolled as the World's
+## would be) and topped up to the difficulty's least; the name shows on its
+## plate (hud.gd elite_seen). level_features.assign_elites anoints them
+## before pick_elites, outside its max, and the random picks keep 20 tiles
+## from them.
+##
 ## Stand-in drawing (until a kind's frames exist): the v2 kinds keep the
 ## o_circle / o_poly helpers; v3 kinds draw with cel_* into one TriBatch per
 ## draw (contract §1: no draw_circle / draw_colored_polygon / draw_polyline
@@ -52,6 +64,9 @@ const WORLD_OMENS := {3: ["Sporebound"], 4: ["Sporebound", "Echoing"], 5: ["Spor
 const DUSK_WAITS := {4: ["Echoing"]}
 const DUSK_VENGEFUL_FROM := 6   # Vengeful joins Dusk's pool only in W6 ("all nine")
 const MAX_OMENS := 3
+# The tiers behave_diff() lends Nightfall's moves on Dusk from World 3 (not
+# "warden": the secret levels' Wardens keep theirs).
+const BEHAVE_TIERS := ["anointed", "dread"]
 const NEVER_ON := {"Swift": ["lidlurk", "hoarowl"], "Burning": ["brinejaw", "weepcap"], "Twinned": ["creepbone", "unwick"],
 		"Vengeful": ["hushling"], "Sporebound": ["weepcap"], "Echoing": ["unwick", "hoarowl"],
 		"Glassed": ["frostbuckle", "paneguard"], "Hushed": ["stillmaw", "hushling", "unwick"]}
@@ -241,9 +256,44 @@ func difficulty() -> String:
 	return str(d) if d != null else "dusk"
 
 
+func behave_diff() -> String:
+	## The difficulty its moves are chosen by (Build 2): difficulty(), but
+	## an Anointed or a Dread (BEHAVE_TIERS) on Dusk in a story level from
+	## World 3 (Combat.DUSK_TEETH_FROM) fights with Nightfall's moves: a
+	## Rattlehound's second pounce, a Paneguard's 150 px lunge, an Anointed
+	## Hushling's pack of 3-5. Only those lookups read it: its life, damage
+	## and tells stay Dusk's (setup_stats, tell() and cd() read difficulty(),
+	## so the Swift Omen still leaves Dusk's tells whole). Never "witching"
+	## on Dusk, so a Witching-only branch stays on difficulty(). A Warden
+	## keeps its own (the secrets are unchanged), a Twinned half is plain
+	## (no tier), and a mode keeps v3's Dusk. The level's header
+	## elite_behave: nightfall turns it on in any world (lab-elites), and
+	## elite_behave: dusk off.
+	var d := difficulty()
+	if not BEHAVE_TIERS.has(tier) or d != "dusk" or world == null or world.get("mode") != null:
+		return d
+	var hd = level.get("headers") if level != null else null
+	var say := str(hd.get("elite_behave", "")).strip_edges().to_lower() if hd is Dictionary else ""
+	if say == "nightfall" or say == "dusk":
+		return say
+	var wn = world.get("world_n")
+	return "nightfall" if wn != null and int(wn) >= Combat.DUSK_TEETH_FROM else d
+
+
 func by_diff(dusk, nightfall, witching):
 	## One of three values by the World's difficulty (a kind's per-difficulty numbers).
 	match difficulty():
+		"nightfall":
+			return nightfall
+		"witching":
+			return witching
+	return dusk
+
+
+func by_behave(dusk, nightfall, witching):
+	## by_diff by behave_diff(): a move's per-difficulty number (a speed, a
+	## reach, a count), never a life, a blow or a tell.
+	match behave_diff():
 		"nightfall":
 			return nightfall
 		"witching":
@@ -988,6 +1038,12 @@ static func pick_elites(world: Node, level: RefCounted, rng: RandomNumberGenerat
 	for e in level.entities:
 		if e["kind"] == "dread":
 			chosen.append(e["cell"])
+	# And the ones already tiered: the Anointed an anoint: header placed
+	# (level_features.assign_elites, before this). They're outside the max.
+	for en in world.enemies:
+		var tc: Vector2i = en.spawn.get("cell", Vector2i(-1, -1))
+		if en.tier != "" and tc.x >= 0 and not chosen.has(tc):
+			chosen.append(tc)
 	var cands := []
 	for en in world.enemies:
 		if en.tier != "" or not (en.kind in ELIGIBLE) or en.get("copy"):
@@ -1081,6 +1137,57 @@ static func roll_omens(k: String, diff_id: String, world_n: int, r: RandomNumber
 		var i := r.randi_range(0, pool.size() - 1)
 		out.append(pool[i])
 		pool.remove_at(i)
+	return out
+
+
+static func anoint_specs(level: RefCounted) -> Array:
+	## The level's anoint: header as [{cell, omens, name}]: "x,y" (its Omens
+	## rolled), "x,y:Swift+Warded" (those Omens), "x,y:Swift:Brother Clatter"
+	## or "x,y::Brother Clatter" (a name, rolled Omens), parts by ";". An
+	## Omen's case doesn't matter; a part whose cell isn't "x,y" is skipped.
+	var out := []
+	var hd = level.get("headers") if level != null else null
+	if not (hd is Dictionary) or str(hd.get("anoint", "")).strip_edges() == "":
+		return out
+	for part in str(hd["anoint"]).split(";"):
+		var bits := part.strip_edges().split(":", true, 2)
+		var xy := bits[0].strip_edges().split(",")
+		if xy.size() != 2 or not xy[0].strip_edges().is_valid_int() or not xy[1].strip_edges().is_valid_int():
+			continue
+		var omens := []
+		if bits.size() > 1:
+			for o in bits[1].split("+", false):
+				var want := str(o).strip_edges().to_lower()
+				for known in OMENS:
+					if str(known).to_lower() == want and not omens.has(known):
+						omens.append(known)
+		out.append({"cell": Vector2i(int(xy[0]), int(xy[1])), "omens": omens,
+				"name": bits[2].strip_edges() if bits.size() > 2 else ""})
+	return out
+
+
+static func forced_omens(k: String, chosen: Array, diff_id: String, world_n: int, r: RandomNumberGenerator, rules := {}) -> Array:
+	## A header's Anointed's Omens: the chosen ones its kind may carry here
+	## (omen_pool: not NEVER_ON, the world's, Vengeful and W4's Echoing only
+	## where they're allowed), then topped up from the pool to the
+	## difficulty's least (Witching's 2), never more than MAX_OMENS. None
+	## chosen, or none that fit: roll_omens, as the World would (so 3-S's
+	## plain cells roll what they always rolled).
+	var pool := omen_pool(k, diff_id, world_n)
+	var out := []
+	for o in chosen:
+		if pool.has(o) and not out.has(o) and out.size() < MAX_OMENS:
+			out.append(o)
+	if out.is_empty():
+		return roll_omens(k, diff_id, world_n, r, rules)
+	var least := omen_span(diff_id).x
+	if rules.has("omens_min"):
+		least = maxi(least, int(rules["omens_min"]))
+	var rest := pool.filter(func(o): return not out.has(o))
+	while out.size() < mini(least, MAX_OMENS) and rest.size() > 0:
+		var i := r.randi_range(0, rest.size() - 1)
+		out.append(rest[i])
+		rest.remove_at(i)
 	return out
 
 

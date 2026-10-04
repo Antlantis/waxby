@@ -290,6 +290,18 @@ static func diff_of(e) -> String:
 	return "dusk"
 
 
+static func behave_of(e) -> String:
+	## The difficulty a kind's TUNE moves are picked by: elites.gd
+	## behave_diff() (an Anointed or a Dread on Dusk from World 3 moves as on
+	## Nightfall), else diff_of. Life, blows and tells read TUNE's plain
+	## numbers or diff_of, never this. (A plain one goes straight to
+	## diff_of: k() is asked often.)
+	var t = e.get("tier") if e != null else null
+	if t != null and str(t) != "" and e.has_method("behave_diff"):
+		return str(e.behave_diff())
+	return diff_of(e)
+
+
 # ---------------------------------------------------------------- the art's points
 
 static func frame_points(frame: String) -> Dictionary:
