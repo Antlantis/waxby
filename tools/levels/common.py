@@ -80,13 +80,14 @@ SIGN_BUDGET = True
 
 # Where written headers go when an entry doesn't give its own order. Build
 # 2's keys sit just before the hints (a secret level's warden_room, then
-# anoint, as they always fell): anoint (forced Anointed: anoint_header),
-# twist (the level's rule), roster and threat (world_tables), roles (a re-cut
+# anoint, as they always fell): elite_behave (the elites' Nightfall moves on
+# or off: lab-elites), anoint (forced Anointed: anoint_header), twist (the
+# level's rule), roster and threat (world_tables), roles (a re-cut
 # level's section roles: world_problems), the sealed rooms' duel, ambush and
 # room, and belt_flip (range keys: span()).
 HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'boss', 'boss_music', 'dread', 'warden',
                 'secret', 'secret_prize', 'tick', 'story_start', 'story_boss', 'story_end', 'par', 'rush',
-                'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'warden_room', 'anoint', 'twist',
+                'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'warden_room', 'elite_behave', 'anoint', 'twist',
                 'roster', 'threat', 'roles', 'duel', 'ambush', 'room', 'belt_flip', 'hints']
 
 

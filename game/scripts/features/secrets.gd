@@ -60,7 +60,9 @@ extends "res://scripts/features/feature.gd"
 ##     bell stands from the start.
 ##   - first_secret, once, on the first stone landing of a secret level.
 ##   - Header `anoint: x,y; x,y`: the monsters placed there are Anointed
-##     every run (3-S's two wide knots, spec §3.9).
+##     every run (3-S's two wide knots, spec §3.9). Since Build 2 any level
+##     may carry it, with Omens and a name (x,y:Swift+Warded:Name):
+##     level_features.assign_elites reads it; anoint_cells() is its cells.
 ##   - A Warden whose kind lives in deep water (6-S's Lurecoil) keeps its D
 ##     cell water (level_data makes a D air; W0 may take this over).
 ##   - 1-S's crumbling slates carry a line of snow above the dark (so they
@@ -291,7 +293,7 @@ func _build_secret_level() -> void:
 		elif e["kind"] == "dread" and not level.warden.is_empty():
 			warden_home = {"kind": str(level.warden["kind"]), "cell": e["cell"], "name": str(level.warden["name"]),
 					"omens": (level.warden.get("omens", []) as Array).duplicate()}
-	_anoint()
+	# (The anoint: header's monsters: level_features.assign_elites, for every level.)
 	_water_warden()
 	if int(level.world) == 1:
 		for y in level.height:
@@ -365,36 +367,11 @@ func _find_room(bell_floor: Vector2) -> Dictionary:
 
 
 func anoint_cells() -> Array:
-	## Header anoint: "x,y; x,y" as cells (the tests read it).
-	var hd = level.get("headers")
-	var cells: Array = []
-	if not (hd is Dictionary) or str(hd.get("anoint", "")) == "":
-		return cells
-	for part in str(hd["anoint"]).split(";"):
-		var xy := part.strip_edges().split(",")
-		if xy.size() == 2 and xy[0].strip_edges().is_valid_int() and xy[1].strip_edges().is_valid_int():
-			cells.append(Vector2i(int(xy[0]), int(xy[1])))
-	return cells
-
-
-func _anoint() -> void:
-	## The monsters placed at the anoint: cells are Anointed every run (their
-	## Omens rolled as the World's would be).
-	var cells := anoint_cells()
-	if cells.is_empty() or not ResourceLoader.exists(ELITES):
-		return
-	var El = load(ELITES)
-	var r := RandomNumberGenerator.new()
-	r.seed = hash("anoint|%s|%s" % [level.id, str(world.diff)])
-	var rules: Dictionary = world.elite_rules() if world.has_method("elite_rules") else {}
-	for en in world.enemies:
-		if not is_instance_valid(en) or en.tier != "" or not en.has_method("make_elite"):
-			continue
-		var c = en.spawn.get("cell", Vector2i(-1, -1))
-		if cells.has(c):
-			en.make_elite("anointed", El.roll_omens(en.kind, str(world.diff), int(world.world_n), r, rules))
-			var cc: Vector2i = c
-			world.spawns = world.spawns.filter(func(sp): return sp["cell"] != cc)
+	## Header anoint: its cells (Elites.anoint_specs reads the whole of it,
+	## "x,y[:Omen+Omen[:Name]]; ..."; the tests read this).
+	if not ResourceLoader.exists(ELITES):
+		return []
+	return load(ELITES).anoint_specs(level).map(func(s): return s["cell"])
 
 
 func _sleep(en: Node2D) -> void:

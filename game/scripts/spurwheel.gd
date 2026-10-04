@@ -20,7 +20,7 @@ extends "res://scripts/elites.gd"
 ## Caught, a stomp deals 2x and holds the catch 0.5 s more. The Bellfounder's
 ## maul on a rolling Spurwheel forces a catch; Grave Chill's root counts as
 ## one, and so does the knight's Perfect Guard (its stagger). Never
-## Anointed (a Dread may be one). Nightfall: 170 px/s, caught 0.85 s. Witching: 190, caught 0.75 s, and it hops at outer corners.
+## Anointed (a Dread may be one). Nightfall (and a Dread on Dusk from World 3, behave_diff): 170 px/s, caught 0.85 s. Witching: 190, caught 0.75 s, and it hops at outer corners.
 ## (The spec's re-spin is 0.30 s; it's 0.50 here, floor 0.40: rule 1's
 ## escape formula for Wick hugging it when it rolls on, 0.35 + 24/205. The
 ## window itself stays CAUGHT s: a re-spinning wheel clangs.) Caught, its
@@ -122,11 +122,11 @@ func caught() -> bool:
 
 
 func roll_speed() -> float:
-	return spd(by_diff(ROLL, ROLL_NF, ROLL_WITCHING))
+	return spd(by_behave(ROLL, ROLL_NF, ROLL_WITCHING))
 
 
 func caught_len() -> float:
-	return float(by_diff(CAUGHT, CAUGHT_NF, CAUGHT_WITCHING))
+	return float(by_behave(CAUGHT, CAUGHT_NF, CAUGHT_WITCHING))
 
 
 func _set_hub(c: Vector2) -> void:

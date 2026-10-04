@@ -62,6 +62,10 @@ extends RefCounted
 ## game plays the same without them): roster (the cast it declares:
 ## headline=..; support=..; guest=..; rattle_max=n; fodder_max=f; count=a-b),
 ## threat (its cost per 100 tiles), roles (a re-cut level's section roles).
+## Build 2's elite keys, read from there (elites.gd), both optional: anoint
+## (`x,y[:Omen+Omen[:Name]]; ...`: the monsters placed there are Anointed
+## every run, in any level) and elite_behave (`nightfall` | `dusk`: turns
+## behave_diff on in any world, or off from World 3).
 
 const TILE := 32
 

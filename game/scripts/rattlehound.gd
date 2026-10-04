@@ -18,8 +18,8 @@ extends "res://scripts/elites.gd"
 ## A stomp stuns it STOMP_STUN s; a Perfect Guard bops its nose (the knight's
 ## 1.0 s stagger); the Bellfounder's maul from above pins it PIN s; after an
 ## overshoot its back faces a Sootrunner (a Backstab). Nightfall: a second
-## pounce SECOND_AFTER s after landing (crouch 0.40). Witching: chase 270,
-## tires after 4.
+## pounce SECOND_AFTER s after landing (crouch 0.40); an Anointed or a Dread
+## on Dusk from World 3 too (behave_diff). Witching: chase 270, tires after 4.
 
 const MOVES := {"pounce": 34.0, "touch": 24.0}
 const ARCHETYPE := "heavy"
@@ -246,7 +246,7 @@ func _land() -> void:
 	## the first lands, then the full landing after the second).
 	state = "land"
 	move_id = "touch"
-	if difficulty() != "dusk" and not _in_pair and pounces < tires_after():
+	if behave_diff() != "dusk" and not _in_pair and pounces < tires_after():
 		_in_pair = true
 		_second = true
 		timer = SECOND_AFTER

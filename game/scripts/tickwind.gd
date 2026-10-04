@@ -13,7 +13,8 @@ extends "res://scripts/elites.gd"
 ## A hit on its back (Combat.is_back_hit) while it marches or winds stops it
 ## cold: "Unwound!", run down UNWOUND s. A Knight's Perfect Guard on its
 ## charge sends it back x1.25 as a bowling ball (1.0x basic to every monster
-## in its path); a stomp kills it (fodder). Nightfall: charge 330. Witching:
+## in its path); a stomp kills it (fodder). Nightfall (and an elite on Dusk
+## from World 3, behave_diff): charge 330. Witching:
 ## wind 0.45 (floor 0.40), and Tickwinds within FILE_X wind with it and
 ## charge as a file.
 
@@ -112,7 +113,7 @@ func think(dt: float, player: Node2D) -> void:
 			if timer <= 0.0:
 				_charge()
 		"charge", "bowled":
-			var v := spd(CHARGE_NF if difficulty() != "dusk" else CHARGE)
+			var v := spd(CHARGE_NF if behave_diff() != "dusk" else CHARGE)
 			if state == "bowled":
 				v = CHARGE * BOWL_MULT
 				_bowl_others()

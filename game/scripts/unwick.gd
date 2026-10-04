@@ -132,7 +132,15 @@ func _init() -> void:
 
 
 func k(n: String) -> float:
-	return HK.pick(TUNE, HK.diff_of(self), n)
+	return HK.pick(TUNE, HK.behave_of(self), n)
+
+
+func make_elite(t: String, o: Array) -> void:
+	## Promoted after _ready (level_features.assign_elites): the delay is
+	## picked again, by behave_diff (an Anointed one follows 0.85 s behind on
+	## Dusk from World 3).
+	super(t, o)
+	delay = k("delay") * delay_mult
 
 
 func _ready() -> void:

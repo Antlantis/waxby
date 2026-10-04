@@ -596,6 +596,10 @@ func elite_seen(e: Node2D) -> void:
 	var omens: Array = []
 	for o in (e.get("omens") if e.get("omens") is Array else []):
 		omens.append(str(o).capitalize())
+	if tier == "anointed" and not name.begins_with("Anointed "):
+		# A named one (a level's anoint: header, Build 2): what it is leads
+		# its Omens' line, "ANOINTED RATTLEHOUND · SWIFT".
+		omens.push_front("Anointed " + str(KIND_NAME.get(str(e.get("kind")), str(e.get("kind")).capitalize())))
 	_push({"kind": "elite", "key": "elite%d" % id, "title": name, "tier": tier, "omens": omens, "ref": weakref(e)})
 	if first and tier == "dread":
 		# The card's line: "Dread", or what a mode calls it (the Descent's

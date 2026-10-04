@@ -15,6 +15,8 @@ extends "res://scripts/elites.gd"
 ## SHADOW s floor shadow (24 each), and every monster within ALERT_R is
 ## alerted for ALERT s (x1.3 speed, awake); cooldown COOLDOWN s. Two hits
 ## break it. Nightfall: meter 0.50 s, sweep 2.6 s. Witching: meter 0.40 s.
+## An Anointed one on Dusk from World 3 sweeps in 2.6 s (behave_diff); its
+## meter is a tell and stays Dusk's.
 ## As a Warden (Great-Aunt Hoot, 4-S), her alarm calls two Tickwinds instead.
 
 const MOVES := {"icicle": 24.0, "touch": 18.0}
@@ -107,7 +109,7 @@ func eye_world() -> Vector2:
 
 func sweep_angle() -> float:
 	## The cone's direction now, from the feature clock (phased by x off Witching).
-	var sw := float(by_diff(SWEEP, SWEEP_NF, SWEEP_NF))
+	var sw := float(by_behave(SWEEP, SWEEP_NF, SWEEP_NF))
 	var period := 2.0 * (sw + PAUSE)
 	var off := 0.0 if difficulty() == "witching" else fmod(position.x * 0.013, period)
 	var ph := fmod(clock() + off, period)

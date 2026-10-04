@@ -6,17 +6,18 @@ extends "res://scripts/elites.gd"
 ## flinch or stun and Grave Chill doesn't root it; fire deals x2.5 to it,
 ## the maul and a stomp x2, a Finisher x1.5. Breaking it shatters: THAWED s stunned, and
 ## its poise drops to 0.3. The rime regrows after REGROW s unhit (6 s on
-## Nightfall and up): the shell comes back over the life it has left (up to
-## RIME_SHARE of its most), with no healing, so a broken shell's damage
-## stays done. The shell is sized on the life it spawns with (after a
-## Twinned half's share or a mode's scaling).
+## Nightfall and up, and for an elite on Dusk from World 3): the shell comes
+## back over the life it has left (up to RIME_SHARE of its most), with no
+## healing, so a broken shell's damage stays done. The shell is sized on the
+## life it spawns with (after a Twinned half's share or a mode's scaling).
 ##
 ## It advances at ADVANCE px/s once Wick is within SEE px; turning takes
 ## TURN s (a slow swivel: Backstabs land in it). Frost Stomp (Wick within
 ## STOMP_X on its floor): the tell (0.70 s) is a line of ice cracks glowing
 ## along the floor toward him for its whole length, every tile that will
 ## spike; then spikes erupt tile by tile (the front at 400 px/s), each 20x28
-## for 0.35 s, up to 7 tiles (9 on Nightfall), stopping at walls and edges.
+## for 0.35 s, up to 7 tiles (9 on Nightfall, and for an elite on Dusk from
+## World 3: behave_diff), stopping at walls and edges.
 ## Shield Slam (Wick within SLAM_X in front): tell 0.70 s (floor 0.50: the
 ## escape formula for a 60 px slam), the rim flashing white; a 60 px slam,
 ## then 0.8 s of recovery with the shield low. A Perfect Guard on the slam
@@ -253,7 +254,7 @@ func spike_cells(dir: int) -> Array:
 	var out := []
 	if level == null:
 		return out
-	var n := LINE_TILES if difficulty() == "dusk" else LINE_TILES_NF
+	var n := LINE_TILES if behave_diff() == "dusk" else LINE_TILES_NF
 	var fy := floori((position.y + 1.0) / TILE)
 	var x := floori((position.x + dir * size.x * 0.5) / TILE)
 	if dir < 0 and fmod(position.x + dir * size.x * 0.5, TILE) == 0.0:
@@ -301,7 +302,7 @@ func _step_lines(dt: float, player: Node2D) -> void:
 
 func _step_rime(dt: float) -> void:
 	_unhit += dt
-	if rime <= 0.0 and rime_max > 0.0 and _unhit >= (REGROW if difficulty() == "dusk" else REGROW_NF):
+	if rime <= 0.0 and rime_max > 0.0 and _unhit >= (REGROW if behave_diff() == "dusk" else REGROW_NF):
 		# The rime regrows over the life it has (no healing).
 		rime = minf(rime_max, hp)
 		poise = 1.0

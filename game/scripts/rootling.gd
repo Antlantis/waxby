@@ -14,7 +14,8 @@ extends "res://scripts/elites.gd"
 ## Buried, slashes and shots pass over it (hit() is false) and it can't be
 ## touched, but a stomp on the mound kills it (fodder); a Special (a Peal
 ## wave, an Anvil Drop, a Flare burst, a Rush), a shockwave or the Sexton's
-## spade pops it out dazed. Nightfall: the mound moves at 110. Witching: a
+## spade pops it out dazed. Nightfall (and an elite on Dusk from World 3,
+## behave_diff): the mound moves at 110. Witching: a
 ## second pop POP2_AFTER s after the first at his new x (tell 0.45, floor 0.40).
 
 const MOVES := {"pop": 32.0, "touch": 24.0}
@@ -190,7 +191,7 @@ func _buried(dt: float, player: Node2D) -> void:
 		return
 	_follow_t += dt
 	var dir := 1 if dx > 0.0 else -1
-	var v := spd(by_diff(FOLLOW, FOLLOW_NF, FOLLOW_NF))
+	var v := spd(by_behave(FOLLOW, FOLLOW_NF, FOLLOW_NF))
 	# It stops at edges and walls (and right under his feet).
 	if absf(dx) > 3.0 and ground_ahead(dir) and not wall_ahead(dir):
 		facing = dir

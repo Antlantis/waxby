@@ -109,7 +109,7 @@ func _init() -> void:
 
 
 func k(n: String) -> float:
-	return HK.pick(TUNE, HK.diff_of(self), n)
+	return HK.pick(TUNE, HK.behave_of(self), n)
 
 
 func show_frame(n: String) -> void:
