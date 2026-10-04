@@ -231,7 +231,7 @@ BS_CANDLES = block('''
 ''')
 
 # The jaws: floats between stone posts, a Brinejaw in every gap. Bait a
-# jaw from stone, cross in its cooldown.
+# jaw from stone, cross in its cooldown. Hushlings wait on the far stone.
 BS_JAWS = block('''
  0|################################
  1|################################
@@ -245,14 +245,13 @@ BS_JAWS = block('''
  9|................................
 10|......o.......o........o........
 11|................................
-12|................................
+12|.............................n.n
 13|##:f:&&::##::f&&:&:f##:f:&&:####
 14|##:::::::##:::::::::##::::::####
 ''')
 
 # Two Hollow Helms on a stone jetty inside the second Hush zone (Hollin's
-# "deeper quiet"), a Hushling pair between them; a drowned Bonebow on the far
-# rock.
+# "deeper quiet"); a drowned Bonebow on the far rock.
 BS_HELMS = block('''
  0|############################
  1|############################
@@ -266,7 +265,7 @@ BS_HELMS = block('''
  9|............................
 10|........................a...
 11|.......................###..
-12|.....h...n.n..h........###..
+12|.......h......h........###..
 13|####################:::#####
 14|####################:::#####
  Z|;;;;;;;;;;;;;;;;;;;;;;;;;;;;
