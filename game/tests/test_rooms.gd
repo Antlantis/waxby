@@ -280,8 +280,8 @@ func _test_rules() -> void:
 		with_rooms.append(str(lv.id))
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-")),
-			"only labs have rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-") or RegEx.create_from_string("^[1-6]-3$").search(str(id)) != null),
+			"only labs and the X-3 redesigns have rooms (the big fight rooms of 1-3 to 6-3): %s" % [with_rooms])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.
@@ -302,7 +302,7 @@ func _test_rules() -> void:
 func _test_absent() -> void:
 	## No header, nothing changes: a level's monsters stay in the World's
 	## list, seen, and in its spawns.
-	for id in ["1-3", "3-3", "4-3", "5-3", "6-3"]:
+	for id in ["1-3", "3-3", "4-3", "5-1", "6-3"]:
 		var w := _world(id)
 		await process_frame
 		var n0: int = w.enemies.size()

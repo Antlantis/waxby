@@ -602,7 +602,10 @@ func _step_gusts(dt: float) -> void:
 			var near := _gain(z, v)
 			if st == "tell" and near > 0.0:
 				world._tell_sfx("gust_tell", knob("gust_tell"), near)
-				if pl != null and pl.alive and absf(pl.center().x - (float(z["x0"]) + float(z["x1"]) + 1.0) * 0.5 * TILE) < 12.0 * TILE:
+				# (On the zone's own rows: under 5-3's relay, the lower deck
+				# hears the upper's tell but feels no wind.)
+				if pl != null and pl.alive and absf(pl.center().x - (float(z["x0"]) + float(z["x1"]) + 1.0) * 0.5 * TILE) < 12.0 * TILE \
+						and in_rows(z, floori(pl.center().y / TILE)):
 					_want_bark("first_wind")
 			elif st == "gust":
 				if near > 0.0:

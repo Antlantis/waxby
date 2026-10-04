@@ -243,16 +243,24 @@ func _test_unchanged() -> void:
 		if f.ends_with(".txt") and not f.begins_with("lab-"):
 			ids.append(f.get_basename())
 	ids.sort()
-	var bare := true
+	# (Build 2's redesigns carry a twist or a lesson: each one twists.gd
+	# reads; every other level is held to playing as before.)
+	var bare := []
+	var bad := []
 	for id in ids:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		var has := false
 		for k in ["twist", "lesson", "belt_flip"]:
 			if lv.headers.has(k):
-				bare = false
+				has = true
 				print("  %s has a %s header" % [id, k])
-	_check(bare and ids.size() >= 30, "no level on the path or secret carries a twist, lesson or belt_flip header yet (%d levels)" % ids.size())
+		if not has:
+			bare.append(id)
+		elif (lv.headers.has("twist") and Twists.id_in(lv) == "") or (lv.headers.has("lesson") and Twists.lesson_in(lv).size() != 2):
+			bad.append(id)
+	_check(bad.is_empty() and ids.size() >= 30, "every level on the path or secret (%d) with a twist or lesson header carries one twists.gd reads %s" % [ids.size(), bad])
 	var same := 0
-	for id in ids:
+	for id in bare:
 		var w := _world(LevelData.load_file("res://levels/%s.txt" % id))
 		await process_frame
 		var ok: bool = w.twists == null and w.twist_id() == "" and w.title_sub() == w.level.subtitle and w.twist_cards().is_empty()
@@ -267,7 +275,7 @@ func _test_unchanged() -> void:
 		else:
 			print("  %s: a twist leaked in" % id)
 		await _done(w)
-	_check(same == ids.size(), "a World for every level without the header has no twist: no runtime, painters, card, rule or change (%d of %d)" % [same, ids.size()])
+	_check(same == bare.size(), "a World for every level without the header has no twist: no runtime, painters, card, rule or change (%d of %d)" % [same, bare.size()])
 	# A mode never has one, whatever the header says.
 	var w := _world(_level(".P...s", "twist: dark\n"))
 	await process_frame
