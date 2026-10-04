@@ -284,9 +284,9 @@ tools/
                           the bell), so World 4's X-1 < X-2 < X-3 rests on its threat: headers;
                           and an Unwick (the bot stands still to plan and swings without a break,
                           so its echo walks into it: 6.9 of its 7.4 monster lives in 6-2, which
-                          its runs mostly time out of). 5-3's Hold the Glass at 15 s is its call
-                          and provisional (the author's to make: 15 s with three Paneguards, 20 s
-                          with two, or the spec's 20 s)
+                          its runs mostly time out of). 5-3's Hold the Glass at 15 s is its call,
+                          kept by the author after Build 2 (over 20 s with two Paneguards or
+                          the spec's 20 s)
   art/                    the art generators, contact sheets, the icon renderer
   audio/                  the music: music.py (v2's eight) merging tracks_worlds.py and
                           tracks_bosses.py (v3's, on instruments_v3.py); check_music.py (files,

@@ -1114,9 +1114,8 @@ DB_ALTAR3 = block('''
 # retune: at the spec's 20 s the --autoplay bot on Dusk with the arrival
 # hero was snuffed in here 4 times a run (the median), every run at least
 # once, and 5-3 cost it twice what today's 5-3 did; at 15 s once, about
-# today's 5-3. The cast is the spec's. 15 s is provisional, the author's
-# call: 15 s with three Paneguards, 20 s with two (the probe's 6.3 lives),
-# or the spec's 20 s.)
+# today's 5-3. The cast is the spec's. The author kept 15 s (over 20 s
+# with two Paneguards, the probe's 6.3 lives, or the spec's 20 s).)
 DB_KNIGHTS = block('''
  0|##############################
  1|##############################

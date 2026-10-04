@@ -1139,7 +1139,7 @@ func _test_build2() -> void:
 	_check(l3.height > LevelData.STRIP_ROWS and Twists.id_in(l3) == "omens" and str(l3.headers.get("roads", "")).split(";", false).size() == 2,
 			"5-3: the double deck, %d rows, the omens twist, two roads (%s)" % [l3.height, l3.headers.get("roads", "")])
 	_check(rooms.size() == 1 and str(rooms[0]["kind"]) == "hold" and absf(float(rooms[0]["secs"]) - 15.0) < 0.01,
-			"5-3: one sealed room, Hold the Glass, 15 s (the retune's, provisional: the author's call) (%s)" % [rooms])
+			"5-3: one sealed room, Hold the Glass, 15 s (the retune's, kept by the author) (%s)" % [rooms])
 	if rooms.size() == 1:
 		var r: Dictionary = rooms[0]
 		var em: Vector2i = (named.get("Sister Ember", {}) as Dictionary).get("cell", Vector2i(-1, -1))
