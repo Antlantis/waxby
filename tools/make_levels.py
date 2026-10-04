@@ -29,7 +29,7 @@ import common  # noqa: E402
 # secrets before w3/w4: 3-3's and 4-2's set pieces are written only once 3-S.txt
 # and 4-S.txt exist (w3.py SECRET_3S, w4.py SECRET_4S), so one pass from a clean
 # tree writes them too.
-MODULES = ['w1', 'w2', 'secrets', 'w3', 'w4', 'w5', 'w6', 'lab']
+MODULES = ['w1', 'w2', 'secrets', 'w3', 'w4', 'w5', 'w6', 'lab', 'proto']   # proto: PROTOTYPE tall labs (proto-tall)
 
 
 def main(names):
@@ -38,8 +38,9 @@ def main(names):
         if not os.path.exists(os.path.join(HERE, 'levels', name + '.py')):
             continue
         mod = importlib.import_module(name)
+        build = getattr(mod, 'build', common.build)   # PROTOTYPE: proto.py writes its own (tall) rows
         for entry in getattr(mod, 'LEVELS', []):
-            common.build(entry)
+            build(entry)
             written.append(entry['id'])
     return written
 

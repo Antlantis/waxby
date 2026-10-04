@@ -85,6 +85,19 @@ const HEAD_EASE := 900.0         # px/s that stop moves down the glass when he g
 # account), so the tell isn't off the top of the glass. Flits and nests
 # tell only in plain view, so one too high even for that waits.
 const LOOK_UP_MAX := 52.0
+# PROTOTYPE (proto-tall): the camera in a tall level (more than PROTO_TALL_ROWS
+# rows). Falling fast, or sliding down a vine, it looks ahead below him: his
+# feet go up to PROTO_FALL_FEET on the glass, so where he lands is in view and
+# not off the bottom or behind the thumbs. A level with `look: down` (a
+# descent, lab-3) also holds a standing hero's feet higher (PROTO_DOWN_LINE of
+# the view) so the floor below shows between the buttons. proto_look_down
+# false (tools/shot_tall.gd's A/B) is the camera as it was.
+const PROTO_TALL_ROWS := 20
+const PROTO_FALL_FEET := 90.0    # (FEET_TOP 84 is as high as the flame lets the feet go)
+const PROTO_FALL_VY := 250.0
+const PROTO_DOWN_LINE := 0.36
+var proto_look_down := true
+var _proto_floor_y := 0.0        # his feet when last on a floor or a vine
 # Spec §4.1 rule 3 (nothing knocks Wick into a pit without a tell), from
 # World 5 on, where the floor is gone (the rev5 review: a Glassmite's touch
 # on 2-wide glass sent him into the void): a contact knock that would carry
@@ -4272,6 +4285,8 @@ func feet_line() -> float:
 		var k := clampf(float(Game.setting("button_scale")), 0.85, 1.1)
 		L = TouchScript.layout_for(UI.safe_rect(get_viewport()) if is_inside_tree() else Rect2(Vector2.ZERO, vs), k)
 	var top: float = minf(float(L["special"].y) - float(L["r_special"]), float(L["flask"].y) - float(L["r_flask"]))
+	if proto_look_down and level != null and str(level.headers.get("look", "")) == "down":
+		return minf(clampf(top - FEET_CLEAR, vs.y * 0.4, vs.y - 60.0), vs.y * PROTO_DOWN_LINE)   # PROTOTYPE (proto-tall)
 	return clampf(top - FEET_CLEAR, vs.y * 0.4, vs.y - 60.0)
 
 
@@ -4548,7 +4563,20 @@ func _update_camera(dt: float) -> void:
 			_cam_y_target = feet_at - _head_y
 		elif feet_view > low:
 			_cam_y_target = feet_at - low
+	# PROTOTYPE (proto-tall): a tall level looks ahead below a fall or a vine slide
+	# (a fall only once he's below the floor he left, so a plain jump doesn't bob it).
+	if settled:
+		_proto_floor_y = player.position.y
+	if proto_look_down and state == "play" and level.height > PROTO_TALL_ROWS:
+		var sliding: bool = player.climbing and str(player.climb_state) == "slide"   # (a climb zeroes velocity)
+		var falling: bool = not settled and player.velocity.y > PROTO_FALL_VY and player.position.y > _proto_floor_y + 16.0
+		if falling or sliding:
+			_cam_y_target = maxf(_cam_y_target, feet_at - PROTO_FALL_FEET)
 	var target_y: float = _clamp_cam(Vector2(cam.x, _cam_y_target)).y
+	if proto_look_down and player.riding != null and level.height > PROTO_TALL_ROWS:
+		# PROTOTYPE (proto-tall): ride with a lift, so the easing doesn't lag his
+		# feet behind the Special (24 px on lab-2's lift going up).
+		cam.y += float(player.riding.delta.y)
 	cam.y = lerpf(cam.y, target_y, 1.0 - exp(-dt * (9.0 if player.velocity.y > 400.0 else 4.5)))
 	if state == "play" and player.alive:
 		# The easing never lags his flame off the top or under a HUD block:

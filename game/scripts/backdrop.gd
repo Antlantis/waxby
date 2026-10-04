@@ -50,6 +50,10 @@ const THEMES := {
 }
 const FACTORS := [0.12, 0.35, 0.65]
 const SLICE := 1024.0            # a v3 style's slice width, in layer space
+# PROTOTYPE (proto-tall): see build(); PROTO_STOREYS false is the backdrop as it was.
+static var PROTO_STOREYS := true
+const PROTO_TALL_PX := 20 * 32.0
+const STRIP_PX := 15 * 32.0      # the height every style was composed for
 const Themes := preload("res://scripts/themes/loader.gd")
 
 var theme := "nave"
@@ -85,22 +89,44 @@ func build(p_theme: String, p_level_size: Vector2, p_view: Vector2) -> void:
 		# v3: cut into slices, and the windows now.
 		layer.set("mode", 1)
 		var sp := span(i)
-		var x := -SLICE * 0.25
-		while x < sp.x + 200.0:
-			var sl := Node2D.new()
-			sl.set_script(layer_script)
-			sl.set("backdrop", self)
-			sl.set("index", i)
-			sl.set("mode", 2)
-			sl.set("x0", x)
-			sl.set("x1", x + SLICE)
-			sl.set("style", style_script)
-			layer.add_child(sl)
-			x += SLICE
-		for w in style_script.windows(i, colors(), sp):
-			var wd: Dictionary = w
-			wd["layer"] = i
-			windows.append(wd)
+		# PROTOTYPE (proto-tall): the styles compose a layer for a 15-row strip
+		# (their set pieces in a band near the top, plain wall below). In a tall
+		# level the mid and near layers are drawn as a strip's and stacked down
+		# the layer every strip-span px ("storeys"); later copies paint over the
+		# plain bottom of the one above. The far layer (it scrolls least) is left.
+		var oys := [0.0]
+		var dsp := sp
+		if PROTO_STOREYS and i >= 1 and level_size.y > PROTO_TALL_PX:
+			dsp = Vector2(sp.x, maxf(STRIP_PX - view_size.y, 0.0) * FACTORS[i] + view_size.y)
+			oys = []
+			var oy := 0.0
+			while oy < sp.y + 200.0:
+				oys.append(oy)
+				oy += dsp.y
+		for oy in oys:
+			var x := -SLICE * 0.25
+			while x < sp.x + 200.0:
+				var sl := Node2D.new()
+				sl.set_script(layer_script)
+				sl.set("backdrop", self)
+				sl.set("index", i)
+				sl.set("mode", 2)
+				sl.set("x0", x)
+				sl.set("x1", x + SLICE)
+				sl.set("style", style_script)
+				if oy > 0.0 or dsp != sp:
+					sl.position.y = oy
+					sl.set("span_override", dsp)
+				layer.add_child(sl)
+				x += SLICE
+			for w in style_script.windows(i, colors(), dsp):
+				var wd: Dictionary = w
+				wd["layer"] = i
+				if wd.has("center"):
+					wd["center"] = (wd["center"] as Vector2) + Vector2(0, oy)
+				if wd.has("rect"):
+					wd["rect"] = Rect2((wd["rect"] as Rect2).position + Vector2(0, oy), (wd["rect"] as Rect2).size)
+				windows.append(wd)
 
 
 func slice_count() -> int:

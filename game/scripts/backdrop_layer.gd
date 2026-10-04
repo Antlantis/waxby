@@ -15,6 +15,7 @@ var mode := 0
 var x0 := 0.0
 var x1 := 0.0
 var style: Script = null
+var span_override := Vector2.ZERO   # PROTOTYPE (proto-tall): a storey copy drawn as a strip's (backdrop.gd)
 var _tb = null
 
 
@@ -31,7 +32,7 @@ func _draw() -> void:
 	if mode == 1:
 		return
 	var c: Dictionary = backdrop.colors()
-	var span: Vector2 = backdrop.span(index)
+	var span: Vector2 = backdrop.span(index) if span_override == Vector2.ZERO else span_override
 	if mode == 2:
 		if _tb == null:
 			_tb = TriBatch.new()

@@ -872,7 +872,19 @@ func _add_lab_button(m: Control) -> void:
 	_lab_btn = UI.make_button("Feel lab", false, func(): play_level_id(FEEL_LAB), "click", 15)
 	_lab_btn.name = "FeelLab"
 	m.add_child(_lab_btn)
+	# PROTOTYPE (proto-tall): the two tall labs (tools/levels/proto.py), each
+	# placed after the one before it (debug builds only, as the Feel lab).
+	_tall_btns = []
+	for id in PROTO_TALL_LABS:
+		if FileAccess.file_exists("res://levels/%s.txt" % id):
+			var b := UI.make_button(str(PROTO_TALL_LABS[id]), false, func(): play_level_id(id), "click", 15)
+			m.add_child(b)
+			_tall_btns.append(b)
 	_place_lab_button()
+
+
+const PROTO_TALL_LABS := {"lab-2": "Tower", "lab-3": "Shaft"}   # PROTOTYPE (proto-tall)
+var _tall_btns: Array = []
 
 
 func _place_lab_button() -> void:
@@ -883,6 +895,13 @@ func _place_lab_button() -> void:
 		_lab_btn.custom_minimum_size = Vector2(0, (ch as Control).size.y)
 		_lab_btn.reset_size()
 		_lab_btn.position = (ch as Control).position + Vector2((ch as Control).size.x + 12.0, 0.0)
+	var prev: Control = _lab_btn
+	for b in _tall_btns:
+		if b is Control and is_instance_valid(b):
+			(b as Control).custom_minimum_size = Vector2(0, prev.size.y)
+			(b as Control).reset_size()
+			(b as Control).position = prev.position + Vector2(prev.size.x + 8.0, 0.0)
+			prev = b
 
 
 # The one-time cards on the map, one a visit, in this order. A card is due

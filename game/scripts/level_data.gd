@@ -378,6 +378,10 @@ func _header(key: String, value: String) -> void:
 			weight_phase = _phases(value)
 		"rush":
 			rush = value.strip_edges() not in ["", "0", "false", "no"]
+		"world":
+			# PROTOTYPE (proto-tall): a feel lab may play as a World (tools/levels/proto.py's
+			# tall labs: themed movers, W4's icicle lean). The story levels never write it.
+			world = maxi(int(value), 0)
 
 
 static func _named(value: String) -> Dictionary:

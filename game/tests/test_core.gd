@@ -117,7 +117,8 @@ func _test_levels_parse() -> void:
 	for path in _all_level_files():
 		var lv = LevelData.load_file(path)
 		_check(lv.errors.is_empty(), "%s parses cleanly: %s" % [lv.id, ", ".join(lv.errors)])
-		_check(lv.height == 15, "%s is 15 rows" % lv.id)
+		# PROTOTYPE (proto-tall): the tall labs (tools/levels/proto.py) are 46 rows.
+		_check(lv.height == 15 or lv.id in ["lab-2", "lab-3"], "%s is 15 rows" % lv.id)
 		_check(lv.title != "" and lv.subtitle != "", "%s has a title" % lv.id)
 		var start: Vector2i = lv.start
 		_check(LevelData.is_solid(lv.tile(start.x, start.y + 1)), "%s: Wick starts on the floor" % lv.id)

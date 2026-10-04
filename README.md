@@ -177,6 +177,16 @@ tools/
                           check_music.py unless WAXBY_FAST)
   shot*.gd                screenshots of levels, screens and scenes, for checking by eye
                           (shot_screens_v3.gd: SC's v3 screens with stand-in levels; shot_modes.gd)
+  PROTOTYPE (branch proto-tall): tall levels. tools/levels/proto.py writes lab-2
+                          (the Bone Tower, a 46-row climb, orchard) and lab-3 (the Clock
+                          Shaft, a 46-row descent, clockface; `look: down`); the map's
+                          debug Tower and Shaft buttons play them. shot_tall.gd shoots
+                          them (a window; "_old" frames are the camera and backdrop as
+                          they were), proto_reach.gd runs the reachability bot (with the
+                          drop-through reach.gd DROPS adds), proto_bot.gd the autoplay
+                          bot, proto_sheet.gd makes contact sheets. Every hack is marked
+                          PROTOTYPE in world.gd, backdrop.gd, backdrop_layer.gd,
+                          level_data.gd (`world:`), reach.gd, main.gd, test_core.gd.
   art/                    the art generators, contact sheets, the icon renderer
   audio/                  the music: music.py (v2's eight) merging tracks_worlds.py and
                           tracks_bosses.py (v3's, on instruments_v3.py); check_music.py (files,

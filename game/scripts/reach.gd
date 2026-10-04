@@ -235,6 +235,13 @@ static func goals_of(lv: RefCounted) -> Array:
 
 # ---------------------------------------------------------------- actions
 
+# PROTOTYPE (proto-tall): the bot never drops through a ledge, so it can't go
+# DOWN a lift (laid out as a stack of ledges over its sweep) or a ledge stack:
+# a descent (lab-3) is unprovable. With DROPS on (tools/proto_reach.gd sets it)
+# a floor state also tries pure down held 0.3 s (player.gd DROP_HOLD 0.15 s).
+static var DROPS := false
+
+
 static func floor_actions() -> Array:
 	var out := []
 	for dir in [-1, 1]:
@@ -243,6 +250,8 @@ static func floor_actions() -> Array:
 			for hold in [0.12, 0.6]:
 				out.append({"walk": run, "dir": dir, "jump": true, "hold": hold})
 	out.append({"walk": 0.0, "dir": 0, "jump": true, "hold": 0.6})
+	if DROPS:
+		out.append({"walk": 0.3, "dir": 0, "jump": false, "drop": true})
 	return out
 
 
@@ -279,6 +288,9 @@ static func action_pad(a: Dictionary, t: float, st: Dictionary) -> Dictionary:
 		if not st.has("leap_t"):
 			st["leap_t"] = maxf(t, PlayerScript.LEAP_AFTER + DT) + DT
 		pd["jump"] = t >= float(st["leap_t"]) and t - float(st["leap_t"]) < 0.6
+		return pd
+	if a.get("drop", false):
+		pd["down"] = t < float(a["walk"])   # PROTOTYPE: the drop-through (DROPS)
 		return pd
 	if dir < 0:
 		pd["left"] = true
