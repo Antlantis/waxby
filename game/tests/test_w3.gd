@@ -5,7 +5,9 @@ extends SceneTree
 ## Since Build 2 the regular levels are held to what their own headers
 ## declare (tests/level_rules.gd: their roster:, their threat: and its ramp,
 ## 3-5 altars at most 90 tiles apart), not to fixed counts and widths; 3-4
-## keeps its pins.
+## keeps its pins. World 3 reads strip, tower, bowl (_test_shapes): 3-1 a
+## strip, 3-2 a tower 36 rows tall, 3-3 a bowl 24 rows deep, each with its
+## twist and set pieces in play.
 ##
 ##     godot --headless --path game --script res://tests/test_w3.gd
 ##
@@ -38,38 +40,48 @@ const THREAT_SLACK := 0.15
 const COST := {"skeleton": 1.0, "bat": 1.0, "bonebow": 1.5, "dripkin": 1.0, "gutterwing": 1.0, "brinejaw": 1.0,
 	"thornback": 2.5, "hollow_helm": 3.0, "lidlurk": 3.0, "rootling": 1.0, "weepcap": 2.0, "rattlehound": 3.0,
 	"creepbone": 1.5, "nest": 1.0}
-# Where each World 3 thing is taught (spec §3.4.2): nothing of its kind
-# appears earlier on the main path.
-const TAUGHT := {"rootling": ["3-1", "BG_MOUNDS", 186], "weepcap": ["3-1", "BG_BELL", 294],
-	"rattlehound": ["3-2", "HO_HOUND", 62], "creepbone": ["3-3", "SW_CREEP", 58],
-	"rotten": ["3-2", "HO_ROTTEN", 256], "pod": ["3-2", "HO_SPORES", 100], "vine": ["3-1", "BG_START", 0]}
+# Where each World 3 thing is taught (spec §3.4.2; Build 2's 3-1 teaches
+# the world's three new monsters one at a time, the Creepbone moved there
+# from 3-3): nothing of its kind appears earlier on the main path.
+const TAUGHT := {"rootling": ["3-1", "BG_MOUNDS", 104], "weepcap": ["3-1", "BG_WEEP", 175],
+	"rattlehound": ["3-2", "HO_HOUND", 78], "creepbone": ["3-1", "BG_LADDER", 134],
+	"rotten": ["3-2", "HO_ROTTEN_K", 245], "pod": ["3-2", "HO_SPORES", 118], "vine": ["3-1", "BG_START", 0]}
 # 3-4's monsters on the approach (spec §3.4.3; the regular levels declare
 # their cast: roster:, a nest counted as its Gutterwing).
 const MONSTERS := {"3-4": 11}
-# Each regular level's star sigil (sigil 3, by the bell), the landings its
-# route takes (tight: a lone one-tile stone, a crumble, a rotten run of 3 or
-# fewer, a one-tile root knot), and where the bot starts.
+# Each regular level's star sigil (sigil 3: by 3-1's bell, at the top of
+# 3-2's Rotten Spur over the wall's first catch floor, at the end of 3-3's
+# knots over the Clearing's thorny roof), the landings its route takes
+# (tight: a lone one-tile stone, a crumble, a rotten run of 3 or fewer, a
+# one-tile root knot), and where the bot starts.
 const STAR_ROUTES := {
-	"3-1": {"sigil": 3, "route": [Vector2i(319, 7), Vector2i(322, 5)], "from": Vector2i(310, 12),
+	"3-1": {"sigil": 3, "route": [Vector2i(313, 7), Vector2i(316, 5)], "from": Vector2i(304, 12),
 			"what": "a short vine, then two lone stones"},
-	"3-2": {"sigil": 3, "route": [Vector2i(320, 6), Vector2i(324, 5), Vector2i(328, 5)], "from": Vector2i(313, 12),
-			"what": "two rotten vines, then a lone stone"},
-	"3-3": {"sigil": 3, "route": [Vector2i(310, 10), Vector2i(314, 8), Vector2i(318, 6)], "from": Vector2i(305, 12),
-			"what": "three one-tile root knots under ceiling pods"},
+	"3-2": {"sigil": 3, "route": [Vector2i(268, 18), Vector2i(264, 17)], "from": Vector2i(262, 21),
+			"what": "two rotten runs up the far wall from the catch floor"},
+	"3-3": {"sigil": 3, "route": [Vector2i(83, 11), Vector2i(87, 11), Vector2i(91, 11), Vector2i(95, 11), Vector2i(99, 11),
+			Vector2i(103, 11), Vector2i(107, 11), Vector2i(111, 11), Vector2i(115, 11)], "from": Vector2i(76, 12),
+			"what": "root knots from the lip of Tatterjaw's run over the Clearing's thorny roof"},
 }
 # 3-4's approach (no bell rings there with no monsters, so test_routes can't
 # replay it): recorded by the autoplay bot, replayed here to the arena door.
 const APPROACH := "res://tests/routes/3-4_approach.json"
-# 3-3's secret attic: where its silver bell hangs (SW_UPDRAFT, x 252 + 8, row
-# 2), written only once 3-S.txt is in the build (w3.py SECRET_3S).
-const ATTIC := Vector2i(260, 2)
+# 3-3's secret attic: where its silver bell hangs (SW_UPDRAFT, x 256 + 8, row
+# 2: the bowl's far rim, back at the wood's height), written only once
+# 3-S.txt is in the build (w3.py SECRET_3S).
+const ATTIC := Vector2i(264, 2)
 const SECRET := "res://levels/3-S.txt"
-# 3-3's keeper nook (SW_BRAMBLE, x 140): the Candleknight's Ledge Grab only.
-# He jumps from the branch ledge (row 10) in the slot column, bonks the root
-# lip (row 5) and grabs the hollow's floor (row 7, columns 142-143).
+# 3-3's keeper nook (SW_BRAMBLE2, x 140, placed 6 rows down in the bowl): the
+# Candleknight's Ledge Grab only. He jumps from the branch ledge (row 16) in
+# the slot column, bonks the root lip (row 11) and grabs the hollow's floor
+# (row 13, columns 142-143). The bot comes at it from the trunk's far side.
 const NOOK_X0 := 140
-const NOOK_LEDGE := Vector2i(141, 10)
-const NOOK_FLOOR := 7
+const NOOK_LEDGE := Vector2i(141, 16)
+const NOOK_LIP := 11
+const NOOK_FLOOR := 13
+const NOOK_FROM := Vector2i(138, 21)
+# SW_CANOPY's last vine (x 184 + 25, its top row 2 + 3) by sigil 1's ledge.
+const CANOPY_VINE := Vector2i(209, 5)
 
 var WorldScript: GDScript
 var game: Node
@@ -134,6 +146,7 @@ func _initialize() -> void:
 		await _test_approach()
 		await _test_leap_bands(levels)
 		await _test_canopy_mount(levels["3-3"])
+		await _test_shapes(levels)
 	for suffix in ["", ".bak", ".tmp"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(game.save_path + suffix))
 	if not _skipped.is_empty():
@@ -1122,6 +1135,15 @@ func _nook_try(lv: RefCounted, quirk: String, feet: Vector2, pre: int, dir: int,
 	return inside
 
 
+func _ground(lv: RefCounted, x: int, from_y: int) -> int:
+	## The first solid row at or under from_y in column x (his feet's row
+	## standing there).
+	var y := from_y
+	while y < lv.height and not LevelData.is_solid(lv.tile(x, y)):
+		y += 1
+	return y
+
+
 func _test_nook(lv: RefCounted) -> void:
 	## 3-3's keeper nook (spec §3.1: one optional spot only a quirk reaches,
 	## an ember cache; §3.4.3: the Candleknight's Ledge Grab, "a root lip 12
@@ -1137,13 +1159,13 @@ func _test_nook(lv: RefCounted) -> void:
 	_check(lv.entities.filter(func(e): return e["kind"] == "sigil" and absi(int(e["cell"].x) - NOOK_X0 - 2) <= 2).is_empty(),
 			"3-3: and no sigil")
 	var ledge := Vector2((NOOK_LEDGE.x + 0.5) * TILE, NOOK_LEDGE.y * TILE)
-	_check(LevelData.is_ledge(lv.tile(NOOK_LEDGE.x, NOOK_LEDGE.y)) and LevelData.is_solid(lv.tile(NOOK_LEDGE.x, 5))
+	_check(LevelData.is_ledge(lv.tile(NOOK_LEDGE.x, NOOK_LEDGE.y)) and LevelData.is_solid(lv.tile(NOOK_LEDGE.x, NOOK_LIP))
 			and LevelData.is_solid(lv.tile(NOOK_X0 + 2, NOOK_FLOOR)), "3-3: the branch ledge, the root lip over the slot and the hollow's floor")
 	_check(_nook_try(lv, "ledge_grab", ledge, 1, 1, 5, 60), "3-3: the Candleknight jumps from the ledge into the lip and grabs his way in")
 	# No other way in: every start near it, every way held, every jump timing.
 	var starts := [ledge, Vector2((NOOK_X0 + 0.5) * TILE, NOOK_LEDGE.y * TILE)]
 	for sx in range(NOOK_X0 - 3, NOOK_X0 + 6):
-		starts.append(Vector2((sx + 0.5) * TILE, 13 * TILE))
+		starts.append(Vector2((sx + 0.5) * TILE, _ground(lv, sx, NOOK_LEDGE.y + 1) * TILE))
 	for q in ["", "cling", "stampede"]:
 		var got := 0
 		var n := 0
@@ -1158,7 +1180,7 @@ func _test_nook(lv: RefCounted) -> void:
 		_check(got == 0, "3-3: with %s, none of %d jumps near it gets in (%d did)" % ["no quirk" if q == "" else q, n, got])
 	# The bot (no quirk, its whole action set, vines too once it climbs).
 	var goal := {"what": "nook", "p": LevelData.cell_center(embers[0]["cell"]) if not embers.is_empty() else Vector2.ZERO, "rope": false}
-	var crop = _crop(Reach.static_copy(lv), NOOK_X0 - 12, NOOK_X0 + 30, Vector2i(NOOK_X0 - 6, 12))
+	var crop = _crop(Reach.static_copy(lv), NOOK_X0 - 12, NOOK_X0 + 30, NOOK_FROM)
 	goal["p"] = (goal["p"] as Vector2) - Vector2((NOOK_X0 - 12) * TILE, 0)
 	var s = ReachSearch.new()
 	s.setup(crop, LevelData.cell_floor(crop.start), {"goals": [goal]})
@@ -1396,18 +1418,18 @@ func _test_leap_bands(levels: Dictionary) -> void:
 		var bands := []
 		for x in lv.width:
 			var y := 0
-			while y < 15:
+			while y < lv.height:
 				if not LevelData.is_climb(lv.tile(x, y)):
 					y += 1
 					continue
 				var y0 := y
-				while y < 15 and LevelData.is_climb(lv.tile(x, y)):
+				while y < lv.height and LevelData.is_climb(lv.tile(x, y)):
 					y += 1
 				var y1 := y          # the run is rows y0 .. y1 - 1
 				var under := y1
-				while under < 15 and not LevelData.is_solid(lv.tile(x, under)) and lv.tile(x, under) != LevelData.SPIKES_UP:
+				while under < lv.height and not LevelData.is_solid(lv.tile(x, under)) and lv.tile(x, under) != LevelData.SPIKES_UP:
 					under += 1
-				var hurts: bool = under >= 15 or lv.tile(x, under) == LevelData.SPIKES_UP
+				var hurts: bool = under >= lv.height or lv.tile(x, under) == LevelData.SPIKES_UP
 				if not hurts:
 					continue
 				var ok_rows := 0.0
@@ -1470,13 +1492,14 @@ func _leap_from(w: Node2D, col: int, cy: float) -> String:
 
 
 func _test_canopy_mount(lv: RefCounted) -> void:
-	## SW_CANOPY's sigil 1 ledge: from the top of the vine beside it (x 125),
-	## jump held toward it hauls him up (the roof cell over the vine is open,
-	## as over the ledge: player._clear_above refused the haul under it).
+	## SW_CANOPY's sigil 1 ledge: from the top of the vine beside it
+	## (CANOPY_VINE), jump held toward it hauls him up (the roof cell over the
+	## vine is open, as over the ledge: player._clear_above refused the haul
+	## under it).
 	var w: Node2D = await _world(lv)
 	var pl: Node2D = w.player
-	var col := 125
-	pl.reset_at(Vector2((col + 0.5) * TILE, 6.5 * TILE + 19.0))
+	var col := CANOPY_VINE.x
+	pl.reset_at(Vector2((col + 0.5) * TILE, (CANOPY_VINE.y + 4.5) * TILE + 19.0))
 	pl.grab_vine(col, 0.3)
 	var on := false
 	for i in int(4.0 / DT):
@@ -1484,11 +1507,118 @@ func _test_canopy_mount(lv: RefCounted) -> void:
 		w.test_pad = {} if i < 3 else ({"jump": true} if i < 6 else {"jump": true, "right": true})
 		w._read_pad()
 		w.tick(DT)
-		if pl.on_floor and not pl.climbing and absf(pl.position.y - 3.0 * TILE) < 2.0 and pl.position.x > 126.0 * TILE:
+		if pl.on_floor and not pl.climbing and absf(pl.position.y - (CANOPY_VINE.y + 1.0) * TILE) < 2.0 and pl.position.x > (col + 1.0) * TILE:
 			on = true
 			break
-	_check(on, "3-3: climbing x 125 with jump held toward sigil 1's ledge hauls him onto it (at %s)" % [pl.position / TILE])
+	_check(on, "3-3: climbing x %d with jump held toward sigil 1's ledge hauls him onto it (at %s)" % [col, pl.position / TILE])
 	await _done(w)
+
+
+func _ui_world(lv: RefCounted, monsters := false) -> Node2D:
+	## A Dusk World on lv with its HUD and touch controls (what the HUD's top
+	## band is measured against), ticked half a second.
+	game.reset()
+	game.new_hero("knight")
+	game.data["difficulty"] = "dusk"
+	var w: Node2D = WorldScript.new()
+	w.setup(lv, true)
+	w.no_monsters = not monsters
+	w.paused = true
+	root.add_child(w)
+	await process_frame
+	var hud = load("res://scripts/hud.gd").new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	var touch = load("res://scripts/touch_controls.gd").new()
+	w.touch = touch
+	touch.hud = hud
+	w.add_child(touch)
+	await process_frame
+	touch.apply_settings()
+	_tick(w, 0.5)
+	return w
+
+
+func _test_shapes(levels: Dictionary) -> void:
+	## World 3 reads strip, tower, bowl (Build 2's shapes): 3-1 a strip; 3-2
+	## the 36-row tower, its start on the gallery along its bottom and its
+	## bell on the wall's top storey, in the wall's middle third and 3 rows or
+	## more under its roof; 3-3 the 24-row bowl, its start and bell at the
+	## wood's height and altar 1 at the Clearing's door on the bowl's floor.
+	## With the camera settled on him at each goal, none is behind the HUD's
+	## top band (tall_cam.goal_hits). And each one's twist and set pieces in
+	## play: 3-1's lesson card and no rule; 3-2's Restless and Brother
+	## Clatter; 3-3's Omens, Sister Thistle, and the Clearing's ambush, shut
+	## once he's in and open again once its five (the Mourner's halves too)
+	## are down.
+	var l1 = levels["3-1"]
+	var l2 = levels["3-2"]
+	var l3 = levels["3-3"]
+	_check(l1.height == LevelData.STRIP_ROWS and l2.height == 36 and l3.height == 24,
+			"3-1 a strip, 3-2 a tower 36 rows tall, 3-3 a bowl 24 rows deep (%d, %d, %d)" % [l1.height, l2.height, l3.height])
+	var bell2: Vector2i = l2.entities.filter(func(e): return e["kind"] == "bell")[0]["cell"]
+	var wall0: int = l2.width - 40
+	_check(l2.start.y == 33 and bell2.y >= 3 and bell2.y <= 9 and bell2.x >= wall0 + 13 and bell2.x <= wall0 + 26,
+			"3-2: the start on the gallery's floor (row %d), the bell on the wall's top storey in its middle third (%s)" % [l2.start.y, bell2])
+	var bell3: Vector2i = l3.entities.filter(func(e): return e["kind"] == "bell")[0]["cell"]
+	var alts: Array = l3.entities.filter(func(e): return e["kind"] == "altar").map(func(e): return e["cell"])
+	alts.sort()
+	_check(l3.start.y == 12 and bell3.y == 12 and not alts.is_empty() and alts[0].y == 21,
+			"3-3: the start and the bell at the wood's height (row 12), altar 1 on the bowl's floor (row 21) (%s, %s, %s)" % [l3.start, bell3, alts])
+	for id in ["3-2", "3-3"]:
+		var w := await _ui_world(levels[id])
+		var hits: Array = w.tall_cam.goal_hits() if w.tall_cam != null else ["no tall camera"]
+		_check(hits.is_empty(), "%s: every goal shows clear of the HUD's top band (%s)" % [id, hits])
+		await _done(w)
+	var Twists = load("res://scripts/twists.gd")
+	_check(Twists.lesson_in(l1) == ["Into the Orchard", "Roots follow your steps. Keep moving."] and Twists.id_in(l1) == "",
+			"3-1: the lesson card \"Into the Orchard\", no rule")
+	var w2 := await _ui_world(l2, true)
+	var clatter: Array = w2.enemies.filter(func(e): return e.elite_name == "Brother Clatter")
+	_check(w2.twist("restless") and clatter.size() == 1 and clatter[0].kind == "rattlehound" and clatter[0].tier == "anointed"
+			and (clatter[0].omens as Array).has("Sporebound"), "3-2: Restless, and Brother Clatter a Sporebound Anointed Rattlehound")
+	await _done(w2)
+	var w3 := await _ui_world(l3, true)
+	var thistle: Array = w3.enemies.filter(func(e): return e.elite_name == "Sister Thistle")
+	_check(w3.twist("omens") and thistle.size() == 1 and thistle[0].kind == "thornback" and thistle[0].tier == "anointed"
+			and (thistle[0].omens as Array).has("Swift"), "3-3: Omens, and Sister Thistle a Swift Anointed Thornback")
+	var m = w3.features.module("sealed")
+	var r: Dictionary = m.rooms[0] if m != null and m.rooms.size() == 1 else {}
+	var specs: Array = r.get("specs", [])
+	_check(str(r.get("kind", "")) == "ambush" and specs.size() == 5
+			and specs.any(func(sp): return sp["name"] == "The Mourner" and sp["tier"] == "anointed" and sp["kind"] == "weepcap"),
+			"3-3: the Clearing an ambush of five, the Mourner a Twinned Anointed Weepcap among them (%d)" % specs.size())
+	if not r.is_empty():
+		var pl: Node2D = w3.player
+		pl.invuln = 1000.0
+		pl.reset_at(LevelData.cell_floor(Vector2i(int(r["x0"]) + 4, 21)))
+		for i in int(1.5 / DT):
+			if r["phase"] == "fight":
+				break
+			_tick(w3, DT)
+		_check(r["phase"] == "fight", "3-3: in the Clearing, its doors shut (%s)" % r["phase"])
+		for i in int(15.0 / DT):
+			if r["phase"] == "won":
+				break
+			pl.invuln = 1000.0
+			pl.hp = pl.max_hp
+			# Down with every foe that can be hit; walk at the rest (a buried
+			# Rootling follows him and comes up only near him).
+			var pad := {}
+			if (r["drops"] as Array).is_empty():
+				for e in m.counted(r):
+					if e.alive:
+						w3.deal(e, 1.0, {"flat": e.max_hp * 20.0, "no_hitstop": true})
+				var left: Array = m.counted(r).filter(func(e): return e.alive)
+				if not left.is_empty() and absf(left[0].position.x - pl.position.x) > 3.0 * TILE:
+					pad = {"right": true} if left[0].position.x > pl.position.x else {"left": true}
+			_tick(w3, DT, pad)
+		if r["phase"] != "won":
+			print("  (left: %s, dropping %d)" % [m.counted(r).map(func(e): return "%s %s" % [e.kind, e.position / TILE]), (r["drops"] as Array).size()])
+		_check(r["phase"] == "won" and (r["door"] as Array).all(func(c): return w3.level.tile(c.x, c.y) == LevelData.AIR),
+				"3-3: and its doors open once its five and the Mourner's halves are down (%s)" % r["phase"])
+	await _done(w3)
 
 
 func _test_approach() -> void:

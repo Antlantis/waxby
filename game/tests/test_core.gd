@@ -1456,8 +1456,12 @@ func _test_dusk_teeth() -> void:
 				"%s: after a snuff every emptied spot's monster comes back (%d of %d)" % [id, back.size(), cells.size()])
 		# A respawned monster drops no embers when it dies; a chain stomp on
 		# one counts but pays nothing.
+		# (Rattles; a level with fewer than two, as Build 2's 3-1 with its one
+		# at the gate, makes up the pair with its Bonebows: stompable, and
+		# standing still on the floor as a Rattle does)
 		var rattles: Array = back.filter(func(e): return e.kind == "skeleton" and e.stompable)
-		_check(rattles.size() >= 2, "%s: Rattles came back to test with (%d)" % [id, rattles.size()])
+		rattles += back.filter(func(e): return e.kind == "bonebow" and e.stompable)
+		_check(rattles.size() >= 2, "%s: Rattles (or Bonebows) came back to test with (%d)" % [id, rattles.size()])
 		if rattles.size() < 2:
 			w.queue_free()
 			await process_frame
@@ -1465,14 +1469,14 @@ func _test_dusk_teeth() -> void:
 		var loose0 := _ember_pickups(w, "loose")
 		var once: Node2D = rattles[0]
 		w.deal(once, 1.0, {"flat": once.max_hp * 20.0, "no_hitstop": true})
-		_check(not once.alive and _ember_pickups(w, "loose") == loose0, "%s: a respawned Rattle pays no embers when it dies" % id)
+		_check(not once.alive and _ember_pickups(w, "loose") == loose0, "%s: a respawned %s pays no embers when it dies" % [id, once.kind])
 		var stompy: Node2D = rattles[1]
 		_look_at(w, stompy)
 		var pop0 := _ember_pickups(w, "pop")
 		w.chain = 1
 		var r := _drop_on(w, stompy)
 		_check(r["stomped"] and w.chain == 2 and _ember_pickups(w, "pop") == pop0,
-				"%s: stomping a respawned Rattle mid-chain counts (chain %d) but pays no chain embers (%d)" % [id, w.chain, _ember_pickups(w, "pop") - pop0])
+				"%s: stomping a respawned %s mid-chain counts (chain %d) but pays no chain embers (%d)" % [id, stompy.kind, w.chain, _ember_pickups(w, "pop") - pop0])
 		w.queue_free()
 		await process_frame
 
