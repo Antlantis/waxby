@@ -340,7 +340,7 @@ func show_hint(text: String) -> void:
 
 
 func toast(title: String, sub: String) -> void:
-	# A relic's "put it on your belt" toast: the relic card already says so.
+	# A relic's toast (where it goes on): the relic card already says so.
 	if not _last_relic.is_empty() and title == _last_relic["name"] and _t - float(_last_relic["t"]) < 1.0:
 		return
 	_push({"kind": "toast", "key": "toast:" + title + sub, "title": title, "sub": sub})
@@ -379,7 +379,22 @@ func sigil_found(index: int, got: Array) -> void:
 func relic_found(id: String) -> void:
 	var r: Dictionary = Relics.get_relic(id)
 	_last_relic = {"name": r["name"], "t": _t}
-	_cards.append({"kind": "relic", "id": id, "on": _game_equipped(id), "t": 0.0, "tap_left": 0.0})
+	var on := _game_equipped(id)
+	_cards.append({"kind": "relic", "id": id, "on": on, "altar": not on and _relic_ahead(), "t": 0.0, "tap_left": 0.0})
+
+
+func _relic_ahead() -> bool:
+	## A relic found with the belt full: whether a lit altar ahead will offer
+	## it (world.relic_ahead); else it goes on from the map's Sheet.
+	return world != null and world.has_method("relic_ahead") and bool(world.relic_ahead())
+
+
+static func relic_status(card: Dictionary) -> String:
+	## The relic card's line after its rarity: on the belt, offered at the
+	## next altar (the swap card, world.open_relic), or for the map's Sheet.
+	if bool(card.get("on", false)):
+		return "on your belt"
+	return "the next altar offers it" if bool(card.get("altar", false)) else "put it on from the map"
 
 
 func show_pickup(it: Dictionary, chips: Dictionary, where: String) -> void:
@@ -2167,7 +2182,7 @@ func _draw_relic_card(ci: Control, r: Rect2, a: float) -> void:
 		ci.draw_texture_rect(icon, Rect2(ic - Vector2(26, 26), Vector2(52, 52)), false, Color(1, 1, 1, a))
 	var x := r.position.x + 72.0
 	var w := r.end.x - x - 10.0
-	var head := ("%s relic · %s" % [Relics.RARITY_NAME[rel["rarity"]], "on your belt" if _card["on"] else "swap it on at an altar"]).to_upper()
+	var head := ("%s relic · %s" % [Relics.RARITY_NAME[rel["rarity"]], relic_status(_card)]).to_upper()
 	UI.text(ci, Vector2(x, r.position.y + 18.0), head, UI.fit_size(head, w, 10, 8, "body", 800), Color(col if _card["on"] else UI.MUTED, a), HORIZONTAL_ALIGNMENT_LEFT, w, "body", 800)
 	UI.text(ci, Vector2(x, r.position.y + 42.0), str(rel["name"]), UI.fit_size(str(rel["name"]), w, 21, 14, "title", 700), Color(col, a), HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700)
 	var lines := UI.wrap(str(rel["text"]), w, 12)

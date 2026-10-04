@@ -2483,7 +2483,7 @@ func _collect(p: Dictionary) -> void:
 			if hud:
 				hud.relic_found(id)
 				if not on:
-					hud.toast(r["name"], "Put it on your belt at an altar")
+					hud.toast(r["name"], relic_where())
 			bark("first_relic")
 		"item":
 			if _take_item(p["item"]) == "full":
@@ -2940,13 +2940,32 @@ func relic_block() -> String:
 	return ""
 
 
+func relic_ahead() -> bool:
+	## Whether a relic found now with the belt full will be offered on the
+	## swap card (open_relic): a player's story level (player_block) with an
+	## altar still to light, or one just lit still to ask (_rites_altar).
+	## Else it waits in the codex for the map's Sheet. (The HUD's relic card
+	## asks this too.)
+	if player_block() != "":
+		return false
+	return _rites_altar >= 0 or altars.any(func(a): return not bool(a.get("lit", false)))
+
+
+func relic_where() -> String:
+	## Where a relic found with the belt full goes on, for its toast: the
+	## next altar's swap card, or the map's Sheet.
+	return "The next altar offers it" if relic_ahead() else "In your codex · change your belt on the map"
+
+
 func open_relic() -> bool:
 	## A relic found with the belt full, at the next lit altar: it on one
 	## card and the weakest worn one (by rarity, then the first belted) on
 	## the other, and no button: a tap wears the new one in its place (the
-	## old one back in the codex, as any lit altar can change it) or keeps
-	## the belt. With a slot free by now (a level gained) it simply goes on.
-	## Then the next one waiting. False when nothing was asked.
+	## old one back in the codex) or keeps the belt. This card is the only
+	## way the belt changes in a level (the pause Sheet's Belt tab is only to
+	## look at); otherwise it changes on the map. With a slot free by now (a
+	## level gained) it simply goes on. Then the next one waiting. False when
+	## nothing was asked.
 	if relic_block() != "":
 		return false
 	var belt: Array = Game.hero().get("belt", [])

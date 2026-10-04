@@ -16,13 +16,17 @@ ring them again.
   - Sexton: Knell wisps and Toll the Dead, runs on Dirge; grave step.
 - **Levels and loot:** XP to level 30, skill points, gear with affixes and
   Legendaries, a relic codex with a belt of 2 to 4 slots, and the Chandler's
-  shop. A lit altar with a skill point waiting offers three skills (the Altar
+  shop. The belt changes between levels, on the map's Sheet; in a level its
+  tab is only to look at, and a found relic goes straight onto a free slot.
+  A lit altar with a skill point waiting offers three skills (the Altar
   Rites; again while points are left), then a relic found with the belt full
-  against the weakest worn one. A boss's first kill on a difficulty lets you
-  choose his prize: his signature Legendary or one or two others you don't
-  hold (the Boss Boons). Dusk kills drop half as often and never a Common; a
-  Legendary taken is worn over a piece that isn't one, and announced, and a
-  worn one is never swapped out by itself for a piece that isn't one.
+  against the weakest worn one (the one way the belt changes in a level;
+  found after the last altar, or in a mode, it waits in the codex for the
+  map). A boss's first kill on a difficulty lets you choose his prize: his
+  signature Legendary or one or two others you don't hold (the Boss Boons).
+  Dusk kills drop half as often and never a Common; a Legendary taken is worn
+  over a piece that isn't one, and announced, and a worn one is never swapped
+  out by itself for a piece that isn't one.
 - **Four worlds of four levels** so far (v3 builds toward six), each ending
   in a boss:
   - World 1, the Sunken Cathedral: the Nave, the Crypt Stair, the Burning

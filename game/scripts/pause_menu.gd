@@ -1,10 +1,11 @@
 extends CanvasLayer
 ## The pause sheet over a level: Resume, the Sheet (the hero's stats, skills,
-## gear and belt; the belt only changes by a lit altar), Settings, Restart and
-## Leave, the sound / music / buzz switches, and on the right who's playing
-## and the relics on the belt. Settings take effect at once where they can
-## (numbers, shake, button size, brightness); candle strength from the next
-## level in.
+## gear and belt; the belt only to look at: it changes between levels, on the
+## map's Sheet, and a lit altar offers a relic found with it full, world.gd
+## open_relic), Settings, Restart and Leave, the sound / music / buzz
+## switches, and on the right who's playing and the relics on the belt.
+## Settings take effect at once where they can (numbers, shake, button size,
+## brightness); candle strength from the next level in.
 ##
 ## v3: in a mode (world.mode), its pause_items() ([{label, cb, confirm}])
 ## take the place of Restart and Leave ("Rest here", "Leave the Descent",
@@ -15,7 +16,6 @@ const UI := preload("res://scripts/ui.gd")
 const Relics := preload("res://scripts/relics.gd")
 const Classes := preload("res://scripts/classes.gd")
 const SheetScript := preload("res://scripts/hero_screen.gd")
-const ALTAR_REACH := 44.0         # this close to a lit altar, the belt can change
 
 # key, label, [values], [names], note
 const SETTINGS := [
@@ -213,29 +213,16 @@ func show_page(p: String) -> void:
 	_place()
 
 
-func near_lit_altar() -> bool:
-	## Standing by a lit altar: the belt can change from here.
-	if world == null or world.get("player") == null:
-		return false
-	var altars = world.get("altars")
-	if not (altars is Array):
-		return false
-	for a in altars:
-		if a.get("lit", false) and (a["pos"] as Vector2).distance_to(world.player.position) <= ALTAR_REACH:
-			return true
-	return false
-
-
 func open_sheet() -> void:
 	## The Sheet over the paused level; changes go straight onto Waxby. It
-	## opens on Skills while a skill point waits.
+	## opens on Skills while a skill point waits. Over a level its Belt tab
+	## is only to look at (belt_panel.editable: the hero_screen's over_level).
 	show_page("sheet")
 	_sheet = SheetScript.new()
 	var g := _game()
 	if g != null and int(g.hero().get("points", 0)) > 0:
 		_sheet.tab = "skills"
 	_sheet.over_level = true
-	_sheet.belt_editable = near_lit_altar()
 	_sheet.back.connect(func(): show_page("main"))
 	_sheet.changed.connect(func():
 		if world and world.has_method("apply_hero"):
@@ -496,8 +483,6 @@ func _draw_card(ci: Control) -> void:
 	var y := R.position.y + 98.0
 	var belt: Array = g.belt()
 	UI.text(ci, Vector2(R.position.x + 16.0, y), ("Belt · %d of %d" % [belt.size(), g.belt_slots()]).to_upper(), 10, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 800)
-	if near_lit_altar():
-		UI.text(ci, Vector2(R.position.x, y), "By a lit altar: change it in the Sheet", 10, UI.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, R.size.x - 16.0, "body", 700)
 	y += 10.0
 	if belt.is_empty():
 		UI.text(ci, Vector2(R.position.x + 16.0, y + 22.0), "No relics yet. Gold reliquaries hold them;", 13, UI.MUTED)

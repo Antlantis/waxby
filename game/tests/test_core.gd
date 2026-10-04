@@ -3245,7 +3245,11 @@ func _test_relic_altar() -> void:
 	## free slot) waits for the next lit altar, where a player's World offers
 	## it against the weakest worn one (open_relic: two cards, no button,
 	## after any Rites): the new one tapped goes on in its place, the worn
-	## one keeps the belt. Never headless or for the bot (relic_block).
+	## one keeps the belt. Never headless or for the bot (relic_block). This
+	## card is the one way the belt changes in a level (the pause Sheet's
+	## Belt tab is only to look at: test_screens' belt_in_level), so its
+	## toast says the next altar offers it while one is still to light, and
+	## else (every altar lit, or a mode) that the map's Sheet puts it on.
 	var w := _world_as("1-1", "knight", ["tallow_heart", "phoenix_wick"])
 	await process_frame
 	w.set_physics_process(false)
@@ -3264,6 +3268,16 @@ func _test_relic_altar() -> void:
 	_check(w.relic_block() == "autoplay", "nor for the bot (%s)" % w.relic_block())
 	w.autoplay = false
 	_check(w.relic_block() == "" and w.rites_block() == "no points", "a player's World: the next altar may offer it (%s)" % w.relic_block())
+	_check(w.relic_ahead() and w.relic_where() == "The next altar offers it", "an altar still to light: the toast says it offers the relic (%s)" % w.relic_where())
+	var lit0: Array = w.altars.map(func(x): return bool(x["lit"]))
+	for x in w.altars:
+		x["lit"] = true
+	_check(not w.relic_ahead() and w.relic_where().contains("on the map"), "every altar lit: it waits for the map's Sheet (%s)" % w.relic_where())
+	for i in w.altars.size():
+		w.altars[i]["lit"] = lit0[i]
+	w.mode = RefCounted.new()
+	_check(not w.relic_ahead() and w.relic_block() == "mode", "in a mode no altar offers it: the map's Sheet (%s)" % w.relic_block())
+	w.mode = null
 	for e in w.enemies:
 		e.active = false
 	var a: Dictionary = w.altars[0]
@@ -3283,6 +3297,9 @@ func _test_relic_altar() -> void:
 			"the new one tapped: on the belt in its place (%s)" % [h["belt"]])
 	_check(bool(w.player.double_jump), "and felt at once (the Rook Feather's jump)")
 	found.call("wind_wick")
+	var ww := str(Relics.get_relic("wind_wick")["name"])
+	_check(hud.said.has(["relic_found", "wind_wick"]) and hud.said.has(["toast", ww, w.relic_where()]) and not w.relic_where().contains("at an altar"),
+			"found with the belt full again: its toast says where it goes on (%s)" % w.relic_where())
 	_check(w.open_relic() and w.choice.is_open() and str(w.choice.offers[1]["id"]) == "rook_feather", "the next: against the Blessed now the weakest")
 	w.choice.choose(1)
 	_check(h["belt"] == ["rook_feather", "phoenix_wick"] and not w.choice.is_open() and w._relic_wait.is_empty(), "the worn one tapped: the belt stays")
@@ -3306,7 +3323,7 @@ func power_card(it) -> void:
 func level_up(n: int) -> void:
 	said.append(["level_up", n])
 func toast(t: String, s: String) -> void:
-	pass
+	said.append(["toast", t, s])
 func show_hint(t: String) -> void:
 	pass
 func bark(k: String) -> void:

@@ -1,9 +1,11 @@
 extends Control
 ## The Sheet: the hero's numbers, skill tree, gear and relic belt, one tab
 ## each (stats_panel, skills_panel, gear_panel, belt_panel). From the map
-## everything is editable; from pause the belt is only while Waxby stands by
-## a lit altar (belt_editable). Emits changed whenever the hero changes (so
-## a level in progress can re-apply the hero) and back when closed.
+## everything is editable; over a paused level (over_level) the belt is only
+## to look at: it changes between levels, here on the map, and in a level a
+## relic found with it full is offered at the next lit altar (world.gd
+## open_relic). Emits changed whenever the hero changes (so a level in
+## progress can re-apply the hero) and back when closed.
 ## v3: a fifth tab, Look (the modes' look_panel.gd: flames and trims), shows
 ## once that panel is in the build. At level 30, with one capstone owned, the
 ## Skills tab plays the bark second_capstone over the Sheet, once a save.
@@ -31,8 +33,7 @@ const BARK_TIME := 6.0            # the bark over the Sheet: in, held, out (a ta
 const BARK_FALLBACK := {"who": "hollin", "mood": "relit", "text": "Two flames on one wick! Mother never managed that. Don't tell her."}
 
 var tab := "stats"
-var belt_editable := true
-var over_level := false           # drawn over a paused level: a darker, see-through backdrop
+var over_level := false           # over a paused level: a darker, see-through backdrop, the belt locked
 var panel: Control                # the open tab's panel
 var _tabs := {}                   # name -> Button
 var _back_btn: Button

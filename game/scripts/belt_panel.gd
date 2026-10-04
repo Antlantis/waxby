@@ -2,9 +2,13 @@ extends Control
 ## The Sheet's Belt tab: the relics Waxby carries (2 / 3 / 4 slots at level
 ## 1 / 5 / 10, and v3's fifth at 24 once Progression opens it) and, below,
 ## the codex of every relic (two rows: of six for v2's twelve, wider for
-## v3's twenty): the found ones lit, the rest dark. When the belt can be changed (on the map, or by a lit altar):
-## tap a relic on the belt to take it off, tap one in the codex to put it on
-## (into the chosen slot, else the first free one). Any tap shows the relic.
+## v3's twenty): the found ones lit, the rest dark. On the map's Sheet the
+## belt can be changed: tap a relic on the belt to take it off, tap one in
+## the codex to put it on (into the chosen slot, else the first free one).
+## Over a paused level (the host's over_level) it is only to look at: the
+## belt changes between levels, and in a level a relic found with it full is
+## offered at the next lit altar (world.gd open_relic). Any tap shows the
+## relic.
 
 const UI := preload("res://scripts/ui.gd")
 const Relics := preload("res://scripts/relics.gd")
@@ -30,7 +34,8 @@ func _game() -> Node:
 
 
 func editable() -> bool:
-	return host == null or bool(host.get("belt_editable"))
+	## On the map, yes; over a paused level, never (not even by a lit altar).
+	return host == null or not bool(host.get("over_level"))
 
 
 func belt() -> Array:
@@ -167,6 +172,14 @@ func _process(dt: float) -> void:
 	queue_redraw()
 
 
+func note_text() -> String:
+	## The line beside the belt's heading: how to change it here, or (over a
+	## level) where it changes and what a lit altar does.
+	if editable():
+		return "Tap a relic to take it off or put it on."
+	return "Change your belt on the map. With it full, a lit altar offers a relic you find."
+
+
 func _draw() -> void:
 	var g := _game()
 	var b := belt()
@@ -174,9 +187,10 @@ func _draw() -> void:
 	var ed := editable()
 	var head := "Your belt · %d of %d" % [b.size(), n]
 	UI.text(self, Vector2(8.0, 16.0), head.to_upper(), 11, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 800)
-	var note := "Tap a relic to take it off or put it on." if ed else "Change your belt on the map, or by a lit altar."
+	var note := note_text()
 	var shake := sin(_t * 60.0) * 5.0 * _deny
-	UI.text(self, Vector2(shake, 16.0), note, 12, UI.MUTED.lerp(UI.BAD, _deny) if ed else UI.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, size.x - 8.0)
+	var nw := size.x - 16.0 - UI.text_width(head.to_upper(), 11, "body", 800) - 16.0
+	UI.text(self, Vector2(shake, 16.0), note, UI.fit_size(note, nw, 12, 10), UI.MUTED.lerp(UI.BAD, _deny) if ed else UI.GOLD, HORIZONTAL_ALIGNMENT_RIGHT, size.x - 8.0)
 	var S := slot_rects()
 	for i in S.size():
 		_slot(S[i], i, b, n)

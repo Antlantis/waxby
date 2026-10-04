@@ -882,12 +882,19 @@ func _test_message_slot() -> void:
 	hud._title = {}
 	hud._process(0.1)
 	_check(hud._msg.get("title", "") == "Held" and hud._hint_on, "then the message takes the hint's place")
-	# A relic's card swallows the matching "put it on your belt" toast.
+	# A relic's card swallows the matching toast (where it goes on).
 	hud._msgs.clear()
 	hud._msg = {}
 	hud.relic_found("rook_feather")
-	hud.toast("Rook Feather", "Put it on your belt at an altar")
+	hud.toast("Rook Feather", "The next altar offers it")
 	_check(hud._msgs.is_empty() and hud._cards.size() == 1, "the relic card, not a toast too")
+	# The card says where a relic found with the belt full goes on: the next
+	# altar's swap card (world.relic_ahead), else the map's Sheet.
+	var st: Array = [HudScript.relic_status({"on": true}), HudScript.relic_status({"on": false, "altar": true}),
+			HudScript.relic_status({"on": false, "altar": false})]
+	_check(st[0] == "on your belt" and st[1] == "the next altar offers it" and st[2].contains("map"),
+			"the relic card: on the belt, the next altar offers it, or put on from the map (%s)" % [st])
+	_check(not bool(hud._cards[0].get("altar", true)), "a World that can't say (no relic_ahead): the map, never a promise of an altar")
 	w.queue_free()
 	await _frames(2)
 
@@ -2363,17 +2370,24 @@ func _test_belt() -> void:
 	for id in ["tallow_heart", "rook_feather", "moth_charm", "bellows"]:
 		game.grant_relic(id)
 	var h = load("res://scripts/hero_screen.gd").new()
-	h.belt_editable = false
+	h.over_level = true
 	root.add_child(h)
 	h.open_tab("belt")
 	await _frames(2)
 	var p = h.panel
 	var before: Array = game.belt().duplicate()
 	_check(before.size() == 3, "level 5: three slots, filled from the codex (%s)" % [before])
+	_check(not p.editable(), "over a level the belt is only to look at")
 	p.tap_relic(before[0])
-	_check(game.belt() == before, "away from an altar the belt can't change")
+	p.tap_relic("bellows")
+	p.tap_slot(0)
+	_check(game.belt() == before, "over a level the belt can't change: a worn one stays, a found one doesn't go on")
 	_check(p.shown == before[0], "but the relic is shown")
-	h.belt_editable = true
+	var note: String = p.note_text()
+	_check(note.contains("on the map") and note.contains("altar"), "its line: change it on the map, and a lit altar offers a found relic (%s)" % note)
+	_check(UI.text_width(note, 10) <= p.size.x - 150.0, "the line fits beside the heading (%.0f px at 12, of %.0f)" % [UI.text_width(note, 12), p.size.x])
+	h.over_level = false
+	_check(p.editable() and p.note_text().begins_with("Tap a relic"), "on the map (no level under it) the belt can change")
 	p.tap_relic(before[0])
 	_check(not game.belt().has(before[0]), "tapping a worn relic takes it off")
 	p.tap_relic("bellows")
@@ -2673,10 +2687,9 @@ func _test_pause() -> void:
 	for kv in [["numbers", "on"], ["button_scale", 1.0], ["shake", 1.0], ["candle_strength", "normal"], ["auto_equip", true]]:
 		pm.set_value(kv[0], kv[1])
 	pm.show_page("main")
-	_check(not pm.near_lit_altar(), "away from an altar")
 	pm.open_sheet()
 	await _frames(2)
-	_check(pm._sheet != null and not pm._sheet.belt_editable, "the Sheet opens from pause, the belt locked away from an altar")
+	_check(pm._sheet != null and pm._sheet.over_level, "the Sheet opens from pause, over the level")
 	_check(int(game.hero()["points"]) > 0 and pm._sheet.tab == "skills", "with a skill point waiting, on Skills (%s)" % pm._sheet.tab)
 	pm._sheet.back.emit()
 	await _frames(1)
@@ -2698,15 +2711,63 @@ func _test_pause() -> void:
 	_check(str(mn.current.tab) == "stats", "and on Stats with none")
 	game.hero()["points"] = pts
 	mn.free()
-	if w.altars.size() > 0:
-		w.altars[0]["lit"] = true
-		w.player.position = w.altars[0]["pos"]
-		_check(pm.near_lit_altar(), "by a lit altar the belt can change")
+	await _belt_in_level(w, pm)
 	pm.close()
 	await _frames(1)
 	_check(not w.paused and hud.visible and touch.visible_controls, "closing brings everything back")
 	w.queue_free()
 	await _frames(2)
+
+
+func _belt_in_level(w: Node, pm: Node) -> void:
+	## The belt changes only between levels, from the map's Sheet: over a
+	## paused level its tab is only to look at, even with Waxby standing by a
+	## lit altar (that altar offers a relic found with the belt full on its
+	## swap card, world.open_relic: test_core's relic_altar). The map's
+	## Sheet changes it.
+	for id in ["tallow_heart", "rook_feather", "moth_charm"]:
+		game.grant_relic(id)
+	var worn: Array = game.belt().duplicate()
+	_check(worn.size() == game.belt_slots() and not worn.has("moth_charm"), "(the belt full, one found off it: %s)" % [worn])
+	_check(w.altars.size() > 0, "(1-1 has an altar)")
+	if w.altars.is_empty():
+		return
+	w.altars[0]["lit"] = true
+	w.player.position = w.altars[0]["pos"]
+	_check(not pm.has_method("near_lit_altar"), "the pause sheet has no altar route to the belt")
+	pm.open_sheet()
+	await _frames(2)
+	pm._sheet.open_tab("belt")
+	await _frames(2)
+	var bp = pm._sheet.panel
+	_check(not bp.editable(), "by a lit altar, the pause Sheet's belt is still only to look at")
+	bp.tap_relic(worn[0])
+	bp.tap_relic("moth_charm")
+	bp.tap_slot(0)
+	_check(game.belt() == worn, "a tap on the belt or the codex changes nothing (%s)" % [game.belt()])
+	_check(bp.shown == worn[0], "but shows the relic")
+	_check(bp.note_text().contains("on the map"), "its line sends him to the map (%s)" % bp.note_text())
+	pm._sheet.back.emit()
+	await _frames(1)
+	# The map's Sheet (main.show_sheet): the belt can change there.
+	var mn = load("res://scripts/main.gd").new()
+	mn.show_sheet()
+	var ms = mn.current
+	_check(ms != null and not bool(ms.over_level), "the map's Sheet is over no level")
+	mn.remove_child(ms)
+	root.add_child(ms)
+	ms.open_tab("belt")
+	await _frames(2)
+	var mp = ms.panel
+	_check(mp.editable(), "the map's Sheet: the belt can change")
+	mp.tap_relic(worn[0])
+	_check(not game.belt().has(worn[0]), "a tap takes a worn relic off")
+	mp.tap_relic("moth_charm")
+	_check(game.belt().has("moth_charm"), "and one from the codex goes on")
+	game.set_belt(worn)
+	ms.queue_free()
+	mn.free()
+	await _frames(1)
 
 
 func _test_results() -> void:

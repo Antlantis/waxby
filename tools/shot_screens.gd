@@ -360,6 +360,10 @@ func _set_pause() -> void:
 	w.pause_menu.open_sheet()
 	await _wait(0.167)
 	await _shot("pause_sheet")
+	# The Belt tab over a level: only to look at (it changes on the map).
+	w.pause_menu._sheet.open_tab("belt")
+	await _wait(0.167)
+	await _shot("pause_sheet_belt")
 	await _clear()
 
 
