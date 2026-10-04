@@ -238,11 +238,20 @@ func _test_labs() -> void:
 # ---------------------------------------------------------------- today's levels
 
 func _test_unchanged() -> void:
+	## Every level not yet re-cut carries no twist; one re-cut in Build 2 (it
+	## declares its roles:) carries the twist and lesson its header names, and
+	## nothing else (_test_recut).
 	var ids := []
+	var recut := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if f.ends_with(".txt") and not f.begins_with("lab-"):
-			ids.append(f.get_basename())
+			if LevelData.load_file("res://levels/" + f).headers.has("roles"):
+				recut.append(f.get_basename())
+			else:
+				ids.append(f.get_basename())
 	ids.sort()
+	recut.sort()
+	await _test_recut(recut)
 	var bare := true
 	for id in ids:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
@@ -250,7 +259,7 @@ func _test_unchanged() -> void:
 			if lv.headers.has(k):
 				bare = false
 				print("  %s has a %s header" % [id, k])
-	_check(bare and ids.size() >= 30, "no level on the path or secret carries a twist, lesson or belt_flip header yet (%d levels)" % ids.size())
+	_check(bare and ids.size() + recut.size() >= 30, "no level on the path or secret not re-cut carries a twist, lesson or belt_flip header (%d levels, %d re-cut)" % [ids.size(), recut.size()])
 	var same := 0
 	for id in ids:
 		var w := _world(LevelData.load_file("res://levels/%s.txt" % id))
@@ -276,6 +285,28 @@ func _test_unchanged() -> void:
 	_check(w.twist_id() == "" and not w.twist("dark") and w.title_sub() == "3-9" and w.twist_heal() == 1.0, "in a mode the twist is off: no rule, no card")
 	w.mode = null
 	await _done(w)
+
+
+func _test_recut(ids: Array) -> void:
+	## A re-cut level's World carries the twist its header names (its rule on,
+	## every other off; its card's title line), or none, and its lesson card;
+	## no belt_flip outside World 4.
+	for id in ids:
+		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		var tid := Twists.id_in(lv)
+		_check(str(lv.headers.get("twist", "")).strip_edges() == tid, "%s: its twist header names a twist (%s)" % [id, tid])
+		var w := _world(lv)
+		await process_frame
+		var rule := Twists.rule_of(tid)
+		var ok: bool = w.twist_id() == tid
+		for r in ["restless", "dark", "omens", "dry", "packs", "toll", "lamplit"]:
+			ok = ok and w.twist(r) == (r == rule)
+		var c := Twists.card_of(tid, int(lv.world), id)
+		ok = ok and w.title_sub() == (lv.subtitle if c.is_empty() else "%s · %s" % [lv.subtitle, c[0]])
+		ok = ok and w.twist_cards().size() == int(not c.is_empty()) + int(not Twists.lesson_in(lv).is_empty())
+		ok = ok and (int(lv.world) == 4 or not lv.headers.has("belt_flip"))
+		_check(ok, "%s (re-cut): its World carries twist '%s' (rule '%s'), its cards %s and nothing else" % [id, tid, rule, w.twist_cards()])
+		await _done(w)
 
 
 # ---------------------------------------------------------------- the cards

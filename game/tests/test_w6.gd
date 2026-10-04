@@ -252,7 +252,14 @@ func _test_monsters_settle(id: String) -> void:
 		# The boss's X spawns its boss once its script is in (the Hush, BB's).
 		if str(e["kind"]) == "boss" and w.boss != null:
 			placed += 1
-	_check(w.enemies.size() == placed, "%s: every placed monster spawns (%d of %d)" % [id, w.enemies.size(), placed])
+	# (A sealed room's monsters, 6-3's nave ambush, are out of the World's
+	# list till its doors shut: features/sealed.gd holds them.)
+	var held := 0
+	var sealed = w.features.module("sealed") if w.features != null else null
+	if sealed != null:
+		for r in sealed.rooms:
+			held += (r["specs"] as Array).size()
+	_check(w.enemies.size() + held == placed, "%s: every placed monster spawns (%d of %d, %d held by its sealed rooms)" % [id, w.enemies.size() + held, placed, held])
 	# Park Wick at the start so nothing is woken by him; wake them all.
 	for e in w.enemies:
 		e.active = true

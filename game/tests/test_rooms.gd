@@ -3,8 +3,8 @@ extends SceneTree
 ## `room:`; tools/levels/common.py rooms_header and check_rooms; the lab,
 ## tools/levels/lab_rooms.py's lab-rooms):
 ## - the header reads (its kinds, columns, rows, a clock, a named foe; a part
-##   that doesn't read is left out), and no level on the path or a secret one
-##   has a room yet: their Worlds keep every monster in play and in spawns;
+##   that doesn't read is left out), and a level on the path with no room:
+##   header (one not re-cut yet) keeps every monster in play and in spawns;
 ## - a duel: its Dread asleep at his post (out of the World's list), the
 ##   doors open at the altar; in, they grind SEAL_TELL s (out again in time
 ##   and they stay open), then shut at both ends; he wakes with his title
@@ -266,11 +266,13 @@ func _test_rules() -> void:
 	## room_problems, common.py check_rooms as it writes): a monster in each,
 	## a way in at an end, doorways of air or stone that never opens, no
 	## monster within DOOR_CLEAR columns of a door, an altar within
-	## ALTAR_REACH tiles before its door. Only labs have any yet (this one;
-	## lab-shapes and lab-mirror's, each met by its right door, and
-	## lab-shape-mirror's and lab-shape-decks', test_shaped.gd's: Build 2's
-	## shapes).
+	## ALTAR_REACH tiles before its door. Only labs (this one; lab-shapes and
+	## lab-mirror's, each met by its right door, and lab-shape-mirror's and
+	## lab-shape-decks', test_shaped.gd's: Build 2's shapes) and the levels
+	## re-cut in Build 2 (they declare their roles:; 6-3's nave ambush) have
+	## any.
 	var with_rooms := []
+	var recut := []      # (levels re-cut in Build 2: they declare their roles:)
 	for f in DirAccess.get_files_at("res://levels"):
 		if not f.ends_with(".txt"):
 			continue
@@ -278,10 +280,12 @@ func _test_rules() -> void:
 		if str(lv.headers.get("room", "")) == "":
 			continue
 		with_rooms.append(str(lv.id))
+		if str(lv.headers.get("roles", "")) != "":
+			recut.append(str(lv.id))
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-")),
-			"only labs have rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-") or recut.has(id)),
+			"only labs and re-cut levels have rooms (a level's come with its redesign): %s" % [with_rooms])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.
@@ -303,6 +307,8 @@ func _test_absent() -> void:
 	## No header, nothing changes: a level's monsters stay in the World's
 	## list, seen, and in its spawns.
 	for id in ["1-3", "3-3", "4-3", "5-3", "6-3"]:
+		if str(LevelData.load_file("res://levels/%s.txt" % id).headers.get("room", "")) != "":
+			continue   # (re-cut with its room since Build 2's redraw: _test_rules holds it)
 		var w := _world(id)
 		await process_frame
 		var n0: int = w.enemies.size()
