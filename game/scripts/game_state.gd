@@ -63,7 +63,13 @@ extends Node
 ## from 18), the relic shelf (3, 4 from 23; only worlds reached) and Waxley's
 ## Reserve (a Legendary, from 23, restocked when a boss falls). Fresh stock
 ## (buy_fresh) restocks the wares at once for half a Rare's price at the
-## hero's level, doubling with each use until the next bell. The Draughts
+## hero's level, doubling with each use until the next bell. A stock is
+## stamped with its bell and row (wares_seed) and its picks (wares_picks), so
+## a Build 3 stock (one pick) is made again once; a ware he already wears or
+## carries is never stocked again (no uid sold twice). The Shop's ▲
+## (shop_badge) is for a stock the Buy tab hasn't shown (wares_seen), and
+## like a purchase never puts a plain piece on over a worn Legendary
+## (worn_legend_kept). The Draughts
 ## tab: Mother Yarrow's Second Draught (a gift), the Rich Draught (after the
 ## Tinker, 1,600 embers) and Rekindle (from World 5: a Legendary re-made at
 ## the hero's level).
@@ -72,9 +78,14 @@ extends Node
 ## Items.sell_value, a quarter of his price (sell_item, sell_marked). A piece
 ## sold can be bought back for what it fetched (buy_back) until the shop
 ## forgets its sales (forget_sold, as it opens and closes); that list is
-## never saved. A find sold on touch (add_item, "Sell weaker finds") or for
-## room pays the same price but isn't one of those sales: its pickup card's
-## tap (keep_sold) is its only undo, so the Sell tab never shows its ghost.
+## never saved. A find sold on touch (add_item, "Sell weaker finds": on
+## Dusk's story levels a piece no better than what's worn, anywhere a
+## Common) or for room, and the piece a find worn there replaced
+## (sell_replaced), pay the same price but aren't those sales: the pickup
+## card's tap (keep_sold) is the only undo, so the Sell tab never shows
+## their ghosts. A mode's reward is never sold (mode.gd satchel_add). Build
+## 3's "Auto-salvage Commons" Off carries over as "Sell weaker finds" Off
+## (reload_settings).
 
 const Relics := preload("res://scripts/relics.gd")
 const Hero := preload("res://scripts/hero.gd")
@@ -209,6 +220,7 @@ var _rng := RandomNumberGenerator.new()
 var _settings := {}        # settings.json as last read (setting() is asked every tick)
 var _settings_from := ""   # the path _settings came from
 var last_melt := {}        # what the last equip() melted for room: {for (the worn uid), item, embers, old}
+var last_replaced := {}    # what the last sell_replaced sold: {for (the worn uid), item, embers}
 var slot_base := "user://save"   # slot 1 is <base>.json, slot n <base>_n.json (tests and autoplay move it)
 var _disk := ""            # the save as last read or written ("" if none): what _flush compares with
 var _main_ok := false      # save_path holds a whole save (read or written): a save backs it up as .bak
@@ -733,6 +745,9 @@ func _clean_hero(cls: String, src: Dictionary) -> Dictionary:
 	h["points"] = maxi(int(_num(src.get("points", 0))), 0)
 	h["vigil"] = maxi(int(_num(src.get("vigil", 0))), 0)
 	h["wares_seed"] = maxi(int(_num(src.get("wares_seed", 0))), 0)
+	for k in ["wares_picks", "wares_seen"]:
+		if src.has(k):
+			h[k] = int(_num(src[k]))   # the picks its stock was made with (wares); the stock the Buy tab showed (wares_seen)
 	h["deepest"] = maxi(int(_num(src.get("deepest", 0))), 0)
 	var lk = src.get("look", {})
 	for k in LOOK_KEYS:
@@ -1192,6 +1207,10 @@ func reload_settings() -> void:
 	## way than set_setting.
 	_settings = SettingsLib.read(settings_path)
 	_settings_from = settings_path
+	# Build 3's "Auto-salvage Commons" turned Off (keep every find) carries
+	# over as "Sell weaker finds" Off, written once.
+	if not _settings.has("auto_sell") and _settings.get("auto_salvage") is bool and not bool(_settings["auto_salvage"]):
+		set_setting("auto_sell", false)
 
 
 var haptics: bool:
@@ -1716,17 +1735,20 @@ func _pay(n: int) -> void:
 
 # ---------------------------------------------------------------- gear
 
-func add_item(it: Dictionary, find := false) -> String:
+func add_item(it: Dictionary, find := false, weaker := true) -> String:
 	## A picked-up item that isn't being worn: "satchel", "sold" or "full".
 	## A find (world.gd _take_item: one Waxby touched) sells at once for its
 	## price (Items.sell_value) when "Sell weaker finds" is on (auto_sell)
-	## and it adds nothing: no Legendary, both chips at or below zero against
-	## what's worn in its slot, or a Common (what the old auto-salvage
-	## melted); its card's tap keeps it (keep_sold). With the satchel full
-	## (spec 4.4), anything no better than what's worn sells too, whatever
-	## the setting; an item that would be better, a Legendary, or one for an
-	## empty slot is left: "full" (it stays on the ground with its beam). A
-	## borrowed hero takes nothing ("full"). A Legendary joins legends_found.
+	## and it's a Common (what the old auto-salvage melted) or, with weaker
+	## (a find on Dusk's story levels: world.trophies()), it adds nothing: no
+	## Legendary, both chips at or below zero against what's worn in its
+	## slot. Elsewhere (Nightfall, Witching, a mode) a weaker Blessed or Rare
+	## goes to the satchel, as in Build 3. Its card's tap keeps it
+	## (keep_sold). With the satchel full (spec 4.4), anything no better than
+	## what's worn sells too, whatever the setting; an item that would be
+	## better, a Legendary, or one for an empty slot is left: "full" (it
+	## stays on the ground with its beam). A borrowed hero takes nothing
+	## ("full"). A Legendary joins legends_found.
 	var h := hero()
 	if not _borrowed.is_empty():
 		return "full"
@@ -1734,7 +1756,7 @@ func add_item(it: Dictionary, find := false) -> String:
 	var full := (h["satchel"] as Array).size() >= SATCHEL_MAX
 	var sell := full and weaker_find(it)
 	if not sell and find and bool(setting("auto_sell")):
-		sell = weaker_find(it) or str(it.get("rarity", "")) == "common"
+		sell = str(it.get("rarity", "")) == "common" or (weaker and weaker_find(it))
 	if sell:
 		add_embers(Items.sell_value(it))
 		_prize_taken(it)
@@ -1771,6 +1793,28 @@ func keep_sold(it: Dictionary) -> bool:
 	return true
 
 
+func sell_replaced(it: Dictionary, old) -> int:
+	## A find just worn by auto-equip on Dusk's story levels (world.gd
+	## _take_item) with "Sell weaker finds" on: the piece it replaced, in the
+	## satchel now and no better than it (weaker_find, so never a Legendary),
+	## sells there and then for its price, as a weaker find would (one rule
+	## for both). Not one of the shop's sales: the pickup card's tap undoes it
+	## (keep_sold puts it back, then it's worn again). The embers, or 0;
+	## last_replaced says what was sold, for the card.
+	var h := hero()
+	last_replaced = {}
+	if not (old is Dictionary) or not _borrowed.is_empty() or not bool(setting("auto_sell")):
+		return 0
+	if not _in_satchel(h, old) or not weaker_find(old) or str(it.get("uid", "")) == str(old.get("uid", "-")):
+		return 0
+	var v := Items.sell_value(old)
+	_take_from_satchel(h, old)
+	add_embers(v)
+	last_replaced = {"for": str(it.get("uid", "")), "item": old, "embers": v}
+	save()
+	return v
+
+
 func equip(it: Dictionary):
 	## Wears an item (from the satchel or new); what it replaces goes to the
 	## satchel. A new item worn with the satchel full leaves no room for it,
@@ -1785,6 +1829,7 @@ func equip(it: Dictionary):
 	var old = h["equip"].get(slot)
 	var victim := melt_on_equip(it)
 	last_melt = {}
+	last_replaced = {}
 	h["equip"][slot] = it
 	_take_from_satchel(h, it)
 	if old != null:
@@ -1831,11 +1876,14 @@ func _in_satchel(h: Dictionary, it: Dictionary) -> bool:
 
 
 func _take_from_satchel(h: Dictionary, it: Dictionary) -> void:
+	## Takes one piece out: it (the last with its uid). Two pieces sharing a
+	## uid (which nothing should make) never both go for one sale or swap.
 	var uid: String = it.get("uid", "-")
 	for i in range((h["satchel"] as Array).size() - 1, -1, -1):
 		var o = h["satchel"][i]
 		if o is Dictionary and (o.get("uid", "") == uid or o == it):
 			h["satchel"].remove_at(i)
+			return
 
 
 func sell_item(it: Dictionary) -> int:
@@ -1932,6 +1980,8 @@ func sell_look(it: Dictionary, h: Dictionary = {}) -> Dictionary:
 	## marked: whether it starts marked to sell: not a Legendary, something
 	## worn there, and DMG + LIFE at or below zero (the sum Waxley's "For your
 	## <slot>" picks rank by), so a trade-off that adds up to nothing goes too.
+	## A plain piece with better numbers than a worn Legendary is a "trade"
+	## (its power would go), with legend: that Legendary's name.
 	var hh := h if not h.is_empty() else hero()
 	var out := {"price": Items.sell_value(it), "chips": {"dmg": 0.0, "life": 0.0}, "mark": "open", "marked": false}
 	var slot := str(it.get("slot", ""))
@@ -1943,6 +1993,12 @@ func sell_look(it: Dictionary, h: Dictionary = {}) -> Dictionary:
 		out["chips"] = chips
 		out["mark"] = "worse" if d <= 0.0 and l <= 0.0 else ("better" if Hero.is_upgrade(chips) else "trade")
 		out["marked"] = d + l <= 0.0
+		# Better numbers than a worn Legendary still lose its power (nothing
+		# in the chips): a trade-off, never an upgrade (worn_legend_kept).
+		var leg := worn_legend_kept(it, hh)
+		if out["mark"] == "better" and not leg.is_empty():
+			out["mark"] = "trade"
+			out["legend"] = str(leg.get("name", ""))
 	if str(it.get("rarity", "")) == "legendary":
 		out["mark"] = "legendary"
 		out["marked"] = false
@@ -2002,11 +2058,19 @@ func wares() -> Array:
 	## the picks Rares from 18; from 28, 1 Blessed, 3 Rares and the two picks.
 	## The last WEAK_PICKS are always the picks (weakest first). null where
 	## one was bought. Restocks after every bell rung (and when a new depth
-	## changes the row), or at once for embers (buy_fresh).
+	## changes the row), or at once for embers (buy_fresh); and once for a
+	## stock made before the second pick (Build 3's: "wares_picks" missing),
+	## whatever its size, so its last two are both picks.
 	var h := hero()
-	if int(h["wares_seed"]) != _wares_mark(h) or (h["wares"] as Array).size() != ware_count(h):
+	if not _stock_current(h):
 		_restock(h)
 	return h["wares"]
+
+
+func _stock_current(h: Dictionary) -> bool:
+	## The stock is this bell's, for this row, and of this build's shape.
+	return int(h["wares_seed"]) == _wares_mark(h) and (h["wares"] as Array).size() == ware_count(h) \
+			and int(_num(h.get("wares_picks", 1))) == WEAK_PICKS
 
 
 func _wares_mark(h: Dictionary) -> int:
@@ -2039,6 +2103,7 @@ func _shop_slots(h: Dictionary) -> Array:
 func _restock(h: Dictionary) -> void:
 	h["wares"] = _make_stock(h)
 	h["wares_seed"] = _wares_mark(h)
+	h["wares_picks"] = WEAK_PICKS
 
 
 func _make_stock(h: Dictionary) -> Array:
@@ -2075,6 +2140,17 @@ func _make_stock(h: Dictionary) -> Array:
 		if left.is_empty():
 			left = live.duplicate()
 		stock.append(_best_of(h, weak, lvl, str(row["weak"]), rng))
+	# A ware he holds already (worn or carried) is one he bought from this
+	# very stock: a stock re-made in the same bell (a build whose stock has a
+	# new shape: the same seed makes the same wares, uids and all) keeps it
+	# sold, so no uid is ever sold twice.
+	var held := {}
+	for it in (h["equip"] as Dictionary).values() + (h["satchel"] as Array):
+		if it is Dictionary:
+			held[str(it.get("uid", ""))] = true
+	for k in stock.size():
+		if stock[k] is Dictionary and held.has(str(stock[k]["uid"])):
+			stock[k] = null
 	return stock
 
 
@@ -2134,43 +2210,82 @@ func buy_fresh() -> String:
 func shop_badge() -> Dictionary:
 	## The mark on the Shop button (the map's, the results'): {kind: "full",
 	## text: "16/16"} while the satchel is full; else {kind: "up"} while a
-	## ware (or the Reserve) he can afford would be worn as an upgrade; else
-	## {kind: "new"} for a Reserve not yet seen (or one a boss has just
-	## restocked); else {}. It only looks: a stock not made yet is worked out
-	## and let go (the shop makes it as it opens), so a map looked at
-	## writes nothing.
+	## stock the Buy tab hasn't shown yet (wares_seen: a new bell's, a new
+	## row's), or a Reserve not yet shown, has a piece he can afford that he'd
+	## put on at once (_wears_at_once: never a plain piece over a worn
+	## Legendary); else {kind: "new"} for a Reserve not yet shown (or one a
+	## boss has just restocked); else {}. Once looked at, a stock's mark is
+	## spent until the next restock, bought from or not. It only looks: a
+	## stock not made yet is worked out and let go (the shop makes it as it
+	## opens), so a map looked at writes nothing.
 	if not hero_made() or borrowing():
 		return {}
 	var h := hero()
 	var n := (h["satchel"] as Array).size()
 	if n >= SATCHEL_MAX:
 		return {"kind": "full", "text": "%d/%d" % [n, SATCHEL_MAX]}
-	var current := int(h["wares_seed"]) == _wares_mark(h) and (h["wares"] as Array).size() == ware_count(h)
-	var offers: Array = (h["wares"] if current else _make_stock(h)).filter(func(it): return it is Dictionary)
+	var offers: Array = []
+	if not _stock_current(h):
+		offers = _make_stock(h)
+	elif int(_num(h.get("wares_seen", -1))) != int(h["wares_seed"]):
+		offers = (h["wares"] as Array).duplicate()
+	offers = offers.filter(func(it): return it is Dictionary)
 	var res_new := false
 	if bool(_shop_row(shop_depth(h))["reserve"]):
 		if int(_num(h.get("reserve_seed", -1))) == int(data["bosses"]) + 1 and h.has("reserve"):
-			if h["reserve"] is Dictionary:
+			if h["reserve"] is Dictionary and _flag(h.get("reserve_new", false)):
 				offers.append(h["reserve"])
-				res_new = _flag(h.get("reserve_new", false))
+				res_new = true
 		else:
 			res_new = true   # a boss restocked it: made as the shop opens
 	for it in offers:
-		if Items.price(it) > embers():
-			continue
-		if h["equip"].get(it["slot"]) == null or Hero.is_upgrade(Hero.compare(h, it["slot"], it, h.get("belt", []), diff())):
+		if Items.price(it) <= embers() and _wears_at_once(h, it):
 			return {"kind": "up"}
 	return {"kind": "new"} if res_new else {}
+
+
+func wares_seen() -> void:
+	## The Buy tab has shown this stock: its ▲ on the Shop button
+	## (shop_badge) is spent until the next restock.
+	if not hero_made() or borrowing():
+		return
+	var h := hero()
+	if int(_num(h.get("wares_seen", -1))) != int(h["wares_seed"]):
+		h["wares_seen"] = int(h["wares_seed"])
+		save()
 
 
 func ware_price(it) -> int:
 	return Items.price(it)
 
 
+func worn_legend_kept(it, h: Dictionary = {}) -> Dictionary:
+	## The worn Legendary a piece that isn't one would unseat in its slot (the
+	## pickup's rule, world.gd _legend_kept: its power is nothing in the
+	## chips, so better numbers never put a plain piece on over it), or {}.
+	var hh := h if not h.is_empty() else hero()
+	if not (it is Dictionary) or str(it.get("legend", "")) != "":
+		return {}
+	var worn = hh.get("equip", {}).get(str(it.get("slot", "")))
+	return worn if worn is Dictionary and str(worn.get("rarity", "")) == "legendary" else {}
+
+
+func _wears_at_once(h: Dictionary, it: Dictionary) -> bool:
+	## A bought piece is put on at once: its slot empty, or it beats what's
+	## worn (Hero.is_upgrade), never a plain piece over a worn Legendary
+	## (worn_legend_kept).
+	if h["equip"].get(it["slot"]) == null:
+		return true
+	if not worn_legend_kept(it, h).is_empty():
+		return false
+	return Hero.is_upgrade(Hero.compare(h, it["slot"], it, h.get("belt", []), diff()))
+
+
 func ware_verdict(i: int) -> String:
 	## What buying ware i would do, without buying it: "equipped" (it beats
-	## what's worn, or the slot is empty), "satchel", or why not: "sold",
-	## "poor", "full". The Chandler asks before it arms a sale.
+	## what's worn, or the slot is empty; never a piece that isn't a
+	## Legendary over a worn one: worn_legend_kept), "satchel", or why not:
+	## "sold", "poor", "full". The Chandler asks before it arms a sale.
 	var h := hero()
 	var stock := wares()
 	if i < 0 or i >= stock.size() or not (stock[i] is Dictionary):
@@ -2178,8 +2293,7 @@ func ware_verdict(i: int) -> String:
 	var it: Dictionary = stock[i]
 	if embers() < Items.price(it):
 		return "poor"
-	var chips := Hero.compare(h, it["slot"], it, h.get("belt", []), diff())
-	if h["equip"].get(it["slot"]) == null or Hero.is_upgrade(chips):
+	if _wears_at_once(h, it):
 		return "equipped"
 	if (h["satchel"] as Array).size() >= SATCHEL_MAX:
 		return "full"
@@ -2537,7 +2651,7 @@ func reserve_verdict() -> String:
 	if embers() < int(r["price"]):
 		return "poor"
 	var h := hero()
-	if h["equip"].get(it["slot"]) == null or Hero.is_upgrade(Hero.compare(h, it["slot"], it, h.get("belt", []), diff())):
+	if _wears_at_once(h, it):
 		return "equipped"
 	if (h["satchel"] as Array).size() >= SATCHEL_MAX:
 		return "full"

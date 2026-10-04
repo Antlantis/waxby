@@ -1,8 +1,9 @@
 extends Control
-## The Chandler: Waxley's shop, the map's Shop button (and the results
-## screen's, over the results: back_text "Back"). Three tabs (four once
-## World 3 is reached); it opens on Sell while the satchel holds SELL_FROM
-## pieces or more, else on Buy:
+## The Chandler: Waxley's shop, headed "Waxley's Shop" (TITLE), the map's
+## Shop button (and the results screen's, over the results: back_text
+## "Back"). Three tabs (four once World 3 is reached); it opens on Sell while
+## the satchel holds SELL_FROM pieces or more (unless the Shop's mark is a ▲:
+## then on Buy, where it sent him), else on Buy:
 ##   Buy     items at the hero's level, by shop depth (Game.wares): five or six
 ##           in two rows of three compact cards (Blessed 30 + 8*ilvl, Rare
 ##           90 + 20*ilvl; the last two "For your <slot>", picked for the two
@@ -16,13 +17,19 @@ extends Control
 ##           save and restocks after every bell, or at once with Fresh stock
 ##           (Game.buy_fresh: half a Rare's price, doubling until the next
 ##           bell; two taps). A full satchel shows "Satchel full · Sell ›",
-##           a link to Sell, and a sale refused for it goes there.
+##           a link to Sell, and a sale refused for it goes there. Shown,
+##           a stock's ▲ on the Shop button is spent (Game.wares_seen). A
+##           piece that isn't a Legendary is never worn over a worn one
+##           (Game.worn_legend_kept): bought, it's stowed, and its sheet
+##           names the Legendary that stays on.
 ##   Sell    the satchel as a grid of 4 x 4 squares (empty ones hollow), each
 ##           piece with what Waxley pays (Items.sell_value, a quarter of his
 ##           price) and a corner mark (Game.sell_look): a red ▼ no better than
 ##           what's worn, an amber ◆ a trade-off, a gold ★ a Legendary, a green
-##           ▲ an upgrade. Pieces adding up to nothing start marked (an ember
-##           tag), never a Legendary. A tap shows a piece on the right against
+##           ▲ an upgrade (better numbers than a worn Legendary are a ◆: its
+##           power would go, and the panel says so). Pieces adding up to
+##           nothing start marked (an ember tag), never a Legendary; the key
+##           lists all four marks. A tap shows a piece on the right against
 ##           what's worn, with Wear and "Sell +N"; a tap on the piece shown
 ##           marks or keeps it. "Sell N marked +total" sells them all at once.
 ##           No question asked: a piece sold leaves a ghost in its square,
@@ -59,6 +66,7 @@ const Combat := preload("res://scripts/combat.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
 const Story := preload("res://scripts/story.gd")
 
+const TITLE := "Waxley's Shop"   # the header: the Shop button's own word
 const TABS := ["buy", "sell", "relics", "draughts"]
 const TAB_NAME := {"buy": "Buy", "sell": "Sell", "relics": "Relics", "draughts": "Draughts"}
 const SELL_FROM := 12       # the shop opens on Sell while the satchel holds this many
@@ -89,7 +97,7 @@ const LINES := {
 	"hello": ["A customer! A live one! Browse, browse.", "Fresh stock, straight up from the Deep. Mostly.",
 			"Embers only, friend. No credit, no refunds.", "Everything here's been blessed. By someone."],
 	"equipped": ["Looks better on you already.", "Wear it in good health!", "That'll hold a flame. Probably."],
-	"satchel": ["Into the satchel it goes.", "Sold! Mind the drips."],
+	"satchel": ["Into the satchel it goes.", "Yours! Mind the drips."],
 	"poor": ["Embers first, friend. No credit.", "Ah. Come back a little richer."],
 	"full": ["Your satchel's stuffed! Sell me something first."],
 	"sold": ["That one's gone. More after the next bell."],
@@ -279,8 +287,10 @@ func tabs_shown() -> Array:
 
 static func default_tab() -> String:
 	## Where the shop opens: Sell while the satchel holds SELL_FROM pieces or
-	## more, else Buy.
-	if Game.hero_made() and (Game.hero()["satchel"] as Array).size() >= SELL_FROM:
+	## more, unless the Shop's mark is a ▲ (a stock not yet looked at with an
+	## upgrade he can afford: the mark sent him to Buy); else Buy.
+	if Game.hero_made() and (Game.hero()["satchel"] as Array).size() >= SELL_FROM \
+			and str(Game.shop_badge().get("kind", "")) != "up":
 		return "sell"
 	return "buy"
 
@@ -446,6 +456,7 @@ func _refresh() -> void:
 		"buy":
 			if made:
 				_stock = Game.wares().duplicate()
+				Game.wares_seen()   # looked at: the Shop's ▲ for it is spent
 				var h: Dictionary = Game.hero()
 				for it in _stock:
 					_chips.append(Hero.compare(h, it["slot"], it, h.get("belt", []), Game.diff()) if it is Dictionary else {})
@@ -1252,7 +1263,7 @@ func _layout() -> void:
 	var shown := tabs_shown()
 	var tw := 100.0
 	if shown.size() > 3:
-		var title_end := s.position.x + 96.0 + UI.text_width("The Chandler", 26, "title", 700) + 12.0
+		var title_end := s.position.x + 96.0 + UI.text_width(TITLE, 26, "title", 700) + 12.0
 		tw = clampf(floorf((s.end.x - 108.0 - title_end - 6.0 * (shown.size() - 1)) / shown.size()), 84.0, 100.0)
 	var tx := s.end.x - 108.0 - (tw * shown.size() + 6.0 * (shown.size() - 1))
 	for i in shown.size():
@@ -1338,7 +1349,7 @@ func _draw() -> void:
 	if vs.x - s.end.x >= 40.0:
 		_shelf_candle(Vector2(vs.x - (vs.x - s.end.x) * 0.5, shelf_y + 1.0), 26.0, 1.3)
 	# The header: title and the purse.
-	UI.text(self, Vector2(s.position.x + 96.0, s.position.y + 31.0), "The Chandler", 26, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700, 5)
+	UI.text(self, Vector2(s.position.x + 96.0, s.position.y + 31.0), TITLE, 26, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700, 5)
 	_draw_purse(Rect2(s.end.x - 102.0, s.position.y, 102.0, HEADER_H))
 	# Waxley's line, and a note (and on Buy the row's buttons) on the right.
 	# The note gives way first, then the line shrinks to fit what's left.
@@ -1703,6 +1714,9 @@ func detail_where() -> String:
 				return "Better than what you wear: you'd put it on, and I'd buy one from your full satchel."
 			return "Better than what you wear: you'd put it on at once."
 		"satchel":
+			var leg := Game.worn_legend_kept(detail_item())
+			if not leg.is_empty():
+				return "Your %s stays on (its power isn't in the numbers): this would go in your satchel." % str(leg["name"])
 			return "Not better than what you wear: it would go in your satchel."
 		"full":
 			return "Your satchel is full: sell me something first."
@@ -2043,6 +2057,8 @@ func _draw_sell_piece(p: Rect2, it: Dictionary) -> void:
 	UI.text(self, Vector2(tx, y + 42.0), name, UI.fit_size(name, tw, 18, 12, "title", 700), col, HORIZONTAL_ALIGNMENT_LEFT, tw, "title", 700, 4)
 	var worn = Game.hero()["equip"].get(str(it["slot"]))
 	var vs := ("Against your %s" % str(worn["name"])) if worn is Dictionary else "Nothing worn there: it would fill the slot"
+	if look.has("legend"):
+		vs = "Against your %s: Wear takes its power off" % str(look["legend"])
 	UI.text(self, Vector2(tx, y + 59.0), vs, UI.fit_size(vs, tw, 12, 10), UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, tw)
 	# The chips, and the mark in words.
 	var ch: Dictionary = look.get("chips", {})
@@ -2054,6 +2070,8 @@ func _draw_sell_piece(p: Rect2, it: Dictionary) -> void:
 	var words := {"worse": "No better than worn", "trade": "A trade-off", "legendary": "Legendary",
 			"better": "Better than worn", "open": "Fills an empty slot"}
 	var mw := str(words.get(mark, ""))
+	if look.has("legend"):
+		mw = "Better numbers, no power"
 	var gb := TriBatch.new()
 	mark_glyph(gb, Vector2(x + 238.0, cy + 12.0), 6.0, mark)
 	gb.flush(self)
@@ -2102,7 +2120,8 @@ func _draw_sell_help(p: Rect2) -> void:
 	UI.text(self, Vector2(x, y + 28.0), title, 19, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700, 4)
 	var sub := "A quarter of his price, paid at once." if n > 0 else "Bring him what you don't wear: a quarter of his price."
 	UI.text(self, Vector2(x, y + 48.0), sub, UI.fit_size(sub, w, 13, 10), UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, w)
-	var keys := [["worse", "No better than what you wear"], ["trade", "A trade-off: one up, one down"], ["legendary", "Legendary: kept unless you mark it"]]
+	var keys := [["better", "Better than what you wear"], ["worse", "No better than what you wear"],
+			["trade", "A trade-off (or your Legendary's power lost)"], ["legendary", "Legendary: kept unless you mark it"]]
 	var tb := TriBatch.new()
 	for k in keys.size():
 		mark_glyph(tb, Vector2(x + 6.0, y + 70.0 + 18.0 * k), 5.5, str(keys[k][0]))
@@ -2110,18 +2129,20 @@ func _draw_sell_help(p: Rect2) -> void:
 	for k in keys.size():
 		var t := str(keys[k][1])
 		UI.text(self, Vector2(x + 20.0, y + 75.0 + 18.0 * k), t, UI.fit_size(t, w - 20.0, 12, 9), mark_color(str(keys[k][0])), HORIZONTAL_ALIGNMENT_LEFT, w - 20.0, "body", 700)
+	var ky := y + 70.0 + 18.0 * keys.size()   # under the marks: the ember tag's line
 	if _ember_tex:
-		draw_texture_rect(_ember_tex, Rect2(x - 2.0, y + 117.0, 16, 16), false)
+		draw_texture_rect(_ember_tex, Rect2(x - 2.0, ky - 7.0, 16, 16), false)
 	var m := "Marked: sells with the button below"
-	UI.text(self, Vector2(x + 20.0, y + 129.0), m, UI.fit_size(m, w - 20.0, 12, 9), UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w - 20.0, "body", 700)
+	UI.text(self, Vector2(x + 20.0, ky + 5.0), m, UI.fit_size(m, w - 20.0, 12, 9), UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w - 20.0, "body", 700)
 	var help := "Tap a piece to see it against what you wear; tap it again to mark or keep it. Sold one by mistake? Tap its ghost to buy it back before you go."
+	var hy := ky + 28.0
 	var lines: Array = UI.wrap(help, w, 12)
 	var fs := 12
-	if y + 152.0 + 15.0 * (lines.size() - 1) > p.end.y - 6.0:
+	if hy + 15.0 * (lines.size() - 1) > p.end.y - 6.0:
 		fs = 11
 		lines = UI.wrap(help, w, fs)
 	for k in lines.size():
-		var ty := y + 152.0 + (fs + 3) * k
+		var ty := hy + (fs + 3) * k
 		if ty > p.end.y - 6.0:
 			break
 		UI.text(self, Vector2(x, ty), lines[k], fs, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, w)

@@ -134,7 +134,7 @@ var _ember_bump := 0.0
 var _bank_flash := 0.0
 var _tick := 0                    # the "+N" by the embers (ember_tick): what it adds up...
 var _tick_t := 0.0                # ...how long it still shows...
-var _tick_word := ""              # ...and what it says after the number ("sold"; "" a piece taken)
+var _tick_word := ""              # ...and what it says after the number ("banked": a sale, into the purse; "" a piece taken)
 var _bank_amount := 0
 var _carried_seen := 0
 var _sigil_bump := [0.0, 0.0, 0.0]
@@ -157,6 +157,7 @@ var _points := 0                  # skill points waiting (the badge's "+")
 var _card := {}                   # {kind: item|relic, t, tap_left, ...}
 var card_fits := true             # whether the item card's status line fit when last drawn (tests)
 var card_line := ""               # the item card's status line when last drawn (tests)
+var card_line_size := 0           # ...and its size in px
 var _cards: Array = []
 var _last_relic := {}             # {name, t}: the relic toast world sends too is folded into the card
 
@@ -368,7 +369,8 @@ func bump_embers() -> void:
 func ember_tick(n: int, word := "") -> void:
 	## A "+N" by the carried embers for TICK_TIME: a piece taken (world.gd
 	## _collect: one a kill, carrying its whole worth), or a find sold for
-	## its price ("sold": into the purse, as banked embers go). Pieces taken
+	## its price ("banked": into the purse, as banked embers go, so the
+	## carried count beside it doesn't move). Pieces taken
 	## close together add up.
 	if n <= 0:
 		return
@@ -432,11 +434,14 @@ func show_pickup(it: Dictionary, chips: Dictionary, where: String) -> void:
 	## (claim_item), and without that the card only says it's still there;
 	## if the World already took it up (world.gd today), the tap is its only
 	## chance, as before. "equipped" with Game.last_melt for it: worn, and
-	## the full satchel sold the old one, so there's nothing to undo.
+	## the full satchel sold the old one, so there's nothing to undo; with
+	## Game.last_replaced for it ("Sell weaker finds", Dusk's story levels):
+	## worn and the old one sold, the tap undoing both. Embers a sale banks
+	## tick by the counter as "+N banked" (into the purse, not carried).
 	var uid := str(it.get("uid", ""))
 	var g := _game()
 	if where == "sold":
-		ember_tick(Items.sell_value(it), "sold")
+		ember_tick(Items.sell_value(it), "banked")
 		if g == null or g.satchel_full():
 			_push({"kind": "pickup", "key": "sold:" + uid, "title": str(it.get("name", "")),
 					"sub": "Satchel full · sold  +%d embers" % Items.sell_value(it), "icon": UI.item_icon(it),
@@ -449,6 +454,10 @@ func show_pickup(it: Dictionary, chips: Dictionary, where: String) -> void:
 	elif where == "equipped" and g != null and str(g.last_melt.get("for", "-")) == uid:
 		_melted(card, g.last_melt)
 		card["end"] = 3.2
+	elif where == "equipped" and _replaced(g, uid):
+		# Worn, and the old one sold: the tap buys it back and wears it again.
+		card["sold_old"] = {"item": g.last_replaced["item"], "embers": int(g.last_replaced["embers"])}
+		ember_tick(int(g.last_replaced["embers"]), "banked")
 	elif where == "equipped" and g != null and not _can_undo(it):
 		# Worn in an empty slot (a first pair of boots, a first charm): there's
 		# nothing to swap back to, so it says just "Equipped" and takes no tap.
@@ -483,6 +492,13 @@ func power_card(it: Dictionary, secs := CARD_POWER) -> void:
 			if c.has("end"):
 				c["end"] = maxf(float(c["end"]), secs)
 			return
+
+
+func _replaced(g, uid: String) -> bool:
+	## The piece this find replaced was sold as it was worn
+	## (Game.sell_replaced: Game.last_replaced is for it).
+	var lr = g.get("last_replaced") if g != null else null
+	return lr is Dictionary and str(lr.get("for", "-")) == uid
 
 
 func _melted(card: Dictionary, melt: Dictionary) -> void:
@@ -748,6 +764,15 @@ func tap_card(confirm_melt := false) -> bool:
 			_sfx("select")
 			return true
 		"equipped":
+			if _card.has("sold_old"):
+				# The old one went to Waxley as this was worn: back first (its
+				# embers out of the purse), so the undo has it to wear.
+				if g == null or not g.keep_sold(_card["sold_old"]["item"]):
+					_card["tap_left"] = 0.0
+					_sfx("back")
+					return false
+				_card.erase("sold_old")
+				_tick_t = 0.0
 			if world and world.has_method("undo_equip"):
 				world.undo_equip(it)
 			if _worn(it):
@@ -2104,16 +2129,21 @@ func _draw_card(ci: Control) -> void:
 	var col := UI.rarity_color(str(it.get("rarity", "common")))
 	var where := str(_card["where"])
 	var flash := float(_card.get("flash", 0.0))
+	# Sold on touch: the piece itself dimmed (it's gone), its embers large
+	# where the chips were, the status bigger: not to be read as "In your
+	# satchel" mid-fight.
+	var sold := where == "sold"
+	var dim := 0.4 if sold else 1.0
 	UI.panel(ci, r, Color(col.lerp(Color.WHITE, flash * 0.5), 0.95 * a), Color(UI.PANEL.lerp(col.darkened(0.6), flash * 0.4), 0.95 * a), 12.0)
 	# The icon on a rarity-tinted disc.
 	var ic := Vector2(r.position.x + 36.0, r.get_center().y)
-	ci.draw_circle(ic, 27.0, Color(col, 0.14 * a))
-	ci.draw_arc(ic, 27.0, 0, TAU, 32, Color(col, 0.35 * a), 1.5, true)
+	ci.draw_circle(ic, 27.0, Color(col, 0.14 * a * dim))
+	ci.draw_arc(ic, 27.0, 0, TAU, 32, Color(col, 0.35 * a * dim), 1.5, true)
 	var icon: Texture2D = _card.get("icon")
 	if icon:
-		ci.draw_texture_rect(icon, Rect2(ic - Vector2(24, 24), Vector2(48, 48)), false, Color(1, 1, 1, a))
+		ci.draw_texture_rect(icon, Rect2(ic - Vector2(24, 24), Vector2(48, 48)), false, Color(1, 1, 1, a * dim))
 	else:
-		UI.glyph(ci, UI.slot_glyph(str(it.get("slot", ""))), ic, 34.0, Color(col, a))
+		UI.glyph(ci, UI.slot_glyph(str(it.get("slot", ""))), ic, 34.0, Color(col, a * dim))
 	var x := r.position.x + 72.0
 	var w := r.end.x - x - 10.0
 	# What happened to it, and what a tap does.
@@ -2125,6 +2155,11 @@ func _draw_card(ci: Control) -> void:
 	match where:
 		"equipped":
 			opts = ["Equipped · tap to undo" if tap else "Equipped"]
+			if _card.has("sold_old"):
+				# Worn, and the one it replaced sold (Game.sell_replaced).
+				var n := int(_card["sold_old"]["embers"])
+				opts = ["Equipped · old one sold  +%d · tap to undo" % n, "Equipped · old sold +%d · undo?" % n,
+						"Equipped · sold +%d · undo?" % n] if tap else ["Equipped · old one sold  +%d" % n, "Equipped · sold  +%d" % n]
 			if _card.has("melt"):
 				var m: Dictionary = _card["melt"]
 				var n := int(m["embers"])
@@ -2164,11 +2199,12 @@ func _draw_card(ci: Control) -> void:
 		# The first tap asked: wearing it sells the worn piece for good.
 		opts = ["Tap again to wear · old one sells", "Tap again · old one sells"]
 		scol = UI.BAD
-	var fit := _fit_status(opts, w)
+	var fit := _fit_status(opts, w, 12 if sold else 10)
 	var status: String = fit[0]
 	var fs: int = fit[1]
 	card_fits = UI.text_width(status, fs, "body", 800) <= w + 0.5
 	card_line = status
+	card_line_size = fs
 	# What it does: one line, or (a Legendary's power) two, the card's lines
 	# closing up to make room.
 	var kl := card_power_lines(Items.key_line(it), w) if power else card_key_lines(Items.key_line(it), w)
@@ -2181,17 +2217,28 @@ func _draw_card(ci: Control) -> void:
 		ys = [15.0, 33.0, 49.0, 69.0 if two else 56.0]
 	UI.text(ci, Vector2(x, r.position.y + ys[0]), status, fs, Color(scol, a), HORIZONTAL_ALIGNMENT_LEFT, w, "body", 800)
 	var name := str(it.get("name", ""))
-	UI.text(ci, Vector2(x, r.position.y + ys[1]), name, UI.fit_size(name, w, 17 if power else 19, 13, "title", 700), Color(col, a), HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700)
+	var ncol := col.lerp(UI.MUTED, 0.5) if sold else col
+	UI.text(ci, Vector2(x, r.position.y + ys[1]), name, UI.fit_size(name, w, 17 if power else 19, 13, "title", 700), Color(ncol, a * (0.7 if sold else 1.0)), HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700)
 	var ksz := int(kl["size"])
 	for i in (kl["lines"] as Array).size():
 		UI.text(ci, Vector2(x, r.position.y + ys[2] + i * (14.0 if power else 12.0)), str(kl["lines"][i]), ksz,
-				Color(UI.CREAM, (1.0 if power else 0.9) * a), HORIZONTAL_ALIGNMENT_LEFT, w)
-	var chips: Dictionary = _card["chips"]
-	var cx := x
+				Color(UI.CREAM, (1.0 if power else 0.9) * a * (0.6 if sold else 1.0)), HORIZONTAL_ALIGNMENT_LEFT, w)
 	var chip_y: float = r.position.y + ys[3]
-	var csz := 9 if power else (10 if two else 11)
-	cx += UI.chip(ci, Vector2(cx, chip_y), "DMG", float(chips.get("dmg", 0.0)), csz, a) + 6.0
-	UI.chip(ci, Vector2(cx, chip_y), "LIFE", float(chips.get("life", 0.0)), csz, a)
+	if sold:
+		# Its embers, large: the coal and "+N embers".
+		var et := "+%d embers" % int(_card.get("embers", 0))
+		var coal := UI.tex("res://art/ui/ember.svg")
+		if coal:
+			ci.draw_texture_rect(coal, Rect2(x, chip_y, 18.0, 18.0), false, Color(1, 1, 1, a))
+		else:
+			UI.ember_icon(ci, Vector2(x + 9.0, chip_y + 9.0), 9.0)
+		UI.text(ci, Vector2(x + 23.0, chip_y + 16.0), et, UI.fit_size(et, w - 23.0, 17, 12, "body", 800), Color(UI.GOLD, a), HORIZONTAL_ALIGNMENT_LEFT, w - 23.0, "body", 800, 3)
+	else:
+		var chips: Dictionary = _card["chips"]
+		var cx := x
+		var csz := 9 if power else (10 if two else 11)
+		cx += UI.chip(ci, Vector2(cx, chip_y), "DMG", float(chips.get("dmg", 0.0)), csz, a) + 6.0
+		UI.chip(ci, Vector2(cx, chip_y), "LIFE", float(chips.get("life", 0.0)), csz, a)
 	# How long the tap still counts.
 	if tap:
 		var k := float(_card["tap_left"]) / CARD_TAP
@@ -2237,12 +2284,12 @@ static func card_key_lines(key: String, w: float) -> Dictionary:
 	return {"lines": [first, rest.strip_edges() + "..."], "size": 10}
 
 
-func _fit_status(opts: Array, w: float) -> Array:
+func _fit_status(opts: Array, w: float, top := 10) -> Array:
 	## [text, size]: the first of opts (in capitals) that fits w at 9 px or
-	## more; the last one at whatever size fits.
+	## more (up to top px: a sale's is 12); the last one at whatever size fits.
 	for i in opts.size():
 		var t := str(opts[i]).to_upper()
-		var fs := UI.fit_size(t, w, 10, 8, "body", 800)
+		var fs := UI.fit_size(t, w, top, 8, "body", 800)
 		if i == opts.size() - 1 or (fs >= 9 and UI.text_width(t, fs, "body", 800) <= w):
 			return [t, fs]
 	return ["", 10]

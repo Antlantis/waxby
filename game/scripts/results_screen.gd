@@ -526,20 +526,51 @@ func _draw_xp(x: float, y: float, w: float) -> void:
 			spend_rect = r
 
 
-func _draw_loot(x: float, y: float, w: float, bottom: float) -> void:
-	## What was found: relics first, then items, then any milestone reward.
-	pills = []
+func loot_rows() -> Array:
+	## The found list's rows ({tex, glyph, name, col, sub}): relics first,
+	## then the items worn, then those carried, then what was sold (one row,
+	## or past one "N finds sold" and their total), so when the list runs
+	## out of room "and N more" swallows the sales, never a piece he kept.
 	var rows: Array = []
 	for id in result.get("relics", []):
 		var r: Dictionary = Relics.get_relic(id)
 		rows.append({"tex": UI.relic_icon(id), "name": r["name"], "col": UI.rarity_color(r["rarity"]), "sub": Relics.RARITY_NAME[r["rarity"]] + " relic"})
+	var worn: Array = []
+	var kept: Array = []
+	var sold: Array = []
 	for it in result.get("items", []):
-		if it is Dictionary:
-			var sub := "%s %s" % [Items.RARITY_NAME.get(str(it.get("rarity", "")), ""), UI.SLOT_NAME.get(str(it.get("slot", "")), "")]
-			if sold_find(it):
-				sub = "Sold  +%d" % Items.sell_value(it)
-			rows.append({"tex": _item_icons.get(str(it.get("uid", ""))), "glyph": UI.slot_glyph(str(it.get("slot", ""))), "name": str(it.get("name", "")),
-					"col": UI.rarity_color(str(it.get("rarity", "common"))), "sub": sub})
+		if not (it is Dictionary):
+			continue
+		var row := {"tex": _item_icons.get(str(it.get("uid", ""))), "glyph": UI.slot_glyph(str(it.get("slot", ""))), "name": str(it.get("name", "")),
+				"col": UI.rarity_color(str(it.get("rarity", "common"))),
+				"sub": "%s %s" % [Items.RARITY_NAME.get(str(it.get("rarity", "")), ""), UI.SLOT_NAME.get(str(it.get("slot", "")), "")]}
+		if sold_find(it):
+			row["sub"] = "Sold  +%d" % Items.sell_value(it)
+			row["embers"] = Items.sell_value(it)
+			sold.append(row)
+		elif _worn(it):
+			worn.append(row)
+		else:
+			kept.append(row)
+	if sold.size() > 1:
+		var total := 0
+		for r in sold:
+			total += int(r["embers"])
+		sold = [{"glyph": "sun", "name": "%d finds sold" % sold.size(), "col": UI.EMBER, "sub": "Sold  +%d" % total}]
+	return rows + worn + kept + sold
+
+
+func _worn(it: Dictionary) -> bool:
+	if not Game.hero_made() or Game.borrowing():
+		return false
+	var e = Game.hero().get("equip", {}).get(str(it.get("slot", "")))
+	return e is Dictionary and str(e.get("uid", "")) == str(it.get("uid", "-"))
+
+
+func _draw_loot(x: float, y: float, w: float, bottom: float) -> void:
+	## What was found (loot_rows), then any milestone reward.
+	pills = []
+	var rows: Array = loot_rows()
 	var rew: Array = []
 	for r in rewards:
 		match str(r.get("kind", "")):

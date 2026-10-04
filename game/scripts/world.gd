@@ -113,6 +113,7 @@ const HITSTOP_BUDGET := 0.12     # at most this much freeze in any half second
 const FULL_RETRY := 1.2          # s before an item the full satchel turned away asks again
 const EMBER_LIFE := 9.0          # s a loose ember lies before it goes out...
 const PIECE_LIFE := 20.0         # ...and a kill's (or a boss's) one piece carrying its worth (trophies())
+const EMBER_WARN := 3.0          # s at the end of a loose ember's life that it flickers (ember_fade)
 const KILL_PIECES := 1           # pieces a kill's embers come in (trophies()): its whole worth in one...
 const ELITE_PIECES := 3          # ...an Anointed's or a Dread's in three, so it still bursts
 const BOSS_PIECES := 12          # a boss's, sharing what his spray of 30 to 120 was worth
@@ -2716,10 +2717,14 @@ func _mark_boss_first(p: Dictionary) -> void:
 func _take_item(it: Dictionary) -> String:
 	## A new item: worn at once if it's plainly better (auto-equip), else
 	## into the satchel. The pickup card says which, with its two chips.
+	## Worn on Dusk's story levels with "Sell weaker finds" on, the piece it
+	## replaces sells for its price (Game.sell_replaced), its card offering
+	## the undo; elsewhere it goes to the satchel, as ever.
 	## Returns where it went: "equipped", "satchel", "sold" (into embers at
-	## its price: a find no better than what's worn, with "Sell weaker finds"
-	## on, its card's tap keeping it; or, the satchel full, whatever the
-	## setting) or "full" (no room: it stays put).
+	## its price: with "Sell weaker finds" on, a Common, or on Dusk's story
+	## levels (trophies) a find no better than what's worn, its card's tap
+	## keeping it; or, the satchel full, whatever the setting) or "full" (no
+	## room: it stays put).
 	## A Legendary counts as better over a worn piece that isn't one (its
 	## power is nothing in the chips: _legend_over), and has its moment; a
 	## worn Legendary is never swapped out by a piece that isn't one, however
@@ -2731,12 +2736,20 @@ func _take_item(it: Dictionary) -> String:
 	better = (better and not _legend_kept(h, it)) or _legend_over(h, it)
 	var where := ""
 	if better and bool(Game.setting("auto_equip")):
-		Game.equip(it)
+		var old = Game.equip(it)
 		where = "equipped"
 		apply_hero()
 		_sfx("equip")
+		# Dusk's story levels: the piece it replaced, no better than it now,
+		# sells as a weaker find would ("Sell weaker finds"; never a
+		# Legendary), so the satchel isn't filled with leftovers. The card's
+		# tap undoes both (hud.gd: Game.keep_sold, then undo_equip).
+		if trophies() and Game.last_melt.is_empty() and int(Game.sell_replaced(it, old)) > 0:
+			_sfx("bank")   # (the purse's chime: it's embers now; Game.last_replaced says what)
+			if hud:
+				hud.bump_embers()
 	else:
-		where = Game.add_item(it, true)
+		where = Game.add_item(it, true, trophies())
 		if where == "sold":
 			_sfx("bank")   # (the purse's chime: it's embers now)
 			if hud:
@@ -3731,6 +3744,12 @@ func _update_pickups(dt: float) -> void:
 		if p["loose"]:
 			p["vel"].y = minf(p["vel"].y + 1100.0 * dt, 500.0)
 			var next: Vector2 = p["pos"] + p["vel"] * dt
+			if p["vel"].y < 0.0:
+				# A ceiling stops it rising (never lodged in the stone).
+				var above := Vector2i(floori(next.x / TILE), floori((next.y - 5.0) / TILE))
+				if LevelData.is_solid(level.tile(above.x, above.y)):
+					next.y = maxf(next.y, (above.y + 1) * TILE + 5.0)
+					p["vel"].y = 0.0
 			var below := Vector2i(floori(next.x / TILE), floori((next.y + 5.0) / TILE))
 			var t: int = level.tile(below.x, below.y)
 			if p["vel"].y > 0.0 and (LevelData.is_solid(t) or LevelData.is_ledge(t)) and p["pos"].y + 5.0 <= below.y * TILE + 2.0:
@@ -3996,9 +4015,10 @@ func _ember_pieces(at: Vector2, total: int, pieces: int, boss := false) -> void:
 	## (p.worth: _collect pays it), is drawn by it (p.size: ember_size) and
 	## lies PIECE_LIFE before it goes out. A boss's are marked his.
 	var k := mini(pieces, total)
+	var from := clear_below(at)
 	for i in k:
 		var worth := total / k + (1 if i < total % k else 0)
-		var p := _add_pickup("ember", at)
+		var p := _add_pickup("ember", from)
 		p["loose"] = true
 		p["worth"] = worth
 		p["size"] = ember_size(worth)
@@ -4007,6 +4027,34 @@ func _ember_pieces(at: Vector2, total: int, pieces: int, boss := false) -> void:
 			p["vel"] = Vector2(randf_range(-170, 170), randf_range(-480, -240))
 		else:
 			p["vel"] = Vector2(randf_range(-110, 110), randf_range(-380, -220))
+
+
+func clear_below(at: Vector2) -> Vector2:
+	## at, or the first point under it with open air there and just above
+	## (a monster hung from the ceiling, a Dripkin, dies half in the stone):
+	## where its embers start, so none begins inside a tile.
+	var q := at
+	for i in 4:
+		var t := Vector2i(floori(q.x / TILE), floori((q.y - 6.0) / TILE))
+		var u := Vector2i(floori(q.x / TILE), floori(q.y / TILE))
+		if not LevelData.is_solid(level.tile(t.x, t.y)) and not LevelData.is_solid(level.tile(u.x, u.y)):
+			return q
+		q.y = (maxi(t.y, u.y) + 1) * TILE + 6.0
+	return at
+
+
+func ember_fade(p: Dictionary) -> float:
+	## How bright a loose ember draws (glow.gd): whole, then flickering
+	## faster and fainter through its last EMBER_WARN s, so its going out
+	## (PIECE_LIFE, EMBER_LIFE) is never a surprise.
+	if not bool(p.get("loose", false)) or str(p.get("kind", "")) != "ember":
+		return 1.0
+	var left: float = (PIECE_LIFE if p.has("worth") else EMBER_LIFE) - float(p.get("age", 0.0))
+	if left >= EMBER_WARN:
+		return 1.0
+	var k := clampf(left / EMBER_WARN, 0.0, 1.0)
+	var blink := 0.5 + 0.5 * cos(float(p.get("age", 0.0)) * TAU * (3.0 + 5.0 * (1.0 - k)))
+	return lerpf(0.15, 1.0, blink) * lerpf(0.5, 1.0, k)
 
 
 func ember_size(worth: int) -> int:

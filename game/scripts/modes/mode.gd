@@ -405,11 +405,14 @@ func apply_boss_fallback(e: Node2D, hp_mult: float) -> void:
 
 func satchel_add(it: Dictionary) -> void:
 	## A reward item into the satchel: never lost to a full one (as the
-	## sigil milestones do in game_state.record_result).
+	## sigil milestones do in game_state.record_result), and never sold for
+	## room either, however weak (add_item would sell a weaker piece into a
+	## full satchel), so a full satchel just holds one more.
 	var g := game()
 	if g == null:
 		return
-	if str(g.add_item(it)) == "full" and not g.borrowing():
+	var full: bool = g.has_method("satchel_full") and g.hero_made() and bool(g.satchel_full())
+	if (full or str(g.add_item(it)) == "full") and not g.borrowing():
 		(g.hero()["satchel"] as Array).append(it)
 		if g.has_method("note_legend"):
 			g.note_legend(str(it.get("legend", "")))

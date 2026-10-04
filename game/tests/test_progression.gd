@@ -140,6 +140,9 @@ func _initialize() -> void:
 	_test_settings_cache()
 	_test_chandler_logic()
 	_test_chandler_depth()
+	_test_stock_from_build_3()
+	_test_shop_legend_rule()
+	_test_sell_replaced()
 	_test_reserve()
 	_test_draughts()
 	_test_rekindle()
@@ -1787,6 +1790,141 @@ func _test_chandler_depth() -> void:
 	_check(game.wares()[0] != null and game.wares().size() == 6, "and a bell restocks all six")
 
 
+func _held(uid: String) -> int:
+	## How many pieces with this uid the hero wears or carries.
+	var h: Dictionary = game.hero()
+	var n := 0
+	for it in (h["equip"] as Dictionary).values() + (h["satchel"] as Array):
+		if it is Dictionary and str(it.get("uid", "")) == uid:
+			n += 1
+	return n
+
+
+func _test_stock_from_build_3() -> void:
+	## A Build 3 save's stock (one "For your <slot>" pick, no wares_picks) is
+	## re-made once in the same bell: the same seed makes the same wares, so
+	## a ware he bought from it stays sold (never on the shelf again with its
+	## uid); its last two are both picks, whatever its size (depth 28 kept
+	## six). And no sale or swap ever takes two pieces that share a uid.
+	for row in [[6, 5, 4], [14, 13, 5], [29, 28, 6]]:
+		_fresh()
+		var h := _set_depth(int(row[0]), int(row[1]))
+		game.add_embers(100000)
+		var stock: Array = game.wares()
+		var uid := str(stock[0]["uid"])
+		var w: String = game.buy_ware(0)
+		_check((w == "equipped" or w == "satchel") and _held(uid) == 1, "depth %d: ware 0 bought (%s)" % [row[1], w])
+		# Build 3's shape: one pick (the last of its row wares at depth 28).
+		if int(row[2]) < 6:
+			(h["wares"] as Array).pop_back()
+		else:
+			h["wares"][4] = Items.make("weapon", "knight", int(row[0]), "rare", RandomNumberGenerator.new())
+		h.erase("wares_picks")
+		_check((h["wares"] as Array).size() == int(row[2]), "(Build 3's stock: %d wares)" % int(row[2]))
+		var now: Array = game.wares()
+		_check(now.size() == game.ware_count() and int(h.get("wares_picks", 0)) == game.WEAK_PICKS, "depth %d: re-made once, %d wares, two picks" % [row[1], now.size()])
+		_check(now[0] == null and game.ware_verdict(0) == "sold" and not now.any(func(it): return it is Dictionary and _held(str(it["uid"])) > 0),
+				"depth %d: what he bought stays sold; nothing on the shelf is his already" % row[1])
+		var live: Array = Items.live_slots(game.shop_depth())
+		var first := str(now[now.size() - 2]["slot"]) if now[now.size() - 2] is Dictionary else ""
+		_check(first == game.weakest_slot(h, live) and now[now.size() - 1] is Dictionary
+				and str(now[now.size() - 1]["slot"]) == game.weakest_slot(h, live.filter(func(sl): return sl != first)),
+				"depth %d: its last two are the picks for the two weakest slots (%s, %s)" % [row[1], first, now[now.size() - 1]["slot"] if now[now.size() - 1] is Dictionary else "-"])
+		var again: Array = game.wares().map(func(it): return str(it["uid"]) if it is Dictionary else "")
+		_check(again == now.map(func(it): return str(it["uid"]) if it is Dictionary else ""), "depth %d: and only once (the same stock after)" % row[1])
+		for i in now.size():
+			if now[i] is Dictionary:
+				var u := str(now[i]["uid"])
+				var bought: String = game.buy_ware(i)
+				_check(bought in ["equipped", "satchel"] and _held(u) == 1 and game.ware_verdict(i) == "sold", "depth %d: ware %d bought once, held once" % [row[1], i])
+				break
+	# Two pieces with one uid (a save from before this): one sale takes one.
+	_fresh()
+	var h: Dictionary = game.hero()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 33
+	var twin := Items.make("coat", "knight", 4, "magic", rng)
+	h["satchel"] = [twin, twin.duplicate(true)]
+	var e0: int = game.embers()
+	_check(game.sell_item(twin) == Items.sell_value(twin) and (h["satchel"] as Array).size() == 1 and game.embers() == e0 + Items.sell_value(twin),
+			"two with one uid: a sale takes one, for one price")
+	_check(game.sell_marked([twin, twin]) == Items.sell_value(twin) and (h["satchel"] as Array).is_empty(), "and selling it twice sells what's there once")
+	h["satchel"] = [twin, twin.duplicate(true)]
+	game.equip(twin)
+	_check((h["satchel"] as Array).size() == 2 and str(h["equip"]["coat"]["uid"]) == str(twin["uid"]), "wearing one leaves the other (and the old coat joins it)")
+
+
+func _test_shop_legend_rule() -> void:
+	## The pickup's rule in the shop too (world.gd _legend_kept): a piece
+	## that isn't a Legendary is never put on over a worn one, however its
+	## chips read (the power isn't in them). Buying it stows it, the Shop's ▲
+	## doesn't light for it, and on Sell it's a trade-off naming the Legendary.
+	_fresh()
+	var h := _set_depth(10, 9)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	var leg := Items.make("coat", "knight", 1, "legendary", rng, "ossuary_coat")
+	game.equip(leg)
+	h["satchel"] = []
+	game.wares()
+	game.wares_seen()
+	var big := Items.make("coat", "knight", 10, "rare", rng)
+	var chips := Hero.compare(h, "coat", big)
+	_check(Hero.is_upgrade(chips) and not game.worn_legend_kept(big).is_empty(), "(a level-10 Rare coat has better numbers than the worn Legendary)")
+	h["wares"][0] = big
+	h.erase("wares_seen")
+	game.data["embers"] = 100000
+	for k in range(1, (h["wares"] as Array).size()):
+		h["wares"][k] = null
+	_check(game.ware_verdict(0) == "satchel", "buying it would stow it, not wear it (%s)" % game.ware_verdict(0))
+	_check(str(game.shop_badge().get("kind", "")) != "up", "and the Shop's ▲ doesn't light for it (%s)" % game.shop_badge())
+	_check(game.buy_ware(0) == "satchel" and str(h["equip"]["coat"]["uid"]) == str(leg["uid"]), "bought: in the satchel, the Legendary still worn")
+	var look: Dictionary = game.sell_look(big)
+	_check(str(look["mark"]) == "trade" and str(look.get("legend", "")) == str(leg["name"]) and not bool(look["marked"]),
+			"on Sell: a trade-off (◆), naming the %s, not marked" % leg["name"])
+	# A Legendary over a Legendary, or anything over a plain piece: as before.
+	h["equip"]["coat"] = Items.make("coat", "knight", 1, "magic", rng)
+	_check(game.worn_legend_kept(big).is_empty() and str(game.sell_look(big)["mark"]) == "better", "over a plain coat it's an upgrade again (▲)")
+
+
+func _test_sell_replaced() -> void:
+	## Game.sell_replaced (world.gd _take_item's auto-equip on Dusk's story
+	## levels): the piece a find replaced, no better than it now, sells for
+	## its price as a weaker find would ("Sell weaker finds"); never a
+	## Legendary, never one better on its numbers, nothing with the setting
+	## off; last_replaced says what for the card, and keep_sold undoes it.
+	_fresh()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 909
+	var h: Dictionary = game.hero()
+	h["satchel"] = []
+	var old: Dictionary = h["equip"]["weapon"]
+	var blade := Items.make("weapon", "knight", 12, "rare", rng)
+	game.equip(blade)
+	var e0: int = game.embers()
+	var v: int = game.sell_replaced(blade, old)
+	_check(v == Items.sell_value(old) and v > 0 and game.embers() == e0 + v and not _in(h["satchel"], old), "the old sword sells as the new blade goes on (+%d)" % v)
+	_check(str(game.last_replaced.get("for", "")) == str(blade["uid"]) and str(game.last_replaced["item"]["uid"]) == str(old["uid"]), "last_replaced says what, for which")
+	_check(game.keep_sold(old) and game.embers() == e0 and _in(h["satchel"], old), "keep_sold takes it back (the card's undo)")
+	game.set_setting("auto_sell", false)
+	_check(game.sell_replaced(blade, old) == 0 and _in(h["satchel"], old) and game.last_replaced.is_empty(), "the setting off: kept")
+	game.set_setting("auto_sell", true)
+	# A Legendary replaced is never sold.
+	h["satchel"] = []
+	var leg := Items.make("coat", "knight", 1, "legendary", rng, "ossuary_coat")
+	game.equip(leg)
+	var coat := Items.make("coat", "knight", 30, "rare", rng)
+	game.equip(coat)
+	_check(game.sell_replaced(coat, leg) == 0 and _in(h["satchel"], leg), "a Legendary replaced goes to the satchel")
+	# A Legendary worn over a better plain piece: that piece isn't weaker, so it stays.
+	h["satchel"] = []
+	var strong := Items.make("charm", "knight", 30, "rare", rng)
+	game.equip(strong)
+	var lg := Items.make("charm", "knight", 1, "legendary", rng, "first_dawn")
+	game.equip(lg)
+	_check(not game.weaker_find(strong) and game.sell_replaced(lg, strong) == 0 and _in(h["satchel"], strong), "a better piece a Legendary replaced stays in the satchel")
+
+
 func _test_reserve() -> void:
 	## Waxley's Reserve (spec §8.2): a Legendary legal for the depth from 23,
 	## at 300 + 40 x ilvl, restocked when a boss falls.
@@ -3265,6 +3403,25 @@ func _test_shop_badge() -> void:
 	_check(game.shop_badge().is_empty(), "an upgrade he can't afford: no mark")
 	game.data["embers"] = Items.price(h["wares"][0])
 	_check(str(game.shop_badge().get("kind", "")) == "up", "one he can afford: the green arrow")
+	var Chandler = load("res://scripts/chandler_screen.gd")
+	for i in game.SATCHEL_MAX - 4:
+		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
+	_check(Chandler.default_tab() == "buy", "the arrow sends the shop to Buy, even with %d in the satchel" % (h["satchel"] as Array).size())
+	game.wares_seen()
+	_check(game.shop_badge().is_empty() and Chandler.default_tab() == "sell", "looked at (wares_seen): the arrow is spent (%s), and %d pieces open on Sell" % [game.shop_badge(), (h["satchel"] as Array).size()])
+	var seen_at: int = int(h["wares_seen"])
+	game.save()
+	game.load_save()
+	h = game.hero()
+	_check(int(h["wares_seen"]) == seen_at and game.shop_badge().is_empty(), "and stays spent through a save")
+	game.record_result({"level": "1-1", "cleared": true, "embers": 0, "sigils": [false, false, false], "time": 60.0, "relics": []})
+	game.reserve()
+	game.reserve_seen()
+	var fresh_up := false
+	for it in game._make_stock(h):
+		fresh_up = fresh_up or (it is Dictionary and Items.price(it) <= game.embers() and game._wears_at_once(h, it))
+	_check(str(game.shop_badge().get("kind", "")) == ("up" if fresh_up else ""), "a bell's new stock may light it again (%s)" % game.shop_badge())
+	h["satchel"] = []
 	while (h["satchel"] as Array).size() < game.SATCHEL_MAX:
 		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
 	_check(game.shop_badge() == {"kind": "full", "text": "16/16"}, "the satchel full comes first: \"16/16\" (%s)" % game.shop_badge())
@@ -3340,6 +3497,14 @@ func _test_sell_on_touch() -> void:
 	_check(not game.keep_sold(weak) and game.embers() == e0, "kept once only")
 	h["satchel"] = []
 	_check(game.add_item(weak.duplicate(true)) == "satchel", "not a find (a reward): the satchel")
+	h["satchel"] = []
+	# Outside Dusk's story levels (world.trophies() false: Nightfall,
+	# Witching, a mode) only a Common sells on touch, as in Build 3.
+	var away: Dictionary = weak.duplicate(true)
+	away["uid"] = "weak-coat-away"
+	_check(game.add_item(away, true, false) == "satchel" and _in(h["satchel"], away), "a find outside the story levels: a weaker Rare goes to the satchel")
+	var com0 := Items.make("candle", "knight", 1, "common", rng)
+	_check(game.add_item(com0, true, false) == "sold", "a Common still sells there")
 	h["satchel"] = []
 	# A Common sells as a find whatever its chips (the old auto-salvage).
 	var com := Items.make("boots", "knight", 1, "common", rng)
@@ -3470,6 +3635,19 @@ func _test_settings_cache() -> void:
 	_wipe()
 	game.reset()
 	_check(float(game.setting("shake")) == 1.0 and game.haptics == true, "reset() re-reads: a deleted file means defaults")
+	# Build 3's "Auto-salvage Commons" Off carries over as "Sell weaker finds" Off.
+	SettingsLib.write({"auto_salvage": false}, SETTINGS)
+	game.reload_settings()
+	_check(game.setting("auto_sell") == false and SettingsLib.read(SETTINGS).get("auto_sell") == false, "auto-salvage Off becomes Sell weaker finds Off, written once")
+	game.set_setting("auto_sell", true)
+	game.reload_settings()
+	_check(game.setting("auto_sell") == true, "and turned on after, it stays on")
+	_wipe()
+	SettingsLib.write({"auto_salvage": true}, SETTINGS)
+	game.reload_settings()
+	_check(game.setting("auto_sell") == true and not SettingsLib.read(SETTINGS).has("auto_sell"), "auto-salvage On: the default (on), nothing written")
+	_wipe()
+	game.reset()
 
 
 # ---------------------------------------------------------------- the Chandler
@@ -3741,7 +3919,7 @@ func _test_chandler_screen_v3() -> void:
 		_check((ds.call("tabs_shown") as Array).size() == 4 and str(ds.get("tab")) == "draughts", "%s: four tabs, Draughts on show" % tag)
 		_screen_fits(ds, tag)
 		var safe: Rect2 = ds.call("_safe")
-		var title_end: float = safe.position.x + 96.0 + ds.UI.text_width("The Chandler", 26, "title", 700)
+		var title_end: float = safe.position.x + 96.0 + ds.UI.text_width(str(ds.TITLE), 26, "title", 700)
 		var first_tab: Button = ds.get("_tab_btns")[ds.call("tabs_shown")[0]]
 		_check(first_tab.global_position.x >= title_end, "%s: the tabs clear the title (%.0f >= %.0f)" % [tag, first_tab.global_position.x, title_end])
 		var acts: Array = ds.get("_acts")

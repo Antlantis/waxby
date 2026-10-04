@@ -3358,6 +3358,43 @@ func _test_trophies() -> void:
 	piece["age"] = 20.5
 	w._update_pickups(DT)
 	_check(piece["taken"], "and gone after 20")
+	# It flickers through its last 3 s (glow.gd draws it by ember_fade).
+	var fades := []
+	for age in [1.0, 16.9, 17.5, 18.3, 19.1, 19.9]:
+		fades.append(w.ember_fade({"kind": "ember", "loose": true, "worth": 3, "age": age}))
+	_check(is_equal_approx(float(fades[0]), 1.0) and is_equal_approx(float(fades[1]), 1.0) and fades.slice(2).any(func(f): return float(f) < 0.6)
+			and fades.slice(2).all(func(f): return float(f) <= 1.0) and is_equal_approx(w.ember_fade({"kind": "ember", "loose": false, "age": 30.0}), 1.0),
+			"a loose piece flickers in its last %d s, before it goes out (%s)" % [int(w.EMBER_WARN), fades])
+	# A ceiling: a piece thrown up under it stops there, and one from a kill
+	# half in the stone (a Dripkin hung from it) starts clear of it.
+	var ceil := Vector2i(-1, -1)
+	for y in range(1, w.level.height - 3):
+		for x in range(2, w.level.width - 2):
+			if LevelData.is_solid(w.level.tile(x, y)) and not LevelData.is_solid(w.level.tile(x, y + 1)) and not LevelData.is_solid(w.level.tile(x, y + 2)) \
+					and not LevelData.is_solid(w.level.tile(x, y + 3)):
+				ceil = Vector2i(x, y)
+				break
+		if ceil.x >= 0:
+			break
+	_check(ceil.x >= 0, "(3-1 has a ceiling with air under it: %s)" % ceil)
+	var T := float(w.TILE)
+	var under := Vector2((ceil.x + 0.5) * T, (ceil.y + 1) * T + 10.0)
+	var up: Dictionary = w._add_pickup("ember", under)
+	up["loose"] = true
+	up["worth"] = 3
+	up["vel"] = Vector2(0.0, -380.0)
+	var lodged := false
+	for i in 60:
+		w._update_pickups(DT)
+		var at: Vector2 = up["pos"]
+		lodged = lodged or LevelData.is_solid(w.level.tile(floori(at.x / T), floori((at.y - 4.0) / T)))
+	_check(not lodged and float(up["pos"].y) > (ceil.y + 1) * T, "a piece thrown up under a ceiling stops at it, never in the stone (y %.0f)" % float(up["pos"].y))
+	up["taken"] = true
+	var inside := Vector2((ceil.x + 0.5) * T, (ceil.y + 0.6) * T)
+	var clear: Vector2 = w.clear_below(inside)
+	_check(not LevelData.is_solid(w.level.tile(floori(clear.x / T), floori(clear.y / T))) and not LevelData.is_solid(w.level.tile(floori(clear.x / T), floori((clear.y - 6.0) / T)))
+			and clear.y > inside.y and clear.y < (ceil.y + 2) * T, "a kill in the stone drops its embers just under it (%.0f -> %.0f)" % [inside.y, clear.y])
+	_check(w.clear_below(under) == under, "and one in the open where it fell")
 	# _collect pays a piece's worth and ticks it by the counter.
 	var got0: int = w.embers_got
 	w._collect({"kind": "ember", "pos": w.player.center(), "worth": 37, "taken": false, "loose": false, "age": 1.0})

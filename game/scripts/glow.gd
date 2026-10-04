@@ -108,7 +108,7 @@ func _draw() -> void:
 			continue
 		match p["kind"]:
 			"ember":
-				_ember(p["pos"], p["t"], int(p.get("size", 1)))
+				_ember(p["pos"], p["t"], int(p.get("size", 1)), float(world.ember_fade(p)) if world.has_method("ember_fade") else 1.0)
 			"relic", "item":
 				_beam(p["pos"], RARITY.get(p["rarity"], Color.WHITE), p["t"])
 				if p["kind"] == "item":
@@ -334,19 +334,20 @@ func _tear(base: Vector2, r: float, h: float, sway: float) -> PackedVector2Array
 	return pts
 
 
-func _ember(p: Vector2, t: float, size := 1) -> void:
+func _ember(p: Vector2, t: float, size := 1, a := 1.0) -> void:
 	## An ember pickup; size (world.ember_size: 1 one ember, 2 a kill's
-	## piece, 3 an elite's or a boss's) draws it bigger, with a wider glow.
+	## piece, 3 an elite's or a boss's) draws it bigger, with a wider glow;
+	## a (world.ember_fade) dims it as it's about to go out.
 	var k: float = [1.0, 1.0, 1.35, 1.7][clampi(size, 1, 3)]
 	var bob := sin(t * 3.0 + p.x * 0.05) * 2.0
 	var c := p + Vector2(0, bob - (k - 1.0) * 4.0)
 	var pulse := 0.5 + 0.5 * sin(t * 5.0 + p.x)
-	draw_circle(c, 9.0 * k + (k - 1.0) * 6.0, Color(1.0, 0.6, 0.2, (0.10 + 0.05 * pulse) * (1.0 + 0.4 * (k - 1.0))))
-	draw_circle(c, 6.0 * k, Color("2a1410"))
-	draw_circle(c, 5.0 * k, Color("e0602a"))
-	draw_circle(c + Vector2(-1, -1) * k, 3.2 * k, FLAME_MID)
-	draw_circle(c + Vector2(-1.5, -1.5) * k, 1.5 * k, FLAME_CORE)
-	flame(c + Vector2(0, -3.0 * k), 6.0 * k, p.x, size >= 3)
+	draw_circle(c, 9.0 * k + (k - 1.0) * 6.0, Color(1.0, 0.6, 0.2, (0.10 + 0.05 * pulse) * (1.0 + 0.4 * (k - 1.0)) * a))
+	draw_circle(c, 6.0 * k, Color(Color("2a1410"), a))
+	draw_circle(c, 5.0 * k, Color(Color("e0602a"), a))
+	draw_circle(c + Vector2(-1, -1) * k, 3.2 * k, Color(FLAME_MID, a))
+	draw_circle(c + Vector2(-1.5, -1.5) * k, 1.5 * k, Color(FLAME_CORE, a))
+	flame(c + Vector2(0, -3.0 * k), 6.0 * k, p.x, size >= 3, false, {} if a >= 1.0 else {"alpha": a})
 
 
 func _halo(p: Vector2, col: Color, r: float) -> void:

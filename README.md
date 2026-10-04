@@ -60,8 +60,10 @@ ring them again.
   Trophy: Rare or better, made for the slot it helps most. A boss's first
   kill gives his prize. A find no better than what Waxby wears sells as he
   touches it, for what the Shop's Sell tab pays ("Sell weaker finds"; a tap
-  on its card keeps it). Nightfall,
-  Witching and the modes keep their drop tables (world.gd trophies()).
+  on its card keeps it), and so does the piece a find he puts on replaces
+  (a tap undoes both; never a Legendary). Nightfall, Witching and the modes
+  keep their drop tables (world.gd trophies()), and there only a Common
+  sells on touch, as in Build 3.
 - **Illustrated story scenes** between the worlds, with portraits and voices.
   Waxby is the hero's name until you give him your own at the oath (up to 12
   letters; Rename on the Sheet's Stats tab changes it). Any keeper who carries

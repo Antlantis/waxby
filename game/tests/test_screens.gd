@@ -1131,12 +1131,19 @@ func _test_hud_on_world() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3
 	var better = Items.make("weapon", "knight", 12, "rare", rng)
+	var purse0 := int(game.embers())
+	_check(w.trophies(), "(1-1 on Dusk: a story level)")
 	w._take_item(better)
 	hud._process(0.05)
 	_check(str(game.hero()["equip"]["weapon"]["uid"]) == str(better["uid"]), "a plainly better weapon is worn at once")
 	_check(hud.card_rect().size.x > 0.0 and str(hud._card.get("where", "")) == "equipped", "the card says it's equipped")
+	# The old sword, no better than it now, sold as it came off (Sell weaker finds).
+	_check(int(game.embers()) == purse0 + Items.sell_value(old) and not (game.hero()["satchel"] as Array).any(func(x): return str(x["uid"]) == str(old["uid"])),
+			"the old sword sold as it came off (+%d), not left in the satchel" % Items.sell_value(old))
+	await _frames(1)
+	_check(hud.card_line == "EQUIPPED · OLD ONE SOLD  +%d · TAP TO UNDO" % Items.sell_value(old) and hud._tick_word == "banked", "\"%s\"" % hud.card_line)
 	_check(hud.tap_card(), "a tap inside the window is taken")
-	_check(str(game.hero()["equip"]["weapon"]["uid"]) == str(old["uid"]), "the tap undoes the auto-equip")
+	_check(str(game.hero()["equip"]["weapon"]["uid"]) == str(old["uid"]) and int(game.embers()) == purse0, "the tap undoes the auto-equip, and the sale (the embers back)")
 	_check(str(hud._card["where"]) == "undone", "the card now says it's in the satchel")
 	_check(hud.accept_pickup(), "the equip key does what a tap does")
 	_check(str(game.hero()["equip"]["weapon"]["uid"]) == str(better["uid"]), "and wears it again")
@@ -1155,7 +1162,8 @@ func _test_hud_on_world() -> void:
 	var where: String = str(hud._card.get("where", ""))
 	_check(where == "sold" and hud.card_hit(hud.card_rect().get_center()), "its card says so and takes a tap (%s)" % where)
 	await _frames(1)
-	_check(hud.card_line == "SOLD  +%d · TAP TO KEEP" % Items.sell_value(worse), "\"%s\"" % hud.card_line)
+	_check(hud.card_line == "SOLD  +%d · TAP TO KEEP" % Items.sell_value(worse) and hud.card_line_size == 12, "\"%s\" at %d px" % [hud.card_line, hud.card_line_size])
+	_check(hud._tick_word == "banked" and hud._tick == Items.sell_value(worse), "the counter ticks \"+%d banked\" (into the purse)" % hud._tick)
 	_check(hud.tap_card() and str(hud._card["where"]) == "kept" and int(game.embers()) == purse
 			and (game.hero()["satchel"] as Array).any(func(x): return str(x["uid"]) == str(worse["uid"])), "a tap keeps it: into the satchel, the embers back")
 	_check(not hud.tap_card(), "kept: no more taps")
@@ -1182,7 +1190,18 @@ func _test_hud_on_world() -> void:
 	_check(res == "sold" and int(game.embers()) > before, "a Common find is sold for embers")
 	_check(hud._cards.size() == 1 and str(hud._cards[0]["where"]) == "sold" and not hud._msgs.any(func(q): return q["kind"] == "pickup"),
 			"with room in the satchel a sale is a card (it can be kept), not a note")
-	_check(hud._tick_t > 0.0 and hud._tick == Items.sell_value(common) and hud._tick_word == "sold", "and \"+%d sold\" ticks by the embers" % hud._tick)
+	_check(hud._tick_t > 0.0 and hud._tick == Items.sell_value(common) and hud._tick_word == "banked", "and \"+%d banked\" ticks by the embers" % hud._tick)
+	hud._cards.clear()
+	# Off Dusk's story levels (here Nightfall) a weaker Blessed or Rare goes
+	# to the satchel, as in Build 3; a Common still sells.
+	w.diff = "nightfall"
+	var away = worse.duplicate(true)
+	away["uid"] = "worse-away"
+	_check(not w.trophies() and w._take_item(away) == "satchel", "on Nightfall a weaker find goes to the satchel")
+	var com2 = Items.make("candle", "knight", 1, "common", rng)
+	_check(w._take_item(com2) == "sold", "and a Common still sells")
+	w.diff = "dusk"
+	hud._card = {}
 	hud._cards.clear()
 	# Level up through the World, and banking.
 	hud._lvl = {}
@@ -2949,7 +2968,8 @@ func _test_pickup_states() -> void:
 	# And every other state the card can be in.
 	for v in [["equipped", 2.0, {}], ["equipped", 0.0, {}], ["undone", 2.0, {}], ["undone", 0.0, {}], ["satchel", 2.0, {}],
 			["satchel", 0.0, {}], ["full", 2.0, {"melts": false}], ["full", 0.0, {"floor": true}], ["full", 0.0, {"floor": false}],
-			["sold", 2.0, {"embers": 9999}], ["sold", 0.0, {"embers": 9999}], ["kept", 0.0, {}]]:
+			["sold", 2.0, {"embers": 9999}], ["sold", 0.0, {"embers": 9999}], ["kept", 0.0, {}],
+			["equipped", 2.0, {"sold_old": {"item": left, "embers": 9999}}], ["equipped", 0.0, {"sold_old": {"item": left, "embers": 9999}}]]:
 		var pk: Dictionary = peek.duplicate()
 		pk["where"] = v[0]
 		pk["tap_left"] = v[1]
@@ -3943,6 +3963,8 @@ func _test_sold_meets_shop() -> void:
 	var c = Chandler.new()
 	root.add_child(c)
 	await _frames(2)
+	_check(c.tab == "buy" and int(h.get("wares_seen", -1)) == int(h["wares_seed"]) and str(game.shop_badge().get("kind", "")) != "up",
+			"the Buy tab shown: this stock's ▲ is spent (%s)" % game.shop_badge())
 	c.show_tab("sell")
 	await _frames(1)
 	var ghosts := 0
@@ -3956,6 +3978,20 @@ func _test_sold_meets_shop() -> void:
 	r.result = {"level": "1-1", "cleared": true, "embers": 0, "embers_total": 0, "sigils": [false, false, false], "time": 60.0,
 			"relics": [], "items": [worse, h["equip"]["weapon"]], "xp": 0, "levels": 0, "diff": "dusk"}
 	_check(r.sold_find(worse) and not r.sold_find(h["equip"]["weapon"]), "the results' found list says it was sold (and not what's worn)")
+	# Its rows: relics, then worn, then carried, then the sales (two or more
+	# in one row), so "and N more" swallows sales first.
+	var sold2: Dictionary = _zero_implicit(Items.make("candle", "knight", 6, "magic", rng))
+	var stowed: Dictionary = h["satchel"][0]
+	r.result["relics"] = ["rook_feather"]
+	r.result["items"] = [worse, stowed, h["equip"]["weapon"], sold2]
+	var rows: Array = r.loot_rows()
+	var subs: Array = rows.map(func(x): return str(x["sub"]))
+	_check(rows.size() == 4 and str(rows[1]["name"]) == str(h["equip"]["weapon"]["name"]) and str(rows[2]["name"]) == str(stowed["name"])
+			and str(rows[3]["name"]) == "2 finds sold" and subs[3] == "Sold  +%d" % (price + Items.sell_value(sold2)),
+			"the found list: the relic, the worn, the carried, then \"2 finds sold\" (%s)" % [rows.map(func(x): return x["name"])])
+	r.result["items"] = [worse, h["equip"]["weapon"]]
+	rows = r.loot_rows()
+	_check(rows.size() == 3 and str(rows[2]["name"]) == str(worse["name"]) and str(rows[2]["sub"]) == "Sold  +%d" % price, "one sale keeps its own row, last")
 	r.free()
 	# Kept: it counts.
 	hud.set_process(true)

@@ -1370,6 +1370,23 @@ func _test_waxworks() -> void:
 	_check((game.hero()["satchel"] as Array).size() == sat0, "the seals pay once per boss per difficulty")
 	w.queue_free()
 	await process_frame
+	# A reward is never sold for room, however weak: a full satchel holds one more.
+	var hh: Dictionary = game.hero()
+	var rrng := RandomNumberGenerator.new()
+	rrng.seed = 5
+	while (hh["satchel"] as Array).size() < game.SATCHEL_MAX:
+		hh["satchel"].append(Items.make("candle", "knight", 1, "magic", rrng))
+	var weak: Dictionary = (hh["equip"]["coat"] as Dictionary).duplicate(true)
+	weak["uid"] = "weak-reward"
+	weak["rarity"] = "rare"
+	weak["implicit"]["v"] = 0.0
+	weak["affixes"] = []
+	var e1: int = game.embers()
+	_check(game.weaker_find(weak), "(a Rare reward no better than the worn coat)")
+	Waxworks.new().satchel_add(weak)
+	_check((hh["satchel"] as Array).size() == game.SATCHEL_MAX + 1 and (hh["satchel"] as Array).any(func(x): return str(x["uid"]) == "weak-reward") and game.embers() == e1,
+			"a full satchel takes a weak reward too (%d of %d): never sold for room" % [(hh["satchel"] as Array).size(), game.SATCHEL_MAX])
+	hh["satchel"] = []
 	# The Gauntlet carries life and restarts only the current boss.
 	_fresh()
 	var gm = Waxworks.new()

@@ -11,8 +11,10 @@ extends Control
 ## skill points wait).
 ## Along the bottom: Callings · Sheet · Shop (· Challenges) and Play. The
 ## Shop (Waxley's, the Chandler) wears a corner mark (Game.shop_badge): a red
-## "16/16" while the satchel is full, else a green ▲ while a ware he can
-## afford would be an upgrade, else a gold dot for a Reserve not yet seen.
+## "16/16" while the satchel is full, else a green ▲ while a stock he hasn't
+## looked at yet has a ware he can afford that he'd wear at once (never a
+## plain piece over a worn Legendary), else a gold dot for a Reserve not yet
+## seen.
 ## World tabs appear once World 2 is open: one per world in the build (six
 ## in v3), each in its world's accent with its emblem (art/ui/world_<n>.svg),
 ## a world not reached yet dark behind a lock.
