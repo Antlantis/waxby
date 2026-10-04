@@ -2,12 +2,13 @@ extends Node2D
 ## Static readability lines above the dark, so the path's shape always shows:
 ## W3's vine veins, W5's glass tops, W6's every walkable lip, spike tip and
 ## lake crest (spec §11.2 F6, decisions.md's phone alphas). On the glow layer,
-## one child per 16-column chunk (the tiles' chunks), drawn once as one
-## TriBatch and redrawn only when a tile there changes. A world with no lines
-## (W1, W2) builds no chunks and costs nothing.
+## one child per 16 x 16 chunk (the tiles' chunks: a 15-row level has one row
+## of them), drawn once as one TriBatch and redrawn only when a tile there
+## changes. A world with no lines (W1, W2) builds no chunks and costs nothing.
 ##   build(level, world_n, theme := level.theme, world := null)  the theme's EDGES (themes/loader.gd), else the world's defaults
-##   redraw_chunk(cx)                             after a tile change in chunk cx (and its neighbours' edges)
-##   redraw_cell(x)                               the same, by column
+##   redraw_chunk(k)                              chunk k (column-major: k = column * rows + row)
+##   redraw_cell(x, y := -1)                      after a tile change at (x, y): its chunk and its neighbours'
+##                                                (y -1: every chunk down column x); chunks_at(x, y) lists them
 ## A style entry: {what, color, alpha, width?}. what: vine (veins down vine
 ## cells), glass (glass tops), lip (every walkable top: solid or ledge under
 ## air), ledge (one-way tops only), spike (spike tips), crest (a water
@@ -50,7 +51,8 @@ var level: RefCounted
 var world: Node = null            # asked whether a crumble is there (ledge_present); null: always
 var world_n := 0
 var styles: Array = []
-var chunks: Array = []           # Node2D per chunk (or null where nothing draws)
+var chunks: Array = []           # Node2D per chunk (or null where nothing draws), column-major
+var rows := 1                    # chunks down a column
 var _tb := TriBatch.new()
 
 
@@ -68,26 +70,43 @@ func build(p_level: RefCounted, p_world_n: int, theme := "", p_world: Node = nul
 	if styles.is_empty():
 		return
 	var n := ceili(float(level.width) / CHUNK)
-	for i in n:
+	rows = ceili(float(level.height) / CHUNK)
+	for k in n * rows:
 		var ch := Node2D.new()
-		ch.name = "Edges%d" % i
-		ch.draw.connect(_draw_chunk.bind(ch, i))
+		ch.name = "Edges%d" % k
+		ch.draw.connect(_draw_chunk.bind(ch, k))
 		add_child(ch)
 		chunks.append(ch)
 
 
-func redraw_chunk(cx: int) -> void:
-	if cx >= 0 and cx < chunks.size() and chunks[cx] != null:
-		chunks[cx].queue_redraw()
+func redraw_chunk(k: int) -> void:
+	if k >= 0 and k < chunks.size() and chunks[k] != null:
+		chunks[k].queue_redraw()
 
 
-func redraw_cell(x: int) -> void:
-	var i := x / CHUNK
-	redraw_chunk(i)
-	if (x + 1) / CHUNK != i:
-		redraw_chunk((x + 1) / CHUNK)
-	if x > 0 and (x - 1) / CHUNK != i:
-		redraw_chunk((x - 1) / CHUNK)
+func redraw_cell(x: int, y := -1) -> void:
+	## A tile changed at (x, y): its chunk, and a neighbour's whose cells
+	## touch it (their lines read it). y -1: every chunk down the columns.
+	for k in chunks_at(x, y):
+		redraw_chunk(k)
+
+
+func chunks_at(x: int, y := -1) -> Array:
+	## The chunks (indices into chunks) redraw_cell(x, y) redraws.
+	var cols := []
+	for xx in [x - 1, x, x + 1]:
+		if xx >= 0 and not cols.has(xx / CHUNK):
+			cols.append(xx / CHUNK)
+	var js := []
+	for yy in ([y - 1, y, y + 1] if y >= 0 else range(0, rows * CHUNK, CHUNK)):
+		if yy >= 0 and yy / CHUNK < rows and not js.has(yy / CHUNK):
+			js.append(yy / CHUNK)
+	var out := []
+	for i in cols:
+		for j in js:
+			if i * rows + j < chunks.size():
+				out.append(i * rows + j)
+	return out
 
 
 func _solid(t: int) -> bool:
@@ -103,17 +122,19 @@ func _fallen(t: int, x: int, y: int) -> bool:
 	return t == LevelData.CRUMBLE and world != null and world.has_method("ledge_present") and not world.ledge_present(x, y)
 
 
-func _draw_chunk(ch: Node2D, i: int) -> void:
-	var x0 := i * CHUNK
+func _draw_chunk(ch: Node2D, k: int) -> void:
+	var x0 := (k / rows) * CHUNK
 	var x1 := mini(x0 + CHUNK, level.width)
-	_tb.origin = Vector2(x0 * TILE, 0)
+	var y0 := (k % rows) * CHUNK
+	var y1 := mini(y0 + CHUNK, level.height)
+	_tb.origin = Vector2(x0 * TILE, y0 * TILE)
 	for st in styles:
 		var what := str(st.get("what", "lip"))
 		var c: Color = st.get("color", Color(1, 1, 1))
 		c.a = float(st.get("alpha", 0.3))
 		var w: float = float(st.get("width", 1.5))
 		for x in range(x0, x1):
-			for y in level.height:
+			for y in range(y0, y1):
 				_cell(what, x, y, c, w)
 	_tb.flush(ch)
 

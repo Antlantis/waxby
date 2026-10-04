@@ -13,9 +13,16 @@ extends RefCounted
 ##   near  shore, bell: snuffed-wick reeds, each with a dim smoke tip; eye:
 ##         reeds only by the arena's edges; quiet: nothing
 ## windows(): none. W6 has no decorative lights: every light means something.
-##   static func draw(slice, tb, layer_index, colors, span, x0, x1)
-##   static func windows(layer_index, colors, span) -> Array
+##   static func draw(slice, tb, layer_index, colors, span, x0, x1, tall := 0.0)
+##   static func windows(layer_index, colors, span, tall := 0.0) -> Array
 ## (a gilt theme's "near_density" thins the reeds.)
+## A level taller than 15 rows (tall > 0, backdrop.gd tall(); the shapes
+## plan's E9): the lake stays at the level's foot (its line as far over the
+## bottom as a strip's), the spires hang from the top at the strip's length,
+## and the dark between them gets a little of the drowned town, still
+## sparse: shore and bell, a drowned belfry rising out of the lake every
+## BELFRY_EVERY in the mid layer, and bell ropes hanging out of the dark in
+## the near layer (quiet keeps nothing, as ever). No lights.
 ## No draw_circle / draw_colored_polygon / draw_polyline (test_render.gd).
 
 const RING_EVERY := 1200.0
@@ -23,6 +30,8 @@ const SPIRE_EVERY := 260.0
 const FRAME_EVERY := 700.0
 const POST_EVERY := 530.0
 const REED_EVERY := 46.0
+const BELFRY_EVERY := 900.0       # a tall level's drowned belfries, rising from the lake (mid)
+const ROPE_EVERY := 260.0         # and its bell ropes, hanging from the dark (near)
 const VIEW_W := 844.0
 const RING := Color("1a1830")
 
@@ -45,10 +54,11 @@ static func _variant(colors: Dictionary) -> String:
 	return str(colors.get("variant", "shore"))
 
 
-static func lake_line(span: Vector2, layer_index: int) -> float:
+static func lake_line(span: Vector2, layer_index: int, tall := 0.0) -> float:
 	## Where the lake's surface sits in a layer (it lies near the level's
-	## bottom rows: lower on the nearer layers).
-	return span.y * [0.66, 0.74, 0.82][clampi(layer_index, 0, 2)]
+	## bottom rows: lower on the nearer layers; in a tall level as far over
+	## the bottom as in a strip).
+	return (span.y - tall) * [0.66, 0.74, 0.82][clampi(layer_index, 0, 2)] + tall
 
 
 static func _arena_x(span: Vector2) -> float:
@@ -64,22 +74,25 @@ static func _oval(tb, c: Vector2, rx: float, ry: float, w: float, col: Color, se
 	tb.polyline(pts, w, col, true)
 
 
-static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var v := _variant(colors)
+	# The strip's span: what the composition is laid out on (tall: how much
+	# deeper this level's layer goes; the lake and the fills go to its foot).
+	var base := Vector2(span.x, span.y - tall)
 	match layer_index:
 		0:
-			_far(slice, tb, colors, span, x0, x1, v)
+			_far(slice, tb, colors, base, x0, x1, v, tall)
 		1:
-			_mid(slice, tb, colors, span, x0, x1, v)
+			_mid(slice, tb, colors, base, x0, x1, v, tall)
 		2:
-			_near(slice, tb, colors, span, x0, x1, v)
+			_near(slice, tb, colors, base, x0, x1, v, tall)
 
 
-static func _far(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String) -> void:
+static func _far(slice, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String, tall := 0.0) -> void:
 	var sky: Color = colors.get("sky", Color("040406"))
 	var far: Color = colors.get("far", Color("09090e"))
-	var bottom := span.y + 400.0
-	var ll := lake_line(span, 0)
+	var bottom := span.y + tall + 400.0
+	var ll := lake_line(span, 0) + tall
 	slice.draw_rect(Rect2(x0, -200.0, x1 - x0, bottom + 200.0), sky)
 	# The lake: a shade apart from the dark above it, its far line faint.
 	slice.draw_rect(Rect2(x0, ll, x1 - x0, bottom - ll), far.darkened(0.2))
@@ -117,7 +130,7 @@ static func _far(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float
 			_oval(tb, c, 40.0, 26.0, 3.0, Color("3a3060"), 36)
 
 
-static func _bell_frame(slice: Node2D, tb, foot: Vector2, s: float, col: Color) -> void:
+static func _bell_frame(slice, tb, foot: Vector2, s: float, col: Color) -> void:
 	## A bell frame's top jutting out of the lake: two leaning posts, a beam,
 	## a bell hanging half under.
 	var w := 90.0 * s
@@ -129,11 +142,25 @@ static func _bell_frame(slice: Node2D, tb, foot: Vector2, s: float, col: Color) 
 	tb.convex(PackedVector2Array([Vector2(foot.x - 8 * s, bt), Vector2(foot.x + 8 * s, bt), Vector2(foot.x + 14 * s, foot.y), Vector2(foot.x - 14 * s, foot.y)]), col)
 
 
-static func _mid(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String) -> void:
+static func _mid(slice, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String, tall := 0.0) -> void:
 	var mid: Color = colors.get("mid", Color("0e0e14"))
-	var ll := lake_line(span, 1)
+	var ll := lake_line(span, 1) + tall
 	if v == "quiet" or v == "eye":
 		return
+	if tall > 0.0:
+		# a drowned belfry rising out of the lake into the dark, no light in it
+		for i in _each(BELFRY_EVERY, x0, x1, 460.0):
+			var x := i * BELFRY_EVERY + 460.0 + _h(i, 37) * 200.0
+			var w := 40.0 + 20.0 * _h(i, 38)
+			var top := ll - 120.0 - tall * (0.55 + 0.3 * _h(i, 39))
+			slice.draw_rect(Rect2(x - w * 0.5, top, w, ll - top + 6.0), mid.darkened(0.2))
+			tb.tri(Vector2(x - w * 0.62, top), Vector2(x + w * 0.62, top), Vector2(x, top - w * 0.9), mid.darkened(0.2))
+			# its belfry: an arched opening with a bell's dark shape, a broken louvre
+			tb.convex(_belfry_arch(x, top + 16.0, w * 0.5, 40.0), mid.darkened(0.55))
+			tb.convex(PackedVector2Array([Vector2(x - 5.0, top + 30.0), Vector2(x + 5.0, top + 30.0), Vector2(x + 9.0, top + 48.0), Vector2(x - 9.0, top + 48.0)]),
+					mid.darkened(0.25))
+			slice.draw_rect(Rect2(x - w * 0.5, top + 70.0, w, 3.0), mid.darkened(0.1))
+			slice.draw_rect(Rect2(x - 2.0, top + 100.0, 4.0, 9.0), mid.darkened(0.55))
 	# The nearer lake line (faint), so the layers stack like distance.
 	slice.draw_rect(Rect2(x0, ll, x1 - x0, 1.0), Color(RING, 0.8))
 	if v == "shore":
@@ -149,7 +176,7 @@ static func _mid(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float
 			_sunk_bell(tb, Vector2(x, ll), 34.0 + 22.0 * _h(i, 35), mid, _h(i, 36) - 0.5)
 
 
-static func _post(slice: Node2D, tb, foot: Vector2, col: Color, lean: float) -> void:
+static func _post(slice, tb, foot: Vector2, col: Color, lean: float) -> void:
 	## A drowned lantern post, leaning, its lantern dark.
 	var top := foot + Vector2(sin(lean) * 90.0, -cos(lean) * 90.0)
 	tb.line(foot + Vector2(0, 6), top, 5.0, col)
@@ -172,13 +199,24 @@ static func _sunk_bell(tb, foot: Vector2, r: float, col: Color, tilt: float) -> 
 	tb.ring(foot + Vector2(0, -r * 1.25).rotated(tilt * 0.4), 5.0, 3.0, col, 10)
 
 
-static func _near(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String) -> void:
+static func _near(slice, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String, tall := 0.0) -> void:
 	if v == "quiet":
 		return
 	var near: Color = colors.get("near", Color("050507"))
 	var density: float = float(colors.get("near_density", 1.0))
 	var every := REED_EVERY / maxf(density, 0.1)
-	var ll := lake_line(span, 2)
+	var ll := lake_line(span, 2) + tall
+	if tall > 0.0 and v != "eye":
+		# bell ropes hanging out of the dark, frayed where they broke
+		for i in _each(ROPE_EVERY, x0, x1, 90.0):
+			if _h(i, 47) < 0.4:
+				continue
+			var x := i * ROPE_EVERY + 90.0 + _h(i, 48) * 120.0
+			var ln := 120.0 + tall * (0.3 + 0.4 * _h(i, 49))
+			var sway := (_h(i, 50) - 0.5) * 16.0
+			tb.line(Vector2(x, -40.0), Vector2(x + sway, ln), 2.2, near.lightened(0.03))
+			for f in 3:
+				tb.line(Vector2(x + sway, ln), Vector2(x + sway + (f - 1) * 4.0, ln + 8.0 + f * 3.0), 1.2, near.lightened(0.03))
 	var ax := _arena_x(span)
 	for i in _each(every, x0, x1):
 		var x := i * every + _h(i, 41) * every * 0.8
@@ -197,9 +235,19 @@ static func _near(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: floa
 		# The snuffed wick at its tip: a dim grey curl of old smoke.
 		tb.rect(Rect2(tip + Vector2(-1.2, -4.0), Vector2(2.4, 4.0)), Color("1c1a22"))
 		tb.circle(tip + Vector2(1.0, -6.0), 1.6, Color(0.36, 0.34, 0.42, 0.35), 6)
-	slice.draw_rect(Rect2(x0, span.y + 60.0, x1 - x0, 400.0), near)
+	slice.draw_rect(Rect2(x0, span.y + tall + 60.0, x1 - x0, 400.0), near)
 
 
-static func windows(layer_index: int, colors: Dictionary, span: Vector2) -> Array:
+static func _belfry_arch(x: float, top: float, hw: float, h: float) -> PackedVector2Array:
+	## A round-headed opening hw wide each side, h tall from its crown (convex).
+	var pts := PackedVector2Array([Vector2(x - hw * 0.6, top + h)])
+	for k in 7:
+		var a := PI + PI * k / 6.0
+		pts.append(Vector2(x + cos(a) * hw * 0.6, top + hw * 0.6 + sin(a) * hw * 0.6))
+	pts.append(Vector2(x + hw * 0.6, top + h))
+	return pts
+
+
+static func windows(layer_index: int, colors: Dictionary, span: Vector2, tall := 0.0) -> Array:
 	## None: the Hushdeep has no decorative lights (spec §4.4's rule 3).
 	return []

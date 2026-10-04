@@ -119,11 +119,14 @@ func _initialize() -> void:
 	var worst_chunk := 0
 	for t in tiles:
 		var c0: int = t.col0
-		var r := Rect2(c0 * 32, -200, 16 * 32, 2000)
+		var r0: int = int(t.get("row0")) if "row0" in t else 0
+		# (16 x 16 cells, the bottom row of chunks with the bedrock; before
+		# tile_view.gd's row0, 16 columns the level's whole height)
+		var r := Rect2(c0 * 32, r0 * 32, 16 * 32, 16 * 32 + 160) if "row0" in t else Rect2(c0 * 32, -200, 16 * 32, 2000)
 		if not r.intersects(view):
 			continue
 		t.visible = true
-		var d := await _measure("  tile chunk %d alone (+)" % (c0 / 16))
+		var d := await _measure("  tile chunk %d,%d alone (+)" % [c0 / 16, r0 / 16])
 		t.visible = false
 		worst_chunk = maxi(worst_chunk, d - no_tiles)
 	for t in tiles:

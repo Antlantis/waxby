@@ -17,9 +17,17 @@ extends RefCounted
 ## windows(): the rose windows (tinted by their glass) and a few lit shards
 ## on the mid layer, decorative tinted lights (s 0.45, tint = the pane at
 ## 0.8); the prism's white window.
-##   static func draw(slice, tb, layer_index, colors, span, x0, x1)
-##   static func windows(layer_index, colors, span) -> Array
+##   static func draw(slice, tb, layer_index, colors, span, x0, x1, tall := 0.0)
+##   static func windows(layer_index, colors, span, tall := 0.0) -> Array
 ## An element is drawn by the one slice its anchor falls in (backdrops/plain.gd).
+## A level taller than 15 rows (tall > 0, backdrop.gd tall(); the shapes
+## plan's E9): the strip's composition stays at the top, laid out on the
+## strip's span (nothing spreads thinner or grows), the void's glow still
+## rises from the level's bottom and the rising shards stand on it, and the
+## void goes on down: more stars, and a storey at a time (STOREY) more of
+## what floats in the variant's mid layer (stalls and broken arches, came
+## ribbons, fragments) and loose shards drifting in the near layer, each
+## storey salted by its index. The lights stay the strip's.
 ## No draw_circle / draw_colored_polygon / draw_polyline (test_render.gd).
 
 const ROSE_EVERY := 1800.0
@@ -32,6 +40,8 @@ const NEAR_EVERY := 520.0
 const SHARD_LIGHT_EVERY := 920.0
 const FRAME_W := 250.0            # the Saint's empty window
 const VIEW_W := 844.0
+const STOREY := 180.0             # a tall level's storey down the mid layer
+const NEAR_STOREY := 260.0        # and down the near layer
 
 
 static func _h(i: int, salt: int = 0) -> float:
@@ -62,30 +72,34 @@ static func _arena_x(span: Vector2) -> float:
 	return maxf(span.x - VIEW_W * 0.5, VIEW_W * 0.5)
 
 
-static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var v := _variant(colors)
+	# The strip's span: what the composition is laid out on (tall: how much
+	# deeper this level's layer goes).
+	var base := Vector2(span.x, span.y - tall)
 	match layer_index:
 		0:
-			_far(slice, tb, colors, span, x0, x1, v)
+			_far(slice, tb, colors, base, x0, x1, v, tall)
 		1:
-			_mid(slice, tb, colors, span, x0, x1, v)
+			_mid(slice, tb, colors, base, x0, x1, v, tall)
 		2:
-			_near(slice, tb, colors, span, x0, x1, v)
+			_near(slice, tb, colors, base, x0, x1, v, tall)
 
 
 # ---------------------------------------------------------------- far
 
-static func _far(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String) -> void:
+static func _far(slice, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String, tall := 0.0) -> void:
 	var sky: Color = colors.get("sky", Color("08060e"))
 	var far: Color = colors.get("far", Color("120e1e"))
 	var glass := _glass(colors)
-	var bottom := span.y + 400.0
+	var bottom := span.y + tall + 400.0
 	slice.draw_rect(Rect2(x0, -200.0, x1 - x0, bottom + 200.0), sky)
-	# The void glows faintly from below: the old light in the glass.
+	# The void glows faintly from below: the old light in the glass (from
+	# the level's bottom, however deep).
 	var glow_c: Color = sky.lerp((glass[0] as Color), 0.10)
 	for b in 6:
 		var f := float(b) / 6.0
-		var y := span.y * (0.55 + 0.45 * f)
+		var y := span.y * (0.55 + 0.45 * f) + tall
 		slice.draw_rect(Rect2(x0, y, x1 - x0, bottom - y), Color(glow_c, 0.18 + 0.1 * f))
 	# Stars.
 	for i in _each(STAR_EVERY, x0, x1):
@@ -96,6 +110,9 @@ static func _far(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float
 		if v == "void" and _h(i, 6) < 0.35:
 			continue
 		slice.draw_rect(Rect2(sx, sy, s, s), Color(0.9, 0.88, 1.0, a))
+		if tall > 0.0 and _h(i, 7) < tall / (span.y * 0.9):
+			# as many again a pixel down in the deeper void
+			slice.draw_rect(Rect2(sx + _h(i, 8) * STAR_EVERY, span.y * 0.9 + _h(i, 9) * tall, s, s), Color(0.9, 0.88, 1.0, a))
 	# Far floating chunks of the old cathedral.
 	for i in _each(CHUNK_EVERY, x0, x1, 150.0):
 		if v == "void" and _h(i, 17) < 0.6:
@@ -144,7 +161,7 @@ static func _petal(tb, c: Vector2, a: float, r0: float, r1: float, half_w: float
 	tb.convex(PackedVector2Array([c + d * r0, m + o * half_w, c + d * r1, m - o * half_w]), col)
 
 
-static func _rose(slice: Node2D, tb, c: Vector2, r: float, g: Color, far: Color, streaming: bool, seed: int) -> void:
+static func _rose(slice, tb, c: Vector2, r: float, g: Color, far: Color, streaming: bool, seed: int) -> void:
 	## A broken rose window, far off: a lead ring round two rings of
 	## almond petals of dim glass (six in, twelve out) and a hub, some petals
 	## gone; in the wind (streaming) the lost ones trail away to the right as
@@ -176,7 +193,7 @@ static func _rose(slice: Node2D, tb, c: Vector2, r: float, g: Color, far: Color,
 	tb.circle(c, r * 0.08, glass, 10)
 
 
-static func _lancet_frame(slice: Node2D, tb, top: Vector2, w: float, h: float, colors: Dictionary) -> void:
+static func _lancet_frame(slice, tb, top: Vector2, w: float, h: float, colors: Dictionary) -> void:
 	## The Saint's empty window: a vast lancet of lead with no glass left,
 	## white light standing in it.
 	var lead := Color(colors.get("far", Color("16122a"))).darkened(0.45)
@@ -223,10 +240,12 @@ static func _arch_pts(x0: float, x1: float, top: float, bottom: float, seg: int)
 
 # ---------------------------------------------------------------- mid
 
-static func _mid(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String) -> void:
+static func _mid(slice, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String, tall := 0.0) -> void:
 	var mid: Color = colors.get("mid", Color("1c1630"))
 	var glass := _glass(colors)
 	var lead := mid.darkened(0.55)
+	if tall > 0.0 and v != "prism":
+		_tall_mid(slice, tb, mid, lead, glass, span, x0, x1, v, tall)
 	match v:
 		"choir":
 			for i in _each(STALL_EVERY, x0, x1, 120.0):
@@ -258,7 +277,7 @@ static func _mid(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float
 				_pew(slice, tb, Vector2(x, span.y * (0.35 + 0.3 * _h(i, 82))), mid, lead, 0.8)
 
 
-static func _stall(slice: Node2D, tb, p: Vector2, mid: Color, lead: Color, g: Color, i: int) -> void:
+static func _stall(slice, tb, p: Vector2, mid: Color, lead: Color, g: Color, i: int) -> void:
 	## A floating choir stall: a canopied bench on a broken block, a chain
 	## hanging from it into the void, a sliver of lit glass in its canopy.
 	var w := 90.0 + 40.0 * _h(i, 54)
@@ -284,7 +303,7 @@ static func _stall(slice: Node2D, tb, p: Vector2, mid: Color, lead: Color, g: Co
 		y += 7.0
 
 
-static func _broken_arch(slice: Node2D, tb, p: Vector2, mid: Color, lead: Color, g: Color, i: int) -> void:
+static func _broken_arch(slice, tb, p: Vector2, mid: Color, lead: Color, g: Color, i: int) -> void:
 	## A broken arch floating: two piers, one half of a pointed arch, glass
 	## fragments still in it with lead lines.
 	var w := 70.0 + 30.0 * _h(i, 57)
@@ -327,7 +346,7 @@ static func _came_ribbon(tb, p: Vector2, col: Color, lead: Color, glass: Array, 
 		tb.convex(PackedVector2Array([q + Vector2(-4, 1), q + Vector2(4, -2), q + Vector2(5, 7), q + Vector2(-3, 8)]), g.darkened(0.4))
 
 
-static func _pew(slice: Node2D, tb, p: Vector2, mid: Color, lead: Color, s: float) -> void:
+static func _pew(slice, tb, p: Vector2, mid: Color, lead: Color, s: float) -> void:
 	## A floating pew, tumbled (never level, so it never reads as a ledge),
 	## darker than the stone by a long way.
 	var c := mid.darkened(0.3)
@@ -344,18 +363,20 @@ static func _pew(slice: Node2D, tb, p: Vector2, mid: Color, lead: Color, s: floa
 
 # ---------------------------------------------------------------- near
 
-static func _near(slice: Node2D, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String) -> void:
+static func _near(slice, tb, colors: Dictionary, span: Vector2, x0: float, x1: float, v: String, tall := 0.0) -> void:
 	var near: Color = colors.get("near", Color("0d0a17"))
 	var glass := _glass(colors)
 	var density: float = float(colors.get("near_density", 1.0))
 	var every := NEAR_EVERY / maxf(density, 0.1)
+	if tall > 0.0 and v != "prism":
+		_tall_near(tb, near, glass, span, x0, x1, v, tall, every)
 	match v:
 		"choir", "void":
 			var ev := every if v == "choir" else every * 2.6
 			for i in _each(ev, x0, x1, 200.0):
 				var x := i * ev + 200.0 + _h(i, 91) * 160.0
 				var hanging := _h(i, 92) < 0.55
-				_near_shard(tb, x, span, near, glass[absi(i) % glass.size()], hanging, i)
+				_near_shard(tb, x, Vector2(span.x, span.y + tall), near, glass[absi(i) % glass.size()], hanging, i)
 		"rose":
 			for i in _each(every, x0, x1, 140.0):
 				var x := i * every + 140.0 + _h(i, 93) * 200.0
@@ -382,7 +403,7 @@ static func _near_shard(tb, x: float, span: Vector2, near: Color, g: Color, hang
 	tb.convex(pts, near)
 
 
-static func _banner(slice: Node2D, tb, x: float, span: Vector2, near: Color, banner: Color, i: int) -> void:
+static func _banner(slice, tb, x: float, span: Vector2, near: Color, banner: Color, i: int) -> void:
 	## A torn banner hanging from the dark, its ragged end lifting.
 	var w := 34.0 + 14.0 * _h(i, 98)
 	var l := 90.0 + 80.0 * _h(i, 99)
@@ -396,7 +417,7 @@ static func _banner(slice: Node2D, tb, x: float, span: Vector2, near: Color, ban
 		tb.tri(Vector2(tx, l - 6.0), Vector2(tx + w / 3.0, l - 6.0), Vector2(tx + w / 3.0 + 8.0, l + 14.0 + 10.0 * _h(i * 3 + k, 100)), b)
 
 
-static func _pillar(slice: Node2D, tb, x: float, span: Vector2, near: Color, i: int) -> void:
+static func _pillar(slice, tb, x: float, span: Vector2, near: Color, i: int) -> void:
 	## A near pillar of the Lightwell with a gold capital.
 	var gold := Color("6a5424")
 	slice.draw_rect(Rect2(x - 22.0, -60.0, 44.0, span.y + 460.0), near)
@@ -407,12 +428,63 @@ static func _pillar(slice: Node2D, tb, x: float, span: Vector2, near: Color, i: 
 	slice.draw_rect(Rect2(x - 3.0, cy + 18.0, 2.0, span.y), near.lightened(0.05))
 
 
+# ---------------------------------------------------------------- a tall level's void
+
+static func _tall_mid(slice, tb, mid: Color, lead: Color, glass: Array, span: Vector2, x0: float, x1: float, v: String, tall: float) -> void:
+	## More of what floats in the mid layer, a storey at a time under the
+	## strip's (its own salts: no storey is the strip's again).
+	var k := 0
+	while span.y * 0.74 + k * STOREY < span.y + tall + 20.0:
+		var sy := span.y * 0.74 + k * STOREY
+		match v:
+			"choir":
+				for i in _each(STALL_EVERY, x0, x1, 120.0 + 200.0 * (k % 2)):
+					var x := i * STALL_EVERY + 120.0 + 200.0 * (k % 2) + _h(i, 151 + k) * 120.0
+					var y := sy + _h(i, 152 + k) * STOREY * 0.6
+					if _h(i, 153 + k) < 0.5:
+						_stall(slice, tb, Vector2(x, y), mid, lead, glass[absi(i + k) % glass.size()], i + 40 * (k + 1))
+					else:
+						_broken_arch(slice, tb, Vector2(x, y), mid, lead, glass[absi(i + k + 1) % glass.size()], i + 40 * (k + 1))
+			"rose":
+				for i in _each(RIBBON_EVERY, x0, x1, 60.0 + 150.0 * (k % 2)):
+					var x := i * RIBBON_EVERY + 60.0 + 150.0 * (k % 2) + _h(i, 161 + k) * 140.0
+					_came_ribbon(tb, Vector2(x, sy + _h(i, 162 + k) * STOREY * 0.7), mid.lightened(0.05), lead, glass, i + 50 * (k + 1))
+			"void":
+				for i in _each(FRAG_EVERY * 0.7, x0, x1, 200.0 + 260.0 * (k % 2)):
+					var x := i * FRAG_EVERY * 0.7 + 200.0 + 260.0 * (k % 2) + _h(i, 171 + k) * 300.0
+					_chunk(tb, Vector2(x, sy + _h(i, 172 + k) * STOREY * 0.7), 26.0 + 30.0 * _h(i, 173 + k), mid, i + 900 + 60 * (k + 1))
+		k += 1
+
+
+static func _tall_near(tb, near: Color, glass: Array, span: Vector2, x0: float, x1: float, v: String, tall: float, every: float) -> void:
+	## Loose shards drifting in the near layer's deeper void, a storey at a
+	## time: dark, a thin coloured edge, tilted (never level: nothing to
+	## stand on).
+	var ev := every * (1.4 if v == "choir" else 2.2)
+	var k := 0
+	while span.y * 0.55 + k * NEAR_STOREY < span.y + tall - 80.0:
+		var sy := span.y * 0.55 + k * NEAR_STOREY
+		for i in _each(ev, x0, x1, 90.0 + 230.0 * (k % 2)):
+			var c := Vector2(i * ev + 90.0 + 230.0 * (k % 2) + _h(i, 181 + k) * 200.0, sy + _h(i, 182 + k) * NEAR_STOREY * 0.6)
+			var w := 26.0 + 26.0 * _h(i, 183 + k)
+			var l := 60.0 + 60.0 * _h(i, 184 + k)
+			var ang := (_h(i, 185 + k) - 0.5) * 1.6
+			var u := Vector2(cos(ang), sin(ang))
+			var n := u.orthogonal()
+			var pts := PackedVector2Array([c - n * l * 0.5 - u * w * 0.4, c - n * l * 0.3 + u * w * 0.5, c + n * l * 0.5 + u * w * 0.1, c + n * l * 0.2 - u * w * 0.3])
+			var edge := (glass[absi(i + k) % glass.size()] as Color).darkened(0.25)
+			tb.convex(PackedVector2Array([pts[0] - u * 2.0, pts[1] + u * 2.0, pts[2] + n * 2.0, pts[3] - u * 2.0]), Color(edge, 0.9))
+			tb.convex(pts, near)
+		k += 1
+
+
 # ---------------------------------------------------------------- lights
 
-static func windows(layer_index: int, colors: Dictionary, span: Vector2) -> Array:
+static func windows(layer_index: int, colors: Dictionary, span: Vector2, tall := 0.0) -> Array:
 	var out := []
 	var glass := _glass(colors)
 	var v := _variant(colors)
+	span = Vector2(span.x, span.y - tall)   # (laid out on the strip's span, as draw() does)
 	if layer_index == 0:
 		if v == "choir" or v == "rose":
 			var i := 0

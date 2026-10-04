@@ -84,7 +84,7 @@ static func seal(world: Node, level: RefCounted, door: Array) -> void:
 	for c in door:
 		level.set_tile(c.x, c.y, LevelData.STONE)
 		if world:
-			world._redraw_at(c.x)
+			world._redraw_at(c.x, c.y)
 			world.dust_at(LevelData.cell_center(c))
 	if world and not door.is_empty():
 		world._sfx("block_break", 0.7)
@@ -113,4 +113,4 @@ static func unseal(world: Node, level: RefCounted, door: Array) -> void:
 	for c in door:
 		level.set_tile(c.x, c.y, LevelData.AIR)
 		if world:
-			world._redraw_at(c.x)
+			world._redraw_at(c.x, c.y)

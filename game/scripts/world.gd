@@ -174,7 +174,8 @@ var signs: Array = []           # {pos, text, node}
 var shots: Array = []           # see spawn_shot
 var hazards: Array = []         # see add_hazard
 var bolts: Array = []           # old name kept empty: shots replaced them
-var chunks: Array = []
+var chunks: Array = []          # the TileViews, column-major: chunk (i, j) at i * chunk_rows + j
+var chunk_rows := 1             # tile chunks down a column (a 15-row level: one)
 var spawns: Array = []          # {kind, cell, opts} to respawn ordinary monsters from
 var floaters := Floaters.new()
 var checkpoint := Vector2.ZERO
@@ -361,15 +362,19 @@ func _build() -> void:
 	add_child(backdrop)
 	backdrop.build(_theme(), level.pixel_size(), view)
 
-	# Tiles, in chunks the canvas can cull.
+	# Tiles, in chunks the canvas can cull: CHUNK x CHUNK cells, so a tall
+	# level's redraws and culling scale with the screen, not its height.
 	var n := ceili(float(level.width) / TileView.CHUNK)
+	chunk_rows = ceili(float(level.height) / TileView.CHUNK)
 	for i in n:
-		var tv := TileView.new()
-		tv.level = level
-		tv.col0 = i * TileView.CHUNK
-		tv.world = self
-		add_child(tv)
-		chunks.append(tv)
+		for j in chunk_rows:
+			var tv := TileView.new()
+			tv.level = level
+			tv.col0 = i * TileView.CHUNK
+			tv.row0 = j * TileView.CHUNK
+			tv.world = self
+			add_child(tv)
+			chunks.append(tv)
 
 	var under := Node2D.new()
 	under.name = "Under"
@@ -2240,7 +2245,7 @@ func _open_block(cell: Vector2i) -> void:
 func break_tile(cell: Vector2i) -> void:
 	## A cracked brick or false stone breaks.
 	level.set_tile(cell.x, cell.y, LevelData.AIR)
-	_redraw_at(cell.x)
+	_redraw_at(cell.x, cell.y)
 	_sfx("block_break")
 	_haptic(16)
 	shake = maxf(shake, 3.0)
@@ -2251,19 +2256,34 @@ func _break_brick(cell: Vector2i) -> void:
 	break_tile(cell)
 
 
-func _redraw_at(x: int) -> void:
+func _redraw_at(x: int, y := -1) -> void:
+	## A tile changed at (x, y): its chunk again, and a neighbour's whose
+	## cells touch it (their outlines and lips read it). y -1: every chunk
+	## down column x (a change over a run of rows).
 	if edges != null:
-		edges.redraw_cell(x)
-	var i := x / TileView.CHUNK
-	if i >= 0 and i < chunks.size():
-		chunks[i].queue_redraw()
-	# A neighbour chunk's edge outlines may change too.
-	var j := (x + 1) / TileView.CHUNK
-	if j != i and j < chunks.size():
-		chunks[j].queue_redraw()
-	var k := (x - 1) / TileView.CHUNK
-	if k != i and k >= 0:
+		edges.redraw_cell(x, y)
+	for k in chunks_at(x, y):
 		chunks[k].queue_redraw()
+
+
+func chunks_at(x: int, y := -1) -> Array:
+	## The tile chunks (indices into chunks) that draw cell (x, y) or one
+	## next to it (y -1: the whole column's, and its neighbours').
+	var cols := []
+	for xx in [x - 1, x, x + 1]:
+		if xx >= 0 and not cols.has(xx / TileView.CHUNK):
+			cols.append(xx / TileView.CHUNK)
+	var rows := []
+	for yy in ([y - 1, y, y + 1] if y >= 0 else range(0, chunk_rows * TileView.CHUNK, TileView.CHUNK)):
+		if yy >= 0 and yy / TileView.CHUNK < chunk_rows and not rows.has(yy / TileView.CHUNK):
+			rows.append(yy / TileView.CHUNK)
+	var out := []
+	for i in cols:
+		for j in rows:
+			var k: int = i * chunk_rows + j
+			if k < chunks.size():
+				out.append(k)
+	return out
 
 
 # ---------------------------------------------------------------- crumbling ledges
@@ -2332,11 +2352,11 @@ func _update_crumbles(dt: float) -> void:
 			continue
 		c["timer"] -= dt
 		if c["state"] == "shake":
-			_redraw_at(cell.x)
+			_redraw_at(cell.x, cell.y)
 			if c["timer"] <= 0.0:
 				c["state"] = "fallen"
 				c["timer"] = 3.5
-				_redraw_at(cell.x)
+				_redraw_at(cell.x, cell.y)
 				_rubble().burst(LevelData.cell_center(cell) + Vector2(0, -10), 3, true)
 				if cell.x % 2 == 0:
 					_sfx("block_break", 1.3)
@@ -2345,7 +2365,7 @@ func _update_crumbles(dt: float) -> void:
 			var r := Rect2(cell.x * TILE, cell.y * TILE, TILE, 12)
 			if not r.intersects(player.rect()):
 				c["state"] = "idle"
-				_redraw_at(cell.x)
+				_redraw_at(cell.x, cell.y)
 
 
 # ---------------------------------------------------------------- touching

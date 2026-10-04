@@ -11,9 +11,16 @@ extends RefCounted
 ##          (the windows); near: chimney stacks and a weathervane. The snow
 ##          itself is the theme's motes (modes.gd AMBIENT, 40 flakes at most).
 ## windows(): the hall's gold windows, Lanternfold's lamps (warm, tinted).
-##   static func draw(slice, tb, layer_index, colors, span, x0, x1)
-##   static func windows(layer_index, colors, span) -> Array
+##   static func draw(slice, tb, layer_index, colors, span, x0, x1, tall := 0.0)
+##   static func windows(layer_index, colors, span, tall := 0.0) -> Array
 ## (a gilt theme's "near_density" 0.5 halves the near layer.)
+## A level taller than 15 rows (tall > 0, backdrop.gd tall(); the shapes
+## plan's E9): the strip's composition stays at the top on the strip's span
+## (the hourglasses, the gold windows and the arcade's arches keep their
+## size), the fills go to the bottom, and the hall goes on down: the far
+## wall's gold courses, the near pillars' lozenges and a capital every
+## CAPITAL_EVERY, and the arcade a storey at a time, each under a gold string
+## course.
 ## No draw_circle / draw_colored_polygon / draw_polyline (test_render.gd).
 
 const WINDOW_EVERY := 900.0
@@ -25,6 +32,7 @@ const ROOF_EVERY := 150.0
 const TOWN_EVERY := 120.0
 const LAMP_EVERY := 330.0
 const STACK_EVERY := 430.0
+const CAPITAL_EVERY := 400.0      # a tall level's near pillars: another capital this far down
 const GOLD := Color("c8a860")
 
 
@@ -59,26 +67,28 @@ static func _arch_pts(x0: float, x1: float, top: float, bottom: float, seg := 8)
 	return pts
 
 
-static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	if str(colors.get("variant", "hall")) == "roof":
-		_roof(slice, tb, layer_index, colors, span, x0, x1)
+		_roof(slice, tb, layer_index, colors, span, x0, x1, tall)
 		return
+	var full := span
+	span = Vector2(span.x, span.y - tall)   # the strip's span: what the composition is laid out on
 	var sky: Color = colors.get("sky", Color("0c0a10"))
 	var far: Color = colors.get("far", Color("16121c"))
 	var mid: Color = colors.get("mid", Color("1e1a26"))
 	var near: Color = colors.get("near", Color("0e0b14"))
 	var glass: Array = colors.get("glass", [Color("ffd84a"), Color("fff2c8")])
-	var bottom := span.y + 400.0
+	var bottom := span.y + tall + 400.0
 	match layer_index:
 		0:
 			slice.draw_rect(Rect2(x0, -200.0, x1 - x0, bottom + 200.0), sky)
 			# The far wall of black marble, its courses picked out in gold.
 			slice.draw_rect(Rect2(x0, 40.0, x1 - x0, bottom), far)
-			for r in 6:
+			for r in 6 + ceili(tall / 64.0):
 				slice.draw_rect(Rect2(x0, 70.0 + r * 64.0, x1 - x0, 1.0), Color(GOLD, 0.16))
 			for i in _each(HOURGLASS_EVERY, x0, x1, 600.0):
 				_hourglass(tb, Vector2(i * HOURGLASS_EVERY + 600.0 + _h(i, 1) * 200.0, span.y * 0.42), span.y * 0.3)
-			for w in windows(0, colors, span):
+			for w in windows(0, colors, full, tall):
 				var r: Rect2 = w["rect"]
 				if r.get_center().x < x0 or r.get_center().x >= x1:
 					continue
@@ -97,6 +107,16 @@ static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: 
 				var arch := _arch_pts(ax - BAY * 0.5 + 14.0, ax + BAY * 0.5 - 14.0, top, top + span.y * 0.9, 8)
 				tb.convex(arch, mid.darkened(0.5))
 				tb.polyline(arch, 1.5, Color(GOLD, 0.28), true)
+				# a tall level: the arcade again under a gold string course, a storey at a time
+				var oy := span.y * 0.9 + 30.0
+				while top + oy < span.y + tall + 20.0:
+					slice.draw_rect(Rect2(x, top + oy - 18.0, BAY, 8.0), mid.lightened(0.06))
+					slice.draw_rect(Rect2(x, top + oy - 10.0, BAY, 1.5), Color(GOLD, 0.35))
+					slice.draw_rect(Rect2(x - 18.0, 30.0 + span.y * 0.25 + oy, 36.0, 6.0), mid.lightened(0.06))
+					var a2 := _arch_pts(ax - BAY * 0.5 + 14.0, ax + BAY * 0.5 - 14.0, top + oy, top + oy + span.y * 0.9, 8)
+					tb.convex(a2, mid.darkened(0.5))
+					tb.polyline(a2, 1.5, Color(GOLD, 0.28), true)
+					oy += span.y * 0.9 + 30.0
 		2:
 			var density: float = float(colors.get("near_density", 1.0))
 			var every := PILLAR_EVERY / maxf(density, 0.1)
@@ -110,7 +130,12 @@ static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: 
 				var cy := 80.0 + _h(i, 6) * 30.0
 				slice.draw_rect(Rect2(x - 32.0, cy, 64.0, 12.0), near.lightened(0.05))
 				slice.draw_rect(Rect2(x - 32.0, cy + 12.0, 64.0, 2.0), Color(GOLD, 0.6))
-				for k in 3:
+				var c2 := cy + CAPITAL_EVERY
+				while c2 < span.y + tall:
+					slice.draw_rect(Rect2(x - 30.0, c2, 60.0, 10.0), near.lightened(0.05))
+					slice.draw_rect(Rect2(x - 30.0, c2 + 10.0, 60.0, 2.0), Color(GOLD, 0.6))
+					c2 += CAPITAL_EVERY
+				for k in 3 + ceili(tall / 90.0):
 					var ly := cy + 60.0 + k * 90.0
 					tb.quad(Vector2(x, ly - 9.0), Vector2(x + 6.0, ly), Vector2(x, ly + 9.0), Vector2(x - 6.0, ly), Color(GOLD, 0.45))
 
@@ -133,7 +158,7 @@ static func _hourglass(tb, c: Vector2, h: float) -> void:
 	tb.line(c, c + Vector2(0, h * 0.45), 1.5, Color(GOLD, 0.25))
 
 
-static func _gold_window(slice: Node2D, tb, r: Rect2, glass: Array, far: Color) -> void:
+static func _gold_window(slice, tb, r: Rect2, glass: Array, far: Color) -> void:
 	## A tall arched window of gold glass in lead.
 	var outer := _arch_pts(r.position.x - 6.0, r.end.x + 6.0, r.position.y - 6.0, r.end.y + 4.0, 8)
 	tb.convex(outer, far.darkened(0.4))
@@ -149,13 +174,17 @@ static func _gold_window(slice: Node2D, tb, r: Rect2, glass: Array, far: Color) 
 
 # ---------------------------------------------------------------- 1-S: the roof
 
-static func _roof(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _roof(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
+	## (1-S is a strip; a taller roof keeps its roofs at the strip's places,
+	## its fills to the bottom.)
 	var sky: Color = colors.get("sky", Color("0e1024"))
 	var far: Color = colors.get("far", Color("1a1c34"))
 	var mid: Color = colors.get("mid", Color("24264a"))
 	var near: Color = colors.get("near", Color("14142a"))
 	var snow := Color("d8dcf0")
-	var bottom := span.y + 400.0
+	var full := span
+	span = Vector2(span.x, span.y - tall)
+	var bottom := span.y + tall + 400.0
 	match layer_index:
 		0:
 			slice.draw_rect(Rect2(x0, -200.0, x1 - x0, bottom + 200.0), sky)
@@ -198,7 +227,7 @@ static func _roof(slice: Node2D, tb, layer_index: int, colors: Dictionary, span:
 				if _h(i, 14) > 0.55:
 					slice.draw_rect(Rect2(x + w * 0.2, top - w * 0.36, 10.0, w * 0.26), mid)
 					slice.draw_rect(Rect2(x + w * 0.2 - 1.0, top - w * 0.36, 12.0, 3.0), Color(snow, 0.6))
-			for w in windows(1, colors, span):
+			for w in windows(1, colors, full, tall):
 				var r: Rect2 = w["rect"]
 				var c := r.get_center()
 				if c.x < x0 or c.x >= x1:
@@ -224,9 +253,10 @@ static func _roof(slice: Node2D, tb, layer_index: int, colors: Dictionary, span:
 					tb.line(Vector2(x - 12.0, top - 46.0), Vector2(x + 12.0, top - 46.0), 1.5, near)
 
 
-static func windows(layer_index: int, colors: Dictionary, span: Vector2) -> Array:
+static func windows(layer_index: int, colors: Dictionary, span: Vector2, tall := 0.0) -> Array:
 	var out := []
 	var roof := str(colors.get("variant", "hall")) == "roof"
+	span = Vector2(span.x, span.y - tall)   # (laid out on the strip's span, as draw() does)
 	if roof:
 		if layer_index == 1:
 			var i := 0

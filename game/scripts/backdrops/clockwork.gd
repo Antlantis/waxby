@@ -28,6 +28,18 @@ extends RefCounted
 ## little clocks there have no hands (the mid layer's last ARENA_MID px).
 ## No gear has the grinder rim (the Spurwheel's). Colours stay at or under
 ## each layer's own.
+## A level taller than 15 rows (tall > 0, backdrop.gd tall(); the shapes
+## plan's E9): the strip's composition stays at the top on the strip's span
+## (the wall's top, the belts, the benches, the gears where a strip has
+## them), the fills go to the bottom, and the tower goes on down a storey at
+## a time (STOREY), by variant: clockface a string course, then louvred
+## windows and bell niches or crossed girders by turns; gearworks trusses
+## between its posts, a belt every other storey; icebells ice-sheathed beams;
+## escapement benches of stopped clocks (handless over the arena, as ever).
+## The near layer's pipes keep their brackets all the way down, a small gear
+## or a frozen beam with icicles comes a storey at a time, and the gearworks'
+## chains hang from girders lower down too. No window is added: the lights
+## stay the strip's.
 
 const Clip := preload("res://scripts/backdrops/orchard.gd")
 const FACE_EVERY := 1600.0
@@ -39,6 +51,8 @@ const WHEEL_R := 90.0
 const WHEEL_REACH := Vector2(100.0, 250.0)   # left of the wheel's centre (its teeth), right (the pendulum's bob)
 const ARENA_FAR := 1000.0        # the far layer's last px: what shows over the Tinker's arena
 const ARENA_MID := 1400.0        # and the mid layer's
+const STOREY := 210.0            # a tall level's storey down the mid wall
+const NEAR_STOREY := 300.0       # and down the near layer
 
 
 static func _h(i: int, salt: int = 0) -> float:
@@ -85,29 +99,32 @@ static func _variant(colors: Dictionary) -> String:
 	return str(colors.get("variant", "clockface"))
 
 
-static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	## The strip [x0, x1) of the layer: everything reaching into it, cut to it.
 	var v := _variant(colors)
 	var st = Clip.Strip.new(slice, x0, x1)
 	var i_from: int = tb.indices.size()
 	var a0 := x0 - OVER
 	var a1 := x1 + OVER
+	# The strip's span: what the composition is laid out on (tall: how much
+	# deeper this level's layer goes; its fills go to the bottom).
+	var base := Vector2(span.x, span.y - tall)
 	match layer_index:
 		0:
-			_far(st, tb, v, colors, span, a0, a1)
+			_far(st, tb, v, colors, base, a0, a1, tall)
 		1:
-			_mid(st, tb, v, colors, span, a0, a1)
+			_mid(st, tb, v, colors, base, a0, a1, tall)
 		2:
-			_near(st, tb, v, colors, span, a0, a1)
+			_near(st, tb, v, colors, base, a0, a1, tall)
 	Clip.clip_strip(tb, x0, x1, i_from)
 
 
 # ---------------------------------------------------------------- far
 
-static func _far(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _far(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var sky: Color = c.get("sky", Color("0a0e1a"))
 	var far: Color = c.get("far", Color("141c30"))
-	var bottom := span.y + 420.0
+	var bottom := span.y + tall + 420.0
 	slice.draw_rect(Rect2(x0, -200.0, x1 - x0, bottom + 200.0), sky)
 	slice.draw_rect(Rect2(x0, span.y * 0.6, x1 - x0, bottom), sky.lerp(far, 0.4))
 	match v:
@@ -204,9 +221,9 @@ static func _far(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 
 # ---------------------------------------------------------------- mid
 
-static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var mid: Color = c.get("mid", Color("1e2a44"))
-	var bottom := span.y + 420.0
+	var bottom := span.y + tall + 420.0
 	var wt := wall_top(v, span)
 	slice.draw_rect(Rect2(x0, wt, x1 - x0, bottom - wt), mid.darkened(0.28))
 	match v:
@@ -287,6 +304,8 @@ static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 				while y < wt + 26.0 + ln:
 					tb.ring(Vector2(chx, y), 3.6, 1.6, mid.darkened(0.04), 8)
 					y += 8.0
+	if tall > 0.0:
+		_tall_mid(slice, tb, v, mid, span, x0, x1, tall, wt)
 
 
 static func _little_clock(tb, c: Vector2, r: float, mid: Color, hands := true) -> void:
@@ -303,9 +322,9 @@ static func _little_clock(tb, c: Vector2, r: float, mid: Color, hands := true) -
 
 # ---------------------------------------------------------------- near
 
-static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var near: Color = c.get("near", Color("0e1528"))
-	var bottom := span.y + 420.0
+	var bottom := span.y + tall + 420.0
 	match v:
 		"gearworks":
 			_chains(tb, near, span, x0, x1, 170.0, true)
@@ -332,13 +351,15 @@ static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float,
 			for i in _each(450.0, x0, x1, 200.0):
 				var x := 200.0 + i * 450.0 + _h(i, 1) * 80.0
 				slice.draw_rect(Rect2(x - 7.0, -40.0, 14.0, bottom + 40.0), near.lightened(0.03))
-				for k in 4:
+				for k in 4 + ceili(tall / 110.0):
 					slice.draw_rect(Rect2(x - 10.0, 60.0 + k * 110.0, 20.0, 8.0), near.lightened(0.06))
 			for i in _each(330.0, x0, x1, 90.0):
 				if _h(i, 5) < 0.5:
 					continue
 				var p := Vector2(90.0 + i * 330.0, span.y * 0.7 + _h(i, 6) * 60.0)
 				_gear(tb, p, 26.0, 10, near.lightened(0.03), near.darkened(0.2), _h(i, 7))
+	if tall > 0.0:
+		_tall_near(slice, tb, v, near, span, x0, x1, tall)
 
 
 static func _icicles(tb, near: Color, span: Vector2, x0: float, x1: float, k: float, max_len: float) -> void:
@@ -363,6 +384,154 @@ static func _chains(tb, near: Color, span: Vector2, x0: float, x1: float, every:
 		if hooks:
 			tb.polyline(PackedVector2Array([Vector2(x, ln), Vector2(x, ln + 12.0), Vector2(x + 4.0, ln + 20.0), Vector2(x + 11.0, ln + 17.0),
 					Vector2(x + 11.0, ln + 10.0)]), 3.4, near.lightened(0.06))
+
+
+# ---------------------------------------------------------------- a tall level's storeys
+
+static func _storeys(y0: float, y1: float, every: float) -> Array:
+	## [storey index, its top] for every storey from y0 down to y1.
+	var out := []
+	var k := 0
+	while y0 + k * every < y1:
+		out.append([k, y0 + k * every])
+		k += 1
+	return out
+
+
+static func _tall_mid(slice, tb, v: String, mid: Color, span: Vector2, x0: float, x1: float, tall: float, wt: float) -> void:
+	## The tower's wall on down a tall level, a storey at a time under the
+	## strip's band, each storey salted by its index (see the header).
+	var y0 := wt + 200.0
+	var every := STOREY
+	if v == "escapement":
+		y0 = span.y * 0.64 + STOREY
+	elif v == "icebells":
+		y0 = wt + 160.0
+		every = 150.0
+	for sk in _storeys(y0, span.y + tall + 60.0, every):
+		var k: int = sk[0]
+		var sy: float = sk[1]
+		match v:
+			"gearworks":
+				# trusses between the posts (the strip's posts run the wall's height)
+				for i in _each(240.0, x0, x1):
+					var x := i * 240.0
+					var a := Vector2(x + 9.0, sy + 40.0)
+					var b := Vector2(x + 231.0, sy + 140.0)
+					if (i + k) % 2 == 1:
+						a.y = sy + 140.0
+						b.y = sy + 40.0
+					tb.line(a, b, 6.0, mid.darkened(0.12))
+					if _h(i, 100 + k) < 0.5:
+						tb.line(Vector2(a.x, b.y), Vector2(b.x, a.y), 6.0, mid.darkened(0.12))
+					slice.draw_rect(Rect2(x, sy + 36.0, 240.0, 8.0), mid.darkened(0.06))
+					slice.draw_rect(Rect2(x, sy + 136.0, 240.0, 8.0), mid.darkened(0.06))
+				if k % 2 == 1:
+					# a belt between two wheels
+					for i in _each(470.0, x0, x1, 120.0 + 150.0 * (k % 3)):
+						var ax := 120.0 + 150.0 * (k % 3) + i * 470.0
+						var ay := sy + 180.0
+						var bxx := ax + 200.0
+						var byy := ay - 50.0 - _h(i, 101 + k) * 30.0
+						tb.circle(Vector2(ax, ay), 26.0, mid.darkened(0.04), 16)
+						tb.circle(Vector2(bxx, byy), 18.0, mid.darkened(0.04), 14)
+						tb.line(Vector2(ax, ay - 26.0), Vector2(bxx, byy - 18.0), 4.0, mid.darkened(0.16))
+						tb.line(Vector2(ax, ay + 26.0), Vector2(bxx, byy + 18.0), 4.0, mid.darkened(0.16))
+			"icebells":
+				for i in _each(200.0, x0, x1, 100.0 * (k % 2)):
+					var x := 100.0 * (k % 2) + i * 200.0
+					var y := sy + _h(i, 102 + k) * 70.0
+					var a := Vector2(x, y)
+					var b := Vector2(x + 200.0, y + (_h(i, 103 + k) - 0.5) * 70.0)
+					tb.line(a, b, 12.0, mid.darkened(0.1))
+					tb.line(a + Vector2(0, -5.5), b + Vector2(0, -5.5), 2.5, mid.lightened(0.05))
+					for q in 5:
+						var p := a.lerp(b, (q + 0.5) / 5.0) + Vector2(0, 5.0)
+						tb.tri(p + Vector2(-3, 0), p + Vector2(3, 0), p + Vector2(0, 8.0 + _h(i, 104 + k + q) * 14.0), mid.darkened(0.02))
+			"escapement":
+				for i in _each(260.0, x0, x1, 70.0 + 90.0 * (k % 3)):
+					if _h(i, 105 + k) < 0.3:
+						continue
+					var x := 70.0 + 90.0 * (k % 3) + i * 260.0
+					slice.draw_rect(Rect2(x, sy, 150.0, 8.0), mid.darkened(0.04))
+					slice.draw_rect(Rect2(x + 8.0, sy + 8.0, 7.0, 80.0), mid.darkened(0.14))
+					slice.draw_rect(Rect2(x + 135.0, sy + 8.0, 7.0, 80.0), mid.darkened(0.14))
+					# its clocks stopped at the strip's minute, handless over the arena
+					var hands := x + 150.0 < span.x - ARENA_MID
+					for q in 2 + int(_h(i, 106 + k) * 1.99):
+						_little_clock(tb, Vector2(x + 28.0 + q * 46.0, sy - 12.0 - (q % 2) * 4.0), 10.0 + (q % 2) * 3.0, mid, hands)
+			_:
+				# clockface: a string course, then louvred windows and bell
+				# niches, or girders crossed between posts, by turns
+				slice.draw_rect(Rect2(x0, sy, x1 - x0, 10.0), mid.darkened(0.08))
+				slice.draw_rect(Rect2(x0, sy, x1 - x0, 2.0), mid.lightened(0.04))
+				if k % 2 == 0:
+					var off := 120.0 + 150.0 * ((k / 2) % 2)
+					for i in _each(300.0, x0, x1, off):
+						var x := off + i * 300.0
+						var r := Rect2(x - 26.0, sy + 40.0, 52.0, 100.0)
+						slice.draw_rect(r, mid.darkened(0.5))
+						tb.ellipse(Vector2(x, r.position.y), 26.0, 18.0, mid.darkened(0.5), 14)
+						for q in 6:
+							slice.draw_rect(Rect2(r.position.x, r.position.y + 6.0 + q * 15.0, r.size.x, 6.0), mid.darkened(0.2))
+						if _h(i, 107 + k) > 0.4:
+							var nx := x + 130.0
+							slice.draw_rect(Rect2(nx - 18.0, sy + 90.0, 36.0, 50.0), mid.darkened(0.45))
+							tb.ellipse(Vector2(nx, sy + 90.0), 18.0, 12.0, mid.darkened(0.45), 12)
+							tb.convex(PackedVector2Array([Vector2(nx - 7, sy + 96), Vector2(nx + 7, sy + 96), Vector2(nx + 11, sy + 118), Vector2(nx - 11, sy + 118)]),
+									mid.darkened(0.08))
+				else:
+					for i in _each(240.0, x0, x1, 60.0):
+						var x := 60.0 + i * 240.0
+						slice.draw_rect(Rect2(x - 8.0, sy + 10.0, 16.0, every - 10.0), mid.darkened(0.12))
+						var a := Vector2(x + 8.0, sy + 30.0)
+						var b := Vector2(x + 232.0, sy + every - 20.0)
+						tb.line(a, b, 5.0, mid.darkened(0.14))
+						tb.line(Vector2(a.x, b.y), Vector2(b.x, a.y), 5.0, mid.darkened(0.14))
+
+
+static func _tall_near(slice, tb, v: String, near: Color, span: Vector2, x0: float, x1: float, tall: float) -> void:
+	## The near layer on down a tall level, a storey at a time: the gearworks'
+	## girders with chains and hooks off them, the icebells' and the
+	## escapement's frozen beams with icicles, the clockface's small gears.
+	for sk in _storeys(span.y * 0.7 + NEAR_STOREY * 0.6, span.y + tall - 40.0, NEAR_STOREY):
+		var k: int = sk[0]
+		var sy: float = sk[1]
+		match v:
+			"gearworks":
+				for i in _each(400.0, x0, x1, 80.0 + 130.0 * (k % 3)):
+					if _h(i, 120 + k) < 0.15:
+						continue
+					var x := 80.0 + 130.0 * (k % 3) + i * 400.0
+					slice.draw_rect(Rect2(x - 120.0, sy, 240.0, 12.0), near.lightened(0.03))
+					slice.draw_rect(Rect2(x - 120.0, sy, 240.0, 2.0), near.lightened(0.07))
+					for c in 2:
+						var chx := x - 70.0 + c * 130.0 + _h(i, 121 + k + c) * 20.0
+						var ln := 60.0 + _h(i, 123 + k + c) * 110.0
+						var y := sy + 16.0
+						while y < sy + 16.0 + ln:
+							tb.ring(Vector2(chx, y), 5.0, 2.2, near.lightened(0.05), 8)
+							y += 10.0
+						tb.polyline(PackedVector2Array([Vector2(chx, y), Vector2(chx, y + 12.0), Vector2(chx + 4.0, y + 20.0), Vector2(chx + 11.0, y + 17.0),
+								Vector2(chx + 11.0, y + 10.0)]), 3.4, near.lightened(0.06))
+			"icebells", "escapement":
+				for i in _each(360.0, x0, x1, 60.0 + 120.0 * (k % 3)):
+					if _h(i, 125 + k) < 0.4:
+						continue
+					var x := 60.0 + 120.0 * (k % 3) + i * 360.0
+					var w := 140.0 + _h(i, 126 + k) * 100.0
+					var y := sy + _h(i, 127 + k) * 60.0
+					slice.draw_rect(Rect2(x - w * 0.5, y, w, 10.0), near.lightened(0.03))
+					for q in int(w / 14.0):
+						var ix := x - w * 0.5 + 6.0 + q * 14.0
+						var ln := 12.0 + _h(i * 31 + q, 128 + k) * 50.0
+						tb.tri(Vector2(ix - 4.0, y + 9.0), Vector2(ix + 4.0, y + 9.0), Vector2(ix, y + 9.0 + ln), near.lightened(0.05))
+			_:
+				for i in _each(330.0, x0, x1, 90.0 + 110.0 * (k % 3)):
+					if _h(i, 130 + k) < 0.5:
+						continue
+					var p := Vector2(90.0 + 110.0 * (k % 3) + i * 330.0, sy + _h(i, 131 + k) * 80.0)
+					_gear(tb, p, 20.0 + _h(i, 132 + k) * 12.0, 10, near.lightened(0.03), near.darkened(0.2), _h(i, 133 + k))
 
 
 # ---------------------------------------------------------------- the windows
@@ -424,12 +593,13 @@ static func _lamps(v: String, span: Vector2) -> Array:
 	return out
 
 
-static func windows(layer_index: int, colors: Dictionary, span: Vector2) -> Array:
+static func windows(layer_index: int, colors: Dictionary, span: Vector2, tall := 0.0) -> Array:
 	## The clock faces lit from outside (far), the louvres' moonlight (far,
 	## icebells), the brass lamps (mid, gearworks): decorative lights.
 	var v := _variant(colors)
 	var out := []
 	var glass: Array = colors.get("glass", [Color("f4f0e0")])
+	span = Vector2(span.x, span.y - tall)   # (laid out on the strip's span, as draw() does)
 	match layer_index:
 		0:
 			if v == "clockface":

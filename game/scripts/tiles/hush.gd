@@ -9,7 +9,7 @@ extends RefCounted
 ## looks drained to grey by this world's palette; glass and dawnglass are
 ## glass.gd's in ink-silver panes (dawnglass keeps W5's gold: one tell
 ## language).
-##   static func paint_chunk(ci, tb, level, x0, x1, pal, world)   the painter contract (contract.md §12.4)
+##   static func paint_chunk(ci, tb, level, x0, x1, pal, world, y0, y1)   the painter contract (contract.md §12.4)
 ##   static func paint_cell(ci, tb, level, x, y, t, pal, world)
 ## The live looks the deep feature (features/deep.gd, WL6) draws each frame,
 ## kept here so the world's look has one owner:
@@ -78,14 +78,15 @@ static func _solid(level: RefCounted, x: int, y: int) -> bool:
 
 # ---------------------------------------------------------------- the chunk
 
-static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node) -> void:
-	tb.origin = Vector2(x0 * TILE, 0)
+static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node, y0 := 0, y1 := -1) -> void:
+	var ye: int = level.height if y1 < 0 else y1
+	tb.origin = Vector2(x0 * TILE, y0 * TILE)
 	for x in range(x0, x1):
-		for y in level.height:
+		for y in range(y0, ye):
 			var t: int = level.tile(x, y)
 			if t != LevelData.AIR:
 				paint_cell(ci, tb, level, x, y, t, pal, world)
-		if Plain.is_solid_id(level.tile(x, level.height - 1)):
+		if ye >= level.height and Plain.is_solid_id(level.tile(x, level.height - 1)):
 			for y in range(level.height, level.height + BEDROCK_ROWS):
 				ci.draw_rect(Rect2(x * TILE, y * TILE, TILE, TILE), col(pal, "buried").darkened(0.15 * (y - level.height + 1)))
 	tb.flush(ci)

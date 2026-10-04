@@ -2,8 +2,11 @@ extends RefCounted
 ## The plain backdrop style: the fallback when a theme's style file is
 ## missing, and the reference for the art streams' styles (A1's orchard and
 ## clockwork, A2's sanctum, hushdeep and hall follow the same shape).
-##   static func draw(slice, tb, layer_index, colors, span, x0, x1)   one 1024 px slice of one layer
-##   static func windows(layer_index, colors, span) -> Array           its glowing bits, computed at build
+##   static func draw(slice, tb, layer_index, colors, span, x0, x1, tall := 0.0)   one 1024 px slice of one layer
+##   static func windows(layer_index, colors, span, tall := 0.0) -> Array           its glowing bits, computed at build
+## (tall: how much deeper a level taller than 15 rows shows the layer,
+## backdrop.gd tall(); 0 for a strip. A style keeps the strip's composition
+## on span.y - tall and fills the band below; this fallback draws as before.)
 ## A slice draws only the elements whose anchor x is in [x0, x1) (an element
 ## may overhang into the next slice; each is drawn by exactly one slice), so
 ## Godot culls the slices off screen. Rects with slice.draw_rect, the rest
@@ -33,7 +36,7 @@ static func _each(every: float, x0: float, x1: float) -> Array[int]:
 	return out
 
 
-static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var sky: Color = colors.get("sky", Color("150f1e"))
 	var far: Color = colors.get("far", Color("1f1730"))
 	var mid: Color = colors.get("mid", Color("2a2040"))
@@ -88,7 +91,7 @@ static func draw(slice: Node2D, tb, layer_index: int, colors: Dictionary, span: 
 						y += 8.0
 
 
-static func windows(layer_index: int, colors: Dictionary, span: Vector2) -> Array:
+static func windows(layer_index: int, colors: Dictionary, span: Vector2, tall := 0.0) -> Array:
 	## Lancet windows on the wall layer, every WINDOW_EVERY px.
 	var out := []
 	if layer_index != 1:

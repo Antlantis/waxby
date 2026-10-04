@@ -22,6 +22,11 @@ extends SceneTree
 ##   chunk budget; v2's themes keep their path.
 ## - edge_lines.gd, ambient.gd: no chunks / no motes for v2's worlds; the
 ##   stub's lines and motes within their caps.
+## - 16 x 16 tile chunks (the shapes plan's E4): a 15-row level is one row of
+##   them laid out as before; the four painters' levels and their tall render
+##   labs (levels/tall, 24 and 36 rows) paint exactly what whole columns did,
+##   each chunk inside the budget; the World's grid, its bedrock and what a
+##   redraw asks for (chunks_at); edge lines chunk the same way.
 ## - glow.gd: flame(..., pal), sparks in one batch, the mirror hook.
 ## - perf_meter.gd's line; the grep rule: no draw_circle,
 ##   draw_colored_polygon or draw_polyline in the new render files.
@@ -64,6 +69,7 @@ func _initialize() -> void:
 	await _test_plans()
 	await _test_backdrop_and_tiles()
 	await _test_edges_and_ambient()
+	await _test_cell_chunks()
 	await _test_glow()
 	_test_perf_meter()
 	print("test_render: %d passed, %d failed" % [_passed, _failed])
@@ -989,3 +995,138 @@ func _test_perf_meter() -> void:
 class FallenWorld extends Node:
 	func ledge_present(_x: int, _y: int) -> bool:
 		return false
+
+# ---------------------------------------------------------------- 16 x 16 chunks (the shapes plan's E4)
+
+class TriLog extends "res://scripts/tri_batch.gd":
+	## A batch that keeps every triangle it flushes (corners and colours as
+	## text, to compare as a multiset) and the most vertices it held.
+	var tris := PackedStringArray()
+	var most := 0
+
+	func flush(ci: CanvasItem) -> void:
+		most = maxi(most, vertex_count())
+		for t in range(0, indices.size(), 3):
+			var s := ""
+			for q in 3:
+				s += "%s %s|" % [points[indices[t + q]], colors[indices[t + q]]]
+			tris.append(s)
+		clear()
+
+
+func _sorted(a: PackedStringArray) -> PackedStringArray:
+	var b := a.duplicate()
+	b.sort()
+	return b
+
+
+func _test_cell_chunks() -> void:
+	## Tiles are chunked 16 x 16 (tile_view.gd's row0, world.gd's grid): a
+	## 15-row level is one row of chunks laid out as before; a taller one
+	## paints exactly what whole-height columns painted (every triangle, once),
+	## its bottom chunks the bedrock; a redraw asks only for the chunks at and
+	## next to the changed cell; edge lines chunk the same way.
+	var LevelData = load("res://scripts/level_data.gd")
+	var Edges = load("res://scripts/edge_lines.gd")
+	var probe := Node2D.new()
+	root.add_child(probe)
+	var cases := []
+	for id in ["3-1", "4-1", "5-3", "6-1"]:
+		for rows in [15, 24, 36]:
+			var path := "res://levels/%s.txt" % id if rows == 15 else "res://levels/tall/lab-tall-%s-%d.txt" % [id, rows]
+			if FileAccess.file_exists(path):
+				cases.append(LevelData.load_file(path))
+	_check(cases.size() == 12, "the four painters' levels at 15 rows and their tall render labs at 24 and 36 (%d)" % cases.size())
+	var res := {}
+	probe.draw.connect(func():
+		for lv in cases:
+			var painter: Script = Themes.painter(str(lv.theme))
+			var pal: Dictionary = Themes.palette(str(lv.theme))
+			var whole := TriLog.new()
+			var cells := TriLog.new()
+			for x0 in range(0, lv.width, 16):
+				painter.paint_chunk(probe, whole, lv, x0, mini(x0 + 16, lv.width), pal, null)
+				for y0 in range(0, lv.height, 16):
+					painter.paint_chunk(probe, cells, lv, x0, mini(x0 + 16, lv.width), pal, null, y0, mini(y0 + 16, lv.height))
+			res[lv.id] = [_sorted(whole.tris) == _sorted(cells.tris) and whole.tris.size() > 0, cells.most, whole.most, whole.tris.size()]
+	)
+	probe.queue_redraw()
+	await process_frame
+	await process_frame
+	for id in res:
+		var r: Array = res[id]
+		_check(r[0], "%s: its 16 x 16 chunks paint exactly what whole columns did (%d triangles)" % [id, r[3]])
+		_check(r[1] <= 6000, "%s: a 16 x 16 chunk within 6000 vertices (%d; a whole column %d)" % [id, r[1], r[2]])
+	# The World's grid, and what a redraw asks for.
+	var ws: Script = load("res://scripts/world.gd")
+	for lv in [LevelData.load_file("res://levels/3-1.txt"), LevelData.load_file("res://levels/tall/lab-tall-3-1-36.txt")]:
+		var w: Node = ws.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await process_frame
+		var n: int = ceili(lv.width / 16.0)
+		var m: int = ceili(lv.height / 16.0)
+		var laid: bool = w.chunks.size() == n * m and w.chunk_rows == m
+		for k in w.chunks.size():
+			laid = laid and w.chunks[k].col0 == (k / m) * 16 and w.chunks[k].row0 == (k % m) * 16
+		_check(laid, "%s: %d x %d chunks, column-major (%d)" % [lv.id, n, m, w.chunks.size()])
+		if lv.height == 15:
+			var same := true
+			for x in [0, 5, 15, 16, 17, 31, lv.width - 1]:
+				var old := [x / 16]
+				if (x + 1) / 16 != x / 16 and (x + 1) / 16 < n:
+					old.append((x + 1) / 16)
+				if x > 0 and (x - 1) / 16 != x / 16:
+					old.append((x - 1) / 16)
+				var got: Array = w.chunks_at(x, 12)
+				got.sort()
+				old.sort()
+				same = same and got == old and w.chunks_at(x) == w.chunks_at(x, 3)
+			_check(same and m == 1, "a 15-row level: one row of chunks, a redraw asks for the columns it always did")
+		else:
+			_check(w.chunks_at(20, 20).size() == 1, "36 rows: a change inside a chunk redraws that chunk only")
+			_check(w.chunks_at(16, 16).size() == 4 and w.chunks_at(15, 15).size() == 4, "at a chunk's corner, the four that touch it")
+			_check(w.chunks_at(20, 0).size() == 1 and w.chunks_at(20, lv.height - 1).size() == 1, "the top and bottom rows: their chunk")
+			_check(w.chunks_at(20).size() == m and w.chunks_at(16).size() == 2 * m, "y -1: every chunk down the column(s)")
+			var bottoms := 0
+			for tv in w.chunks:
+				if tv.row0 + 16 >= lv.height:
+					bottoms += 1
+			_check(bottoms == n, "the bottom chunk of every column draws the bedrock (%d)" % bottoms)
+		w.queue_free()
+		await process_frame
+	# Edge lines: the same grid; every chunk's lines are its cells' lines, once.
+	var tall_lv = LevelData.load_file("res://levels/tall/lab-tall-5-3-36.txt")
+	var e = Edges.new()
+	root.add_child(e)
+	e.build(tall_lv, 5, str(tall_lv.theme))
+	var en := ceili(tall_lv.width / 16.0)
+	_check(e.rows == 3 and e.chunks.size() == en * 3, "edge lines: 16 x 16 chunks too (%d)" % e.chunks.size())
+	_check(e.chunks_at(20, 20).size() == 1 and e.chunks_at(16, 16).size() == 4 and e.chunks_at(20).size() == 3,
+			"edge lines: a redraw asks for the chunks at and next to the cell")
+	var got := TriLog.new()
+	var want := TriLog.new()
+	var host := Node2D.new()
+	root.add_child(host)
+	host.draw.connect(func():
+		e._tb = got
+		for k in e.chunks.size():
+			e._draw_chunk(host, k)
+		e._tb = want
+		for st in e.styles:
+			var c: Color = st.get("color", Color(1, 1, 1))
+			c.a = float(st.get("alpha", 0.3))
+			for x in tall_lv.width:
+				for y in tall_lv.height:
+					e._cell(str(st.get("what", "lip")), x, y, c, float(st.get("width", 1.5)))
+		want.flush(host)
+	)
+	host.queue_redraw()
+	await process_frame
+	await process_frame
+	_check(_sorted(got.tris) == _sorted(want.tris) and got.tris.size() > 0,
+			"edge lines: the chunks draw every cell's lines once (%d triangles)" % got.tris.size())
+	host.queue_free()
+	e.queue_free()
+	probe.queue_free()
+	await process_frame

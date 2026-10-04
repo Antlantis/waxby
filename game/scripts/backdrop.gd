@@ -20,6 +20,16 @@ extends Node2D
 ## so nothing may be appended while drawing). A v3 theme whose style is
 ## "cathedral" or "cavern" (the secret gilt variants of W1-W2) keeps v2's
 ## unchunked drawing with its own colours. v2's themes below are untouched.
+##
+## A level taller than 15 rows (the shapes plan's E9): every layer is
+## composed for a 15-row strip, so a taller one shows more of each layer than
+## the composition fills. tall(i) is how much more (0 at 15 rows, which draws
+## exactly as before); a style is told it (draw's and windows' last
+## argument, 0 by default) and keeps its strip's composition at the top, its
+## ground at the bottom (moved down, never stretched) and fills the band
+## between with what repeats down a wall: storeys of windows, niches,
+## girders, shelves, each style its own (no copy of the strip stacked on
+## itself). v2's cathedral and cavern do the same in backdrop_layer.gd.
 
 const THEMES := {
 	"nave": {"sky": Color("150f1e"), "far": Color("1f1730"), "mid": Color("2a2040"), "near": Color("181226"),
@@ -50,6 +60,7 @@ const THEMES := {
 }
 const FACTORS := [0.12, 0.35, 0.65]
 const SLICE := 1024.0            # a v3 style's slice width, in layer space
+const STRIP_H := 480.0           # a 15-row level's height: what every layer is composed for
 const Themes := preload("res://scripts/themes/loader.gd")
 
 var theme := "nave"
@@ -97,7 +108,7 @@ func build(p_theme: String, p_level_size: Vector2, p_view: Vector2) -> void:
 			sl.set("style", style_script)
 			layer.add_child(sl)
 			x += SLICE
-		for w in style_script.windows(i, colors(), sp):
+		for w in style_script.windows(i, colors(), sp, tall(i)):
 			var wd: Dictionary = w
 			wd["layer"] = i
 			windows.append(wd)
@@ -114,6 +125,12 @@ func span(i: int) -> Vector2:
 	## How much of layer i there is to see across the level.
 	var f: float = FACTORS[i]
 	return Vector2(maxf(level_size.x - view_size.x, 0.0) * f + view_size.x, maxf(level_size.y - view_size.y, 0.0) * f + view_size.y)
+
+
+func tall(i: int) -> float:
+	## How much more of layer i a level taller than 15 rows shows than a
+	## strip does (0 for 15 rows or fewer): the band its style fills.
+	return maxf(level_size.y - STRIP_H, 0.0) * float(FACTORS[i])
 
 
 func follow(cam_origin: Vector2) -> void:

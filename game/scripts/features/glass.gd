@@ -380,7 +380,7 @@ func step(dt: float) -> void:
 					p["state"] = "gone"
 					p["t"] = ftime()
 					level.set_tile(c, LevelData.AIR)
-					world._redraw_at(c.x)
+					world._redraw_at(c.x, c.y)
 					world._sfx("glass_shatter")
 					if world.glow:
 						var mid := LevelData.cell_center(c)
@@ -414,7 +414,7 @@ func _reform(c: Vector2i) -> void:
 	_busy.erase(c)
 	if level.tile(c.x, c.y) != LevelData.GLASS:
 		level.restore_tile(c)
-		world._redraw_at(c.x)
+		world._redraw_at(c.x, c.y)
 
 
 func _body_in(c: Vector2i) -> bool:
@@ -722,7 +722,7 @@ func _step_dawn() -> void:
 				d["lit"] = true
 				_dawn_on[c] = true
 				level.set_tile(c, LevelData.DAWN_ON)
-				world._redraw_at(c.x)
+				world._redraw_at(c.x, c.y)
 				if v.has_point(LevelData.cell_center(c)):
 					if not sounded.has("on"):
 						world._sfx("dawnglass_on")
@@ -741,7 +741,7 @@ func _step_dawn() -> void:
 				_dawn_on.erase(c)
 				var under := _stands_on(pl, c)
 				level.restore_tile(c)
-				world._redraw_at(c.x)
+				world._redraw_at(c.x, c.y)
 				if under and world.has_method("note_feature"):
 					world.note_feature("dawnglass")
 

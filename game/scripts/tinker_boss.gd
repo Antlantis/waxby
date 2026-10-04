@@ -1473,7 +1473,7 @@ func _grow_ice() -> void:
 		level.set_tile(c, LevelData.ICE)
 		_ice_cells.append(c)
 		if world != null:
-			world._redraw_at(nx)
+			world._redraw_at(nx, row)
 
 
 func grown_ice() -> Array:
@@ -1507,7 +1507,7 @@ func _reset_arena(_keep: bool) -> void:
 		for c in _ice_cells:
 			level.restore_tile(c)
 			if world != null:
-				world._redraw_at(c.x)
+				world._redraw_at(c.x, c.y)
 	_ice_cells.clear()
 	_reset_clock()
 	facing = 1

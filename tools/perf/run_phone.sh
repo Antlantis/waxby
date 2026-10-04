@@ -9,6 +9,16 @@
 #   tools/perf/run_phone.sh --field quarter 2-4       # a level under Plan B
 #   tools/perf/run_phone.sh --no-build --vulkan spike:lights48   # reuse the last .ipa
 #
+# Tall levels (the shapes plan's E3, not run yet: it needs the phone): the
+# render labs at 24 and 36 rows (python3 tools/levels/lab_tall.py writes them
+# to game/levels/tall), the orchard and the glass, the slowest painters:
+#   tools/perf/run_phone.sh tall/lab-tall-3-1-24 tall/lab-tall-5-3-24 tall/lab-tall-3-1-36 tall/lab-tall-5-3-36
+# The bot plays the bottom storey (the level's lower nine rows; the storeys
+# above are its terrain and scenery, in view as the camera climbs), so the
+# frames carry the taller level's tiles, chunks and backdrop; the gate is the
+# same. tools/perf/paint_probe.gd has the Mac's painter numbers to set
+# against (a redraw's cost by height, both chunk layouts).
+#
 # Runs: a level id (1-1 ... 6-4, 1-S ...; <id>@<n> from its altar n, 0 the
 # first: 4-3@2 past W4's weights, 3-4@1 / 4-4@1 at the boss's door), spike:all | spike:lights48 |
 # spike:lights48b | spike:scene33, scene:<id>, descent:<d>, rush:<boss>,

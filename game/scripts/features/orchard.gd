@@ -465,9 +465,10 @@ func _step_runs(pl: Node2D) -> void:
 
 
 func _redraw_run(r: Dictionary) -> void:
-	## The painter caches vines (it asks vine_present): draw that column again.
+	## The painter caches vines (it asks vine_present): draw the run's cells again.
 	if world != null and world.has_method("_redraw_at"):
-		world._redraw_at(int(r["x"]))
+		for y in range(int(r["y0"]), int(r["y1"]) + 1):
+			world._redraw_at(int(r["x"]), y)
 
 
 func _step_pods(pl: Node2D, alive: bool) -> void:

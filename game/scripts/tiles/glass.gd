@@ -5,7 +5,7 @@ extends RefCounted
 ## underfoot); spikes as glass teeth; the breaking glass G as jewel panes in
 ## black lead (a colour per run, by hash, that never means anything);
 ## dawnglass as a gold ghost at alpha 0.30, lit as bright pale gold.
-##   static func paint_chunk(ci, tb, level, x0, x1, pal, world)   the painter contract (contract.md §12.4)
+##   static func paint_chunk(ci, tb, level, x0, x1, pal, world, y0, y1)   the painter contract (contract.md §12.4)
 ##   static func paint_cell(ci, tb, level, x, y, t, pal, world)   one cell (the rest of v3's tiles: plain.gd)
 ## Rects go to ci.draw_rect, every other shape into tb, flushed once.
 ##
@@ -91,14 +91,15 @@ static func _solid(level: RefCounted, x: int, y: int) -> bool:
 
 # ---------------------------------------------------------------- the chunk
 
-static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node) -> void:
-	tb.origin = Vector2(x0 * TILE, 0)
+static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node, y0 := 0, y1 := -1) -> void:
+	var ye: int = level.height if y1 < 0 else y1
+	tb.origin = Vector2(x0 * TILE, y0 * TILE)
 	for x in range(x0, x1):
-		for y in level.height:
+		for y in range(y0, ye):
 			var t: int = level.tile(x, y)
 			if t != LevelData.AIR:
 				paint_cell(ci, tb, level, x, y, t, pal, world)
-		if is_solid_id(level.tile(x, level.height - 1)):
+		if ye >= level.height and is_solid_id(level.tile(x, level.height - 1)):
 			for y in range(level.height, level.height + BEDROCK_ROWS):
 				ci.draw_rect(Rect2(x * TILE, y * TILE, TILE, TILE), col(pal, "buried").darkened(0.15 * (y - level.height + 1)))
 	tb.flush(ci)

@@ -34,6 +34,27 @@ extends RefCounted
 ## moons, the bone trees' crowns, the oculus, the heart-knot and its bell)
 ## sit in the band above them, so every window's light comes from something
 ## you can see.
+## A level taller than 15 rows (tall > 0, backdrop.gd tall(); the shapes
+## plan's E9 and E11): each layer keeps the strip's composition at its top,
+## drawn with the strip's span (nothing stretches: the haze, the walls, the
+## caps, the threads and the hanging roots sit where a strip has them), its
+## fills and its ground (the rib arches' feet) go down to the level's
+## bottom, and the band between is the variant's:
+##   orchard   the ossuary wall goes on down in storeys: a cornice, two rows
+##             of niches (staggered), a cornice, a bone lattice of crossed
+##             femurs; roots hanging from the cornices in the near layer
+##   sporewood bracket fungi in shelves down the dark wall, a thin haze over
+##             each; moss hanging from them in the near layer
+##   rootvault three storeys that read as a climb (E11, the 3-2 tower):
+##             roots at the bottom (trunks rising out of the ground, a root
+##             curtain falling to meet them, buttresses at the near pillars'
+##             feet), the ossuary in the middle (niche rows to the roots, a
+##             row of coffins on them), the canopy at the top (a tangle of
+##             bone boughs and leaves over the vaults, the oculus's moon
+##             showing through; fronds hanging in the near layer)
+##   rootheart the ribcage's rows go on down (her arena is a strip)
+## The band's things repeat by storey (TALL_STOREY), salted by storey, so no
+## two storeys are alike and nothing is the strip stacked on itself.
 
 const MOON_EVERY := 1400.0
 const TREE_EVERY := 420.0
@@ -44,6 +65,10 @@ const RIB_EVERY := 520.0
 const CAP_EVERY := 330.0
 const WALL := {"orchard": 0.38, "rootvault": 0.36, "rootheart": 0.38}   # the mid wall's top, x span.y
 const OVER := 360.0              # the farthest an element reaches from its anchor (the wall's root threads: 322)
+const TALL_STOREY := 186.0       # a tall band's storey in the mid layer: a cornice, two niche rows, a lattice
+const NEAR_STOREY := 300.0       # and the near layer's (a root beam with roots hanging off it)
+const TOWER_ROWS := 30           # from this many rows a rootvault level is the tower (E11): roots, ossuary, canopy
+const FACTORS := [0.12, 0.35, 0.65]   # backdrop.gd's
 
 
 static func _h(i: int, salt: int = 0) -> float:
@@ -208,29 +233,32 @@ static func _variant(colors: Dictionary) -> String:
 	return str(colors.get("variant", "orchard"))
 
 
-static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func draw(slice, tb, layer_index: int, colors: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	## The strip [x0, x1) of the layer: everything reaching into it, cut to it.
 	var v := _variant(colors)
 	var st := Strip.new(slice, x0, x1)
 	var i_from: int = tb.indices.size()
 	var a0 := x0 - OVER
 	var a1 := x1 + OVER
+	# The strip's span: what the composition is laid out on (tall: how much
+	# deeper this level's layer goes; its fills and ground go to the bottom).
+	var base := Vector2(span.x, span.y - tall)
 	match layer_index:
 		0:
-			_far(st, tb, v, colors, span, a0, a1)
+			_far(st, tb, v, colors, base, a0, a1, tall)
 		1:
-			_mid(st, tb, v, colors, span, a0, a1)
+			_mid(st, tb, v, colors, base, a0, a1, tall)
 		2:
-			_near(st, tb, v, colors, span, a0, a1)
+			_near(st, tb, v, colors, base, a0, a1, tall)
 	clip_strip(tb, x0, x1, i_from)
 
 
 # ---------------------------------------------------------------- far
 
-static func _far(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _far(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var sky: Color = c.get("sky", Color("0e0d0a"))
 	var far: Color = c.get("far", Color("1a1914"))
-	var bottom := span.y + 420.0
+	var bottom := span.y + tall + 420.0
 	slice.draw_rect(Rect2(x0, -200.0, x1 - x0, bottom + 200.0), sky)
 	slice.draw_rect(Rect2(x0, span.y * 0.58, x1 - x0, bottom), sky.lerp(far, 0.45))
 	for m in _moons(v, span):
@@ -255,20 +283,20 @@ static func _far(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 			slice.draw_rect(Rect2(p.x - r * 1.6, p.y + r * 0.3, r * 3.2, 7.0), Color(sky.lerp(far, 0.6), 0.85))
 	match v:
 		"rootvault":
-			_vaults(slice, tb, far, span, x0, x1)
+			_vaults(slice, tb, far, span, x0, x1, tall)
 		"sporewood":
-			_caps(slice, tb, far, span, x0, x1)
+			_caps(slice, tb, far, span, x0, x1, tall)
 		"rootheart":
-			_root_masses(slice, tb, far, span, x0, x1, 300.0, 0.9)
+			_root_masses(slice, tb, far, span, x0, x1, 300.0, 0.9, tall)
 			var hk := _heart_knot(span)
 			if hk.x >= x0 and hk.x < x1:
 				_draw_heart_knot(slice, tb, far, hk, span)
 		_:
-			_bone_trees(slice, tb, far, span, x0, x1)
+			_bone_trees(slice, tb, far, span, x0, x1, tall)
 
 
-static func _bone_trees(slice, tb, far: Color, span: Vector2, x0: float, x1: float) -> void:
-	var bottom := span.y + 420.0
+static func _bone_trees(slice, tb, far: Color, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
+	var bottom := span.y + tall + 420.0
 	for i in _each(TREE_EVERY, x0, x1, 180.0):
 		var x := 180.0 + i * TREE_EVERY + (_h(i, 1) - 0.5) * 120.0
 		var top := 44.0 + _h(i, 3) * 46.0
@@ -295,8 +323,8 @@ static func _bone_trees(slice, tb, far: Color, span: Vector2, x0: float, x1: flo
 			tb.rect(Rect2(tip + Vector2(1.4, 15.5), Vector2(2.4, 2.4)), far.darkened(0.25))
 
 
-static func _vaults(slice, tb, far: Color, span: Vector2, x0: float, x1: float) -> void:
-	var bottom := span.y + 420.0
+static func _vaults(slice, tb, far: Color, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
+	var bottom := span.y + tall + 420.0
 	for i in _each(260.0, x0, x1):
 		var x := i * 260.0
 		var w := 220.0
@@ -315,8 +343,8 @@ static func _vaults(slice, tb, far: Color, span: Vector2, x0: float, x1: float) 
 			tb.polyline(_wavy(rx, spring - 60.0 + _h(i, k + 5) * 30.0, spring + 80.0 + _h(i, k + 9) * 90.0, 6.0, k + i), 3.0, far.darkened(0.12))
 
 
-static func _caps(slice, tb, far: Color, span: Vector2, x0: float, x1: float) -> void:
-	var bottom := span.y + 420.0
+static func _caps(slice, tb, far: Color, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
+	var bottom := span.y + tall + 420.0
 	for i in _each(CAP_EVERY, x0, x1, 120.0):
 		var cap := _cap(i, span)
 		var x: float = cap["x"]
@@ -340,8 +368,8 @@ static func _cap(i: int, span: Vector2) -> Dictionary:
 	return {"x": 120.0 + i * CAP_EVERY + (_h(i, 1) - 0.5) * 90.0, "top": span.y * 0.34 + _h(i, 2) * 70.0, "w": 160.0 + _h(i, 3) * 100.0}
 
 
-static func _root_masses(slice, tb, col: Color, span: Vector2, x0: float, x1: float, every: float, k: float) -> void:
-	var bottom := span.y + 420.0
+static func _root_masses(slice, tb, col: Color, span: Vector2, x0: float, x1: float, every: float, k: float, tall := 0.0) -> void:
+	var bottom := span.y + tall + 420.0
 	for i in _each(every, x0, x1, 60.0):
 		var x := 60.0 + i * every + (_h(i, 7) - 0.5) * 80.0
 		var w := (40.0 + _h(i, 8) * 40.0) * k
@@ -370,9 +398,9 @@ static func _draw_heart_knot(slice, tb, far: Color, c: Vector2, span: Vector2) -
 
 # ---------------------------------------------------------------- mid
 
-static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var mid: Color = c.get("mid", Color("26241c"))
-	var bottom := span.y + 420.0
+	var bottom := span.y + tall + 420.0
 	match v:
 		"sporewood":
 			for i in _each(90.0, x0, x1):
@@ -389,6 +417,8 @@ static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 				slice.draw_rect(Rect2(x0, hz + k * 18.0, x1 - x0, 18.0), Color(mid.lightened(0.08), a))
 			slice.draw_rect(Rect2(x0, hz + 72.0, x1 - x0, 24.0), Color(mid.darkened(0.3), 0.5))
 			slice.draw_rect(Rect2(x0, hz + 96.0, x1 - x0, bottom), mid.darkened(0.3))
+			if tall > 0.0:
+				_tall_spores(slice, tb, mid, span, x0, x1, tall)
 		"rootheart":
 			var wt := wall_top(v, span)
 			slice.draw_rect(Rect2(x0, wt, x1 - x0, bottom - wt), mid.darkened(0.3))
@@ -396,7 +426,7 @@ static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 				var x := i * 180.0 + 60.0
 				# a ribcage: a spine and curved ribs either side
 				slice.draw_rect(Rect2(x - 5.0, wt + 20.0, 10.0, bottom), mid.darkened(0.06))
-				for r in 5:
+				for r in 5 + int(tall / 34.0):
 					var y := wt + 50.0 + r * 34.0
 					for s in [-1.0, 1.0]:
 						tb.polyline(_arc(Vector2(x + s * 30.0, y + 14.0), 30.0, 18.0, -PI * 0.5 - s * PI * 0.5, -PI * 0.5 + s * 0.2, 6), 5.0,
@@ -407,13 +437,15 @@ static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 			slice.draw_rect(Rect2(x0, wt2, x1 - x0, bottom - wt2), mid.darkened(0.24))
 			slice.draw_rect(Rect2(x0, wt2 - 6.0, x1 - x0, 8.0), mid.darkened(0.08))
 			var every := NICHE_EVERY if v == "orchard" else 48.0
-			var rows := 3 if v == "orchard" else 4
+			var rows := 3 if v == "orchard" else (5 + int(tall / 58.0) if tall > 0.0 else 4)
 			for i in _each(every, x0, x1):
 				for r in rows:
 					if _h(i, 40 + r) < 0.2:
 						continue
 					var cx := i * every + every * 0.5 + (r % 2) * every * 0.25
 					var cy := wt2 + 46.0 + r * 58.0
+					if v == "rootvault" and _tower(tall, 1) and cy > _root_line(span, tall) - 30.0:
+						continue   # (the tower's roots have the wall's foot)
 					_niche(slice, tb, mid, Vector2(cx, cy), 0.02 if v == "orchard" else 0.14)
 			if v == "rootvault":
 				for i in _each(210.0, x0, x1, 90.0):
@@ -430,6 +462,11 @@ static func _mid(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, 
 					for k in 5:
 						tb.line(o, o + Vector2(cos(0.3 + k * 0.6), sin(0.3 + k * 0.6)) * (50.0 + _h(i, k) * 30.0), 1.2, mid.darkened(0.02))
 			_threads(slice, tb, mid, span, x0, x1, wt2)
+			if tall > 0.0:
+				if v == "rootvault":
+					_tall_vault(slice, tb, mid, span, x0, x1, tall, wt2)
+				else:
+					_tall_ossuary(slice, tb, mid, span, x0, x1, tall, wt2)
 			# a skull lantern every 700 px
 			for w in _mid_lamps(v, span):
 				var p: Vector2 = w["center"]
@@ -457,11 +494,13 @@ static func _niche(slice, tb, mid: Color, c: Vector2, dim := 0.02) -> void:
 	tb.rect(Rect2(c + Vector2(1.4, 1.0), Vector2(3.0, 2.8)), mid.darkened(0.6))
 
 
-static func _threads(slice, tb, mid: Color, span: Vector2, x0: float, x1: float, wt: float) -> void:
-	## Roots threading across the wall.
+static func _threads(slice, tb, mid: Color, span: Vector2, x0: float, x1: float, wt: float, salt := 50, spread := -1.0) -> void:
+	## Roots threading across the wall (spread: how far down from wt + 30
+	## they wander, half the layer by default).
+	var sp := span.y * 0.5 if spread < 0.0 else spread
 	for i in _each(300.0, x0, x1):
 		var x := i * 300.0
-		var y := wt + 30.0 + _h(i, 50) * (span.y * 0.5)
+		var y := wt + 30.0 + _h(i, salt) * sp
 		var pts := PackedVector2Array()
 		for k in 9:
 			pts.append(Vector2(x + k * 40.0, y + sin(k * 1.3 + i) * 14.0))
@@ -488,19 +527,26 @@ static func _mid_lamps(v: String, span: Vector2) -> Array:
 
 # ---------------------------------------------------------------- near
 
-static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float) -> void:
+static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float, x1: float, tall := 0.0) -> void:
 	var near: Color = c.get("near", Color("12110c"))
-	var bottom := span.y + 420.0
+	var bottom := span.y + tall + 420.0
 	match v:
 		"rootvault":
 			for i in _each(420.0, x0, x1, 100.0):
 				var x := 100.0 + i * 420.0 + _h(i, 1) * 90.0
 				var w := 54.0 + _h(i, 2) * 30.0
-				var pts := _wavy(x, -60.0, bottom, 18.0, i * 1.9, 10)
+				var sb := span.y + 420.0   # (the strip's foot: a tall level's pillar goes on down from it, unstretched)
+				var pts := _wavy(x, -60.0, sb, 18.0, i * 1.9, 10)
 				tb.polyline(pts, w, near)
-				tb.polyline(_wavy(x + w * 0.35, -60.0, bottom, 18.0, i * 1.9, 10), 3.0, near.lightened(0.05))
+				tb.polyline(_wavy(x + w * 0.35, -60.0, sb, 18.0, i * 1.9, 10), 3.0, near.lightened(0.05))
 				for k in 3:
 					tb.ellipse(pts[2 + k * 3], w * 0.36, w * 0.24, near.lightened(0.02), 10)
+				if tall > 0.0:
+					tb.polyline(_wavy(pts[pts.size() - 1].x, sb - 4.0, bottom, 14.0, i * 2.7, 6), w, near)
+				if _tower(tall, 2):
+					_buttress(tb, near, x, w, tall + 380.0, i)
+			if _tower(tall, 2):
+				_canopy_fronds(slice, tb, near, span, x0, x1, tall)
 		"sporewood":
 			for i in _each(110.0, x0, x1):
 				var x := i * 110.0 + _h(i, 1) * 50.0
@@ -512,6 +558,8 @@ static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float,
 					tb.line(Vector2(sx, -20.0), Vector2(sx + 3.0, ln), 1.6, near.lightened(0.04))
 					tb.circle(Vector2(sx + 3.0, ln + 2.0), 2.4, near.lightened(0.07), 6)
 			_hanging(slice, tb, near, span, x0, x1, 0.5)
+			if tall > 0.0:
+				_tall_hanging(slice, tb, near, span, x0, x1, tall, 0.45, false)
 		"rootheart":
 			for i in _each(380.0, x0, x1, 150.0):
 				var x := 150.0 + i * 380.0 + _h(i, 1) * 90.0
@@ -525,10 +573,14 @@ static func _near(slice, tb, v: String, c: Dictionary, span: Vector2, x0: float,
 			_hanging(slice, tb, near, span, x0, x1, 0.6)
 		_:
 			_hanging(slice, tb, near, span, x0, x1, 1.0)
+			if tall > 0.0:
+				_tall_hanging(slice, tb, near, span, x0, x1, tall, 0.7, true)
 			for i in _each(RIB_EVERY, x0, x1, 260.0):
 				var x := 260.0 + i * RIB_EVERY + (_h(i, 7) - 0.5) * 100.0
 				var r := 170.0 + _h(i, 8) * 40.0
-				var pts := _arc(Vector2(x + r * 0.9, bottom - 120.0), r * 0.9, bottom - 40.0, PI, PI * 1.5, 12)
+				# (a tall level's rib stands where a strip's does: its feet sink
+				# under the bottom storey's floor)
+				var pts := _arc(Vector2(x + r * 0.9, span.y + 300.0), r * 0.9, span.y + 380.0, PI, PI * 1.5, 12)
 				tb.polyline(pts, 20.0, near)
 				var hl := PackedVector2Array()
 				for q in pts:
@@ -552,6 +604,235 @@ static func _hanging(slice, tb, near: Color, span: Vector2, x0: float, x1: float
 			tb.tri(p, p + Vector2(d * 12.0, -4.0), p + Vector2(d * 7.0, 4.0), near.lightened(0.04))
 
 
+# ---------------------------------------------------------------- a tall level's bands
+
+static func _storeys(y0: float, y1: float, every: float) -> Array:
+	## [storey index, its top] for every storey from y0 down to y1.
+	var out := []
+	var k := 0
+	while y0 + k * every < y1:
+		out.append([k, y0 + k * every])
+		k += 1
+	return out
+
+
+static func _tall_ossuary(slice, tb, mid: Color, span: Vector2, x0: float, x1: float, tall: float, wt: float) -> void:
+	## The ossuary wall on down a tall level, a storey at a time under the
+	## strip's three niche rows: a cornice, two rows of niches (staggered by
+	## storey), a lattice of crossed femurs, roots threading it.
+	var y0 := wt + 46.0 + 3.0 * 58.0 - 10.0
+	for sk in _storeys(y0, span.y + tall + 60.0, TALL_STOREY):
+		var k: int = sk[0]
+		var sy: float = sk[1]
+		slice.draw_rect(Rect2(x0, sy, x1 - x0, 7.0), mid.darkened(0.08))
+		slice.draw_rect(Rect2(x0, sy, x1 - x0, 1.5), mid.darkened(0.02))
+		for i in _each(NICHE_EVERY, x0, x1):
+			for r in 2:
+				if _h(i, 140 + k * 7 + r) < 0.25:
+					continue
+				var cx := i * NICHE_EVERY + NICHE_EVERY * 0.5 + ((r + k) % 2) * NICHE_EVERY * 0.25
+				_niche(slice, tb, mid, Vector2(cx, sy + 40.0 + r * 58.0), 0.02)
+		# the lattice: femurs crossed in an X, their knobs at the ends
+		var ly := sy + 152.0
+		for i in _each(96.0, x0, x1, 48.0 * (k % 2)):
+			if _h(i, 160 + k) < 0.3:
+				continue
+			var c := Vector2(48.0 * (k % 2) + i * 96.0, ly)
+			var col := mid.darkened(0.06)
+			for d in [-1.0, 1.0]:
+				var a := c + Vector2(-22.0, -17.0 * d)
+				var b := c + Vector2(22.0, 17.0 * d)
+				tb.line(a, b, 4.0, col)
+				tb.ellipse(a, 4.0, 3.2, col, 8)
+				tb.ellipse(b, 4.0, 3.2, col, 8)
+		_threads(slice, tb, mid, span, x0, x1, sy - 20.0, 170 + k * 3, TALL_STOREY - 40.0)
+
+
+static func _tall_spores(slice, tb, mid: Color, span: Vector2, x0: float, x1: float, tall: float) -> void:
+	## The Sporewood's dark wall on down: shelves of bracket fungi, a thin
+	## haze over each, a storey at a time.
+	var y0 := span.y * 0.5 + 96.0 + 60.0
+	for sk in _storeys(y0, span.y + tall + 60.0, 150.0):
+		var k: int = sk[0]
+		var sy: float = sk[1]
+		for b in 3:
+			slice.draw_rect(Rect2(x0, sy - 30.0 + b * 10.0, x1 - x0, 10.0), Color(mid.lightened(0.08), [0.04, 0.07, 0.04][b]))
+		for i in _each(80.0, x0, x1, 40.0 * (k % 2)):
+			if _h(i, 180 + k) < 0.35:
+				continue
+			var x := 40.0 * (k % 2) + i * 80.0 + _h(i, 181 + k) * 30.0
+			var y := sy + _h(i, 182 + k) * 40.0
+			for f in 1 + int(_h(i, 183 + k) * 2.99):
+				var w := 26.0 + _h(i * 3 + f, 184 + k) * 30.0
+				var c := Vector2(x + f * w * 0.45, y + f * 9.0)
+				tb.fan(c, _arc(c, w * 0.5, w * 0.24, PI, TAU, 10), mid.darkened(0.04))
+				slice.draw_rect(Rect2(c.x - w * 0.46, c.y - 1.0, w * 0.92, 3.0), mid.darkened(0.22))
+
+
+static func _tower(tall: float, layer_index: int) -> bool:
+	## Is a rootvault level this deep the tower (E11)? (tall: layer layer_index's.)
+	return tall >= (TOWER_ROWS * 32.0 - 480.0) * float(FACTORS[layer_index])
+
+
+static func _root_line(span: Vector2, tall: float) -> float:
+	## Where the rootvault tower's roots take the mid wall over (E11): from
+	## the bottom storey's floor the mid layer shows about tall + 83 .. tall
+	## + 294 over his feet (the camera at the level's foot), so the roots fill
+	## that and the niches the storey above it.
+	return maxf(wall_top("rootvault", span) + 46.0 + 58.0, tall + 100.0)
+
+
+static func _tall_vault(slice, tb, mid: Color, span: Vector2, x0: float, x1: float, tall: float, wt: float) -> void:
+	## The rootvault's mid layer in a tall level. Under TOWER_ROWS the
+	## ossuary goes on down (the strip's niche rows, extended), its coffin
+	## stacks and threading roots a storey at a time. The tower (E11, the 3-2
+	## tower) is three storeys that read as a climb: the niche rows go down
+	## to the roots, a row of coffins rests on them; the roots take the foot
+	## of the wall; the canopy hangs over the top.
+	if not _tower(tall, 1):
+		for sk in _storeys(span.y * 0.72 + TALL_STOREY * 0.5, span.y + tall + 60.0, TALL_STOREY):
+			var k: int = sk[0]
+			var sy: float = sk[1]
+			for i in _each(210.0, x0, x1, 90.0 + 70.0 * (k % 3)):
+				if _h(i, 290 + k) < 0.3:
+					continue
+				var x := 90.0 + 70.0 * (k % 3) + i * 210.0
+				for kk in 2 + int(_h(i, 291 + k) * 1.99):
+					var cy2 := sy - kk * 24.0
+					slice.draw_rect(Rect2(x - 20.0, cy2 - 20.0, 40.0, 20.0), mid.darkened(0.08))
+					slice.draw_rect(Rect2(x - 20.0, cy2 - 20.0, 40.0, 3.0), mid.lightened(0.03))
+					slice.draw_rect(Rect2(x - 3.0, cy2 - 16.0, 6.0, 12.0), mid.darkened(0.3))
+			_threads(slice, tb, mid, span, x0, x1, sy - TALL_STOREY * 0.6, 300 + k * 3, TALL_STOREY - 40.0)
+		return
+	var rl := _root_line(span, tall)
+	var bottom := span.y + tall + 420.0
+	# the roots: a darker wall, a curtain falling, trunks rising to meet it
+	slice.draw_rect(Rect2(x0, rl + 12.0, x1 - x0, bottom - rl), mid.darkened(0.34))
+	for i in _each(22.0, x0, x1):
+		if _h(i, 200) < 0.3:
+			continue
+		var x := i * 22.0 + _h(i, 201) * 10.0
+		var ln := 50.0 + _h(i, 202) * 120.0
+		tb.polyline(_wavy(x, rl - 10.0, rl + ln, 5.0, i * 0.7, 6), 2.0 + _h(i, 203) * 2.0, mid.darkened(0.14))
+	for i in _each(230.0, x0, x1, 60.0):
+		var x := 60.0 + i * 230.0 + (_h(i, 210) - 0.5) * 80.0
+		var w := 30.0 + _h(i, 211) * 22.0
+		var top := rl + 30.0 + _h(i, 212) * 70.0
+		var trunk := _wavy(x, bottom, top, 16.0, i * 1.3, 10)
+		tb.polyline(trunk, w, mid.darkened(0.08))
+		tb.polyline(_wavy(x - w * 0.3, bottom, top + 10.0, 16.0, i * 1.3, 10), 2.0, mid.lightened(0.02))
+		# where it splits: two or three roots spreading up into the curtain
+		for b in 2 + int(_h(i, 213) * 1.99):
+			var side := -1.0 if b % 2 == 0 else 1.0
+			var tip := Vector2(x + side * (40.0 + _h(i, 214 + b) * 70.0), top - 40.0 - _h(i, 216 + b) * 50.0)
+			tb.polyline(PackedVector2Array([Vector2(x, top + 12.0), Vector2(x + side * 12.0, top - 8.0), (Vector2(x, top) + tip) * 0.5 + Vector2(0, 6.0), tip]),
+					w * (0.42 - b * 0.08), mid.darkened(0.08))
+		for kn in 2:
+			var q := trunk[3 + kn * 3]
+			tb.ellipse(q, w * 0.62, w * 0.3, mid.darkened(0.04), 10)
+		if _h(i, 220) > 0.55:
+			# a skull caught in the roots
+			var sk := Vector2(x + w * 0.2, top + 60.0 + _h(i, 221) * 80.0)
+			tb.ellipse(sk, 7.0, 6.2, mid.darkened(0.04), 10)
+			tb.rect(Rect2(sk + Vector2(-3.8, -1.5), Vector2(2.4, 2.4)), mid.darkened(0.4))
+			tb.rect(Rect2(sk + Vector2(1.4, -1.5), Vector2(2.4, 2.4)), mid.darkened(0.4))
+	# coffins end-on resting where the ossuary meets the roots
+	for i in _each(150.0, x0, x1, 40.0):
+		if _h(i, 230) < 0.35:
+			continue
+		var x := 40.0 + i * 150.0 + _h(i, 231) * 50.0
+		for kk in 1 + int(_h(i, 232) * 1.99):
+			var cy := rl + 6.0 - kk * 22.0
+			slice.draw_rect(Rect2(x - 20.0, cy - 20.0, 40.0, 20.0), mid.darkened(0.08))
+			slice.draw_rect(Rect2(x - 20.0, cy - 20.0, 40.0, 3.0), mid.lightened(0.03))
+			slice.draw_rect(Rect2(x - 3.0, cy - 16.0, 6.0, 12.0), mid.darkened(0.3))
+	# the canopy: bone boughs over the vaults (under a tower's stone
+	# ceiling: it hangs from about the third row down), leaves hanging off them
+	for i in _each(260.0, x0, x1, 30.0):
+		var x := 30.0 + i * 260.0 + _h(i, 240) * 60.0
+		var y := 70.0 + _h(i, 241) * 40.0
+		var pts := PackedVector2Array()
+		for k in 8:
+			pts.append(Vector2(x - 150.0 + k * 43.0, y + sin(k * 0.9 + i) * 10.0 - absf(k - 3.5) * 5.0))
+		tb.polyline(pts, 9.0 + _h(i, 242) * 6.0, mid.darkened(0.04))
+		var hl := PackedVector2Array()
+		for q in pts:
+			hl.append(q + Vector2(0, -3.0))
+		tb.polyline(hl, 1.5, mid.lightened(0.04))
+		# up into the dark from its crown, where the boughs meet the vault
+		tb.polyline(_wavy(pts[3].x, pts[3].y, -20.0, 12.0, i * 2.1, 6), 11.0, mid.darkened(0.04))
+		for k in [1, 5]:
+			tb.ellipse(pts[k], 7.0, 5.5, mid, 10)
+		for k in 7:
+			var q := pts[k].lerp(pts[k + 1], _h(i * 7 + k, 243))
+			if _h(i * 7 + k, 244) < 0.3:
+				continue
+			var ln := 26.0 + _h(i * 7 + k, 245) * 80.0
+			tb.line(q, q + Vector2(2.0, ln), 1.4, mid.darkened(0.06))
+			for lf in int(ln / 14.0):
+				var lp := q + Vector2(2.0 * lf / maxf(ln / 14.0, 1.0), 8.0 + lf * 14.0)
+				var d := 1.0 if (lf + k) % 2 == 0 else -1.0
+				tb.tri(lp, lp + Vector2(d * 9.0, -3.0), lp + Vector2(d * 5.0, 4.0), mid.darkened(0.02))
+		# leaf clusters where the bough's crown is thickest
+		for c in 5:
+			tb.ellipse(pts[2 + c % 4] + Vector2(-20.0 + c * 12.0, -10.0 + (c % 2) * 8.0), 18.0, 10.0, mid.darkened(0.08 + 0.03 * (c % 2)), 10)
+
+
+static func _buttress(tb, near: Color, x: float, w: float, ground: float, i: int) -> void:
+	## A root pillar's foot in the 3-2 tower: roots flaring out into the ground.
+	for b in 4:
+		var side := -1.0 if b % 2 == 0 else 1.0
+		var reach := 50.0 + _h(i, 250 + b) * 90.0
+		var pts := PackedVector2Array([Vector2(x + side * w * 0.2, ground - 170.0 - b * 20.0), Vector2(x + side * w * 0.45, ground - 90.0),
+				Vector2(x + side * (w * 0.5 + reach * 0.6), ground - 20.0), Vector2(x + side * (w * 0.5 + reach), ground + 60.0)])
+		tb.polyline(pts, w * (0.5 - b * 0.08), near)
+
+
+static func _canopy_fronds(slice, tb, near: Color, span: Vector2, x0: float, x1: float, tall: float) -> void:
+	## The canopy's fronds over the 3-2 tower's top: boughs across the top,
+	## leafy roots hanging from them.
+	for i in _each(340.0, x0, x1, 120.0):
+		var x := 120.0 + i * 340.0 + _h(i, 260) * 80.0
+		tb.polyline(_wavy(x - 160.0, -10.0, 30.0 + _h(i, 261) * 30.0, 10.0, i * 1.7, 6), 14.0, near)
+		tb.polyline(PackedVector2Array([Vector2(x - 170.0, 10.0), Vector2(x - 60.0, 26.0 + _h(i, 262) * 20.0), Vector2(x + 60.0, 18.0),
+				Vector2(x + 170.0, 30.0 + _h(i, 263) * 20.0)]), 11.0, near)
+	for i in _each(90.0, x0, x1, 20.0):
+		if _h(i, 264) < 0.25:
+			continue
+		var x := 20.0 + i * 90.0 + _h(i, 265) * 50.0
+		var ln := 60.0 + _h(i, 266) * 140.0
+		var pts := _wavy(x, -30.0, ln, 9.0, i * 1.3, 8)
+		tb.polyline(pts, 4.0, near)
+		for q in range(1, pts.size()):
+			var d := 1.0 if q % 2 == 0 else -1.0
+			tb.tri(pts[q], pts[q] + Vector2(d * 14.0, -5.0), pts[q] + Vector2(d * 8.0, 5.0), near.lightened(0.03))
+
+
+static func _tall_hanging(slice, tb, near: Color, span: Vector2, x0: float, x1: float, tall: float, k: float, beams: bool) -> void:
+	## Under the strip's hanging roots, a storey at a time: a root beam across
+	## (beams; else a mossy bough) with roots and leaves hanging off it.
+	for sk in _storeys(span.y * 0.7, span.y + tall + 40.0, NEAR_STOREY):
+		var st: int = sk[0]
+		var sy: float = sk[1]
+		for i in _each(330.0, x0, x1, 100.0 + 120.0 * (st % 2)):
+			if _h(i, 270 + st) > k:
+				continue
+			var x := 100.0 + 120.0 * (st % 2) + i * 330.0
+			var y := sy + _h(i, 271 + st) * 80.0
+			var beam := PackedVector2Array()
+			for q in 7:
+				beam.append(Vector2(x - 140.0 + q * 46.0, y + sin(q * 1.1 + i + st) * 8.0 + (6.0 if q in [2, 3, 4] else 0.0)))
+			tb.polyline(beam, 10.0 if beams else 6.0, near)
+			for r in 3 + int(_h(i, 272 + st) * 2.99):
+				var top := beam[1 + r % 5]
+				var ln := 40.0 + _h(i * 5 + r, 273 + st) * 110.0
+				var pts := _wavy(top.x, top.y, top.y + ln, 7.0, i + r * 1.9, 6)
+				tb.polyline(pts, 4.0 if beams else 2.4, near)
+				for q in range(2, pts.size() - 1, 2):
+					var d := 1.0 if q % 4 == 0 else -1.0
+					tb.tri(pts[q], pts[q] + Vector2(d * 12.0, -4.0), pts[q] + Vector2(d * 7.0, 4.0), near.lightened(0.04))
+
+
 # ---------------------------------------------------------------- windows
 
 static func _moons(v: String, span: Vector2) -> Array:
@@ -570,12 +851,13 @@ static func _moons(v: String, span: Vector2) -> Array:
 	return out
 
 
-static func windows(layer_index: int, colors: Dictionary, span: Vector2) -> Array:
+static func windows(layer_index: int, colors: Dictionary, span: Vector2, tall := 0.0) -> Array:
 	## The haze moons and the heart-knot's bell (far), the glowing caps (far,
 	## sporewood), the skull lanterns (mid): decorative, tinted lights.
 	var v := _variant(colors)
 	var out := []
 	var glass: Array = colors.get("glass", [Color("d8d0a0")])
+	span = Vector2(span.x, span.y - tall)   # (laid out on the strip's span, as draw() does)
 	match layer_index:
 		0:
 			var moon: Color = colors.get("moon", Color("e8dcb0"))

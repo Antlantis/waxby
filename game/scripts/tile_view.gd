@@ -1,8 +1,12 @@
 extends Node2D
-## Draws one chunk of the level's tiles (CHUNK columns, the full height) in
-## the cel-shaded stone look: exposed faces get a candlelit top lip, a dark
-## outline and a hard shade band; buried stone is darker and quieter. The
-## drawing is cached by the canvas and redone only when a tile changes.
+## Draws one chunk of the level's tiles (CHUNK columns by CHUNK rows from
+## col0, row0; the bottom row of chunks also draws the bedrock under the
+## level) in the cel-shaded stone look: exposed faces get a candlelit top lip,
+## a dark outline and a hard shade band; buried stone is darker and quieter.
+## The drawing is cached by the canvas and redone only when a tile changes,
+## and the canvas culls a chunk off screen, so a redraw and the tiles drawn a
+## frame scale with the screen, not the level's height (the shapes plan's E4:
+## a 15-row level is one row of chunks, drawn exactly as before).
 ## Reliquaries are sprites (the Block nodes) and lava animates on its own;
 ## water and false stone's crack are level_features' (false stone itself is
 ## drawn here exactly like stone, which is the point).
@@ -14,8 +18,8 @@ extends Node2D
 ##
 ## v3: a theme from scripts/themes/* (themes/loader.gd) names a painter,
 ## scripts/tiles/<painter>.gd, and the chunk is handed to its
-## paint_chunk(ci, tb, level, x0, x1, pal, world) (the plain painter when the
-## file is missing; painter "" or "v2" keeps this file's stone with the
+## paint_chunk(ci, tb, level, x0, x1, pal, world, y0, y1) (the plain painter
+## when the file is missing; painter "" or "v2" keeps this file's stone with the
 ## theme's palette). In v2's themes, a v3 tile (vines, ice, glass, ...) is
 ## drawn by the plain painter's stand-in, batched and flushed once; with none
 ## (W1-W2) the drawing is exactly v2's.
@@ -67,6 +71,7 @@ const PALETTES := {
 
 var level: RefCounted
 var col0 := 0
+var row0 := 0                    # the chunk's first row (world.gd lays chunks out CHUNK rows apart)
 var world: Node          # for the crumbling ledges' state (may be null)
 var _p: Dictionary = PALETTES["cathedral"]
 var _tb = null                   # a TriBatch, made the first time a chunk needs one
@@ -81,17 +86,18 @@ func _batch():
 func _draw() -> void:
 	var th := str(level.theme)
 	var col1 := mini(col0 + CHUNK, level.width)
+	var row1 := mini(row0 + CHUNK, level.height)
 	if not PALETTES.has(th) and Themes.has_theme(th):
 		var painter: Script = Themes.painter(th)
 		var pal: Dictionary = Themes.palette(th)
 		if painter != null:
-			painter.paint_chunk(self, _batch(), level, col0, col1, pal, world)
+			painter.paint_chunk(self, _batch(), level, col0, col1, pal, world, row0, row1)
 			return
 		_p = PALETTES["cathedral"].merged(pal, true)
 	else:
 		_p = PALETTES.get(th, PALETTES["cathedral"])
 	for x in range(col0, col1):
-		for y in level.height:
+		for y in range(row0, row1):
 			var t: int = level.tile(x, y)
 			match t:
 				LevelData.STONE, LevelData.FALSE_STONE:
@@ -114,8 +120,8 @@ func _draw() -> void:
 					if t >= V3_FIRST and V2_THEME_STANDINS:
 						Plain.paint_cell(self, _batch(), level, x, y, t, _p, world)
 		# The bedrock under the level, where the floor goes down: just for looks
-		# (as deep as the camera shows, world.gd BELOW).
-		if LevelData.is_solid(level.tile(x, level.height - 1)) or Plain.V3_SOLID.has(level.tile(x, level.height - 1)):
+		# (as deep as the camera shows, world.gd BELOW), by the bottom chunks.
+		if row1 >= level.height and (LevelData.is_solid(level.tile(x, level.height - 1)) or Plain.V3_SOLID.has(level.tile(x, level.height - 1))):
 			for y in range(level.height, level.height + BEDROCK_ROWS):
 				draw_rect(Rect2(x * TILE, y * TILE, TILE, TILE), (_p["buried"] as Color).darkened(0.15 * (y - level.height + 1)))
 	if _tb != null:
