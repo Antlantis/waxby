@@ -3,8 +3,10 @@ extends RefCounted
 ## the stand-in look for v3's tiles in a v2 theme (tile_view.gd asks it for
 ## any tile past v2's), and the reference painter for the art streams (A1's
 ## orchard/frost, A2's glass/hush follow the same shape).
-##   static func paint_chunk(ci, tb, level, x0, x1, pal, world)   the painter contract (contract.md §12.4)
+##   static func paint_chunk(ci, tb, level, x0, x1, pal, world, y0, y1)   the painter contract (contract.md §12.4)
 ##   static func paint_cell(ci, tb, level, x, y, t, pal, world)   one cell
+## A chunk is columns [x0, x1) by rows [y0, y1) (y1 -1: to the level's
+## bottom); the chunk that reaches the bottom draws the bedrock under it too.
 ## Rects go straight to ci.draw_rect; every other shape into the TriBatch tb,
 ## flushed once at the end of the chunk (the caller flushes for paint_cell).
 ## No draw_circle / draw_colored_polygon / draw_polyline (test_render.gd).
@@ -53,14 +55,15 @@ static func is_solid_id(t: int) -> bool:
 	return LevelData.is_solid(t) or V3_SOLID.has(t)
 
 
-static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node) -> void:
-	tb.origin = Vector2(x0 * TILE, 0)
+static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node, y0 := 0, y1 := -1) -> void:
+	var ye: int = level.height if y1 < 0 else y1
+	tb.origin = Vector2(x0 * TILE, y0 * TILE)
 	for x in range(x0, x1):
-		for y in level.height:
+		for y in range(y0, ye):
 			var t: int = level.tile(x, y)
 			if t != LevelData.AIR:
 				paint_cell(ci, tb, level, x, y, t, pal, world)
-		if is_solid_id(level.tile(x, level.height - 1)):
+		if ye >= level.height and is_solid_id(level.tile(x, level.height - 1)):
 			for y in range(level.height, level.height + BEDROCK_ROWS):
 				ci.draw_rect(Rect2(x * TILE, y * TILE, TILE, TILE), col(pal, "buried").darkened(0.15 * (y - level.height + 1)))
 	tb.flush(ci)

@@ -28,9 +28,14 @@ extends SceneTree
 ## - the Proving Hall is the brightest level theme;
 ## - the props exist (spec §11.3), ThorVG-safe, at their frames, with their
 ##   points files; the swaps keep v2's frames;
-## - the gilt rule for all six secrets (and 6-S's dark, 1-S's snow).
+## - the gilt rule for all six secrets (and 6-S's dark, 1-S's snow);
+## - at 24 and 36 rows (the shapes plan's E9, backdrop.gd tall()) the
+##   styles' budgets, the strip's composition kept at the top and its far
+##   lights, the deep band filled (the Hushdeep's lake and the hushquiet's
+##   emptiness kept), the lake at the level's foot, W6 still unlit.
 
 const Themes_path := "res://scripts/themes/loader.gd"
+const WA := preload("res://tests/test_world_art.gd")   # its tall-level measures (tall_elements, tall_cover)
 const W5 := ["choirglass", "rosewind", "voidnave", "prismheart"]
 const W6 := ["stillshore", "drownbell", "hushquiet", "husheye"]
 const GILT := ["nave_gilt", "tallow_gilt", "orchard_gilt", "carillon_gilt", "sanctum_gilt", "hushdeep_gilt"]
@@ -90,6 +95,7 @@ func _initialize() -> void:
 	_test_edges()
 	await _test_painters()
 	await _test_styles()
+	await _test_tall()
 	await _test_gusts()
 	await _test_live_w5()
 	await _test_live_w6()
@@ -401,6 +407,73 @@ func _test_styles() -> void:
 		_check(results[id][2] == 0, "%s: no backdrop windows" % id)
 	for id in ["choirglass", "rosewind", "prismheart", "trialhall", "nave_gilt"]:
 		_check(results[id][2] > 0, "%s: its windows are made at build" % id)
+
+
+# ---------------------------------------------------------------- tall levels (the shapes plan's E9)
+
+func _test_tall() -> void:
+	## A2's styles at 24 and 36 rows (768 and 1152 px backdrops): every slice
+	## inside the budget; the strip's composition at the top as it was (every
+	## element of a 15-row level's upper half drawn the same, the far lights
+	## where the strip has them); the band only a tall level shows filled in
+	## the mid and near layers (test_world_art.gd's measure), but where the
+	## style keeps it empty by design: the Hushdeep's mid layer there is the
+	## lake, the hushquiet has nothing. W6 still has no lights.
+	var Backdrop = load("res://scripts/backdrop.gd")
+	for id in ["choirglass", "rosewind", "voidnave", "stillshore", "drownbell", "hushquiet", "trialhall"]:
+		var strip = Backdrop.new()
+		root.add_child(strip)
+		strip.build(id, Vector2(380 * 32, 480), Vector2(844, 390))
+		var style: Script = strip.style_script
+		for rows in [24, 36]:
+			var bd = Backdrop.new()
+			root.add_child(bd)
+			bd.build(id, Vector2(380 * 32, rows * 32), Vector2(844, 390))
+			var worst := 0
+			var kept := true
+			for i in 3:
+				var sp: Vector2 = bd.span(i)
+				var x := -256.0
+				while x < sp.x + 200.0:
+					var tb = TriBatch.new()
+					style.draw(WA.RectLog.new(), tb, i, bd.colors(), sp, x, x + 1024.0, bd.tall(i))
+					worst = maxi(worst, tb.vertex_count())
+					x += 1024.0
+				var have := {}
+				for e in WA.tall_elements(style, bd.colors(), sp, i, bd.tall(i)):
+					have[e] = true
+				for e in WA.tall_elements(style, strip.colors(), strip.span(i), i, 0.0, strip.span(i).y * 0.5):
+					kept = kept and have.has(e)
+			_check(worst <= CHUNK_BUDGET, "%s, %d rows: every backdrop slice within %d vertices (%d)" % [id, rows, CHUNK_BUDGET, worst])
+			_check(kept, "%s, %d rows: the strip's composition stays at the top, nothing stretched" % [id, rows])
+			var far := []
+			var far_strip := []
+			for wd in bd.windows:
+				if int(wd["layer"]) == 0:
+					far.append(str(wd.get("center", wd.get("rect"))))
+			for wd in strip.windows:
+				if int(wd["layer"]) == 0:
+					far_strip.append(str(wd.get("center", wd.get("rect"))))
+			_check(far == far_strip, "%s, %d rows: its far lights where the strip has them (%d)" % [id, rows, far.size()])
+			if W6.has(id):
+				_check(bd.windows.is_empty(), "%s, %d rows: still no backdrop windows" % [id, rows])
+			for i in [1, 2]:
+				if id == "hushquiet" or (W6.has(id) and i == 1):
+					continue
+				var band: Vector2 = WA.deep_band(i, rows)
+				var old: float = WA.tall_cover(style, bd.colors(), bd.span(i), i, 0.0, band.x, band.y)
+				var now: float = WA.tall_cover(style, bd.colors(), bd.span(i), i, bd.tall(i), band.x, band.y)
+				_check(now >= WA.DEEP_MIN and now >= old, "%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f; drawn as a strip, %.3f)"
+						% [id, rows, ["far", "mid", "near"][i], band.x, band.y, now, old])
+			bd.queue_free()
+		strip.queue_free()
+	await process_frame
+	# the Hushdeep's lake stays at the level's foot, as far over it as a strip's
+	var hd: Script = load("res://scripts/backdrops/hushdeep.gd")
+	var s15 := Vector2(5000, (480 - 390) * 0.35 + 390)
+	var s36 := Vector2(5000, (1152 - 390) * 0.35 + 390)
+	_check(is_equal_approx(s36.y - hd.lake_line(s36, 1, (1152 - 480) * 0.35), s15.y - hd.lake_line(s15, 1)),
+			"the Hushdeep: a tall level's lake line as far over its foot as a strip's")
 
 
 # ---------------------------------------------------------------- the gust

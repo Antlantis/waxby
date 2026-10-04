@@ -17,7 +17,10 @@ extends SceneTree
 ## every layer of every theme, make their windows at build and put every far
 ## window above the mid wall; each backdrop slice paints only its own strip
 ## and the slices add up to the whole layer (nothing cut at a seam); nothing
-## that reads as a clock shows over the Tinker's arena.
+## that reads as a clock shows over the Tinker's arena; at 24 and 36 rows (the
+## shapes plan's E9, backdrop.gd tall()) the same budgets and seams, the
+## strip's composition kept at the top, the deep band filled, 3-2's tower's
+## three storeys at 36 rows (E11), and v2's arcade going on down.
 ##
 ## Two more modes, for looking (they need a window):
 ##   $G --path . --resolution 1266x585 --script res://tests/test_world_art.gd -- shots <out_dir> [theme,...] [x,...]
@@ -235,6 +238,7 @@ func _initialize() -> void:
 	await _test_styles()
 	_test_seams()
 	_test_arena_clocks()
+	await _test_tall()
 	await _test_world()
 	print("test_world_art: %d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)
@@ -920,6 +924,205 @@ static func _long_arena(width: int) -> Array:
 			line = line.replace(".P", "..")
 		rows.append(pad + line)
 	return rows
+
+
+# ---------------------------------------------------------------- tall levels (the shapes plan's E9, E11)
+
+const TALL_ROWS := [24, 36]
+const FACTORS := [0.12, 0.35, 0.65]   # backdrop.gd's
+const DEEP_MIN := 0.008          # the least of the deep band a tall level's mid and near layers fill (calibrated: the sparsest, 3-3's moss, 1.5%)
+
+
+static func tall_elements(style: Script, colors: Dictionary, sp: Vector2, i: int, tall: float, y_top := INF) -> PackedStringArray:
+	## Every rect narrower than a fill and every triangle a layer draws, as
+	## text (slice by slice, as backdrop.gd cuts it), those wholly above
+	## y_top only.
+	var out := PackedStringArray()
+	var x := -256.0
+	while x < sp.x + 200.0:
+		var log := RectLog.new()
+		var tb = TriBatch.new()
+		style.draw(log, tb, i, colors, sp, x, x + 1024.0, tall)
+		for rc in log.rects:
+			var r: Rect2 = (rc[0] as Rect2).abs()
+			if r.size.x < 500.0 and r.end.y < y_top:
+				out.append("%s %s" % [r, rc[1]])
+		for t in range(0, tb.indices.size(), 3):
+			var a: Vector2 = tb.points[tb.indices[t]]
+			var b: Vector2 = tb.points[tb.indices[t + 1]]
+			var c: Vector2 = tb.points[tb.indices[t + 2]]
+			var cut := a.x in [x, x + 1024.0] or b.x in [x, x + 1024.0] or c.x in [x, x + 1024.0]
+			if maxf(a.y, maxf(b.y, c.y)) < y_top and not cut:
+				# (a piece clip_strip cut at the seam is the piece of a whole
+				# element: one reaching down to the bottom is cut otherwise)
+				out.append("%s %s %s %s" % [a, b, c, tb.colors[tb.indices[t]]])
+		x += 1024.0
+	return out
+
+
+static func tall_cover(style: Script, colors: Dictionary, sp: Vector2, i: int, tall: float, y0: float, y1: float) -> float:
+	## How much of the band y0..y1 across the layer its things cover (not
+	## its fills: rects as wide as a slice), 0..1 (overlaps count twice).
+	var area := 0.0
+	var x := -256.0
+	while x < sp.x + 200.0:
+		var log := RectLog.new()
+		var tb = TriBatch.new()
+		style.draw(log, tb, i, colors, sp, x, x + 1024.0, tall)
+		for rc in log.rects:
+			var r: Rect2 = (rc[0] as Rect2).abs()
+			if r.size.x >= 500.0 or (rc[1] as Color).a < 0.02:
+				continue
+			var a := maxf(r.position.y, y0)
+			var b := minf(r.end.y, y1)
+			if b > a:
+				area += (b - a) * r.size.x
+		for t in range(0, tb.indices.size(), 3):
+			var p: Vector2 = tb.points[tb.indices[t]]
+			var q: Vector2 = tb.points[tb.indices[t + 1]]
+			var c: Vector2 = tb.points[tb.indices[t + 2]]
+			var cy := (p.y + q.y + c.y) / 3.0
+			if cy >= y0 and cy < y1:
+				area += absf((q - p).cross(c - p)) * 0.5
+		x += 1024.0
+	return area / (sp.x * (y1 - y0))
+
+
+static func deep_band(i: int, rows: int) -> Vector2:
+	## The band of layer i only a level of this many rows shows: from the
+	## deepest a 15-row level's camera shows it to the deepest this one's does.
+	return Vector2(250.0 * FACTORS[i] + 390.0, (rows * 32 + 160 - 390) * FACTORS[i] + 390.0)
+
+
+func _test_tall() -> void:
+	## A1's styles at 24 and 36 rows (768 and 1152 px backdrops): each slice
+	## inside 6000 vertices and only its own strip (adding up to the layer);
+	## the strip's composition at the top as it was (every element of a
+	## 15-row level's upper half drawn the same: nothing stretches), its far
+	## set pieces where they were; the band only a tall level shows filled
+	## (mid and near: no bare wall where the strip's elements ran out); and
+	## 3-2's tower (E11) at 36 rows: the canopy over the top, roots in the
+	## bottom storey's view, the ossuary between.
+	var Backdrop = load("res://scripts/backdrop.gd")
+	for id in W3_THEMES + W4_THEMES:
+		if id == "rootheart":
+			continue   # (her arena is a strip)
+		var strip: Node2D = Backdrop.new()
+		root.add_child(strip)
+		strip.build(id, Vector2(380 * 32, 480), Vector2(844, 390))
+		var style: Script = strip.style_script
+		for rows in TALL_ROWS:
+			var bd: Node2D = Backdrop.new()
+			root.add_child(bd)
+			bd.build(id, Vector2(380 * 32, rows * 32), Vector2(844, 390))
+			var worst := 0
+			var inside := true
+			var seam := 0.0
+			var kept := true
+			for i in 3:
+				var sp: Vector2 = bd.span(i)
+				var tall: float = bd.tall(i)
+				var sum := {}
+				var x := -256.0
+				while x < sp.x + 200.0:
+					var log := RectLog.new()
+					var tb = TriBatch.new()
+					style.draw(log, tb, i, bd.colors(), sp, x, x + 1024.0, tall)
+					worst = maxi(worst, tb.vertex_count())
+					var a := _areas(log, tb)
+					inside = inside and float(a["_x0"]) >= x - 0.01 and float(a["_x1"]) <= x + 1024.0 + 0.01
+					for k in a:
+						if not str(k).begins_with("_"):
+							sum[k] = float(sum.get(k, 0.0)) + float(a[k])
+					x += 1024.0
+				var log2 := RectLog.new()
+				var tb2 = TriBatch.new()
+				style.draw(log2, tb2, i, bd.colors(), sp, -256.0, x, tall)
+				var whole := _areas(log2, tb2)
+				for k in whole:
+					if not str(k).begins_with("_"):
+						seam = maxf(seam, absf(float(whole[k]) - float(sum.get(k, 0.0))) / maxf(float(whole[k]), 1.0))
+				var top: float = strip.span(i).y * 0.5
+				var have := {}
+				for e in tall_elements(style, bd.colors(), sp, i, tall):
+					have[e] = true
+				for e in tall_elements(style, strip.colors(), strip.span(i), i, 0.0, top):
+					kept = kept and have.has(e)
+			_check(worst <= 6000, "%s, %d rows: a backdrop slice within 6000 vertices (%d)" % [id, rows, worst])
+			_check(inside and seam < 1e-3, "%s, %d rows: each slice paints its own strip and they add up (worst %.5f)" % [id, rows, seam])
+			_check(kept, "%s, %d rows: the strip's composition stays at the top, nothing stretched" % [id, rows])
+			var far_kept := true
+			for wd in bd.windows:
+				if int(wd["layer"]) == 0:
+					var found := false
+					for sd in strip.windows:
+						found = found or (int(sd["layer"]) == 0 and str(sd.get("center", sd.get("rect"))) == str(wd.get("center", wd.get("rect"))))
+					far_kept = far_kept and found
+			_check(far_kept, "%s, %d rows: its far set pieces (and their lights) where the strip has them" % [id, rows])
+			for i in [1, 2]:
+				var band := deep_band(i, rows)
+				var old := tall_cover(style, bd.colors(), bd.span(i), i, 0.0, band.x, band.y)
+				var now := tall_cover(style, bd.colors(), bd.span(i), i, bd.tall(i), band.x, band.y)
+				_check(now >= DEEP_MIN and now >= old,
+						"%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f; drawn as a strip, %.3f)" % [id, rows, ["far", "mid", "near"][i], band.x, band.y, now, old])
+			bd.queue_free()
+		strip.queue_free()
+	await process_frame
+	# 3-2's tower (E11): three storeys that read as a climb.
+	var orch: Script = Themes.style("rootvault")
+	var bd36: Node2D = Backdrop.new()
+	root.add_child(bd36)
+	bd36.build("rootvault", Vector2(280 * 32, 36 * 32), Vector2(844, 390))
+	var bd24: Node2D = Backdrop.new()
+	root.add_child(bd24)
+	bd24.build("rootvault", Vector2(280 * 32, 24 * 32), Vector2(844, 390))
+	_check(orch._tower(bd36.tall(1), 1) and orch._tower(bd36.tall(2), 2) and not orch._tower(bd24.tall(1), 1),
+			"rootvault: 36 rows is the tower, 24 rows the ossuary going on down")
+	var sp36: Vector2 = bd36.span(1)
+	var t36: float = bd36.tall(1)
+	var c: Dictionary = bd36.colors()
+	var base := Vector2(sp36.x, sp36.y - t36)
+	var rl: float = orch._root_line(base, t36)
+	# from the bottom storey's floor the mid layer shows about tall + 83 .. tall + 294 over his feet
+	_check(rl >= orch.wall_top("rootvault", base) + 100.0 and rl <= t36 + 120.0,
+			"the tower's roots start at %.0f: under the ossuary, inside the bottom storey's view (%.0f-%.0f)" % [rl, t36 + 83.0, t36 + 294.0])
+	var canopy := tall_cover(orch, c, sp36, 1, t36, 60.0, 170.0) - tall_cover(orch, c, sp36, 1, 0.0, 60.0, 170.0)
+	var roots := tall_cover(orch, c, sp36, 1, t36, t36 + 100.0, t36 + 294.0)
+	var niches := 0
+	var hole: Color = (c["mid"] as Color).darkened(0.55)
+	var x := -256.0
+	while x < sp36.x + 200.0:
+		var log := RectLog.new()
+		orch.draw(log, TriBatch.new(), 1, c, sp36, x, x + 1024.0, t36)
+		for rc in log.rects:
+			var r: Rect2 = rc[0]
+			if r.size == Vector2(26.0, 22.0) and (rc[1] as Color).is_equal_approx(hole) and r.position.y > rl:
+				niches += 1
+		x += 1024.0
+	var fronds := tall_cover(orch, c, bd36.span(2), 2, bd36.tall(2), 0.0, 200.0) - tall_cover(orch, c, bd36.span(2), 2, 0.0, 0.0, 200.0)
+	_check(canopy > 0.05 and fronds > 0.02, "the tower's top: the canopy over the vaults (%.3f more of the mid's 60-170), fronds hanging (%.3f)" % [canopy, fronds])
+	_check(roots > 0.2 and niches == 0, "its bottom storey: roots (%.3f of the band), the niches stopping over them (%d under)" % [roots, niches])
+	bd36.queue_free()
+	bd24.queue_free()
+	# v2's cathedral (World 1-2, backdrop_layer.gd): a 36-row level's arcade
+	# goes on down, a storey of glass among its storeys (lit as the strip's);
+	# a 15-row level has none past the strip's.
+	for th in ["nave", "crypt", "choir", "chandlery"]:
+		var deep := []
+		for rows in [15, 36]:
+			var b: Node2D = Backdrop.new()
+			root.add_child(b)
+			b.build(th, Vector2(240 * 32, rows * 32), Vector2(844, 390))
+			await process_frame
+			await process_frame
+			var n := 0
+			for wd in b.windows:
+				if int(wd["layer"]) == 1 and not wd.get("rose", false) and (wd["rect"] as Rect2).position.y > 300.0:
+					n += 1
+			deep.append(n)
+			b.queue_free()
+		_check(deep[0] == 0 and deep[1] > 0, "%s: the arcade's glass storey below the strip's at 36 rows (%d), none at 15" % [th, deep[1]])
+	await process_frame
 
 
 # ---------------------------------------------------------------- the World

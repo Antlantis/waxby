@@ -748,12 +748,10 @@ func _melt(i: int) -> void:
 	pt["p"] = 0.0
 	pt["fire"] = -1.0
 	pt["heard"] = false
-	var cols := {}
 	for c in pt["cells"]:
 		level.set_tile(c, LevelData.AIR)
-		cols[c.x] = true
-	for x in cols:
-		world._redraw_at(int(x))
+	for c in pt["cells"]:
+		world._redraw_at(c.x, c.y)
 	if world.glow:
 		var r: Rect2 = pt["rect"]
 		world.glow.burst(r.get_center(), 8 + mini(int(r.size.x * r.size.y / 512.0), 16), FROST, 70.0, 0.6, -60.0, 2.2, 40.0)
@@ -765,12 +763,10 @@ func _freeze(i: int) -> void:
 	var pt: Dictionary = patches[i]
 	pt["state"] = "solid"
 	pt["p"] = 0.0
-	var cols := {}
 	for c in pt["cells"]:
 		level.restore_tile(c)
-		cols[c.x] = true
-	for x in cols:
-		world._redraw_at(int(x))
+	for c in pt["cells"]:
+		world._redraw_at(c.x, c.y)
 
 
 func _body_in(pt: Dictionary) -> bool:

@@ -342,7 +342,7 @@ func _water_warden() -> void:
 		if fx != null and "water_cells" in fx and not (fx.water_cells as Array).has(c):
 			fx.water_cells.append(c)
 		if world.has_method("_redraw_at"):
-			world._redraw_at(c.x)
+			world._redraw_at(c.x, c.y)
 
 
 func _find_room(bell_floor: Vector2) -> Dictionary:

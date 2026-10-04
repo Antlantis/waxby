@@ -1336,7 +1336,7 @@ func _raise_humps() -> void:
 			level.set_tile(c, LevelData.STONE)
 			_hump_cells.append(c)
 			if world != null:
-				world._redraw_at(c.x)
+				world._redraw_at(c.x, c.y)
 	_lift_bodies()
 	sfx("root_burst", "boss_slam")
 
@@ -1396,7 +1396,7 @@ func _reset_arena(_keep: bool) -> void:
 		for c in _hump_cells:
 			level.restore_tile(c)
 			if world != null:
-				world._redraw_at(c.x)
+				world._redraw_at(c.x, c.y)
 	_humps_up = false
 	_hump_cells.clear()
 	_hump_at.clear()

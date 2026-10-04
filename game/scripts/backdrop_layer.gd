@@ -3,6 +3,15 @@ extends Node2D
 ## cathedral (vaults, arcade, pillars) or, for the World 2 themes, the
 ## cavern (a far wall with waxfall curtains, a giant candle or lilies; wax
 ## terraces with candle stubs; near stalactites, drip columns and roots).
+## In a level taller than 15 rows (backdrop.tall(), the shapes plan's E9)
+## the strip's drawing stays as it was at the top and its ground at the
+## bottom, and the band between goes on down a storey at a time, in one
+## TriBatch: the cathedral's arcade under a string course, a triforium of
+## blind lancets and a storey of glass by turns (that glass lights, as the
+## strip's does), the near pillars' capitals with a lamp chain off them; the
+## cavern's wax shelves with drips (moss and leaves in the garden) and near
+## rock ledges with stalactites under them. The far layers barely move and
+## keep the strip's drawing.
 
 const TriBatch := preload("res://scripts/tri_batch.gd")
 
@@ -16,7 +25,8 @@ var x0 := 0.0
 var x1 := 0.0
 var style: Script = null
 var _tb = null
-
+const STOREY := 250.0            # a tall level's storey down the arcade (mid)
+const NEAR_STOREY := 300.0       # and down the near pillars, the cavern's ledges
 
 func _ready() -> void:
 	queue_redraw()
@@ -36,17 +46,20 @@ func _draw() -> void:
 		if _tb == null:
 			_tb = TriBatch.new()
 		_tb.origin = Vector2(x0, 0)
-		style.draw(self, _tb, index, c, span, x0, x1)
+		style.draw(self, _tb, index, c, span, x0, x1, backdrop.tall(index))
 		_tb.flush(self)
 		return
+	var tall: float = backdrop.tall(index) if backdrop.has_method("tall") else 0.0
 	if str(c.get("style", "cathedral")) == "cavern":
 		match index:
 			0:
 				_cave_far(c, span)
 			1:
-				_cave_terraces(c, span)
+				_cave_terraces(c, span, tall)
 			2:
 				_cave_near(c, span)
+		if tall > 0.0 and index > 0:
+			_tall_cavern(c, span, tall)
 		return
 	match index:
 		0:
@@ -55,6 +68,8 @@ func _draw() -> void:
 			_arcade(c, span)
 		2:
 			_near(c, span)
+	if tall > 0.0 and index > 0:
+		_tall_cathedral(c, span, tall)
 
 
 func _arch(x: float, w: float, top: float, bottom: float, col: Color) -> void:
@@ -194,6 +209,163 @@ func _lancet(rr: Rect2, cols: Array, seed: int) -> void:
 	draw_colored_polygon(inner, (cols[seed % cols.size()] as Color).darkened(0.1))
 
 
+# ---------------------------------------------------------------- a tall level (E9)
+
+func _arch_pts(x: float, w: float, top: float, bottom: float) -> PackedVector2Array:
+	## _arch's outline for a TriBatch: an equilateral pointed arch, top to bottom.
+	var pts := PackedVector2Array()
+	var spring := top + w * 0.866
+	pts.append(Vector2(x, bottom))
+	for k in range(0, 9):
+		var th := deg_to_rad(180.0 - 60.0 * k / 8.0)
+		pts.append(Vector2(x + w + w * cos(th), spring - w * sin(th)))
+	for k in range(1, 9):
+		var th := deg_to_rad(60.0 - 60.0 * k / 8.0)
+		pts.append(Vector2(x + w * cos(th), spring - w * sin(th)))
+	pts.append(Vector2(x + w, bottom))
+	return pts
+
+
+func _tb_lancet(tb, rr: Rect2, cols: Array, seed: int) -> void:
+	## _lancet's glass into a TriBatch: panes in two columns under a pointed head.
+	var spring := rr.position.y + rr.size.x * 0.866
+	var ph := (rr.end.y - spring) / 5.0
+	for row in 5:
+		for colm in 2:
+			var col: Color = cols[(seed * 7 + row * 3 + colm) % cols.size()]
+			tb.rect(Rect2(rr.position.x + colm * rr.size.x * 0.5 + 2.0, spring + row * ph + 2.0, rr.size.x * 0.5 - 4.0, ph - 4.0), col.darkened(0.2))
+	var head := _arch_pts(rr.position.x, rr.size.x, rr.position.y, spring)
+	var ctr := Vector2(rr.get_center().x, spring - rr.size.x * 0.3)
+	var inner := PackedVector2Array()
+	for q in head:
+		inner.append(ctr + (q - ctr) * 0.82)
+	tb.convex(inner, (cols[seed % cols.size()] as Color).darkened(0.1))
+
+
+func _tall_cathedral(c: Dictionary, span: Vector2, tall: float) -> void:
+	## The cathedral on down a tall level (mid: the arcade's storeys; near:
+	## the pillars' capitals and lamp chains), each storey salted by its index.
+	var tb := TriBatch.new()
+	if index == 1:
+		var mid: Color = c["mid"]
+		var wall_top := 60.0
+		var bay := 200.0
+		var n := int(span.x / bay) + 2
+		var k := 1
+		while wall_top + 60.0 + k * STOREY < span.y + 60.0:
+			var oy := k * STOREY
+			# the string course across the wall, the pillars' capitals again
+			tb.rect(Rect2(-200.0, wall_top + oy - 22.0, span.x + 400.0, 8.0), mid.darkened(0.08))
+			tb.rect(Rect2(-200.0, wall_top + oy - 22.0, span.x + 400.0, 2.0), mid.lightened(0.04))
+			for i in n:
+				var x := i * bay
+				tb.rect(Rect2(x - 22.0, wall_top + 30.0 + oy, 44.0, 10.0), mid.lightened(0.08))
+				if _h(i, 40 + k) < 0.15:
+					continue
+				var wtop := wall_top + 60.0 + oy + _h(i, 41 + k) * 20.0
+				if k % 2 == 1:
+					# a triforium: three blind lancets in the bay
+					for q in 3:
+						var lx := x + 34.0 + q * 46.0
+						tb.convex(_arch_pts(lx - 4.0, 34.0, wtop - 4.0, wtop + 96.0), mid.darkened(0.3))
+						tb.convex(_arch_pts(lx, 26.0, wtop, wtop + 92.0), mid.darkened(0.5))
+				else:
+					# a storey of glass: the strip's lancet, lit as the strip's are
+					var wx := x + bay * 0.5 - 26.0
+					tb.convex(_arch_pts(wx - 6.0, 64.0, wtop - 6.0, wtop + 150.0), mid.darkened(0.45))
+					tb.convex(_arch_pts(wx, 52.0, wtop, wtop + 144.0), (c["far"] as Color).darkened(0.3))
+					_tb_lancet(tb, Rect2(wx, wtop, 52.0, 144.0), c["glass"], i + 100 * k)
+					backdrop.windows.append({"layer": 1, "rose": false, "rect": Rect2(wx, wtop, 52.0, 144.0),
+							"colors": c["glass"], "seed": i + 100 * k})
+			k += 1
+	else:
+		var near: Color = c["near"]
+		var gap := 520.0
+		var n := int(span.x / gap) + 2
+		var dens := float(c.get("near_density", 1.0))
+		var k := 1
+		while 90.0 + k * NEAR_STOREY < span.y + 40.0:
+			for i in n:
+				if dens < 1.0 and _h(i, 31) >= dens:
+					continue
+				var x := i * gap + _h(i, 5) * 120.0
+				var cy := 90.0 + k * NEAR_STOREY + _h(i + k, 50) * 40.0
+				tb.rect(Rect2(x - 34.0, cy, 68.0, 14.0), near.lightened(0.06))
+				if _h(i, 51 + k) > 0.4:
+					# a lamp chain off the capital, its iron lamp dark
+					var cx := x + 34.0 + _h(i, 52 + k) * 40.0
+					var ln := 50.0 + _h(i, 53 + k) * 80.0
+					var y := cy + 14.0
+					while y < cy + 14.0 + ln:
+						tb.ring(Vector2(cx, y), 3.5, 1.6, near.lightened(0.12), 10)
+						y += 8.0
+					tb.convex(PackedVector2Array([Vector2(cx - 7.0, y), Vector2(cx + 7.0, y), Vector2(cx + 5.0, y + 16.0), Vector2(cx - 5.0, y + 16.0)]),
+							near.lightened(0.1))
+			k += 1
+	tb.flush(self)
+
+
+func _tall_cavern(c: Dictionary, span: Vector2, tall: float) -> void:
+	## The cavern on down a tall level (mid: wax shelves jutting from the wall,
+	## moss and leaves off them in the garden; near: rock ledges with
+	## stalactites, roots in the garden, under them), a storey at a time.
+	var tb := TriBatch.new()
+	var th := _theme()
+	var wax: Color = c.get("wax", Color("cdb88e"))
+	if index == 1:
+		var mid: Color = c["mid"]
+		var y0 := (span.y - tall) - 150.0
+		var k := 0
+		while y0 + k * 200.0 < span.y - 230.0:
+			var sy := y0 + k * 200.0
+			for i in int(span.x / 300.0) + 2:
+				if _h(i, 60 + k) < 0.3:
+					continue
+				var x := i * 300.0 + 140.0 * (k % 2) + _h(i, 61 + k) * 80.0
+				var w := 90.0 + _h(i, 62 + k) * 80.0
+				var y := sy + _h(i, 63 + k) * 60.0
+				# under it, a wedge of rock back into the wall
+				tb.convex(PackedVector2Array([Vector2(x - w * 0.5, y + 12.0), Vector2(x + w * 0.5, y + 12.0), Vector2(x + w * 0.2, y + 40.0),
+						Vector2(x - w * 0.3, y + 34.0)]), mid.darkened(0.1))
+				tb.rect(Rect2(x - w * 0.5, y, w, 12.0), mid.darkened(0.04))
+				tb.rect(Rect2(x - w * 0.5 - 4.0, y - 4.0, w + 8.0, 7.0), mid.lightened(0.08))
+				tb.circle(Vector2(x - w * 0.5, y + 1.0), 5.0, mid.lightened(0.08), 10)
+				tb.circle(Vector2(x + w * 0.5, y + 1.0), 5.0, mid.lightened(0.08), 10)
+				for d in 4:
+					var dx := x - w * 0.45 + _h(i * 5 + d, 64 + k) * w * 0.9
+					var ln := 6.0 + _h(i * 5 + d, 65 + k) * 18.0
+					if th == "garden":
+						tb.line(Vector2(dx, y + 3.0), Vector2(dx + 2.0, y + 3.0 + ln * 1.6), 2.0, mid.lightened(0.06))
+						tb.tri(Vector2(dx + 2.0, y + 3.0 + ln * 1.6), Vector2(dx + 12.0, y + ln * 1.6), Vector2(dx + 7.0, y + 8.0 + ln * 1.6), mid.lightened(0.1))
+					else:
+						tb.rect(Rect2(dx - 2.5, y + 3.0, 5.0, ln), wax.darkened(0.55))
+						tb.circle(Vector2(dx, y + 3.0 + ln), 3.0, wax.darkened(0.55), 8)
+			k += 1
+	else:
+		var near: Color = c["near"]
+		var y0 := (span.y - tall) * 0.6
+		var k := 0
+		while y0 + k * NEAR_STOREY < span.y - 150.0:
+			var sy := y0 + k * NEAR_STOREY
+			for i in int(span.x / 430.0) + 2:
+				if _h(i, 70 + k) < 0.45:
+					continue
+				var x := i * 430.0 + 200.0 + 170.0 * (k % 2) + _h(i, 71 + k) * 100.0
+				var w := 70.0 + _h(i, 72 + k) * 70.0
+				var y := sy + _h(i, 73 + k) * 80.0
+				tb.convex(PackedVector2Array([Vector2(x - w, y + 6.0), Vector2(x - w * 0.4, y - 8.0), Vector2(x + w * 0.5, y - 4.0), Vector2(x + w, y + 8.0),
+						Vector2(x + w * 0.4, y + 22.0), Vector2(x - w * 0.6, y + 20.0)]), near)
+				for q in 4:
+					var sx := x - w * 0.6 + q * w * 0.4 + _h(i * 4 + q, 74 + k) * 10.0
+					var ln := 14.0 + _h(i * 4 + q, 75 + k) * 40.0
+					if th == "garden":
+						tb.line(Vector2(sx, y + 18.0), Vector2(sx + 3.0, y + 18.0 + ln * 1.5), 2.6, near.lightened(0.1))
+					else:
+						tb.tri(Vector2(sx - 6.0, y + 18.0), Vector2(sx + 6.0, y + 18.0), Vector2(sx, y + 18.0 + ln), near.lightened(0.05))
+			k += 1
+	tb.flush(self)
+
+
 # ---------------------------------------------------------------- the cavern (World 2)
 
 func _theme() -> String:
@@ -316,7 +488,7 @@ func _cave_far(c: Dictionary, span: Vector2) -> void:
 		n += 1
 
 
-func _cave_terraces(c: Dictionary, span: Vector2) -> void:
+func _cave_terraces(c: Dictionary, span: Vector2, tall := 0.0) -> void:
 	## Wax terraces stepping up the cave wall, with curtains between.
 	var mid: Color = c["mid"]
 	var wax: Color = c.get("wax", Color("cdb88e"))
@@ -336,7 +508,7 @@ func _cave_terraces(c: Dictionary, span: Vector2) -> void:
 			var vx := x + bay * 0.5
 			var pts := PackedVector2Array()
 			for k in 12:
-				var y := -20.0 + k * (span.y * 0.06)
+				var y := -20.0 + k * ((span.y - tall) * 0.06)   # (a tall level's vines: the strip's length)
 				pts.append(Vector2(vx + sin(k * 0.8 + i) * 10.0, y))
 			draw_polyline(pts, mid.lightened(0.08), 3.0)
 			for k in range(1, 12, 2):

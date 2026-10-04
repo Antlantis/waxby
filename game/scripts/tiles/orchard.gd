@@ -1,7 +1,7 @@
 extends RefCounted
 ## World 3's tile painter, the Bone Orchard (A1; spec 11.3, p_artaudio 4.1).
-## The painter contract (contract.md 12.4): paint_chunk draws one 16-column
-## chunk, rects with ci.draw_rect, every other shape into the TriBatch tb,
+## The painter contract (contract.md 12.4): paint_chunk draws one 16 x 16
+## chunk (its rows y0..y1; the bottom one the bedrock), rects with ci.draw_rect, every other shape into the TriBatch tb,
 ## flushed once at the end. No draw_circle / draw_colored_polygon /
 ## draw_polyline (test_render.gd, test_world_art.gd).
 ##   #  stone     packed loam with bone fragments for mortar and a knuckle, a
@@ -81,12 +81,13 @@ static func _sealed(level: RefCounted, x: int, y: int) -> bool:
 
 # ---------------------------------------------------------------- the chunk
 
-static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node) -> void:
-	tb.origin = Vector2(x0 * TILE, 0)
+static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node, y0 := 0, y1 := -1) -> void:
+	var ye: int = level.height if y1 < 0 else y1
+	tb.origin = Vector2(x0 * TILE, y0 * TILE)
 	var theme := str(level.theme)
 	var wall := root_wall(level)
 	for x in range(x0, x1):
-		for y in level.height:
+		for y in range(y0, ye):
 			var t: int = level.tile(x, y)
 			if t == LevelData.AIR:
 				continue
@@ -94,10 +95,10 @@ static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int,
 				_root_mass(ci, tb, level, x, y, pal, wall)
 				continue
 			paint_cell(ci, tb, level, x, y, t, pal, world, theme)
-		if _solid(level, x, level.height - 1):
+		if ye >= level.height and _solid(level, x, level.height - 1):
 			for y in range(level.height, level.height + BEDROCK_ROWS):
 				ci.draw_rect(Rect2(x * TILE, y * TILE, TILE, TILE), col(pal, "buried").darkened(0.15 * (y - level.height + 1)))
-	if wall.has_area():
+	if wall.has_area() and wall.end.y >= y0 and wall.end.y < ye:
 		_root_creep(tb, level, x0, x1, pal, wall)
 	tb.flush(ci)
 

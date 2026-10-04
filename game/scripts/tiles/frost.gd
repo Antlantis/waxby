@@ -68,14 +68,15 @@ static func _sealed(level: RefCounted, x: int, y: int) -> bool:
 			and level.original_tile(Vector2i(x, y)) == LevelData.AIR
 
 
-static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node) -> void:
-	tb.origin = Vector2(x0 * TILE, 0)
+static func paint_chunk(ci: CanvasItem, tb, level: RefCounted, x0: int, x1: int, pal: Dictionary, world: Node, y0 := 0, y1 := -1) -> void:
+	var ye: int = level.height if y1 < 0 else y1
+	tb.origin = Vector2(x0 * TILE, y0 * TILE)
 	for x in range(x0, x1):
-		for y in level.height:
+		for y in range(y0, ye):
 			var t: int = level.tile(x, y)
 			if t != LevelData.AIR:
 				paint_cell(ci, tb, level, x, y, t, pal, world)
-		if _solid(level, x, level.height - 1):
+		if ye >= level.height and _solid(level, x, level.height - 1):
 			for y in range(level.height, level.height + BEDROCK_ROWS):
 				ci.draw_rect(Rect2(x * TILE, y * TILE, TILE, TILE), col(pal, "buried").darkened(0.15 * (y - level.height + 1)))
 	tb.flush(ci)

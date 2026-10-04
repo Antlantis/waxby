@@ -56,10 +56,10 @@ func _update_lights() -> void:
 	lights.pack(view_rect())
 
 
-func _redraw_at(x: int) -> void:
+func _redraw_at(x: int, y := -1) -> void:
 	if edges:
-		edges.redraw_cell(x)
-	super._redraw_at(x)
+		edges.redraw_cell(x, y)
+	super._redraw_at(x, y)
 
 
 func tick(dt: float) -> void:

@@ -275,7 +275,7 @@ func _toll(b: Dictionary) -> void:
 		if t == LevelData.WATER or t == LevelData.STILL:
 			if t == LevelData.WATER:
 				level.set_tile(c, LevelData.STILL)
-				world._redraw_at(c.x)
+				world._redraw_at(c.x, c.y)
 			still[c] = maxf(float(still.get(c, -INF)), until)
 			_cracking.erase(c)
 	# The jaws under it hold at once (their next think would tell), and
@@ -396,7 +396,7 @@ func _step_still() -> void:
 		_cracking.erase(c)
 		if level.tile(c.x, c.y) == LevelData.STILL:
 			level.restore_tile(c)
-			world._redraw_at(c.x)
+			world._redraw_at(c.x, c.y)
 			if world.glow and view().grow(64.0).has_point(LevelData.cell_center(c)):
 				world.glow.burst(Vector2((c.x + 0.5) * TILE, c.y * TILE + 6.0), 3, STILL_SHEET, 60.0, 0.35, 400.0, 1.8)
 	if not gone.is_empty():
