@@ -16,8 +16,9 @@ extends "res://scripts/elites.gd"
 ## in its path); a stomp kills it (fodder). Nightfall (and an elite on Dusk
 ## from World 3, behave_diff): charge 330. Witching:
 ## wind 0.45 (floor 0.40), and Tickwinds within FILE_X wind with it and
-## charge as a file.
+## charge as a file (the file, at its own wind, under a level's packs twist).
 
+const Twists := preload("res://scripts/twists.gd")
 const MOVES := {"charge": 32.0, "touch": 26.0}
 const ARCHETYPE := "fodder"
 const TELLS := {"wind": {"sec": 0.55, "floor": 0.40, "jump": true}}
@@ -157,7 +158,8 @@ func start_wind(player: Node2D) -> void:
 	charge_dir = facing
 	velocity.x = 0.0
 	tell_sfx("wind_up", sec, "arrow_draw")
-	if difficulty() == "witching" and world != null:
+	# (A level's packs twist marches them as Witching's file, at this difficulty's wind.)
+	if (difficulty() == "witching" or Twists.on(self, "packs")) and world != null:
 		for e in world.enemies:
 			if e != self and e.alive and e.get("kind") == "tickwind" and e.get("state") == "march" \
 					and absf(e.position.x - position.x) <= FILE_X and absf(e.position.y - position.y) < 8.0:

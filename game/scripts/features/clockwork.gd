@@ -30,7 +30,11 @@ extends "res://scripts/features/feature.gd"
 ##                            shot) knocks a hanging one down early, harmless
 ##   gear belt < >            the carry is actor.gd's (80 px/s); here the
 ##                            teeth's run, reverse_belts (a REVERSE_TELL tell)
-##                            and belt_dir
+##                            and belt_dir. Build 2's optional `belt_flip:
+##                            x0-x1=N` header flips that run of belts (tile
+##                            columns, inclusive) every N beats, landing on the
+##                            beat (its tell starts REVERSE_TELL before), so
+##                            with N = 8 every toll (twists.gd) lands on a flip
 ##   cog O Q                  four tooth ledges on a 96 px ring, 12 ticks a
 ##                            turn (movers.gd orbit); cog_phase: per hub
 ##   pendulum weight Y        a bob on a 96-192 px rod, +-50 deg, 6 ticks; hurts
@@ -134,6 +138,7 @@ var swings: Array = []           # [Mover]
 var icicles: Array = []          # {cell, hang, tip, state, t, vy, safe}
 var patches: Array = []          # rime: {cells, rect, state, p, last, t, fire, heard}
 var belts_rev: Array = []        # {x0, x1, at: ftime when it flips, done}
+var flips: Array = []            # belt_flip: {x0, x1, every (beats), next (the flip to come, from 1)}
 var ice_runs: Array = []         # [{x0, x1, y}] px: the ice tops that reflect
 var painted := false             # the theme's painter draws the ice, rime and belt bodies
 var _ice: Array[Vector2i] = []
@@ -189,6 +194,7 @@ func build(w: Node, lv: RefCounted) -> void:
 			elif t == LevelData.CRUMBLE:
 				_thin.append(c)
 	_find_ice_runs()
+	flips = belt_flips(str(lv.headers.get("belt_flip", "")) if lv.get("headers") is Dictionary else "")
 	var n_weight := 0
 	var n_swing := 0
 	for e in lv.entities:
@@ -351,11 +357,39 @@ func slick_at(p: Vector2) -> bool:
 	return LevelData.is_slick(level.tile(floori(p.x / TILE), floori(p.y / TILE)))
 
 
-func reverse_belts(x0: int, x1: int) -> void:
+func reverse_belts(x0: int, x1: int, quiet := false) -> void:
 	## A boss or a script flips a run of belts, after a REVERSE_TELL tell
-	## (the teeth flash, a clunk).
+	## (the teeth flash, a clunk; quiet: no clunk, for a belt_flip far off).
 	belts_rev.append({"x0": mini(x0, x1), "x1": maxi(x0, x1), "at": ftime() + REVERSE_TELL, "done": false})
-	world._sfx("belt_reverse")
+	if not quiet:
+		world._sfx("belt_reverse")
+
+
+static func belt_flips(value: String) -> Array:
+	## The belt_flip header, "x0-x1=N, ...": [{x0, x1, every, next}] (a bad part is skipped).
+	var out := []
+	for part in value.split(","):
+		var kv := part.strip_edges().split("=")
+		if kv.size() != 2 or not kv[1].strip_edges().is_valid_int() or int(kv[1]) <= 0:
+			continue
+		var ab := kv[0].strip_edges().split("-")
+		if ab.size() != 2 or not ab[0].strip_edges().is_valid_int() or not ab[1].strip_edges().is_valid_int():
+			continue
+		out.append({"x0": mini(int(ab[0]), int(ab[1])), "x1": maxi(int(ab[0]), int(ab[1])), "every": int(kv[1]), "next": 1})
+	return out
+
+
+func _step_flips() -> void:
+	## Each belt_flip run flips on every N-th beat (its tell starting
+	## REVERSE_TELL before it), the clunk heard only near him.
+	for f in flips:
+		var guard := 0
+		while ftime() >= float(int(f["next"]) * int(f["every"])) * tick - REVERSE_TELL and guard < 4:
+			guard += 1
+			var mid := (int(f["x0"]) + int(f["x1"]) + 1) * 0.5 * TILE
+			var pl := player()
+			reverse_belts(int(f["x0"]), int(f["x1"]), pl == null or absf(pl.position.x - mid) > view().size.x)
+			f["next"] = int(f["next"]) + 1
 
 
 func belt_dir(cell: Vector2i, dir: int) -> int:
@@ -407,9 +441,21 @@ func step(dt: float) -> void:
 	_on_beat = b != _beat
 	_beat = b
 	_hit_cool = maxf(_hit_cool - dt, 0.0)
+	if not flips.is_empty():
+		_step_flips()
+	var cancel := false
 	for r in belts_rev:
 		if not r["done"] and ftime() >= float(r["at"]):
 			r["done"] = true
+			# Two flips of the same run cancel (a belt_flip's list stays short).
+			for o in belts_rev:
+				if not is_same(o, r) and o["done"] and not o.get("gone", false) and int(o["x0"]) == int(r["x0"]) and int(o["x1"]) == int(r["x1"]):
+					o["gone"] = true
+					r["gone"] = true
+					cancel = true
+					break
+	if cancel:
+		belts_rev = belts_rev.filter(func(r): return not r.get("gone", false))
 	var pl := player()
 	var near := Vector2(INF, INF)
 	if pl != null:
@@ -865,8 +911,12 @@ func on_respawn() -> void:
 
 func on_boss_reset() -> void:
 	## A retry: the belts run their own way again, the icicles hang, the rime
-	## is back.
+	## is back (a belt_flip run keeps its beat: flipped while its flips so far
+	## are odd).
 	belts_rev.clear()
+	for f in flips:
+		if (int(f["next"]) - 1) % 2 == 1:
+			belts_rev.append({"x0": f["x0"], "x1": f["x1"], "at": ftime(), "done": true})
 	on_respawn()
 	for i in patches.size():
 		if patches[i]["state"] != "solid" and not _body_in(patches[i]):

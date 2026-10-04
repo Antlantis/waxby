@@ -13,8 +13,9 @@ extends "res://scripts/elites.gd"
 ## dazed DAZED s (+50%), then crawls back to its lane at RETURN px/s and
 ## climbs on again. A stomp kills it (fodder). Nightfall (and an elite on
 ## Dusk from World 3, behave_diff): lunge 128 px.
-## Witching: two share a lane, out of step.
+## Witching (and a level's packs twist): two share a lane, out of step.
 
+const Twists := preload("res://scripts/twists.gd")
 const MOVES := {"lunge": 32.0, "touch": 28.0}
 const ARCHETYPE := "fodder"
 const TELLS := {"coil": {"sec": 0.50, "floor": 0.40, "escape_px": 18.0}}
@@ -315,8 +316,9 @@ func as_copy() -> void:
 
 
 func _maybe_partner() -> void:
-	## Witching: a second on the same lane, out of step.
-	if difficulty() != "witching" or partner or copy or respawned or lane.is_empty() or world == null or lane_len() < TILE * 3.0:
+	## Witching (and a level's packs twist, twists.gd): a second on the same
+	## lane, out of step.
+	if (difficulty() != "witching" and not Twists.on(self, "packs")) or partner or copy or respawned or lane.is_empty() or world == null or lane_len() < TILE * 3.0:
 		return
 	if not world.has_method("spawn_enemy"):
 		return

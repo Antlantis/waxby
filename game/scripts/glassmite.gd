@@ -11,14 +11,16 @@ extends "res://scripts/elites.gd"
 ## pushes it (actor push, braked at edges). Numbers: TUNE (provisional until
 ## the W3 playtest).
 ##
-## Nightfall: a 0.50 s gnaw (the tell multiplier) and 4 tiles. Witching:
-## trios (each placed one, an Anointed too, brings two more, and brings them
+## Nightfall: a 0.50 s gnaw (the tell multiplier) and 4 tiles. Witching (and
+## a level's packs twist, with its own tells): trios (each placed one, an
+## Anointed too, brings two more, and brings them
 ## back after every relight as the World respawns it). The 5-1 Dread Queen
 ## Crackle is one at x1.6. placement_problems() checks a level against the
 ## spec's rule: never glass over the void without solid footing in a jump.
 
 const HK := preload("res://scripts/hush_kind.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
+const Twists := preload("res://scripts/twists.gd")
 const TUNE := {
 	"life": 14.0, "touch": 24.0, "embers": 2, "item": 0.07,
 	"speed": 80.0,
@@ -136,8 +138,9 @@ func _bring_pack() -> void:
 	## Witching's trios: a placed Glassmite (an Anointed too; not a copy, a
 	## Dread, a Warden or a trio's extra) brings two more, just behind it:
 	## on its first think, and after each relight (HK.relit) back up to
-	## size, counting the extras still alive (never more than a trio).
-	var n := int(k("pack"))
+	## size, counting the extras still alive (never more than a trio). A
+	## level's packs twist (twists.gd) brings them on any difficulty.
+	var n := int(HK.pick(TUNE, "witching", "pack")) if Twists.on(self, "packs") else int(k("pack"))
 	var cell: Vector2i = spawn.get("cell", Vector2i(-1, -1))
 	if n <= 1 or copy or tier == "dread" or tier == "warden" or pack_of.x >= 0 or world == null or not world.has_method("spawn_enemy") or cell.x < 0:
 		return

@@ -17,12 +17,13 @@ extends "res://scripts/elites.gd"
 ## him. It never dodges; a hit cancels its next copy. Numbers: TUNE.
 ##
 ## Nightfall: 0.85 s behind. Witching: 0.7 s, in pairs (the second 1.4 s
-## behind). At most 2 on screen (the levels' rule). The 6-3 Dread is the
+## behind; a level's packs twist pairs them at their own delay). At most 2 on screen (the levels' rule). The 6-3 Dread is the
 ## Long Shadow.
 
 const HK := preload("res://scripts/hush_kind.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
 const RigScript := preload("res://scripts/wick_rig.gd")
+const Twists := preload("res://scripts/twists.gd")
 const TUNE := {
 	"life": 40.0, "echo": 34.0, "shot": 30.0, "touch": 28.0, "poise": 0.3,
 	"embers": 6, "item": 0.16, "relic": 0.04,
@@ -477,11 +478,13 @@ func _copies(dt: float, player: Node2D) -> void:
 
 
 func _bring_pair() -> void:
-	## Witching's pairs: a placed Unwick brings a second, twice as far behind,
-	## on its first think (never a third). A heavy: neither comes back after
-	## a snuff (the World respawns only ordinary monsters).
+	## Witching's pairs (and a level's packs twist's, twists.gd): a placed
+	## Unwick brings a second, twice as far behind, on its first think (never
+	## a third). A heavy: neither comes back after a snuff (the World respawns
+	## only ordinary monsters).
 	var cell: Vector2i = spawn.get("cell", Vector2i(-1, -1))
-	if int(k("pair")) < 2 or copy or delay_mult != 1.0 or pack_of.x >= 0 or tier == "dread" or tier == "warden" or world == null or cell.x < 0:
+	var pair := int(HK.pick(TUNE, "witching", "pair")) if Twists.on(self, "packs") else int(k("pair"))
+	if pair < 2 or copy or delay_mult != 1.0 or pack_of.x >= 0 or tier == "dread" or tier == "warden" or world == null or cell.x < 0:
 		return
 	if HK.pack_count(world, kind, cell) > 0:
 		return

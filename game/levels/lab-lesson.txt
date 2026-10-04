@@ -1,0 +1,23 @@
+title: The Lesson Lab
+subtitle: lab-lesson
+music: chapel
+theme: nave
+area: 1
+lesson: First Frost|Ice carries you. Walls stop what slides.
+hints: A lesson card follows the title: no rule, just the level's idea
+---
+
+
+
+
+
+
+
+
+
+
+
+
+.P...@.....K............s..........s.............E
+########################################################
+########################################################

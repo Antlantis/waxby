@@ -425,6 +425,43 @@ def check_tick(x):
     off = sum(energy(k * tick + tick / 8.0) for k in range(CARILLON_TICKS))
     ratio = 10 * math.log10(max(on, 1e-20) / max(off, 1e-20))
     check(ratio >= 6.0, 'the carillon\'s clock strikes on the tick: %.1f dB more click on the beats than a 32nd after them' % ratio)
+    # Build 2's toll (game/scripts/twists.gd): its bell every TOLL_EVERY ticks
+    # lands on a bar of the carillon's loop; a level that tolls without the
+    # carillon gets a note (its tolls keep the tick, not the music's bar).
+    toll = toll_every()
+    check(toll > 0 and toll % 4 == 0 and CARILLON_TICKS % toll == 0,
+          'the toll (twists.gd TOLL_EVERY, %d ticks) falls on a bar of the carillon\'s %d-tick loop' % (toll, CARILLON_TICKS))
+    for lid in sorted(levels_with('twist', 'toll')):
+        if lid not in plays:
+            print('note: %s tolls (twist: toll) but doesn\'t play the carillon: its tolls aren\'t on the music\'s bar' % lid)
+
+
+TWISTS_GD = os.path.normpath(os.path.join(HERE, '..', '..', 'game', 'scripts', 'twists.gd'))
+
+
+def toll_every():
+    """twists.gd's TOLL_EVERY (0 when the file or the constant isn't there)."""
+    if not os.path.exists(TWISTS_GD):
+        return 0
+    with open(TWISTS_GD) as fh:
+        m = re.search(r'^const TOLL_EVERY := (\d+)', fh.read(), re.M)
+    return int(m.group(1)) if m else 0
+
+
+def levels_with(key, value):
+    """The written levels whose header has key: value."""
+    out = []
+    for f in sorted(os.listdir(LEVELS_DIR)) if os.path.isdir(LEVELS_DIR) else []:
+        if not f.endswith('.txt'):
+            continue
+        with open(os.path.join(LEVELS_DIR, f)) as fh:
+            for line in fh:
+                if line.strip() == '---':
+                    break
+                k, _, v = line.partition(':')
+                if k.strip() == key and v.strip() == value:
+                    out.append(f[:-4])
+    return out
 
 
 def level_ticks(default):

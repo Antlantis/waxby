@@ -22,11 +22,13 @@ extends "res://scripts/elites.gd"
 ## Nightfall and Witching (the first of each placed pack brings the rest,
 ## and brings them back up to size after every relight where the World
 ## respawns the placed ones; an Anointed first brings them too). A
-## challenge mode's Dusk keeps v3's: none (MODE_PACKS).
+## challenge mode's Dusk keeps v3's: none (MODE_PACKS). A level's packs
+## twist (twists.gd) brings 3-5 on every difficulty.
 ## Witching: they lunge twice. The 6-1 Dread is the Hush-a-Bye, one at x1.8.
 
 const HK := preload("res://scripts/hush_kind.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
+const Twists := preload("res://scripts/twists.gd")
 const TUNE := {
 	"life": 14.0, "lunge": 30.0, "touch": 26.0, "embers": 2, "item": 0.07,
 	"sense": 180.0, "creep": 70.0,
@@ -89,13 +91,17 @@ func k(n: String) -> float:
 
 func pack_rule(n: String) -> int:
 	## TUNE's pack_min / pack_max on this World's difficulty; in a mode, its
-	## Dusk (or a difficulty that reads Dusk's) is MODE_PACKS' instead.
+	## Dusk (or a difficulty that reads Dusk's) is MODE_PACKS' instead; under
+	## a level's packs twist (twists.gd), Witching's 3-5 (its tells stay the
+	## difficulty's).
 	var m = world.get("mode") if world != null else null
 	if m != null and MODE_PACKS.has(n):
 		var d := HK.behave_of(self)
 		var key := d if (TUNE[n] as Dictionary).has(d) else "dusk"
 		if (MODE_PACKS[n] as Dictionary).has(key):
 			return int(MODE_PACKS[n][key])
+	if Twists.on(self, "packs"):
+		return int(HK.pick(TUNE, "witching", n))
 	return int(k(n))
 
 

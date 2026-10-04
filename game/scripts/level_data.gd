@@ -66,6 +66,9 @@ extends RefCounted
 ## (`x,y[:Omen+Omen[:Name]]; ...`: the monsters placed there are Anointed
 ## every run, in any level) and elite_behave (`nightfall` | `dusk`: turns
 ## behave_diff on in any world, or off from World 3).
+## Build 2's twist keys, read from there, all optional: twist (an id in
+## twists.gd TWISTS) and lesson (Title|Line) by twists.gd, belt_flip
+## (x0-x1=N, ...) by features/clockwork.gd; a level without them plays as before.
 
 const TILE := 32
 
