@@ -25,7 +25,10 @@ extends SceneTree
 ##   since Build 2; the 5-3 share-cap ruling), the threat within 10% of what
 ##   each one's threat: header declares, ramping (tests/level_rules.gd),
 ##   the signs and inscriptions, an 11-wide stone island, the per-screen
-##   caps, the Glassmite and Gustling placement checks, the arena; no air
+##   caps, the Glassmite and Gustling placement checks, the arena; Build
+##   2's personalities (5-1's lesson and lone first Gustling, 5-2's packs
+##   and its named Anointed on stone, 5-3's omens, roads, upper-deck wind and
+##   its hold room: _test_build2); no air
 ##   under glass cut off from the level; every stone stretch in a gust zone
 ##   waits out a whole gust from its downwind end; a running jump held
 ##   through a full tailwind lands with room to stop; no monster an elite
@@ -121,6 +124,7 @@ func _initialize() -> void:
 		_test_layout()
 		_test_arena()
 		_test_teaching()
+		_test_build2()
 		for id in IDS:
 			_test_pockets(id)
 			await _test_posts(id)
@@ -726,25 +730,25 @@ func _test_knock_and_void() -> void:
 	var lv = LevelData.load_file("res://levels/5-1.txt")
 	var w := await _world_of(lv)
 	var pl: Node2D = w.player
-	# The 2-wide capital at 223-224 (FA_ARCHES), the void either side.
-	pl.reset_at(Vector2(223.9 * TILE, 9 * TILE))
+	# The 2-wide capital at 237-238 (FA_ARCHES), the void either side.
+	pl.reset_at(Vector2(237.9 * TILE, 9 * TILE))
 	for i in 3:
 		w.tick(DT)
 	pl.invuln = 0.0
-	_check(pl.on_floor, "(he stands on the capital at 223-224)")
+	_check(pl.on_floor, "(he stands on the capital at 237-238)")
 	pl.take_damage(10.0, pl.position.x + 20.0, "hit")
 	_check(absf(pl.velocity.x) < 60.0 and pl.velocity.y < 0.0, "a touch on a 2-wide glass capital knocks him up, braked short of the void (vx %.0f)" % pl.velocity.x)
 	for i in int(0.8 / DT):
 		w.tick(DT)
-	_check(pl.on_floor and w.snuffs == 0 and pl.position.x > 223.0 * TILE and pl.position.x < 225.0 * TILE, "and he lands on the capital (x %.1f)" % (pl.position.x / TILE))
-	pl.reset_at(Vector2(225.5 * TILE, 6 * TILE))   # (over the gap 225-226: the void under him)
+	_check(pl.on_floor and w.snuffs == 0 and pl.position.x > 237.0 * TILE and pl.position.x < 239.0 * TILE, "and he lands on the capital (x %.1f)" % (pl.position.x / TILE))
+	pl.reset_at(Vector2(239.5 * TILE, 6 * TILE))   # (over the gap 239-240: the void under him)
 	pl.on_floor = false
 	pl.velocity = Vector2(150.0, 0.0)
 	pl.invuln = 0.0
 	pl.take_damage(10.0, pl.position.x + 20.0, "hit")
 	_check(absf(pl.velocity.x - 150.0) < 0.01, "a hit mid-hop over the void keeps his own drift (vx %.0f)" % pl.velocity.x)
 	# The void's own share.
-	pl.reset_at(Vector2(223.9 * TILE, 9 * TILE))
+	pl.reset_at(Vector2(237.9 * TILE, 9 * TILE))
 	for i in 3:
 		w.tick(DT)
 	pl.hp = pl.max_hp
@@ -1039,7 +1043,12 @@ func _test_teaching() -> void:
 	var z0: Dictionary = l2.gusts[0]
 	var solid := true
 	for x in range(int(z0["x0"]), int(z0["x1"]) + 1):
-		solid = solid and LevelData.is_safe(l2.tile(x, 13))
+		# (The first floor down each column of it: a taller level's islands
+		# stand at their own heights.)
+		var fy := maxi(int(z0.get("y0", 0)), 1)
+		while fy < l2.height and not LevelData.is_solid(l2.tile(x, fy)):
+			fy += 1
+		solid = solid and fy < l2.height and LevelData.is_safe(l2.tile(x, fy))
 	_check(solid, "5-2: the first gust zone blows over solid stone")
 	var d2 := _first_tile(l2, LevelData.DAWNGLASS)
 	_check(d2.x >= 0 and _floor_below(l2, d2, 4), "5-2: its one dawnglass step (a first look at 5-3) is over a safe drop %s" % d2)
@@ -1052,6 +1061,103 @@ func _test_teaching() -> void:
 	var m0: Vector2i = mites[0]["cell"]
 	_check(l1.tile(m0.x, m0.y + 1) == LevelData.GLASS and _floor_below(l1, m0 + Vector2i(0, 1), 4),
 			"5-1: the first Glassmite, on glass pews over stone %s" % m0)
+
+
+func _kind_at(lv: RefCounted, c: Vector2i) -> String:
+	for e in lv.entities:
+		if e["cell"] == c:
+			return str(e["kind"])
+	return ""
+
+
+func _floor_under(lv: RefCounted, c: Vector2i) -> int:
+	## The first solid row under a cell (a flier's floor), or -1.
+	for y in range(c.y + 1, lv.height):
+		if LevelData.is_solid(lv.tile(c.x, y)):
+			return y
+	return -1
+
+
+func _test_build2() -> void:
+	## Build 2's personalities (the spec's 5-1 to 5-3, the shape plan): 5-1 a
+	## strip with a lesson card and no rule, its first Gustling alone over
+	## stone right after altar 1; 5-2 islands with the packs twist and the
+	## landing rule, its named Anointed Sister Splinter (a Glassmite on a
+	## proud stone post, glass a row under her either side) and Brother
+	## Bellows (a Gustling over stone); 5-3 the double deck with the omens
+	## twist, two roads, the wind on the upper deck's rows only, and Hold the
+	## Glass: one hold room of 20 s as tall as both decks, Sister Ember (a
+	## Refractor) over its stone and Gleam (a Rattlehound) on the loft's stone.
+	var Twists = load("res://scripts/twists.gd")
+	var Sealed = load("res://scripts/features/sealed.gd")
+	var l1: RefCounted = _levels["5-1"]
+	var l2: RefCounted = _levels["5-2"]
+	var l3: RefCounted = _levels["5-3"]
+	_check(l1.height == LevelData.STRIP_ROWS and Twists.id_in(l1) == "" and Twists.lesson_in(l1) == ["Over Nothing", "Glass holds you once. The void never does."],
+			"5-1: a strip, no rule, its lesson card 'Over Nothing' (%s)" % [Twists.lesson_in(l1)])
+	_check(Rules.anoint_of(l1).is_empty(), "5-1: no forced Anointed (an X-1)")
+	var altars := _entities(l1, "altar").map(func(e): return int(e["cell"].x))
+	altars.sort()
+	var gus := _entities(l1, "gustling")
+	gus.sort_custom(func(a, b): return a["cell"].x < b["cell"].x)
+	var g0: Vector2i = gus[0]["cell"]
+	var fy := _floor_under(l1, g0)
+	var alone := true
+	for e in l1.entities:
+		if COST.has(e["kind"]) and e["cell"] != g0 and absi(int(e["cell"].x) - g0.x) <= 8:
+			alone = false
+	var stone := fy > 0
+	for dx in range(-5, 6):
+		stone = stone and LevelData.is_safe(l1.tile(g0.x + dx, fy)) and l1.tile(g0.x + dx, fy) != LevelData.GLASS
+	_check(g0.x > int(altars[0]) and g0.x < int(altars[1]) and alone and stone,
+			"5-1: the first Gustling, right after altar 1, alone over stone %s (altars %s)" % [g0, altars])
+	# 5-2: islands in the wind, Glassmites in threes.
+	_check(l2.height > LevelData.STRIP_ROWS and Twists.id_in(l2) == "packs" and str(l2.headers.get("landing", "")) == "6/2",
+			"5-2: islands %d rows tall, the packs twist, landing: 6/2" % l2.height)
+	var named := {}
+	for a in Rules.anoint_of(l2) + Rules.anoint_of(l3):
+		named[str(a["name"])] = a
+	var want := {"Sister Splinter": ["glassmite", "Glassed", l2], "Brother Bellows": ["gustling", "Warded", l2],
+			"Gleam": ["rattlehound", "Twinned", l3], "Sister Ember": ["refractor", "Burning", l3]}
+	for nm in want:
+		var w: Array = want[nm]
+		var lv: RefCounted = w[2]
+		var a: Dictionary = named.get(nm, {})
+		var c: Vector2i = a.get("cell", Vector2i(-1, -1))
+		var k := _kind_at(lv, c)
+		var under := _floor_under(lv, c) if k in ["gustling", "refractor"] else c.y + 1
+		_check(k == w[0] and (a.get("omens", []) as Array) == [w[1]] and under > 0 and LevelData.is_safe(lv.tile(c.x, under)) and lv.tile(c.x, under) != LevelData.GLASS,
+				"%s: %s, a %s (%s), over stone (%s at %s)" % [lv.id, nm, w[0], w[1], k, c])
+	var sp: Vector2i = (named.get("Sister Splinter", {}) as Dictionary).get("cell", Vector2i(-1, -1))
+	var glass_by := false
+	for dx in range(-4, 5):
+		glass_by = glass_by or l2.tile(sp.x + dx, sp.y + 2) == LevelData.GLASS
+	_check(glass_by and not LevelData.is_solid(l2.tile(sp.x - 2, sp.y + 1)) and not LevelData.is_solid(l2.tile(sp.x + 2, sp.y + 1)),
+			"5-2: Sister Splinter's post stands a row proud, glass under it either side")
+	# 5-3: the double deck.
+	var rooms: Array = Sealed.parse(str(l3.headers.get("room", "")))
+	_check(l3.height > LevelData.STRIP_ROWS and Twists.id_in(l3) == "omens" and str(l3.headers.get("roads", "")).split(";", false).size() == 2,
+			"5-3: the double deck, %d rows, the omens twist, two roads (%s)" % [l3.height, l3.headers.get("roads", "")])
+	_check(rooms.size() == 1 and str(rooms[0]["kind"]) == "hold" and absf(float(rooms[0]["secs"]) - 20.0) < 0.01,
+			"5-3: one sealed room, Hold the Glass, 20 s (%s)" % [rooms])
+	if rooms.size() == 1:
+		var r: Dictionary = rooms[0]
+		var em: Vector2i = (named.get("Sister Ember", {}) as Dictionary).get("cell", Vector2i(-1, -1))
+		var opens := []
+		for x in [int(r["x0"]), int(r["x1"])]:
+			for y in l3.height - 1:
+				if not LevelData.is_solid(l3.tile(x, y)):
+					opens.append(y)
+		opens.sort()
+		_check(em.x > int(r["x0"]) and em.x < int(r["x1"]) and _entities(l3, "paneguard").all(func(e): return int(e["cell"].x) > int(r["x0"]) and int(e["cell"].x) < int(r["x1"])),
+				"5-3: Sister Ember and the three Paneguards hold the room")
+		_check(not opens.is_empty() and opens[-1] - opens[0] >= 3 and int((r["rows"] as Array).size()) == 0,
+				"5-3: the room is as tall as the level, in by one doorway and out by another lower (doorway rows %s)" % [opens])
+	var low := 999
+	for e in _entities(l3, "gutterwing") + _entities(l3, "bonebow"):
+		low = mini(low, int(e["cell"].y))
+	for z in l3.gusts:
+		_check(int(z.get("y1", l3.height - 1)) < low, "5-3: the headwind %d-%d blows on the upper deck's rows only (to row %d; the lower deck's monsters from %d)" % [z["x0"], z["x1"], int(z.get("y1", l3.height - 1)), low])
 
 
 func _test_pockets(id: String) -> void:

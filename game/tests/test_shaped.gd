@@ -164,11 +164,13 @@ const TOOL_LABS := ["lab-shapes", "lab-mirror"]
 # The levels on the path re-cut into shapes (Build 2's redesigns: tools/levels'
 # world modules): {id: tall}. 1-2's stair down and 1-3's climb, 2-1's
 # terraces, 2-2's split roads and 2-3's switchback, 3-2's 36-row tower and
-# 3-3's bowl, 4-1's stair and 4-2's loop are taller than a strip; 4-3 is a
-# strip played right to left. Each goes by route; 1-1, 3-1 and the other
-# strips keep v2's way.
+# 3-3's bowl, 4-1's stair and 4-2's loop, 5-2's islands and 5-3's double
+# deck are taller than a strip; 4-3 is a strip played right to left. Each
+# goes by route (a level on the path goes by route exactly when it's taller
+# than a strip or faces left); 1-1, 3-1, 5-1 and the other strips keep v2's
+# way.
 const SHAPED_LEVELS := {"1-2": true, "1-3": true, "2-1": true, "2-2": true, "2-3": true, "3-2": true, "3-3": true,
-		"4-1": true, "4-2": true, "4-3": false}
+		"4-1": true, "4-2": true, "4-3": false, "5-2": true, "5-3": true}
 
 
 func _lab(id: String) -> RefCounted:
@@ -704,6 +706,7 @@ func _test_route_pad() -> void:
 			g = _goal(lv, "boss arena")
 		if not g.is_empty() and AutoBot.shaped(lv, g):
 			by.append(lv.id)
+			_check(lv.tall() or lv.facing < 0, "%s goes by route: it's taller than a strip or faces left" % lv.id)
 	var shaped := SHAPED_LEVELS.keys().filter(func(id): return FileAccess.file_exists("res://levels/%s.txt" % id))
 	by.sort()
 	shaped.sort()

@@ -68,7 +68,8 @@ const LABS := {"lab-restless": "restless", "lab-restless-all": "restless_all", "
 # twist id. A re-cut level not listed (1-1, 2-1) carries none.
 const RECUT := {"1-2": {"twist": "restless"}, "1-3": {"twist": "duel"}, "2-2": {"twist": "dark"}, "2-3": {"twist": "lamplit"},
 		"3-1": {"lesson": true}, "3-2": {"twist": "restless"}, "3-3": {"twist": "omens"},
-		"4-1": {"lesson": true}, "4-2": {"twist": "toll", "belt_flip": true}, "4-3": {"twist": "dry"}}
+		"4-1": {"lesson": true}, "4-2": {"twist": "toll", "belt_flip": true}, "4-3": {"twist": "dry"},
+		"5-1": {"lesson": true}, "5-2": {"twist": "packs"}, "5-3": {"twist": "omens"}}
 
 var WorldScript: GDScript
 var game: Node
@@ -311,7 +312,8 @@ func _test_unchanged() -> void:
 
 func _test_recut(ids: Array) -> void:
 	## A re-cut level's World carries the twist its header names (its rule on,
-	## every other off; its card's title line), or none, and its lesson card;
+	## every other off; its card's title line), or none, and its lesson card
+	## (one twists.gd reads: a title and a line);
 	## a belt_flip only in World 4, and its belts flip.
 	for id in ids:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
@@ -326,6 +328,7 @@ func _test_recut(ids: Array) -> void:
 		var c := Twists.card_of(tid, int(lv.world), id)
 		ok = ok and w.title_sub() == (lv.subtitle if c.is_empty() else "%s · %s" % [lv.subtitle, c[0]])
 		ok = ok and w.twist_cards().size() == int(not c.is_empty()) + int(not Twists.lesson_in(lv).is_empty())
+		ok = ok and (not lv.headers.has("lesson") or Twists.lesson_in(lv).size() == 2)
 		if lv.headers.has("belt_flip"):
 			ok = ok and int(lv.world) == 4 and not (w.features.module("clockwork").flips as Array).is_empty()
 		_check(ok, "%s (re-cut): its World carries twist '%s' (rule '%s'), its cards %s and nothing else" % [id, tid, rule, w.twist_cards()])
