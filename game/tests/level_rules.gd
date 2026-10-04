@@ -17,12 +17,14 @@ extends RefCounted
 ##   anoint: x,y[:Omen+Omen[:Name]]; x,y   forced Anointed: an anointable kind,
 ##           Omens from its Dusk pool there (elites.gd omen_pool)
 ##   roles:  S C A ...   a re-cut level's section roles: no two alike in a world
-##   duel:, ambush:, room:  x0-x1[@n]   a sealed room: an altar by its door
+##   room:   duel x0-x1 ...; ambush ...   the sealed rooms (features/sealed.gd
+##           parse): an altar by each one's door
 ##   twist: packs   pack kinds budgeted at PACK_SIZE a placed pack
 
 const LevelData := preload("res://scripts/level_data.gd")
 const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
 const Elites := preload("res://scripts/elites.gd")
+const Sealed := preload("res://scripts/features/sealed.gd")
 # common.py's numbers (THREAT_SLACK, RAMP_STEP, RAMP_TOL, PACK_SIZE, ALTARS,
 # DOOR_ALTAR, HOME): the generator's checks and these are one rule.
 const THREAT_SLACK := 0.10
@@ -32,7 +34,6 @@ const PACK_SIZE := {"hushling": 3, "glassmite": 3, "creepbone": 2, "unwick": 2}
 const PACK_TILES := 4
 const ALTARS := Vector2i(3, 5)
 const DOOR_ALTAR := 8
-const SEALED_KEYS := ["duel", "ambush", "room"]
 const HOME := {"brinejaw": 2, "rootling": 3, "weepcap": 3, "rattlehound": 3, "creepbone": 3,
 		"tickwind": 4, "spurwheel": 4, "frostbuckle": 4, "hoarowl": 4,
 		"glassmite": 5, "gustling": 5, "refractor": 5, "paneguard": 5,
@@ -296,10 +297,11 @@ static func threat_problems(levels: Array) -> Array:
 # ---------------------------------------------------------------- checkpoints and roles
 
 static func ranges_of(value: String) -> Array:
-	## [Vector2i(x0, x1)] from a range header ("a-b, c-d@8").
+	## [Vector2i(x0, x1)] from a range header ("a-b, c-d@8"; a belt_flip's
+	## "c-d=8").
 	var out := []
 	for part in value.split(",", false):
-		var ab := part.split("@")[0].split("-")
+		var ab := part.split("@")[0].split("=")[0].split("-")
 		if ab.size() == 2 and ab[0].strip_edges().is_valid_int() and ab[1].strip_edges().is_valid_int():
 			out.append(Vector2i(int(ab[0]), int(ab[1])))
 	return out
@@ -308,8 +310,8 @@ static func ranges_of(value: String) -> Array:
 static func checkpoint_problems(lv: RefCounted, max_gap: int) -> Array:
 	## A regular level's checkpoints (start, altars, bell): at most max_gap
 	## apart, ALTARS altars, and an altar at most DOOR_ALTAR tiles before
-	## every sealed room's door (the left column of a duel:, ambush: or
-	## room: range).
+	## every sealed room's door (the left column of each room in its room:
+	## header, as features/sealed.gd reads it).
 	var marks: Array = [int(lv.start.x)]
 	var altars := []
 	for e in lv.entities:
@@ -328,13 +330,13 @@ static func checkpoint_problems(lv: RefCounted, max_gap: int) -> Array:
 		out.append("checkpoints %d tiles apart (at most %d): %s" % [worst, max_gap, marks])
 	if altars.size() < ALTARS.x or altars.size() > ALTARS.y:
 		out.append("%d altars (%d-%d)" % [altars.size(), ALTARS.x, ALTARS.y])
-	for k in SEALED_KEYS:
-		for r in ranges_of(str(lv.headers.get(k, ""))):
-			var near := false
-			for a in altars:
-				near = near or (r.x - int(a) >= 0 and r.x - int(a) <= DOOR_ALTAR)
-			if not near:
-				out.append("no altar within %d tiles of the %s door at %d (altars %s)" % [DOOR_ALTAR, k, r.x, altars])
+	for room in Sealed.parse(str(lv.headers.get("room", ""))):
+		var x0 := int(room["x0"])
+		var near := false
+		for a in altars:
+			near = near or (x0 - int(a) >= 0 and x0 - int(a) <= DOOR_ALTAR)
+		if not near:
+			out.append("no altar within %d tiles of the %s door at %d (altars %s)" % [DOOR_ALTAR, room["kind"], x0, altars])
 	return out
 
 

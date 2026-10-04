@@ -39,7 +39,9 @@ extends "res://scripts/features/feature.gd"
 ## ambush's "Ambush · 5", its foes left; with a clock "Hold · 0:14", the
 ## time left (the foes left under it). A foe holds the doors while it's alive
 ## in the room: one of the room's own, a Twinned half, or one risen on a room
-## cell; a nest's wings and other strays don't. One that falls out of it
+## cell (in a restless level, twists.gd, the remains of one of its own too,
+## till they stand again or a swing lays them to rest; the bot goes for
+## them); a nest's wings and other strays don't. One that falls out of it
 ## (below the level, into deep water or lava) is put out, a pit kill, so a
 ## foe knocked into a pit never leaves the doors shut for good.
 ## Won (none left, or the clock out): the doors open with dust, a chime and a
@@ -305,8 +307,21 @@ func counted(r: Dictionary) -> Array:
 
 
 func foes_left(r: Dictionary) -> int:
-	## Those, and any still dropping in (the bar's count; the tests read it).
-	return counted(r).size() + (r["drops"] as Array).size()
+	## Those, any still dropping in, and a restless level's remains of its own
+	## still to stand (the bar's count; the tests read it).
+	return counted(r).size() + (r["drops"] as Array).size() + remains_in(r).size()
+
+
+func remains_in(r: Dictionary) -> Array:
+	## A restless level's remains (twists.gd) of the room's own lying in it:
+	## each stands again as the room's foe unless struck first, so the doors
+	## wait for them. [] with no twist (or no remains).
+	var tw = world.get("twists")
+	var lying = tw.get("remains") if tw != null else null
+	if not (lying is Array) or (lying as Array).is_empty():
+		return []
+	var cells: Dictionary = r["cells"]
+	return (lying as Array).filter(func(rm): return cells.has(rm["cell"]) and _in_room(r, (rm["pos"] as Vector2) + Vector2(0, -4.0)))
 
 
 # ---------------------------------------------------------------- the step
@@ -653,8 +668,9 @@ func _title_of(e: Node2D) -> String:
 
 func bot_target(pl: Node2D):
 	## The --autoplay bot's foe in a shut room (autoplay_bot.gd's room pad):
-	## the nearest that holds the doors; the room's middle while they drop
-	## in; null while no room is shut.
+	## the nearest that holds the doors; a restless level's remains still to
+	## stand (it swings over them); the room's middle while they drop in;
+	## null while no room is shut.
 	for r in rooms:
 		if r["phase"] != "fight":
 			continue
@@ -664,6 +680,8 @@ func bot_target(pl: Node2D):
 				best = e
 		if best != null:
 			return best
+		for rm in remains_in(r):
+			return Vector2((rm["pos"] as Vector2).x, pl.position.y)
 		return Vector2((float(r["left"]) + float(r["right"])) * 0.5, pl.position.y)
 	return null
 

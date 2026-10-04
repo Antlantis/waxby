@@ -45,8 +45,9 @@ check_rooms.
 
 Build 2's toolkit (the toolkit part below): swap() edits a copy of a
 section, stamp() drops an encounter stamp (STAMPS) into one, span() names a
-section's columns for a range header (a sealed room's duel:, ambush: or
-room:, a belt_flip: run), and each world's regular levels declare their own
+section's columns for a range header (a belt_flip: run, written x0-x1=N as
+features/clockwork.gd reads it; a sealed room is rooms_header's room:), and
+each world's regular levels declare their own
 cast and threat density (world_tables: ROSTER and THREAT), checked as each
 file is written (check_roster, check_threat), with the world's rules across
 them (check_roles: the ramp, the checkpoints, the section roles), and
@@ -84,13 +85,13 @@ SIGN_BUDGET = True
 # 2's keys sit just before the hints (a secret level's warden_room, then
 # anoint, as they always fell): elite_behave (the elites' Nightfall moves on
 # or off: lab-elites), anoint (forced Anointed: anoint_header), twist (the
-# level's rule), roster and threat (world_tables), roles (a re-cut
-# level's section roles: world_problems), the sealed rooms' duel, ambush and
-# room, and belt_flip (range keys: span()).
+# level's rule: twists.gd) and lesson (an X-1's card), roster and threat
+# (world_tables), roles (a re-cut level's section roles: world_problems),
+# room (the sealed rooms: rooms_header) and belt_flip (span(): x0-x1=N).
 HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'boss', 'boss_music', 'dread', 'warden',
                 'secret', 'secret_prize', 'tick', 'story_start', 'story_boss', 'story_end', 'par', 'rush',
                 'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'warden_room', 'elite_behave', 'anoint', 'twist',
-                'roster', 'threat', 'roles', 'duel', 'ambush', 'room', 'belt_flip', 'hints']
+                'lesson', 'roster', 'threat', 'roles', 'room', 'belt_flip', 'hints']
 
 
 class Section(list):
@@ -265,6 +266,21 @@ def rooms_header(rows, rooms):
     return '; '.join(out)
 
 
+def rooms_of(value):
+    """[(kind, x0, x1)] from a written room: header ('duel 98-109 rows 3-7;
+    hold 300-327 @20'), as features/sealed.gd parse reads it (a part that
+    doesn't read is left out)."""
+    out = []
+    for part in str(value).split(';'):
+        bits = part.split()
+        if len(bits) < 2 or bits[0] not in ROOM_KINDS:
+            continue
+        ab = bits[1].split('-')
+        if len(ab) == 2 and ab[0].isdigit() and ab[1].isdigit():
+            out.append((bits[0], int(ab[0]), int(ab[1])))
+    return out
+
+
 def check_rooms(name, rows, value):
     """Every sealed room (a written 'room' header) holds a monster, has a way
     in at an end, and has an altar within ROOM_ALTAR_REACH tiles before its
@@ -398,7 +414,7 @@ def header_of(entry, rows):
         elif k == 'anoint' and not isinstance(v, str):
             v = anoint_header(rows, v, entry_world(entry), entry['id'])
         elif _has_span(v):
-            v = spans_header(rows, v)
+            v = spans_header(rows, v, SPAN_SEP.get(k, '@'))
         vals[k] = str(v)
     out = [(k, vals.pop(k)) for k in HEADER_ORDER if k in vals]
     # Keys HEADER_ORDER doesn't know (the modes' private ones) go before the hints.
@@ -461,11 +477,11 @@ RAMP_TOL = 0.25
 PACK_SIZE = {'hushling': 3, 'glassmite': 3, 'creepbone': 2, 'unwick': 2}
 PACK_TILES = 4
 # A regular level's altars (3-5, as its gaps need), and a sealed room's door
-# (the left column of a duel:, ambush: or room: range) has an altar at most
-# 8 tiles before it, as a boss arena's does (test_content).
+# (the left column of each room in its room: header, rooms_of) has an altar
+# at most 8 tiles before it, as a boss arena's does (test_content; check_rooms
+# holds every written file to the same, ROOM_ALTAR_REACH).
 ALTARS = (3, 5)
 DOOR_ALTAR = 8
-SEALED_KEYS = ('duel', 'ambush', 'room')
 # Each kind's home world, for the roster's rules from World 3 on (a headline
 # kind is the level's world's own, a guest an earlier world's): v2's kinds
 # are World 1's (the Brinejaw World 2's), v3's their world's (contract §6.3).
@@ -715,11 +731,17 @@ class Span(object):
 
 
 def span(section, dx0=0, dx1=None, n=0):
-    """span(SEC): all of a section's columns (a sealed room's, its walls
-    included); span(SEC, 2, 21): its columns 2-21; n: its n-th use. An
-    entry's value may be a Span, a list of Spans or (Span, value) pairs, or
-    {Span: value}: 'duel': span(WT_HALL), 'belt_flip': [(span(ES_FLIP, 2, 21), 8)]."""
+    """span(SEC): all of a section's columns (its walls included);
+    span(SEC, 2, 21): its columns 2-21; n: its n-th use. An entry's value
+    may be a Span, a list of Spans or (Span, value) pairs, or {Span: value}:
+    'belt_flip': [(span(ES_FLIP, 2, 21), 8)] is written 'x0-x1=8'. (A
+    sealed room is a 'room' list: rooms_header.)"""
     return Span(section, dx0, dx1, n)
+
+
+# The separator before a span key's value where it isn't '@': a belt_flip
+# run's beats, as features/clockwork.gd belt_flips reads them.
+SPAN_SEP = {'belt_flip': '='}
 
 
 def _has_span(v):
@@ -732,9 +754,10 @@ def _has_span(v):
     return False
 
 
-def spans_header(rows, v):
+def spans_header(rows, v, sep='@'):
     """'x0-x1, x0-x1@value' (x ascending) from a Span, a list of Spans or
-    (Span, value) pairs, or {Span: value}."""
+    (Span, value) pairs, or {Span: value}; sep goes before a value (a
+    belt_flip's is '=': SPAN_SEP)."""
     if isinstance(v, Span):
         v = [v]
     elif isinstance(v, dict):
@@ -743,7 +766,7 @@ def spans_header(rows, v):
     for item in v:
         sp, val = (item, None) if isinstance(item, Span) else item
         a, b = sp.cols(rows)
-        tail = '' if val is None else '@%s' % (_num(val) if isinstance(val, (int, float)) else val)
+        tail = '' if val is None else '%s%s' % (sep, _num(val) if isinstance(val, (int, float)) else val)
         out.append((a, '%d-%d%s' % (a, b, tail)))
     return ', '.join(s for _a, s in sorted(out))
 
@@ -993,7 +1016,7 @@ def roles_of(sections):
 def checkpoint_problems(rows, header, max_gap):
     """A regular level's checkpoints (start, altars, bell): at most max_gap
     apart, ALTARS altars, and an altar at most DOOR_ALTAR tiles before every
-    sealed room's door (the left column of each SEALED_KEYS range)."""
+    sealed room's door (the left column of each room: room, rooms_of)."""
     marks = sorted(x for r in rows for x, ch in enumerate(r) if ch in 'PKEX')
     altars = sorted(x for r in rows for x, ch in enumerate(r) if ch == 'K')
     out = []
@@ -1002,10 +1025,9 @@ def checkpoint_problems(rows, header, max_gap):
         out.append('checkpoints %d tiles apart (at most %d): %s' % (worst, max_gap, marks))
     if not ALTARS[0] <= len(altars) <= ALTARS[1]:
         out.append('%d altars (%d-%d)' % (len(altars), ALTARS[0], ALTARS[1]))
-    for k in SEALED_KEYS:
-        for x0, _x1 in ranges_of(header.get(k, '')):
-            if not any(0 <= x0 - a <= DOOR_ALTAR for a in altars):
-                out.append('no altar within %d tiles of the %s door at %d (altars %s)' % (DOOR_ALTAR, k, x0, altars))
+    for kind, x0, _x1 in rooms_of(header.get('room', '')):
+        if not any(0 <= x0 - a <= DOOR_ALTAR for a in altars):
+            out.append('no altar within %d tiles of the %s door at %d (altars %s)' % (DOOR_ALTAR, kind, x0, altars))
     return out
 
 
@@ -1112,6 +1134,9 @@ def self_check():
     # span: a section's columns, its n-th use, with a value.
     lvl = join(sec, T_OPEN, sec)
     assert spans_header(lvl, [span(sec, n=1), (span(sec, 2, 5), 8)]) == '2-5@8, 22-41' and ranges_of('2-5@8, 22-41') == [(2, 5), (22, 41)], 'span'
+    flip = header_of({'id': 'x', 'sections': [sec, T_OPEN, sec], 'belt_flip': [(span(sec, 2, 5, n=1), 8)]}, lvl)
+    assert flip[-1] == ('belt_flip', '24-27=8') and ranges_of('24-27=8') == [(24, 27)], 'belt_flip, as clockwork.gd reads it (%s)' % (flip,)
+    assert rooms_of('duel 98-109 rows 3-7; brawl 1-9; hold 300-327 @20') == [('duel', 98, 109), ('hold', 300, 327)], 'rooms_of'
     # anoint: written with Omens and a name, read back; a cell holding no
     # anointable kind, an Omen the kind can't carry there, World 1-2's
     # limits all fail.
@@ -1153,11 +1178,11 @@ def self_check():
     def ent(i, t, secs, **kw):
         return dict({'id': i, 'roster': good, 'threat': t, 'sections': secs}, **kw)
     w = [ent('6-1', 10.0, [start, alt, alt, alt, bell]), ent('6-2', 11.0, [start, alt, alt, room, alt, bell]),
-         ent('6-3', 12.0, [start, alt, room, alt, alt, bell], duel=span(room))]
+         ent('6-3', 12.0, [start, alt, room, alt, alt, bell], room=[('duel', room)])]
     assert world_problems(w, 78) == [], world_problems(w, 78)
     assert roles_of(w[2]['sections']) == 'S A C A A B', roles_of(w[2]['sections'])
     for bad, what in (([w[0], dict(w[1], threat=9.0), w[2]], 'ramp'),
-                      ([w[0], dict(w[1], sections=[start, alt, plain, room, alt, bell], duel=span(room)), w[2]], 'door'),
+                      ([w[0], dict(w[1], sections=[start, alt, plain, room, alt, bell], room=[('ambush', room)]), w[2]], 'ambush door'),
                       ([w[0], w[1], dict(w[2], sections=[start, alt, room, room, room, alt, alt, bell])], 'apart'),
                       ([w[0], dict(w[1], sections=w[0]['sections'], roles='S A A A B'), w[2]], 'share'),
                       ([dict(w[0], roles='S C C'), w[1], w[2]], 'declares'),

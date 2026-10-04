@@ -1,9 +1,9 @@
 """Build 2's toolkit, proven (the spec's build_plan steps 2-3): runs
 common.self_check() (each generator tool and check on made-up sections) and
 writes game/tests/fixtures/toolkit-cast.txt, a made-up World 6 level cut
-with every tool (swap, stamp, span, anoint_header) and carrying every Build
-2 key (roster, threat, roles, anoint with Omens and names, twist, duel,
-belt_flip), which tests/test_toolkit.gd reads back through
+with every tool (swap, stamp, span, anoint_header, rooms_header) and
+carrying every Build 2 key (roster, threat, roles, anoint with Omens and
+names, twist, room, belt_flip), which tests/test_toolkit.gd reads back through
 tests/level_rules.gd. It goes to the tests' fixtures, never game/levels: no
 registry, no bot, never played.
 
@@ -104,7 +104,7 @@ TK_PACK = swap(TK_PACK0, {(10, 12): 's'}, {'x': 'n'})
 
 TK_DOOR = swap(TK_ALTAR, {})
 
-# The sealed room (duel:), its walls included; a Rattlehound's chase onto
+# The sealed room (room: duel), its walls included; a Rattlehound's chase onto
 # Rootling mounds, and the vault's Lidlurk.
 TK_ROOM0 = block('''
  0|########################
@@ -154,7 +154,7 @@ LEVELS.append({
     'threat': 25.0,
     'roles': 'S C A C A V A B',
     'anoint': [(TK_POST, 17, 12, 'Swift+Warded', 'Sister Thistle'), (TK_POST, 13, 9, '', 'Old Quiver'), (TK_PACK, 12, 5)],
-    'duel': span(TK_ROOM),
+    'room': [('duel', TK_ROOM)],
     'belt_flip': [(span(TK_PACK, 2, 9), 8)],
     'sections': [TK_START, TK_POST, TK_ALTAR, TK_PACK, TK_DOOR, TK_ROOM, TK_ALTAR3, TK_BELL],
 })

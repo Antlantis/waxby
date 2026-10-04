@@ -90,7 +90,9 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           secrets.gd (the silver bells and their arches, the Warden rooms, the
                           shrine and its prize), sealed.gd (Build 2's sealed fight rooms, a
                           header's `room:` duel, ambush or hold: the doors lock till it's won,
-                          a snuff resets it at the door altar; the --autoplay bot fights in it)
+                          a snuff resets it at the door altar; the --autoplay bot fights in it;
+                          a forced Anointed keeps its tier and name in it, and a restless
+                          level's remains hold its doors till they rise or are struck)
   scripts/themes/*.gd     v3's themes (loader.gd reads them): w3.gd the orchard, rootvault,
                           sporewood and rootheart; w4.gd clockface, gearworks, icebells and
                           escapement (palettes, props maps, ambient, edge lines, water); w5.gd

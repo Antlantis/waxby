@@ -29,7 +29,13 @@ extends SceneTree
 ##   its bell (walking under the loft); secrets.gd's Warden is its foe only
 ##   in its sealed fight;
 ## - every level file with rooms: a monster in each, a way in, and an altar
-##   within ALTAR_REACH tiles before each door.
+##   within ALTAR_REACH tiles before each door;
+## - with the other Build 2 streams: a forced Anointed (anoint:) on a room's
+##   cell keeps its tier, Omens and name asleep or hidden, is the loft's
+##   named foe, and comes back as it was after a snuff's reset; in a restless
+##   level (twist: restless_all) a stomped foe's remains hold the doors till
+##   they stand again (the room's foe once more) or a swing lays them to
+##   rest, and the bot still clears every room.
 ##
 ##     godot --headless --path game --script res://tests/test_rooms.gd
 
@@ -37,6 +43,7 @@ const LevelData := preload("res://scripts/level_data.gd")
 const Sealed := preload("res://scripts/features/sealed.gd")
 const AutoBot := preload("res://scripts/autoplay_bot.gd")
 const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
+const Twists := preload("res://scripts/twists.gd")
 const TILE := 32
 const DT := 1.0 / 120.0
 const LAB := "lab-rooms"
@@ -117,6 +124,9 @@ func _initialize() -> void:
 	await _test_no_monsters()
 	await _test_resume()
 	await _test_bot()
+	await _test_forced_anoint()
+	await _test_restless()
+	await _test_bot("restless_all")
 	await _test_warden_target()
 	for suffix in ["", ".bak", ".tmp"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(game.save_path + suffix))
@@ -634,11 +644,15 @@ func _test_resume() -> void:
 
 # ---------------------------------------------------------------- the bot
 
-func _test_bot() -> void:
+func _test_bot(twist := "") -> void:
 	## The --autoplay bot on the lab (a hero at level 8, never snuffed): every
 	## room it walks into shut, won and opened, and the bell rung; it walks
-	## under the loft.
-	var w := _world(LAB)
+	## under the loft. With a twist (restless_all: what it stomps may stand
+	## again, its remains holding a room's doors), the same.
+	var lv = LevelData.load_file("res://levels/%s.txt" % LAB)
+	if twist != "":
+		lv.headers["twist"] = twist
+	var w := _world(LAB, {"level": lv})
 	await process_frame
 	var m = _mod(w)
 	var bot = AutoBot.new()
@@ -662,10 +676,155 @@ func _test_bot() -> void:
 		if n % 2400 == 0:
 			await process_frame
 	var ph: Array = m.rooms.map(func(r): return "%s/%s" % [r["phase"], r["won"]])
-	_check(shut.has(0) and shut.has(1) and shut.has(2), "the bot walks into the duel, the ambush and the hold and they shut (%s)" % [shut.keys()])
-	_check(m.rooms[0]["won"] == "clear" and m.rooms[1]["won"] == "clear" and m.rooms[2]["phase"] == "won", "and wins each (%s)" % [ph])
-	_check(m.rooms[3]["phase"] == "wait", "it walks under the loft (%s)" % m.rooms[3]["phase"])
-	_check(w.state == "clear", "and rings the bell (%s after %.0f s)" % [w.state, t])
+	var tag := "" if twist == "" else " (%s)" % twist
+	_check(shut.has(0) and shut.has(1) and shut.has(2), "the bot walks into the duel, the ambush and the hold and they shut%s (%s)" % [tag, shut.keys()])
+	_check(m.rooms[0]["won"] == "clear" and m.rooms[1]["won"] == "clear" and m.rooms[2]["phase"] == "won", "and wins each%s (%s)" % [tag, ph])
+	_check(m.rooms[3]["phase"] == "wait", "it walks under the loft%s (%s)" % [tag, m.rooms[3]["phase"]])
+	_check(w.state == "clear", "and rings the bell%s (%s after %.0f s)" % [tag, w.state, t])
+	await _done(w)
+
+
+# ---------------------------------------------------------------- with the other streams
+
+static func _cell_of(lv: RefCounted, kind: String, x0: int, x1: int) -> Vector2i:
+	## The first placed monster of a kind between two columns.
+	for e in lv.entities:
+		var c: Vector2i = e["cell"]
+		if str(e["kind"]) == kind and c.x >= x0 and c.x <= x1:
+			return c
+	return Vector2i(-1, -1)
+
+
+static func _spec_at(r: Dictionary, c: Vector2i) -> Dictionary:
+	for s in r["specs"]:
+		if s["cell"] == c:
+			return s
+	return {}
+
+
+func _test_forced_anoint() -> void:
+	## A forced Anointed (an anoint: header: level_features.assign_elites, the
+	## elites stream's) on a room's cell: anointed before the room takes its
+	## monsters, so it keeps its tier, Omens and name asleep or hidden, out
+	## of world.spawns; the loft (no Dread) names it its foe; a snuff's reset
+	## brings it back as it was (a respawn, if it was put out).
+	var lv := _story_lab()
+	var loft_c := _cell_of(lv, "thornback", 128, 161)
+	var amb_c := _cell_of(lv, "thornback", 62, 89)
+	lv.headers["anoint"] = "%d,%d:Swift:Old Latch; %d,%d::Sister Snare" % [loft_c.x, loft_c.y, amb_c.x, amb_c.y]
+	var w := _world("", {"level": lv})
+	await process_frame
+	var m = _mod(w)
+	var amb: Dictionary = m.rooms[1]
+	var loft: Dictionary = m.rooms[3]
+	var ls := _spec_at(loft, loft_c)
+	var as_ := _spec_at(amb, amb_c)
+	_check(not ls.is_empty() and ls["tier"] == "anointed" and ls["name"] == "Old Latch" and (ls["omens"] as Array).has("Swift"),
+			"the loft's Thornback is the header's Anointed, Swift and named, as the room takes it (%s)" % [ls])
+	var nf = loft["named"]
+	_check(nf != null and nf == ls.get("node") and not w.enemies.has(nf) and str(m.bar_info(loft)["name"]) == "Old Latch"
+			and str(m.bar_info(loft)["title"]).begins_with("Anointed · Swift"), "and the loft's named foe, asleep: its bar 'Old Latch', 'Anointed · Swift...'")
+	_check(not as_.is_empty() and as_["tier"] == "anointed" and as_["name"] == "Sister Snare" and not (as_["omens"] as Array).is_empty()
+			and not as_["node"].visible, "the ambush's Thornback: Anointed, named, its Omens rolled, hidden (%s)" % [as_])
+	_check(not w.spawns.any(func(sp): return sp["cell"] == loft_c or sp["cell"] == amb_c), "(neither in world.spawns)")
+	var omens: Array = (as_["omens"] as Array).duplicate()
+	var pl: Node2D = w.player
+	pl.invuln = 1000.0
+	_keep_alive = true
+	pl.reset_at(_altar_at(w, 55)["pos"])
+	_ticks(w, 0.5)
+	_seal(w, amb, _floor(70.5))
+	_dropped(w, amb)
+	var snare: Node2D = as_["node"]
+	_check(w.enemies.has(snare) and snare.tier == "anointed" and snare.elite_name == "Sister Snare", "it drops in Anointed, named")
+	_kill(snare)
+	_ticks(w, 2 * DT)
+	_keep_alive = false
+	pl.invuln = 0.0
+	w.hurt_player(99999.0, pl.position.x + 20.0, "lava")
+	_ticks(w, 2.0)
+	var back: Node2D = _spec_at(amb, amb_c).get("node")
+	_check(amb["phase"] == "wait" and back != null and back != snare and back.alive and back.tier == "anointed"
+			and back.elite_name == "Sister Snare" and back.omens == omens and bool(back.respawned),
+			"a snuff's reset brings her back Anointed, named, her Omens kept, as a respawn (%s)" % [back.omens if back != null else []])
+	await _done(w)
+
+
+func _test_restless() -> void:
+	## A restless level's rooms (twists.gd's restless_all on the lab): a foe
+	## of the room's stomped in the fight leaves remains that hold the doors
+	## (the bar counts them; the bot goes for them) till they stand again,
+	## the room's foe once more, or a swing lays them to rest. Only then do
+	## the doors open.
+	var lv := _story_lab()
+	lv.headers["twist"] = "restless_all"
+	var w := _world("", {"level": lv})
+	await process_frame
+	var m = _mod(w)
+	var tw = w.twists
+	_check(tw != null and str(tw.rule) == "restless", "(the restless runtime)")
+	if tw == null:
+		await _done(w)
+		return
+	var pl: Node2D = w.player
+	pl.invuln = 1000.0
+	_keep_alive = true
+	# The ambush: every foe put out but a Rattle, then it's stomped.
+	var r: Dictionary = m.rooms[1]
+	pl.reset_at(_altar_at(w, 55)["pos"])
+	_ticks(w, 0.5)
+	_seal(w, r, _floor(70.5))
+	_dropped(w, r)
+	var rattles: Array = m.counted(r).filter(func(e): return str(e.kind) == "skeleton")
+	rattles.sort_custom(func(a, b): return a.position.x < b.position.x)
+	for e in m.counted(r):
+		if e != rattles[0]:
+			_kill(e)
+	_ticks(w, 2 * DT)
+	w.deal(rattles[0], 1.0, {"how": "stomp", "flat": 99999.0, "no_hitstop": true})
+	_ticks(w, 2 * DT)
+	_check(tw.remains.size() == 1 and m.counted(r).is_empty() and m.foes_left(r) == 1 and r["phase"] == "fight",
+			"a stomped Rattle's remains hold the doors (%d left, %s)" % [m.foes_left(r), r["phase"]])
+	_check(str(m.bar_info(r)["name"]) == "Ambush · 1", "the bar counts them (%s)" % m.bar_info(r)["name"])
+	if tw.remains.size() == 1:
+		var at: Vector2 = tw.remains[0]["pos"]
+		var tgt = m.bot_target(pl)
+		_check(tgt is Vector2 and absf((tgt as Vector2).x - at.x) < 1.0, "the bot goes for them (%s, they lie at %s)" % [tgt, at])
+		var tx := at.x / TILE
+		pl.reset_at(_floor(tx + 5.0 if tx < 76.0 else tx - 5.0))
+		_until(w, func(): return int(tw.risen) == 1, Twists.RISE_WAIT + Twists.RISE_TELL + 2.0)
+		var up: Array = m.counted(r)
+		_check(int(tw.risen) == 1 and up.size() == 1 and Twists.is_risen(up[0]) and r["phase"] == "fight",
+				"it stands again, the room's foe, the doors still shut (%d up, %s)" % [up.size(), r["phase"]])
+		for e in up:
+			_kill(e)
+	_until(w, func(): return r["phase"] == "won", 1.0)
+	_check(r["phase"] == "won" and r["won"] == "clear" and tw.remains.is_empty(), "put out again (it never rises twice), the doors open (%s/%s)" % [r["phase"], r["won"]])
+	# The hold: its last Rattle stomped, a swing on the remains, before the clock.
+	var h: Dictionary = m.rooms[2]
+	pl.reset_at(_altar_at(w, 95)["pos"])
+	_ticks(w, 0.3)
+	_seal(w, h, _floor(106.5))
+	_dropped(w, h)
+	var hr: Array = m.counted(h).filter(func(e): return str(e.kind) == "skeleton")
+	hr.sort_custom(func(a, b): return a.position.x < b.position.x)
+	for e in m.counted(h):
+		if e != hr[0]:
+			_kill(e)
+	_ticks(w, 2 * DT)
+	w.deal(hr[0], 1.0, {"how": "stomp", "flat": 99999.0, "no_hitstop": true})
+	_ticks(w, 2 * DT)
+	_check(tw.remains.size() == 1 and m.foes_left(h) == 1 and h["phase"] == "fight", "the hold's last Rattle stomped: its remains hold the doors")
+	if tw.remains.size() == 1:
+		var rp: Vector2 = tw.remains[0]["pos"]
+		pl.reset_at(Vector2(rp.x - 30.0, rp.y))
+		pl.facing = 1
+		_ticks(w, 3 * DT, {"attack": true})
+		_ticks(w, 30 * DT)
+	_until(w, func(): return h["phase"] == "won", 1.0)
+	_check(int(tw.laid) == 1 and h["phase"] == "won" and h["won"] == "clear" and float(h["won_at"]) - float(h["sealed_at"]) < 19.0,
+			"a swing lays them to rest and the doors open, before the clock (%s/%s)" % [h["phase"], h["won"]])
+	_keep_alive = false
 	await _done(w)
 
 

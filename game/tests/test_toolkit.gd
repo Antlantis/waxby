@@ -6,7 +6,9 @@ extends SceneTree
 ## carrying every Build 2 key). The generator's side proves itself as it
 ## builds (common.self_check); this is the file read back:
 ##   - the headers as written: roster:, threat:, roles:, anoint: with Omens
-##     and names, twist:, and the range keys (duel:, belt_flip:) from spans;
+##     and names, twist:, the sealed room (room:, rooms_header) and the
+##     belts' flip (belt_flip:, a span), each read back by the game script
+##     that plays it (twists.gd, features/sealed.gd, features/clockwork.gd);
 ##   - the cast (a nest as its Gutterwing) and each roster rule, shown to
 ##     catch what it should on edited copies (a Rattle over the cap, a kind
 ##     it doesn't declare, a missing headline, the fodder share, the count, a
@@ -23,6 +25,9 @@ extends SceneTree
 const LevelData := preload("res://scripts/level_data.gd")
 const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
 const Rules := preload("res://tests/level_rules.gd")
+const Twists := preload("res://scripts/twists.gd")
+const Sealed := preload("res://scripts/features/sealed.gd")
+const Clockwork := preload("res://scripts/features/clockwork.gd")
 const FIXTURE := "res://tests/fixtures/toolkit-cast.txt"
 const WIDTH := 162
 const MAX_GAP := 78
@@ -88,8 +93,15 @@ func _test_headers() -> void:
 	var lv := _lv()
 	_check(lv.errors.is_empty() and lv.width == WIDTH and lv.height == 15, "the fixture parses, %d x 15 (%s)" % [WIDTH, lv.errors])
 	_check(str(lv.headers.get("twist", "")) == "packs", "twist: passes through (%s)" % lv.headers.get("twist", ""))
-	_check(str(lv.headers.get("duel", "")) == "106-129", "duel: the sealed room's columns from span(TK_ROOM), walls and all (%s)" % lv.headers.get("duel", ""))
-	_check(str(lv.headers.get("belt_flip", "")) == "62-69@8", "belt_flip: a span with its value (%s)" % lv.headers.get("belt_flip", ""))
+	_check(Twists.id_in(lv) == "packs", "and twists.gd reads it as its packs twist (%s)" % Twists.id_in(lv))
+	_check(str(lv.headers.get("room", "")) == "duel 106-129", "room: the sealed room's columns from rooms_header(TK_ROOM), walls and all (%s)" % lv.headers.get("room", ""))
+	var rooms: Array = Sealed.parse(str(lv.headers.get("room", "")))
+	_check(rooms.size() == 1 and rooms[0]["kind"] == "duel" and rooms[0]["x0"] == 106 and rooms[0]["x1"] == 129,
+			"and features/sealed.gd reads one duel there (%s)" % [rooms])
+	_check(str(lv.headers.get("belt_flip", "")) == "62-69=8", "belt_flip: a span with its beats, x0-x1=N (%s)" % lv.headers.get("belt_flip", ""))
+	var flips: Array = Clockwork.belt_flips(str(lv.headers.get("belt_flip", "")))
+	_check(flips.size() == 1 and flips[0]["x0"] == 62 and flips[0]["x1"] == 69 and flips[0]["every"] == 8,
+			"and features/clockwork.gd flips that run every 8 beats (%s)" % [flips])
 	_check(str(lv.headers.get("roles", "")) == "S C A C A V A B", "roles: the declared section roles (%s)" % lv.headers.get("roles", ""))
 	var a := Rules.anoint_of(lv)
 	_check(a.size() == 3 and a[0]["cell"] == Vector2i(37, 12) and a[0]["omens"] == ["Swift", "Warded"] and a[0]["name"] == "Sister Thistle"
@@ -97,7 +109,8 @@ func _test_headers() -> void:
 			and a[2]["cell"] == Vector2i(72, 5) and (a[2]["omens"] as Array).is_empty() and a[2]["name"] == "",
 			"anoint: three cells, with Omens and a name, a name alone, and bare (%s)" % [a])
 	_check(Rules.forced_cells(lv).size() == 3 and Rules.forced_cells(lv).has(Vector2i(72, 5)), "the forced cells")
-	_check(Rules.ranges_of("106-129, 62-69@8") == [Vector2i(106, 129), Vector2i(62, 69)], "range headers read back")
+	_check(Rules.ranges_of("106-129, 62-69@8") == [Vector2i(106, 129), Vector2i(62, 69)] and Rules.ranges_of("62-69=8") == [Vector2i(62, 69)],
+			"range headers read back")
 	_check(Rules.roles_problems([lv]).is_empty(), "one re-cut level shares its roles with nobody")
 	var twin := _lv("6-2")
 	_check(_has(Rules.roles_problems([_lv("6-1"), twin]), "share their section roles"), "two re-cut levels with the same roles are caught")
@@ -168,8 +181,9 @@ func _test_checkpoints() -> void:
 	var lv := _lv()
 	_check(Rules.checkpoint_problems(lv, MAX_GAP).is_empty(), "checkpoints 52 apart at most, 3 altars, one 6 tiles before the duel's door (%s)" % [Rules.checkpoint_problems(lv, MAX_GAP)])
 	_check(_has(Rules.checkpoint_problems(lv, 40), "52 tiles apart"), "a gap over the world's limit is caught")
-	_check(_has(Rules.checkpoint_problems(_with(_lv(), "duel", "120-130"), MAX_GAP), "the duel door at 120"), "a sealed room with no altar by its door is caught")
-	_check(_has(Rules.checkpoint_problems(_with(_lv(), "ambush", "120-130@20"), MAX_GAP), "the ambush door at 120"), "an ambush's too")
+	_check(_has(Rules.checkpoint_problems(_with(_lv(), "room", "duel 120-130"), MAX_GAP), "the duel door at 120"), "a sealed room with no altar by its door is caught")
+	_check(_has(Rules.checkpoint_problems(_with(_lv(), "room", "duel 106-129; hold 120-130 @20"), MAX_GAP), "the hold door at 120"),
+			"a second room's too (a hold, on a clock)")
 	var few := _lv()
 	few.entities = few.entities.filter(func(e): return e["kind"] != "altar" or e["cell"].x != 54)
 	_check(_has(Rules.checkpoint_problems(few, 200), "2 altars"), "fewer than 3 altars is caught")

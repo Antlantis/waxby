@@ -27,8 +27,7 @@ A lab with no twist header would play exactly as before (a rule never runs
 without its header); tests/test_twists.gd plays each rule in levels of its
 own and checks these files parse with their headers.
 """
-import common
-from common import block
+from common import block, span
 
 LEVELS = []
 
@@ -295,9 +294,7 @@ lab('lab-restless-all', 'The Restless Hall', [S_START, S_FLOOR_KINDS, S_ALTAR, S
     ['Everything stomped here gets up once. A swing keeps it down'], twist='restless_all')
 
 _toll = [S_START, S_BELTS, S_MARCH, S_ALTAR, S_BELTS, S_BELL]
-_rows = common.join(*_toll)
-_flips = ', '.join('%d-%d=8' % (common.x_of(_rows, S_BELTS, BELTS_X0, n), common.x_of(_rows, S_BELTS, BELTS_X1, n))
-                   for n in range(2))
+_flips = [(span(S_BELTS, BELTS_X0, BELTS_X1, n), 8) for n in range(2)]   # (written x0-x1=8: common.SPAN_SEP)
 lab('lab-toll', 'The Toll Lab', _toll,
     ['The bell tolls every 16 beats: what it sees runs faster. The belts flip on the beat'],
     music='carillon', twist='toll', belt_flip=_flips)

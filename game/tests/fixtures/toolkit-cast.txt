@@ -8,8 +8,8 @@ twist: packs
 roster: headline=hushling,stillmaw; support=bonebow,gutterwing; guest=thornback,creepbone,rattlehound,rootling; rattle_max=1; fodder_max=0.67; count=15
 threat: 25
 roles: S C A C A V A B
-duel: 106-129
-belt_flip: 62-69@8
+room: duel 106-129
+belt_flip: 62-69=8
 ---
 ..........................................................................................................########################
 ..........................................................................................................########################
