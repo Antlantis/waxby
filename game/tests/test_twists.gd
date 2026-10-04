@@ -69,7 +69,8 @@ const LABS := {"lab-restless": "restless", "lab-restless-all": "restless_all", "
 const RECUT := {"1-2": {"twist": "restless"}, "1-3": {"twist": "duel"}, "2-2": {"twist": "dark"}, "2-3": {"twist": "lamplit"},
 		"3-1": {"lesson": true}, "3-2": {"twist": "restless"}, "3-3": {"twist": "omens"},
 		"4-1": {"lesson": true}, "4-2": {"twist": "toll", "belt_flip": true}, "4-3": {"twist": "dry"},
-		"5-1": {"lesson": true}, "5-2": {"twist": "packs"}, "5-3": {"twist": "omens"}}
+		"5-1": {"lesson": true}, "5-2": {"twist": "packs"}, "5-3": {"twist": "omens"},
+		"6-1": {"lesson": true}, "6-2": {"twist": "dark"}, "6-3": {"twist": "packs"}}
 
 var WorldScript: GDScript
 var game: Node

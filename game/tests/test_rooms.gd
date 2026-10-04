@@ -61,8 +61,8 @@ const DT := 1.0 / 120.0
 const LAB := "lab-rooms"
 # The levels on the path that have rooms since their redesigns (they declare
 # their roles:): 1-3's Barbs' Loft, 3-3's Clearing ambush, 4-3's Grindstone
-# duel (test_w4.gd plays it), 5-3's Hold the Glass.
-const ROOM_LEVELS := ["1-3", "3-3", "4-3", "5-3"]
+# duel (test_w4.gd plays it), 5-3's Hold the Glass, 6-3's drowned nave.
+const ROOM_LEVELS := ["1-3", "3-3", "4-3", "5-3", "6-3"]
 const AMBUSH_AT := 66.0          # where he seals the ambush (62-89): clear of its posts (69, 75, 80, 83)
 const HOLD_AT := 104.5           # and the hold (102-127): its posts 108, 111, 114, 122
 const STUB_HUD := """extends CanvasLayer
