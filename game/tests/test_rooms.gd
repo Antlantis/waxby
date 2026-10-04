@@ -4,7 +4,8 @@ extends SceneTree
 ## tools/levels/lab_rooms.py's lab-rooms):
 ## - the header reads (its kinds, columns, rows, a clock, a named foe; a part
 ##   that doesn't read is left out), and no level on the path or a secret one
-##   has a room yet: their Worlds keep every monster in play and in spawns;
+##   has a room but the redesigned levels' (ROOM_LEVELS: 4-3's duel, played in
+##   test_w4.gd): the others' Worlds keep every monster in play and in spawns;
 ## - a duel: its Dread asleep at his post (out of the World's list), the
 ##   doors open at the altar; in, they grind SEAL_TELL s (out again in time
 ##   and they stay open), then shut at both ends; he wakes with his title
@@ -57,6 +58,9 @@ const Rules := preload("res://tests/level_rules.gd")
 const TILE := 32
 const DT := 1.0 / 120.0
 const LAB := "lab-rooms"
+# The levels on the path that have rooms since their redesigns (4-3: the
+# Grindstone's duel; test_w4.gd plays it).
+const ROOM_LEVELS := ["4-3"]
 const AMBUSH_AT := 66.0          # where he seals the ambush (62-89): clear of its posts (69, 75, 80, 83)
 const HOLD_AT := 104.5           # and the hold (102-127): its posts 108, 111, 114, 122
 const STUB_HUD := """extends CanvasLayer
@@ -280,8 +284,8 @@ func _test_rules() -> void:
 		with_rooms.append(str(lv.id))
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-")),
-			"only labs have rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-") or ROOM_LEVELS.has(str(id))),
+			"only labs and the redesigned levels have rooms (%s): %s" % [ROOM_LEVELS, with_rooms])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.
@@ -301,8 +305,9 @@ func _test_rules() -> void:
 
 func _test_absent() -> void:
 	## No header, nothing changes: a level's monsters stay in the World's
-	## list, seen, and in its spawns.
-	for id in ["1-3", "3-3", "4-3", "5-3", "6-3"]:
+	## list, seen, and in its spawns (the X-3s and 1-3 that have no room yet;
+	## ROOM_LEVELS' have theirs).
+	for id in ["1-3", "3-3", "4-3", "5-3", "6-3"].filter(func(v): return not ROOM_LEVELS.has(v)):
 		var w := _world(id)
 		await process_frame
 		var n0: int = w.enemies.size()

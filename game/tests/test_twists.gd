@@ -59,6 +59,9 @@ const DT := 1.0 / 120.0
 const SAVE := "user://test_twists_save.json"
 const LABS := {"lab-restless": "restless", "lab-restless-all": "restless_all", "lab-toll": "toll", "lab-dark": "dark",
 		"lab-omens": "omens", "lab-dry": "dry", "lab-packs": "packs", "lab-lamplit": "lamplit", "lab-lesson": ""}
+# The levels on the path re-cut with their twist headers (Build 2's
+# redesigns): what each carries (the keys) and its twist id.
+const RECUT := {"4-1": {"lesson": true}, "4-2": {"twist": "toll", "belt_flip": true}, "4-3": {"twist": "dry"}}
 
 var WorldScript: GDScript
 var game: Node
@@ -238,6 +241,9 @@ func _test_labs() -> void:
 # ---------------------------------------------------------------- today's levels
 
 func _test_unchanged() -> void:
+	## The re-cut levels (RECUT) carry the twist or lesson card the redesign
+	## gave each, and their Worlds play it; every other level carries none
+	## yet, and its World plays exactly as before.
 	var ids := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if f.ends_with(".txt") and not f.begins_with("lab-"):
@@ -246,11 +252,27 @@ func _test_unchanged() -> void:
 	var bare := true
 	for id in ids:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		var mine: Dictionary = RECUT.get(id, {})
 		for k in ["twist", "lesson", "belt_flip"]:
-			if lv.headers.has(k):
+			if lv.headers.has(k) != mine.has(k):
 				bare = false
-				print("  %s has a %s header" % [id, k])
-	_check(bare and ids.size() >= 30, "no level on the path or secret carries a twist, lesson or belt_flip header yet (%d levels)" % ids.size())
+				print("  %s %s a %s header" % [id, "has" if lv.headers.has(k) else "lacks", k])
+		if mine.has("twist") and Twists.id_in(lv) != str(mine["twist"]):
+			bare = false
+			print("  %s's twist is '%s', not '%s'" % [id, Twists.id_in(lv), mine["twist"]])
+	_check(bare and ids.size() >= 30, "no level on the path or secret carries a twist, lesson or belt_flip header but the re-cut ones, each its own (%s; %d levels)" % [RECUT.keys(), ids.size()])
+	for id in RECUT:
+		if not ids.has(id):
+			continue
+		var w := _world(LevelData.load_file("res://levels/%s.txt" % id))
+		await process_frame
+		var want: Dictionary = RECUT[id]
+		var ok: bool = w.twist_id() == str(want.get("twist", "")) and not w.twist_cards().is_empty()
+		if want.has("belt_flip"):
+			ok = ok and not (w.features.module("clockwork").flips as Array).is_empty()
+		_check(ok, "%s: its World plays its own (twist '%s', %d cards)" % [id, w.twist_id(), w.twist_cards().size()])
+		await _done(w)
+	ids = ids.filter(func(i): return not RECUT.has(i))
 	var same := 0
 	for id in ids:
 		var w := _world(LevelData.load_file("res://levels/%s.txt" % id))

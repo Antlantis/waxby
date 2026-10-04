@@ -5,16 +5,21 @@ extends SceneTree
 ## Play a level headless (no monsters) to its silver bell by a live depth-first
 ## search: from Wick's real state, try the reach engine's actions in one continuous run of
 ## his physics on the real tiles with the real movers cloned (the gusts only in calm air, a
-## weight's bob a hurt), until a foothold he may wait on (stone, a plain ledge, a sound vine,
-## a cog tooth, a swing, a moving ledge: never a float, glass or a crumble) nearer the goal;
-## play those pads; if none, wait on the foothold and look again. Writes a golden route.
-##   -- <id> [--out=path] [--touch=x,y;x,y] [--max=400] [--debug] [--note=...] [--depth=4]
+## weight's bob a hurt, BOB_CLEAR px), until a foothold he may wait on (stone, a plain ledge,
+## a sound vine, a cog tooth, a swing, a moving ledge, ice with no pit's edge within
+## ICE_PIT tiles on its floor as test_w4 holds a stop on ice: never a float, glass or a
+## crumble, nor a spot a weight sweeps) nearer the goal; play those pads; if none, wait on
+## the foothold and look again. Writes a golden route (Build 2's re-cut 4-1 to 4-3 too:
+## --goal=bell; 4-2's loop by way of --touch cells at its turn).
+##   -- <id> [--out=path] [--touch=x,y;x,y] [--goal=bell] [--max=400] [--debug] [--note=...] [--depth=4]
 const LevelData := preload("res://scripts/level_data.gd")
 const Reach := preload("res://scripts/reach.gd")
 const Movers := preload("res://scripts/movers.gd")
 const Route := preload("res://scripts/route.gd")
 const PlayerScript := preload("res://scripts/player.gd")
 const DT := 1.0 / 120.0
+const BOB_CLEAR := 30.0        # px between a sim's rect and a weight's bob (its hurt is 18: a margin for the replay)
+const ICE_PIT := 6             # tiles: a foothold on ice needs no pit's edge this near on its floor
 var w: Node2D
 var masks: Array = []
 var debug := false
@@ -22,6 +27,7 @@ var orig_lv: RefCounted
 var sp: Node2D
 var bw
 var glass = null
+var clock = null               # the World's clockwork (its weights' sweep: no foothold under one)
 var weights: Array = []
 var weight_period := 3.216
 var goal_rect := Rect2()
@@ -135,6 +141,7 @@ func _initialize() -> void:
 	if glass != null and (glass.zones as Array).is_empty():
 		glass = null
 	var cw = w.features.module("clockwork")
+	clock = cw
 	if cw != null:
 		weights = cw.weights
 		weight_period = cw.knob("weight_period")
@@ -305,10 +312,36 @@ func _safe(pos: Vector2, climb: bool, floor: bool, riding) -> bool:
 		return orig_lv.tile(floori(pos.x / 32.0), floori((pos.y - 19.0) / 32.0)) == LevelData.VINE
 	if not floor:
 		return false
+	if clock != null and clock.safe_vetoed(pos):
+		return false   # a weight sweeps it
 	for dx in [-8.0, 0.0, 8.0]:
 		var t: int = orig_lv.tile(floori((pos.x + dx) / 32.0), floori((pos.y + 1.0) / 32.0))
 		if LevelData.is_safe(t) and t != LevelData.ICE or t == LevelData.BELT_L or t == LevelData.BELT_R:
 			return true
+		if t == LevelData.ICE and not _pit_within(pos, ICE_PIT):
+			return true
+	return false
+
+
+func _pit_within(pos: Vector2, tiles: int) -> bool:
+	## A floor edge over a pit within this many tiles on his floor, either way,
+	## before a wall (test_w4's _pit_within, which no stop on ice may have).
+	var ty := floori((pos.y + 1.0) / 32.0)
+	var tx := floori(pos.x / 32.0)
+	for dir in [-1, 1]:
+		for k in range(1, tiles + 1):
+			var x: int = tx + dir * k
+			if LevelData.is_solid(orig_lv.tile(x, ty - 1)):
+				break
+			if not LevelData.is_floor(orig_lv.tile(x, ty)):
+				var y := ty
+				while y < orig_lv.height:
+					if LevelData.is_floor(orig_lv.tile(x, y)):
+						break
+					y += 1
+				if y >= orig_lv.height:
+					return true
+				break
 	return false
 
 
@@ -506,7 +539,7 @@ func _step(held: Dictionary, prev: Dictionary, t: float, pads: Array, ms: Array)
 		var ang: float = deg_to_rad(50.0) * sin(TAU * (t / weight_period + float(wt["phase"])))
 		var bob: Vector2 = (wt["anchor"] as Vector2) + Vector2(sin(ang), cos(ang)) * float(wt["rod"])
 		var near := Vector2(clampf(bob.x, r.position.x, r.end.x), clampf(bob.y, r.position.y, r.end.y))
-		if near.distance_to(bob) <= 24.0:
+		if near.distance_to(bob) <= BOB_CLEAR:
 			return false
 	return true
 
