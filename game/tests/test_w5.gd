@@ -1086,7 +1086,7 @@ func _test_build2() -> void:
 	## proud stone post, glass a row under her either side) and Brother
 	## Bellows (a Gustling over stone); 5-3 the double deck with the omens
 	## twist, two roads, the wind on the upper deck's rows only, and Hold the
-	## Glass: one hold room of 20 s as tall as both decks, Sister Ember (a
+	## Glass: one hold room of 15 s (the retune's) as tall as both decks, Sister Ember (a
 	## Refractor) over its stone and Gleam (a Rattlehound) on the loft's stone.
 	var Twists = load("res://scripts/twists.gd")
 	var Sealed = load("res://scripts/features/sealed.gd")
@@ -1138,8 +1138,8 @@ func _test_build2() -> void:
 	var rooms: Array = Sealed.parse(str(l3.headers.get("room", "")))
 	_check(l3.height > LevelData.STRIP_ROWS and Twists.id_in(l3) == "omens" and str(l3.headers.get("roads", "")).split(";", false).size() == 2,
 			"5-3: the double deck, %d rows, the omens twist, two roads (%s)" % [l3.height, l3.headers.get("roads", "")])
-	_check(rooms.size() == 1 and str(rooms[0]["kind"]) == "hold" and absf(float(rooms[0]["secs"]) - 20.0) < 0.01,
-			"5-3: one sealed room, Hold the Glass, 20 s (%s)" % [rooms])
+	_check(rooms.size() == 1 and str(rooms[0]["kind"]) == "hold" and absf(float(rooms[0]["secs"]) - 15.0) < 0.01,
+			"5-3: one sealed room, Hold the Glass, 15 s (%s)" % [rooms])
 	if rooms.size() == 1:
 		var r: Dictionary = rooms[0]
 		var em: Vector2i = (named.get("Sister Ember", {}) as Dictionary).get("cell", Vector2i(-1, -1))

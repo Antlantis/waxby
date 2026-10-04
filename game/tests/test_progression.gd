@@ -42,10 +42,16 @@ const OWNER_1 := "res://tests/fixtures/owner_v2_save.json"     # a copy of the o
 const OWNER_2 := "res://tests/fixtures/owner_v2_save_2.json"   # and his fresh slot 2
 const OWNER_DIR := "/Users/antmacpro/Developer/waxby-snapshots/phone-saves/20260926-0512/"   # the originals: read, never written
 
-# Spec §1.5: the hero's level leaving each level on a first Dusk run.
-const EXIT_TARGET := {"1-1": 2.8, "1-2": 4.6, "1-3": 6.5, "1-4": 7.9, "2-1": 9.2, "2-2": 10.5, "2-3": 11.9, "2-4": 13.5,
-	"3-1": 14.8, "3-2": 15.9, "3-3": 17.2, "3-4": 18.5, "4-1": 19.4, "4-2": 20.4, "4-3": 21.6, "4-4": 23.1,
-	"5-1": 24.0, "5-2": 24.8, "5-3": 26.0, "5-4": 27.6, "6-1": 28.4, "6-2": 29.3, "6-3": 30.2, "6-4": 32.1}
+# The hero's level leaving each level on a first Dusk run: spec §1.5's,
+# reset from Build 2's re-cut files (the walk's exits, cut to a tenth, so
+# each floor is the level he really meets the next one at). The bosses are
+# met where today's cut met them: 1-4 at L6, 2-4 at L12, 3-4 at L17 (§1.5's
+# 17.2; today's cut met him at L16), 4-4 at L21, 5-4 at L25 (§1.5's 26.0:
+# 25.68, as today's 25.69; test_bosses4 still fights the Saint at L26) and
+# 6-4 at L30.
+const EXIT_TARGET := {"1-1": 3.0, "1-2": 4.9, "1-3": 6.9, "1-4": 8.1, "2-1": 9.3, "2-2": 10.6, "2-3": 12.0, "2-4": 13.5,
+	"3-1": 14.5, "3-2": 15.6, "3-3": 17.0, "3-4": 18.3, "4-1": 19.1, "4-2": 20.2, "4-3": 21.5, "4-4": 23.0,
+	"5-1": 23.7, "5-2": 24.5, "5-3": 25.6, "5-4": 27.2, "6-1": 28.0, "6-2": 29.1, "6-3": 30.1, "6-4": 32.0}
 const EXIT_SLACK := 0.7        # worlds 1-2 (v2)
 const EXIT_SLACK_DEEP := 1.0   # worlds 3-6: built to a model; tighten after the first playtest
 # Each level's Dread when its file doesn't name one yet (spec §5).
@@ -340,9 +346,9 @@ func _test_xp_budget() -> void:
 			var by: Array = road_xp(lv, xp)
 			xp = by.min()
 			var got := Progression.level_frac(xp)
-			rows.append("%s %.2f (spec %.1f)%s" % [id, got, want, "" if by.size() < 2 else " roads %s" % [by.map(func(v): return "%.2f" % Progression.level_frac(v))]])
+			rows.append("%s %.2f (target %.1f)%s" % [id, got, want, "" if by.size() < 2 else " roads %s" % [by.map(func(v): return "%.2f" % Progression.level_frac(v))]])
 			if want > 0.0:
-				_check(absf(got - want) <= slack, "XP budget: leaving %s at L%.2f, spec says %.1f (+-%.1f)" % [id, got, want, slack])
+				_check(absf(got - want) <= slack, "XP budget: leaving %s at L%.2f, the target %.1f (+-%.1f)" % [id, got, want, slack])
 		elif int(info["world"]) >= 3 and (fx.get("placements", {}) as Dictionary).has(id):
 			missing.append(id)
 			xp = _play_model(id, xp, fx)
@@ -516,7 +522,10 @@ func _test_balance_bands() -> void:
 		var lv: RefCounted = LevelData.load_file(info["path"])
 		var a: int = Combat.area_level(lv.area, "dusk")
 		var exit_l := int(floor(float(EXIT_TARGET.get(lv.id, entry))))
-		for l in range(entry, maxi(exit_l, entry) + 1):
+		# (A boss level's exit comes with the boss's fall, its XP most of the
+		# level's: he never plays it at that level. 1-4 leaves at L8.)
+		var last := exit_l - 1 if lv.entities.any(func(e): return e["kind"] == "boss") else exit_l
+		for l in range(entry, maxi(last, entry) + 1):
 			var s := Hero.stats(_reference(l, a), [], "dusk")
 			var hit: float = float(s["basic"]) * (1.0 + float(s["dmg_pct"]))
 			var e := Combat.e_scale(a)

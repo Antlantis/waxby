@@ -877,7 +877,7 @@ LEVELS.append({
 # Refractor's beam; sigil 1 up the loft's stair), split again (the lone lamp
 # and its stair to the 5-S silver bell up top, a floor four rows down under
 # it) and rejoin at altar 3, the door of the knights' hall: Hold the Glass,
-# one sealed room as tall as both decks, shut for 20 s on glass over a
+# one sealed room as tall as both decks, shut for 15 s on glass over a
 # shallow dip between three Paneguards on stone, a Glassmite, and Sister
 # Ember (an Anointed Refractor) dropping cinders from above. Then one road,
 # three rows lower: the gutter's lamp posts (a Thornback past them), altar 4,
@@ -1099,14 +1099,18 @@ DB_ALTAR3 = block('''
 14|..........
 ''')
 
-# Hold the Glass (a sealed room, hold, 20 s), as tall as both decks: in by
+# Hold the Glass (a sealed room, hold, 15 s), as tall as both decks: in by
 # its upper doorway, out by its right one three rows lower. Three Paneguards
 # on 5-wide stone a row proud of the glass between (their Glass Cut breaks
 # your footing, never theirs; none has an elite's 11 flat tiles), a
 # Glassmite on a span, and Sister Ember (an Anointed Refractor, Burning)
 # over them dropping cinders while her beam splits the panes. The glass is
 # over a shallow dip, open at its near end: a break drops you a row and a
-# hop climbs out. The doors open at 20 s, or sooner if all are down.
+# hop climbs out. The doors open at 15 s, or sooner if all are down. (The
+# retune: at the spec's 20 s the --autoplay bot on Dusk with the arrival
+# hero was snuffed in here 4 times a run (the median), every run at least
+# once, and 5-3 cost it twice what today's 5-3 did; at 15 s once, about
+# today's 5-3. The cast is the spec's.)
 DB_KNIGHTS = block('''
  0|##############################
  1|##############################
@@ -1268,7 +1272,7 @@ L53 = {
     'twist': 'omens',
     'roles': 'S C A C C A C C C A C C A VD B',
     'anoint': [(DB_CHOIR, 9, 8, 'Twinned', 'Gleam'), (DB_KNIGHTS, 15, 9, 'Burning', 'Sister Ember')],
-    'room': [('hold', DB_KNIGHTS, {'secs': 20})],
+    'room': [('hold', DB_KNIGHTS, {'secs': 15})],
     'hints': ['She sang, and the dark slept.'],
     'height': H53,
     'sections': [(DB_START, 0), (DB_LAMPS, 0), (DB_ALTAR, 0), DB_SPLIT1, (DB_ALTAR2, 0), (DB_CHOIR, 0), DB_SPLIT2,

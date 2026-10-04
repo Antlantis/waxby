@@ -12,7 +12,7 @@ twist: omens
 roster: headline=paneguard,refractor,glassmite,gustling; support=gutterwing,bonebow; guest=rattlehound,thornback; rattle_max=1; fodder_max=0.65; count=20; banned=frostbuckle,tickwind,hollow_helm
 threat: 14
 roles: S C A C C A C C C A C C A VD B
-room: hold 184-213 @20
+room: hold 184-213 @15
 gusts: 67-88:L:A:0-11
 hints: She sang, and the dark slept.
 ---

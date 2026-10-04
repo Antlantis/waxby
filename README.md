@@ -272,6 +272,10 @@ tools/
                           height columns against 16 x 16 chunks: a chunk's paint, a redraw, the vertices
                           a chunk and a view hold (headless; run_phone.sh's header has the phone runs)
   twist_lab.gd            a level played by hand with any twist (-- 3-2 --twist=restless_all)
+  difficulty_probe.gd     the retune's measure: the --autoplay bot on Dusk with a first run's hero
+                          plays level files (an old cut's copy or a variant too), every calling and
+                          seed, and logs each run's snuffs and the life lost by cause and altar
+                          stretch (a debug bot: read a level against its own world and old cut)
   art/                    the art generators, contact sheets, the icon renderer
   audio/                  the music: music.py (v2's eight) merging tracks_worlds.py and
                           tracks_bosses.py (v3's, on instruments_v3.py); check_music.py (files,

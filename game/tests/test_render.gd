@@ -1267,7 +1267,7 @@ func _test_cell_chunks() -> void:
 			var path := "res://levels/%s.txt" % id if rows == 15 else "res://levels/tall/lab-tall-%s-%d.txt" % [id, rows]
 			if FileAccess.file_exists(path):
 				cases.append(LevelData.load_file(path))
-	_check(cases.size() == 12, "the four painters' levels at 15 rows and their tall render labs at 24 and 36 (%d)" % cases.size())
+	_check(cases.size() == 12, "the four painters' levels (as drawn: 3-1 a strip, 4-1, 5-3 and 6-1 re-cut to 24 rows) and their tall render labs at 24 and 36 (%d)" % cases.size())
 	var res := {}
 	probe.draw.connect(func():
 		for lv in cases:
