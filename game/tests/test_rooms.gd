@@ -555,6 +555,8 @@ func _test_tier_loot() -> void:
 	## A room's tiered foe put out, then brought back by a snuff's reset (a
 	## respawn at its post, its tier and name kept), pays its tier's drops
 	## the first time only: the second kill rolls as any respawn (no farm).
+	## On Dusk's story levels (world.trophies()) an Anointed's are its embers
+	## x5 (no item), a Dread's one Trophy.
 	var lv := _story_lab()
 	var amb_c := _cell_of(lv, "thornback", 62, 89)
 	lv.headers["anoint"] = "%d,%d:Swift:Sister Snare" % [amb_c.x, amb_c.y]   # (Swift: no halves to drop their own)
@@ -569,11 +571,20 @@ func _test_tier_loot() -> void:
 	_dropped(w, r)
 	var snare: Node2D = _spec_at(r, amb_c).get("node")
 	var items := func(): return w.pickups.filter(func(p): return p["kind"] == "item").size()
+	var embers := func() -> int:
+		var n := 0
+		for p in w.pickups:
+			if p["kind"] == "ember" and not p["taken"]:
+				n += int(p.get("worth", w.ember_worth()))
+		return n
 	snare.item_chance = 0.0   # (only the tier's drop can show)
 	var n0: int = items.call()
+	var e0: int = embers.call()
 	_kill(snare)
 	_ticks(w, 2 * DT)
-	_check(items.call() == n0 + 1, "her first kill drops the Anointed's item (%d -> %d)" % [n0, items.call()])
+	var paid: int = embers.call() - e0
+	_check(w.trophies() and items.call() == n0 and paid == int(snare.embers) * w.ANOINTED_EMBERS * w.ember_worth(),
+			"her first kill pays the Anointed's embers x%d (+%d) and no item (%d -> %d)" % [w.ANOINTED_EMBERS, paid, n0, items.call()])
 	_keep_alive = false
 	pl.invuln = 0.0
 	w.hurt_player(99999.0, pl.position.x + 20.0, "lava")
@@ -586,24 +597,25 @@ func _test_tier_loot() -> void:
 	_dropped(w, r)
 	back.item_chance = 0.0
 	var n1: int = items.call()
+	var e1: int = embers.call()
 	_kill(back)
 	_ticks(w, 2 * DT)
-	_check(not back.alive and items.call() == n1, "killed again, she drops no second tier item (%d -> %d)" % [n1, items.call()])
-	# A Dread brought back the same way: neither his dread item nor his boss item again.
+	_check(not back.alive and items.call() == n1 and embers.call() == e1, "killed again, she pays nothing a second time (%d -> %d items, +%d embers)" % [n1, items.call(), embers.call() - e1])
+	# A Dread brought back the same way: not his Trophy again.
 	var d: Node2D = w.spawn_enemy("thornback", Vector2(70 * TILE, 13 * TILE), {"tier": "dread", "name": "The Gaoler", "respawned": true})
 	d.item_chance = 0.0
 	d.relic_chance = 0.0
 	var n2: int = items.call()
 	_kill(d)
 	_ticks(w, 2 * DT)
-	_check(items.call() == n2, "a Dread back as a respawn drops neither of his items again (%d -> %d)" % [n2, items.call()])
+	_check(items.call() == n2, "a Dread back as a respawn drops no Trophy again (%d -> %d)" % [n2, items.call()])
 	var fresh: Node2D = w.spawn_enemy("thornback", Vector2(72 * TILE, 13 * TILE), {"tier": "dread", "name": "The Gaoler"})
 	fresh.item_chance = 0.0
 	fresh.relic_chance = 0.0
 	var n3: int = items.call()
 	_kill(fresh)
 	_ticks(w, 2 * DT)
-	_check(items.call() == n3 + 2, "(a fresh Dread still drops both: %d -> %d)" % [n3, items.call()])
+	_check(items.call() == n3 + 1, "(a fresh Dread still drops his Trophy: %d -> %d)" % [n3, items.call()])
 	_keep_alive = false
 	await _done(w)
 

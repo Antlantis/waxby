@@ -25,7 +25,7 @@ const SETTINGS := [
 	["brightness", "Brightness", [0.0, 0.08, 0.16], ["Dark", "Lighter", "Lightest"], "How deep the dark is."],
 	["candle_strength", "Candle strength", ["gentle", "normal", "fierce"], ["Gentle", "Normal", "Fierce"], "Monster damage ×0.75 / ×1 / ×1.3."],
 	["auto_equip", "Auto-equip upgrades", [true, false], ["On", "Off"], "Wear what's plainly better."],
-	["auto_salvage", "Auto-salvage Commons", [true, false], ["On", "Off"], "Commons become embers."],
+	["auto_sell", "Sell weaker finds", [true, false], ["On", "Off"], "Tap the card to keep one."],
 	["auto_advance", "Story lines", [false, true], ["Tap", "Auto"], ""],
 ]
 

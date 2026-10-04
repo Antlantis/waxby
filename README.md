@@ -50,6 +50,14 @@ ring them again.
   keep Dusk as it was before. A level's anoint: header places Anointed
   every run, with chosen Omens and a name on their plate (lab-elites shows
   both).
+- **Trophies:** on Dusk's story levels gear comes from the big fights. A
+  kill pays embers only, in one piece carrying them all (an Anointed's or a
+  Dread's in three, a boss's in twelve). A Dread, a sealed room won, the
+  vault once every relic is found and a boss killed again each drop one
+  Trophy: Rare or better, made for the slot it helps most. A boss's first
+  kill gives his prize. A find no better than what Waxby wears sells as he
+  touches it ("Sell weaker finds"; a tap on its card keeps it). Nightfall,
+  Witching and the modes keep their drop tables (world.gd trophies()).
 - **Illustrated story scenes** between the worlds, with portraits and voices.
   Waxby is the hero's name until you give him your own at the oath (up to 12
   letters; Rename on the Sheet's Stats tab changes it). Any keeper who carries

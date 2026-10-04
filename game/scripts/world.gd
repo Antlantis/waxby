@@ -32,6 +32,10 @@ extends Node2D
 ## Build 2 (twists.gd, from an optional `twist:` header; none, none of this):
 ##   twist_id() twist(rule) twist_heal() title_sub() twist_cards()
 ##   vars: twists (its runtime, or null)
+##
+## The Trophies (Dusk's story levels: trophies()): drop_item(at, "trophy")
+##   for a Dread, a sealed room won, a vault once the codex is full and a
+##   boss killed again; trophy_item(slot_want) is the piece it makes.
 
 signal finished(result: Dictionary)
 signal quit
@@ -107,6 +111,13 @@ const ARENA_EDGE := 64.0         # px Waxby keeps inside the view's safe edge wh
 const SPIKE_PCT := 0.20
 const HITSTOP_BUDGET := 0.12     # at most this much freeze in any half second
 const FULL_RETRY := 1.2          # s before an item the full satchel turned away asks again
+const EMBER_LIFE := 9.0          # s a loose ember lies before it goes out...
+const PIECE_LIFE := 20.0         # ...and a kill's (or a boss's) one piece carrying its worth (trophies())
+const KILL_PIECES := 1           # pieces a kill's embers come in (trophies()): its whole worth in one...
+const ELITE_PIECES := 3          # ...an Anointed's or a Dread's in three, so it still bursts
+const BOSS_PIECES := 12          # a boss's, sharing what his spray of 30 to 120 was worth
+const ANOINTED_EMBERS := 5       # x an Anointed's embers with the Trophies (it drops no item); 3 elsewhere
+const TROPHY_TRIES := 3          # slots a Trophy is made for; the best by its chips is dropped
 const LEGEND_FREEZE := 0.25      # s the world stops when a Legendary is taken (_legend_moment)
 const CHAIN_PAY_MAX := 4         # bonus embers a single chained stomp pays at most
 const PUSH_CAP := 170.0          # px/s: every push together, on every difficulty
@@ -146,6 +157,7 @@ const DROP_WEIGHTS := {
 	"boss": {"magic": 50, "rare": 42, "legendary": 8},
 	"lidlurk": {"magic": 60, "rare": 36, "legendary": 4},
 	"gold": {"rare": 92, "legendary": 8},
+	"trophy": {"rare": 80, "legendary": 20},   # trophy_item: rolled once, for the slot it helps most
 }
 
 
@@ -759,6 +771,16 @@ func allows(what: String) -> bool:
 func is_lab() -> bool:
 	## A feel lab (lab-0, lab-1): played with the hero, written nowhere.
 	return mode == null and level_id.begins_with("lab-")
+
+
+func trophies() -> bool:
+	## Dusk's story levels drop gear only from the big fights: a Trophy
+	## (trophy_item) for a Dread, a sealed room won, the vault once the codex
+	## is full and a boss killed again; his first kill gives his prize. Their
+	## kills, the Anointed too, pay embers, one piece a kill (three for an
+	## elite, twelve for a boss) carrying its whole worth. A mode keeps its
+	## loot, and Nightfall and Witching their tables and their sprays.
+	return mode == null and diff == "dusk"
 
 
 func flask_max() -> int:
@@ -1627,8 +1649,12 @@ func drop_item(at: Vector2, source := "kill", tier := "", slot_want := "") -> vo
 	## it's there (Dusk richer from area 13, no Commons in a story level; a
 	## mode's Dusk keeps v3's; v2's table on Nightfall and Witching).
 	## slot_want (a Dread's gift: Game.gift_slot) picks the slot, else a live
-	## slot at random.
+	## slot at random. "trophy" (trophies(): Dusk's story levels) is made for
+	## the slot it helps most (trophy_item).
 	if not allows("loot"):
+		return
+	if source == "trophy":
+		place_item(trophy_item(slot_want), at, Vector2(randf_range(-50, 50), -360.0))
 		return
 	var h: Dictionary = Game.hero()
 	var key := source
@@ -1653,6 +1679,49 @@ func drop_item(at: Vector2, source := "kill", tier := "", slot_want := "") -> vo
 		rarity = "rare"
 	var it := Items.make(slot, h["cls"], ilvl, rarity, rng, legend)
 	place_item(it, at, Vector2(randf_range(-50, 50), -360.0))
+
+
+func trophy_item(slot_want := "") -> Dictionary:
+	## A Trophy (trophies()): its rarity rolled once (DROP_WEIGHTS.trophy:
+	## Rare 80 / Legendary 20) at item level area + 2, made for TROPHY_TRIES
+	## live slots, and the one whose chips (DMG + LIFE, as Waxley's
+	## weakest-slot ware is picked) say it helps most kept. Only slots that
+	## wear no Legendary are tried: a Legendary goes where there's none, and
+	## a plain piece never to a slot whose Legendary it couldn't replace
+	## (_legend_kept); with one in every slot, any. A Legendary roll keeps a
+	## Legendary when one is made (its power is nothing in the chips).
+	## slot_want (a Dread's gift: Game.gift_slot) makes it for that slot.
+	var h: Dictionary = Game.hero()
+	var rarity := Items.pick_rarity(DROP_WEIGHTS["trophy"], rng)
+	var ilvl := area + 2
+	var slots: Array = [slot_want]
+	if slot_want == "":
+		slots = Items.live_slots(area)
+		var bare: Array = slots.filter(func(s):
+			var worn = h["equip"].get(s)
+			return not (worn is Dictionary and str(worn.get("rarity", "")) == "legendary"))
+		if not bare.is_empty():
+			slots = bare
+		for i in range(slots.size() - 1, 0, -1):
+			var j := rng.randi_range(0, i)
+			var t = slots[i]
+			slots[i] = slots[j]
+			slots[j] = t
+		slots = slots.slice(0, TROPHY_TRIES)
+	var best := {}
+	var best_score := -INF
+	var best_legend := false
+	for slot in slots:
+		var legend := _pick_legend(str(slot), h["cls"]) if rarity == "legendary" else ""
+		var it := Items.make(str(slot), h["cls"], ilvl, "legendary" if legend != "" else "rare", rng, legend)
+		var chips := Hero.compare(h, str(slot), it, h.get("belt", []), diff)
+		var score := float(chips["dmg"]) + float(chips["life"])
+		var is_legend := legend != ""
+		if best.is_empty() or (is_legend and not best_legend) or (is_legend == best_legend and score > best_score):
+			best_score = score
+			best_legend = is_legend
+			best = it
+	return best
 
 
 func place_item(it: Dictionary, at: Vector2, vel := Vector2(0, -360.0)) -> Dictionary:
@@ -2562,7 +2631,7 @@ func _collect(p: Dictionary) -> void:
 	match p["kind"]:
 		"ember":
 			p["taken"] = true
-			var worth: int = ember_worth()
+			var worth: int = int(p.get("worth", ember_worth()))   # (a kill's one piece carries its whole worth)
 			embers_got += worth
 			embers_carried += worth
 			if p.get("placed", false):
@@ -2573,9 +2642,12 @@ func _collect(p: Dictionary) -> void:
 			_ember_streak_t = 0.7
 			_sfx("ember", Sfx.note(mini(_ember_streak, 8)) if _has_sfx() else 1.0)
 			if glow:
-				glow.burst(p["pos"], 6, Color("f7b64a"), 90.0, 0.35, -60.0, 2.0)
+				var big := int(p.get("size", 1))
+				glow.burst(p["pos"], 6 * big, Color("f7b64a"), 90.0 + 30.0 * (big - 1), 0.35, -60.0, 2.0)
 			if hud:
 				hud.bump_embers()
+				if hud.has_method("ember_tick"):
+					hud.ember_tick(worth)
 		"wax":
 			if player.heal_pct(float(Combat.diff(diff)["wax"])):
 				p["taken"] = true
@@ -2644,9 +2716,10 @@ func _mark_boss_first(p: Dictionary) -> void:
 func _take_item(it: Dictionary) -> String:
 	## A new item: worn at once if it's plainly better (auto-equip), else
 	## into the satchel. The pickup card says which, with its two chips.
-	## Returns where it went: "equipped", "satchel", "salvaged" (melted into
-	## embers: a Common with auto-salvage, or anything no better than what's
-	## worn when the satchel is full) or "full" (no room: it stays put).
+	## Returns where it went: "equipped", "satchel", "sold" (into embers at
+	## its price: a find no better than what's worn, with "Sell weaker finds"
+	## on, its card's tap keeping it; or, the satchel full, whatever the
+	## setting) or "full" (no room: it stays put).
 	## A Legendary counts as better over a worn piece that isn't one (its
 	## power is nothing in the chips: _legend_over), and has its moment; a
 	## worn Legendary is never swapped out by a piece that isn't one, however
@@ -2663,11 +2736,13 @@ func _take_item(it: Dictionary) -> String:
 		apply_hero()
 		_sfx("equip")
 	else:
-		where = Game.add_item(it)
-		if where == "salvaged":
-			_sfx("salvage")
+		where = Game.add_item(it, true)
+		if where == "sold":
+			_sfx("bank")   # (the purse's chime: it's embers now)
 			if hud:
 				hud.bump_embers()
+		elif where == "satchel":
+			_sfx("select", 0.8, 0.0, 0.5)   # (softly: stowed)
 		elif where == "full":
 			_sfx("clang", 0.8)
 	if where != "full":
@@ -2678,8 +2753,8 @@ func _take_item(it: Dictionary) -> String:
 	if hud and hud.has_method("show_pickup"):
 		hud.show_pickup(it, chips, where)
 	_legend_moment(it, where)
-	if where != "full":
-		bark("first_item")   # "...the rest waits in your satchel": not while it's full
+	if where in ["equipped", "satchel"]:
+		bark("first_item")   # "...the rest waits in your satchel": not while it's full, nor for a sale
 	return where
 
 
@@ -3675,7 +3750,7 @@ func _update_pickups(dt: float) -> void:
 					p["vel"] = Vector2.ZERO
 				else:
 					p["taken"] = true
-			if p["kind"] == "ember" and p["age"] > 9.0:
+			if p["kind"] == "ember" and p["age"] > (PIECE_LIFE if p.has("worth") else EMBER_LIFE):
 				p["taken"] = true
 		if magnet and (p["kind"] == "ember" or p["kind"] == "item") and p["age"] > 0.25 and not p.get("full", false):
 			var d: Vector2 = player.center() - p["pos"]
@@ -3699,9 +3774,10 @@ func _drop_relic(at: Vector2, guaranteed: bool, min_rarity := "common", favor :=
 	## W1-W2 every relic is World 1's, so the roll is v2's exactly.
 	var id: String = Game.roll_relic(rng, min_rarity, favor) if favor > 0 else Game.roll_relic(rng, min_rarity)
 	if id == "":
-		# Everything's found: a Rare item instead (or embers).
+		# Everything's found: a Rare item instead (or embers), a Trophy on
+		# Dusk's story levels (trophies()).
 		if guaranteed:
-			drop_item(at, "gold")
+			drop_item(at, "trophy" if trophies() else "gold")
 		return
 	var r: Dictionary = Relics.get_relic(id)
 	var p := {"kind": "relic", "relic": id, "rarity": r["rarity"], "pos": at, "vel": Vector2(randf_range(-40, 40), -360.0),
@@ -3768,12 +3844,18 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 		# Lost in deep water, lava or a pit (a Dripkin that fell): it counts,
 		# but its embers go down with it, and any loot comes up to the hero.
 		at = player.center() + Vector2(player.facing * 24.0, -30.0)
+	var trophy := trophies()
 	if not e.respawned and not lost:
-		var n: int = e.embers * (3 if e.tier == "anointed" else (6 if e.tier == "dread" else 1))
-		for i in n:
-			var p := _add_pickup("ember", at)
-			p["loose"] = true
-			p["vel"] = Vector2(randf_range(-110, 110), randf_range(-380, -220))
+		# With the Trophies an Anointed pays x5 (it drops no item) and the
+		# embers come in one piece (three for an elite) carrying them all.
+		var n: int = e.embers * ((ANOINTED_EMBERS if trophy else 3) if e.tier == "anointed" else (6 if e.tier == "dread" else 1))
+		if trophy:
+			_ember_pieces(at, n * ember_worth(), ELITE_PIECES if e.tier in ["anointed", "dread"] else KILL_PIECES)
+		else:
+			for i in n:
+				var p := _add_pickup("ember", at)
+				p["loose"] = true
+				p["vel"] = Vector2(randf_range(-110, 110), randf_range(-380, -220))
 	var chance := kill_item_chance(e)
 	# A tiered monster back again (a sealed room's reset brings a put-out
 	# Dread or Anointed back at its post, features/sealed.gd) paid its tier's
@@ -3783,16 +3865,21 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 		if rng.randf() < chance:
 			drop_item(at, "kill")
 	elif e.tier == "anointed":
-		drop_item(at, "anointed")
+		if not trophy:
+			drop_item(at, "anointed")
 	elif e.tier == "dread":
 		# The first Dread of World 3 drops boots, of World 4 a charm, while
 		# the hero has none (Game.gift_slot; "" elsewhere: a random slot).
+		# With the Trophies, one Trophy (for that slot when it's a gift).
 		var gift := ""
 		var gs := _game()
 		if gs != null and gs.has_method("gift_slot"):
 			gift = str(gs.gift_slot(world_n))
-		drop_item(at, "dread", "", gift)
-		drop_item(at + Vector2(10, -8), "boss")
+		if trophy:
+			drop_item(at, "trophy", "", gift)
+		else:
+			drop_item(at, "dread", "", gift)
+			drop_item(at + Vector2(10, -8), "boss")
 	elif e.kind == "lidlurk":
 		_lidlurk_prize(at)
 	elif rng.randf() < chance:
@@ -3803,9 +3890,10 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 
 func kill_item_chance(e: Node2D) -> float:
 	## An ordinary kill's chance of an item: its item_chance x the
-	## difficulty's (Combat.kill_drop: Dusk's 0.5 in a story level, a mode's
-	## Dusk keeps v3's 1.0), halved for a respawned monster, x a mode's
-	## loot().drop (the Descent's deeper drops, §10.1).
+	## difficulty's (Combat.kill_drop: Dusk's 0 in a story level, where gear
+	## comes from the Trophies; a mode's Dusk keeps v3's 1.0), halved for a
+	## respawned monster, x a mode's loot().drop (the Descent's deeper drops,
+	## §10.1).
 	var chance: float = e.item_chance * Combat.kill_drop(diff, mode == null) * (0.5 if e.respawned else 1.0)
 	if mode != null:
 		chance *= float(mode.loot().get("drop", 1.0))
@@ -3826,6 +3914,7 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 			Sfx.stop_music(1.0)
 		return
 	var first: bool = not Game.level_record(level_id).get("boss_first", false)
+	var trophy := trophies()
 	if first:
 		# The first-kill prize counts as given only once it's taken
 		# (_mark_boss_first): a snuff, a quit or a Restart before then
@@ -3837,10 +3926,15 @@ func boss_defeated(b: Node2D, at: Vector2) -> void:
 			_boon = {"at": at, "who": str(who) if who != null else "", "t": 0.0, "wait": 0.0}
 		else:
 			_boss_prize(at)
+	elif trophy:
+		drop_item(at, "trophy")
 	else:
 		drop_item(at, "boss")
-	drop_item(at + Vector2(-16, -10), "boss")
-	drop_item(at + Vector2(16, -10), "boss")
+	if not trophy:
+		# (Dusk's story levels, trophies(): his first kill gives his prize
+		# alone, with the relic and his embers; a later one, one Trophy.)
+		drop_item(at + Vector2(-16, -10), "boss")
+		drop_item(at + Vector2(16, -10), "boss")
 	_drop_relic(at + Vector2(0, -20), false, "rare", world_n)
 	_pay_boss_embers(b, at)
 	shake = 8.0
@@ -3881,13 +3975,44 @@ func _pay_boss_embers(b: Node2D, at: Vector2) -> void:
 	## branch): a rush boss is paid by its mode (the Waxworks' embers and
 	## seals, the Descent's echo drops) and a feel lab keeps nothing.
 	## Still loose when the bell rings (rung at once, or at his feet as the
-	## Saint's is), they're gathered to Waxby (_gather_boss_embers).
+	## Saint's is), they're gathered to Waxby (_gather_boss_embers). With the
+	## Trophies (trophies()) they come in BOSS_PIECES pieces sharing it all.
 	var n := int(b.get("embers")) if b != null and b.get("embers") != null else 0
+	if trophies():
+		_ember_pieces(at, n * ember_worth(), BOSS_PIECES, true)
+		return
 	for i in n:
 		var p := _add_pickup("ember", at)
 		p["loose"] = true
 		p["boss"] = true
 		p["vel"] = Vector2(randf_range(-170, 170), randf_range(-480, -240))
+
+
+func _ember_pieces(at: Vector2, total: int, pieces: int, boss := false) -> void:
+	## Embers worth total, loose from where a kill (or a boss) fell, in
+	## `pieces` pickups sharing it (trophies()): each carries its share
+	## (p.worth: _collect pays it), is drawn by it (p.size: ember_size) and
+	## lies PIECE_LIFE before it goes out. A boss's are marked his.
+	var k := mini(pieces, total)
+	for i in k:
+		var worth := total / k + (1 if i < total % k else 0)
+		var p := _add_pickup("ember", at)
+		p["loose"] = true
+		p["worth"] = worth
+		p["size"] = ember_size(worth)
+		if boss:
+			p["boss"] = true
+			p["vel"] = Vector2(randf_range(-170, 170), randf_range(-480, -240))
+		else:
+			p["vel"] = Vector2(randf_range(-110, 110), randf_range(-380, -220))
+
+
+func ember_size(worth: int) -> int:
+	## How big an ember piece is drawn, by what it carries in embers of this
+	## level's worth: 1 (one: a placed ember), 2 (2 to 4: most kills), 3 (5
+	## or more: a big monster's, most elites' and a boss's pieces).
+	var k := float(worth) / float(maxi(ember_worth(), 1))
+	return 1 if k < 1.5 else (2 if k < 4.5 else 3)
 
 
 func _gather_boss_embers() -> void:
@@ -3911,7 +4036,8 @@ func _lidlurk_prize(at: Vector2) -> void:
 	## The Lidlurk guarding a level's hidden vault pays a relic: at least a
 	## Blessed while one is left, else any not yet found, and once the codex
 	## is full a gold-table item (_drop_relic's fallback, Rare 92 / Legendary
-	## 8). A mode's Lidlurk (a Descent room's) keeps the Lidlurk table's item,
+	## 8), a Trophy on Dusk's story levels (trophies()). A mode's Lidlurk (a
+	## Descent room's) keeps the Lidlurk table's item,
 	## and a feel lab's pays nothing (it keeps no relic either).
 	if mode != null or not allows("loot"):
 		drop_item(at, "lidlurk")

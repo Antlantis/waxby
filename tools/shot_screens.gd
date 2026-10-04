@@ -465,7 +465,7 @@ func _touch(t: Node, idx: int, p: Vector2, down: bool) -> void:
 
 
 func _set_cards() -> void:
-	## The pickup card in each state, the salvage notes, a relic card, the
+	## The pickup card in each state, the sold card and notes, a relic card, the
 	## level-up toast, a bark, an elite plate.
 	await _clear()
 	var w = await _hud_world("knight", "1-1", 20)
@@ -539,21 +539,29 @@ func _set_cards() -> void:
 	await _wait(0.500)
 	await _shot("card_equipped_melt")
 	hud._card = {}
-	# Salvaged: a Common (auto-salvage) and a Rare (the satchel was full).
-	var com: Dictionary = _item("coat", "common", "knight", 5)
-	hud.show_pickup(com, {"dmg": 0.0, "life": -8.0}, "salvaged")
+	# Sold: a find no better than what's worn ("Sell weaker finds"), its
+	# card's tap keeping it; and, the satchel full, a note (a Rare, a Blessed).
+	(h["satchel"] as Array).pop_back()
+	var com: Dictionary = _item("coat", "magic", "knight", 5)
+	game.add_embers(Items.sell_value(com))
+	hud.show_pickup(com, {"dmg": 0.0, "life": -8.0}, "sold")
 	await _wait(0.500)
-	await _shot("card_salvaged_common")
-	hud._msg = {}
+	await _shot("card_sold")
+	hud.tap_card()
+	await _wait(0.333)
+	await _shot("card_sold_kept")
+	hud._card = {}
+	while (h["satchel"] as Array).size() < game.SATCHEL_MAX:
+		h["satchel"].append(_item("boots", "common", "knight", 2))
 	var rare: Dictionary = _item("weapon", "rare", "knight", 4)
-	hud.show_pickup(rare, {"dmg": -12.0, "life": 0.0}, "salvaged")
+	hud.show_pickup(rare, {"dmg": -12.0, "life": 0.0}, "sold")
 	await _wait(0.500)
-	await _shot("card_salvaged_rare")
+	await _shot("card_sold_full_rare")
 	hud._msg = {}
 	var bl: Dictionary = _item("candle", "magic", "knight", 4)
-	hud.show_pickup(bl, {"dmg": -2.0, "life": -1.0}, "salvaged")
+	hud.show_pickup(bl, {"dmg": -2.0, "life": -1.0}, "sold")
 	await _wait(0.500)
-	await _shot("card_salvaged_blessed")
+	await _shot("card_sold_full_blessed")
 	hud._msg = {}
 	# A relic card.
 	game.grant_relic("wind_wick")

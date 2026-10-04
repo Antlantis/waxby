@@ -1385,7 +1385,7 @@ func _test_rm_death() -> void:
 		if p["kind"] == "item" or p["kind"] == "relic":
 			loot += 1
 	_check(w.bells.size() == 1, "the great bell rises out of the roots")
-	_check(loot >= 3, "she drops her prize (%d pieces)" % loot)
+	_check(loot >= 2, "she drops her prize and a relic (%d pieces; on Dusk no boss-table items: world.trophies())" % loot)
 	var open := true
 	for c in b.door:
 		open = open and not LevelData.is_solid(w.level.tile(c.x, c.y))

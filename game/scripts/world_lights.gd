@@ -736,7 +736,9 @@ func _pickups(g: Dictionary, grown: Rect2) -> void:
 	near.sort_custom(func(a, b): return (a["pos"] as Vector2).distance_squared_to(c) < (b["pos"] as Vector2).distance_squared_to(c))
 	for p in near:
 		var rs: Array = {"ember": [34.0, 0.55], "relic": [90.0, 0.9], "item": [90.0, 0.9], "sigil": [60.0, 0.7]}[p["kind"]]
-		g["pickup"].append([p["pos"], rs[0], rs[1], null])
+		# (a kill's ember piece, world.ember_size 2-3, lights a little wider)
+		var r: float = float(rs[0]) * (1.0 + 0.25 * (int(p.get("size", 1)) - 1))
+		g["pickup"].append([p["pos"], r, rs[1], null])
 
 
 func _windows(g: Dictionary, view: Rect2, grown: Rect2) -> void:

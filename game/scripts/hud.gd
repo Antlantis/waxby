@@ -5,7 +5,8 @@ extends CanvasLayer
 ##               the wax-candle life bar (it melts from the right and its
 ##               little flame shrinks with life), the calling's resource bar
 ##               (or pips) under it, and the carried embers (cream; they
-##               flash gold when banked)
+##               flash gold when banked, and a "+N" ticks by them as a piece
+##               is taken or a find sold: ember_tick)
 ##   top right   the level's three sigils on a dark tray (the pause button is
 ##               the touch layer's); the left block sits on a soft dark wash,
 ##               so a sigil or a monster on a high ledge behind doesn't read
@@ -23,9 +24,10 @@ extends CanvasLayer
 ##               see-through (see); the camera keeps him from under the
 ##               corner blocks (world.gd head_top)
 ##   bottom      the pickup card between the thumbs: tap it within 3 s to undo
-##               an auto-equip or to wear what went to the satchel (a
-##               second tap when wearing it melts the worn piece for good);
-##               a touch just off a thumb button stays the button's. A
+##               an auto-equip, to wear what went to the satchel (a second
+##               tap when wearing it sells the worn piece for good) or to
+##               keep a find sold on touch ("Sold +N · tap to keep"); a
+##               touch just off a thumb button stays the button's. A
 ##               Legendary's is a "New power" card held 5 s (power_card)
 ##   edges       a warm vignette that beats under 25% life
 ## Everything timed (the slot, the cards, a card's tap window) holds while
@@ -78,6 +80,7 @@ const MSG_MAX := 5.0             # ...and its most: 1 s and 0.05 s a character b
 const PRI := {"pickup": 4, "elite": 3, "bark": 2, "toast": 1}
 const STALE := {"pickup": 8.0, "elite": 4.0, "bark": 9.0, "toast": 6.0}   # a queued message older than this is dropped
 const CARD_TAP := 3.0            # seconds a pickup card takes a tap
+const TICK_TIME := 1.2           # seconds the "+N" by the embers shows (ember_tick)
 const CARD_POWER := 5.0          # seconds a Legendary's "New power" card holds (power_card)
 # A touch this close to a thumb button's centre stays the button's, over the
 # card too: within 2.0 x an arrow's radius (a thumb swinging in for "right"
@@ -129,6 +132,9 @@ var _xp_level := 0
 var _xp_glow := 0.0
 var _ember_bump := 0.0
 var _bank_flash := 0.0
+var _tick := 0                    # the "+N" by the embers (ember_tick): what it adds up...
+var _tick_t := 0.0                # ...how long it still shows...
+var _tick_word := ""              # ...and what it says after the number ("sold"; "" a piece taken)
 var _bank_amount := 0
 var _carried_seen := 0
 var _sigil_bump := [0.0, 0.0, 0.0]
@@ -359,6 +365,18 @@ func bump_embers() -> void:
 	_ember_bump = 1.0
 
 
+func ember_tick(n: int, word := "") -> void:
+	## A "+N" by the carried embers for TICK_TIME: a piece taken (world.gd
+	## _collect: one a kill, carrying its whole worth), or a find sold for
+	## its price ("sold": into the purse, as banked embers go). Pieces taken
+	## close together add up.
+	if n <= 0:
+		return
+	_tick = (_tick if _tick_t > 0.0 and _tick_word == word else 0) + n
+	_tick_word = word
+	_tick_t = TICK_TIME
+
+
 func bump_flames() -> void:
 	_life_bump = 1.0
 
@@ -403,30 +421,32 @@ static func relic_status(card: Dictionary) -> String:
 
 
 func show_pickup(it: Dictionary, chips: Dictionary, where: String) -> void:
-	## An item picked up: worn (auto-equip), in the satchel, or melted into
-	## embers: "salvaged" is a Common with auto-salvage on, or (the satchel
-	## full) anything no better than what's worn, a Blessed or Rare too.
+	## An item picked up: worn (auto-equip), in the satchel, or sold for its
+	## price (Items.sell_value). "sold" with room in the satchel is a find
+	## no better than what's worn, sold on touch ("Sell weaker finds"): its
+	## card's tap keeps it (Game.keep_sold), the embers going back; with the
+	## satchel full it's a note ("Satchel full · sold"), nowhere to keep it.
 	## "full": the satchel had no room and it's better (or a Legendary). A
-	## tap wears it (what it replaces melts: Game.melt_on_equip). If the
+	## tap wears it (what it replaces is sold: Game.melt_on_equip). If the
 	## World left it on the floor, the tap needs the World to lift it
 	## (claim_item), and without that the card only says it's still there;
 	## if the World already took it up (world.gd today), the tap is its only
 	## chance, as before. "equipped" with Game.last_melt for it: worn, and
-	## the full satchel melted the old one, so there's nothing to undo.
+	## the full satchel sold the old one, so there's nothing to undo.
 	var uid := str(it.get("uid", ""))
-	if where == "salvaged":
-		var rarity := str(it.get("rarity", "common"))
-		var g := _game()
-		var auto: bool = rarity == "common" and (g == null or bool(g.setting("auto_salvage")))
-		var sub := ("Salvaged  +%d embers" if auto else "Satchel full · salvaged  +%d embers") % Items.salvage_value(it)
-		_push({"kind": "pickup", "key": "salv:" + uid, "title": str(it.get("name", "")),
-				"sub": sub, "icon": UI.item_icon(it),
-				"glyph": UI.slot_glyph(str(it.get("slot", ""))), "col": UI.rarity_color(rarity)})
-		return
+	var g := _game()
+	if where == "sold":
+		ember_tick(Items.sell_value(it), "sold")
+		if g == null or g.satchel_full():
+			_push({"kind": "pickup", "key": "sold:" + uid, "title": str(it.get("name", "")),
+					"sub": "Satchel full · sold  +%d embers" % Items.sell_value(it), "icon": UI.item_icon(it),
+					"glyph": UI.slot_glyph(str(it.get("slot", ""))), "col": UI.rarity_color(str(it.get("rarity", "common")))})
+			return
 	var card := {"kind": "item", "item": it, "chips": chips, "where": where, "t": 0.0, "tap_left": CARD_TAP,
 			"icon": UI.item_icon(it)}
-	var g := _game()
-	if where == "equipped" and g != null and str(g.last_melt.get("for", "-")) == uid:
+	if where == "sold":
+		card["embers"] = Items.sell_value(it)
+	elif where == "equipped" and g != null and str(g.last_melt.get("for", "-")) == uid:
 		_melted(card, g.last_melt)
 		card["end"] = 3.2
 	elif where == "equipped" and g != null and not _can_undo(it):
@@ -466,8 +486,8 @@ func power_card(it: Dictionary, secs := CARD_POWER) -> void:
 
 
 func _melted(card: Dictionary, melt: Dictionary) -> void:
-	## Worn with the satchel full: what melted to make the room, and no undo
-	## (the old one is embers now).
+	## Worn with the satchel full: what was sold to make the room, and no
+	## undo (the old one is embers now).
 	card["melt"] = {"embers": int(melt.get("embers", 0)), "old": bool(melt.get("old", false)),
 			"name": str((melt.get("item", {}) as Dictionary).get("name", ""))}
 	card["tap_left"] = 0.0
@@ -694,11 +714,13 @@ static func clear_of_thumbs(pos: Vector2, L: Dictionary) -> bool:
 
 
 func tap_card(confirm_melt := false) -> bool:
-	## A tap on the pickup card inside its window: undo an auto-equip, or wear
-	## an item that went to the satchel. Tapping again flips it back.
-	## confirm_melt (a touch, the equip key): when wearing it would melt the
-	## worn piece for good (the satchel full), the first tap only asks ("tap
-	## again") and renews the window; a second tap wears it.
+	## A tap on the pickup card inside its window: undo an auto-equip, wear
+	## an item that went to the satchel, or keep a find sold on touch (into
+	## the satchel, its embers back: "Kept", and no more taps). Tapping again
+	## flips a worn or stowed one back. confirm_melt (a touch, the equip
+	## key): when wearing it would sell the worn piece for good (the satchel
+	## full), the first tap only asks ("tap again") and renews the window; a
+	## second tap wears it.
 	if _card.is_empty() or _card["kind"] != "item" or float(_card["tap_left"]) <= 0.0:
 		return false
 	var it: Dictionary = _card["item"]
@@ -713,6 +735,18 @@ func tap_card(confirm_melt := false) -> bool:
 		_sfx("select")
 		return true
 	match str(_card["where"]):
+		"sold":
+			if g == null or not g.keep_sold(it):
+				_card["tap_left"] = 0.0
+				_sfx("back")
+				return false
+			_card["where"] = "kept"
+			_card["tap_left"] = 0.0
+			_card["end"] = float(_card["t"]) + 1.6
+			_card["flash"] = 1.0
+			_tick_t = 0.0
+			_sfx("select")
+			return true
 		"equipped":
 			if world and world.has_method("undo_equip"):
 				world.undo_equip(it)
@@ -734,7 +768,7 @@ func tap_card(confirm_melt := false) -> bool:
 				world.apply_hero()
 			_card["where"] = "equipped"
 			if g and str(g.last_melt.get("for", "-")) == str(it.get("uid", "")):
-				# The satchel was full: the old one melted, so no flipping back.
+				# The satchel was full: the old one was sold, so no flipping back.
 				_melted(_card, g.last_melt)
 				_card["end"] = float(_card["t"]) + 2.6
 				_card["flash"] = 1.0
@@ -1037,6 +1071,7 @@ func _process(dt: float) -> void:
 	_points = int(g.hero().get("points", 0)) if g != null and not (g.has_method("borrowing") and g.borrowing()) else 0
 	_ember_bump = maxf(_ember_bump - dt * 5.0, 0.0)
 	_bank_flash = maxf(_bank_flash - dt * 0.8, 0.0)
+	_tick_t = maxf(_tick_t - dt, 0.0)
 	if world != null and world.get("embers_carried") != null:
 		_carried_seen = int(world.embers_carried)
 	for i in 3:
@@ -1585,6 +1620,13 @@ func _draw_embers(ci: Control, L: Dictionary) -> void:
 		var a := clampf(_bank_flash * 2.0, 0.0, 1.0)
 		var x := c.x + 20.0 + UI.text_width(n, 15, "body", 800) + (1.0 - _bank_flash) * 10.0
 		UI.text(ci, Vector2(x, c.y + 4.5), "+%d banked" % _bank_amount, 12, Color(UI.GOLD, a), HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 700, 3)
+	elif _tick_t > 0.0 and _tick > 0:
+		# A piece taken (cream) or a find sold (gold): "+N", rising a little.
+		var k := _tick_t / TICK_TIME
+		var a := clampf(k * 3.0, 0.0, 1.0)
+		var x := c.x + 20.0 + UI.text_width(n, 15, "body", 800)
+		var tick := "+%d" % _tick + (" " + _tick_word if _tick_word != "" else "")
+		UI.text(ci, Vector2(x, c.y + 4.5 - (1.0 - k) * 4.0), tick, 12, Color(UI.GOLD if _tick_word != "" else UI.CREAM, a), HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 700, 3)
 
 
 func _draw_sigils(ci: Control, L: Dictionary) -> void:
@@ -2087,16 +2129,22 @@ func _draw_card(ci: Control) -> void:
 				var m: Dictionary = _card["melt"]
 				var n := int(m["embers"])
 				if m["old"]:
-					opts = ["Equipped · old one salvaged  +%d" % n, "Equipped · old one melted  +%d" % n, "Equipped · salvaged  +%d" % n]
+					opts = ["Equipped · old one sold  +%d" % n, "Equipped · sold  +%d" % n]
 				else:
-					opts = ["Equipped · %s salvaged  +%d" % [m["name"], n], "Equipped · %s melted" % m["name"],
-							"Equipped · satchel's weakest salvaged  +%d" % n, "Equipped · one salvaged  +%d" % n]
+					opts = ["Equipped · %s sold  +%d" % [m["name"], n], "Equipped · %s sold" % m["name"],
+							"Equipped · satchel's weakest sold  +%d" % n, "Equipped · one sold  +%d" % n]
 			scol = UI.GOLD
+		"sold":
+			var n := int(_card.get("embers", 0))
+			opts = ["Sold  +%d · tap to keep" % n, "Sold +%d · tap to keep" % n, "Sold +%d · keep?" % n] if tap else ["Sold  +%d" % n]
+			scol = UI.GOLD
+		"kept":
+			opts = ["Kept · in your satchel", "Kept"]
 		"undone":
 			opts = ["In your satchel · tap to wear" if tap else "In your satchel"]
 		"full":
 			if tap and _card.get("melts", false):
-				opts = ["Satchel full · tap to wear, old one melts", "Full · tap to wear, old one melts", "Tap to wear · old one melts"]
+				opts = ["Satchel full · tap to wear, old one sells", "Full · tap to wear, old one sells", "Tap to wear · old one sells"]
 			elif tap:
 				opts = ["Satchel full · tap to wear it"]
 			else:
@@ -2113,8 +2161,8 @@ func _draw_card(ci: Control) -> void:
 			opts = ["New power · tap to wear" if tap else "New power · in your satchel", "New power"]
 		scol = UI.GOLD
 	if tap and bool(_card.get("armed", false)) and where != "equipped":
-		# The first tap asked: wearing it melts the worn piece for good.
-		opts = ["Tap again to wear · old one melts", "Tap again · old one melts"]
+		# The first tap asked: wearing it sells the worn piece for good.
+		opts = ["Tap again to wear · old one sells", "Tap again · old one sells"]
 		scol = UI.BAD
 	var fit := _fit_status(opts, w)
 	var status: String = fit[0]

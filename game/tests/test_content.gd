@@ -1484,7 +1484,7 @@ func _test_snuffer() -> void:
 	for p in w.pickups:
 		if p["kind"] == "item" or p["kind"] == "relic":
 			loot += 1
-	_check(loot >= 3, "with his hoard (%d)" % loot)
+	_check(loot >= 2, "with his prize and a relic (%d; Dusk's story levels: no boss-table items, world.trophies())" % loot)
 	_check(w.lights_tagged("brazier").size() == 4, "and the braziers catch again")
 	await _done(w)
 	# A snuff mid-fight: he sleeps, the braziers come back, the door opens.
