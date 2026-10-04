@@ -5,6 +5,8 @@ theme: rootvault
 area: 14
 dread: The Widow Cap|weepcap|Warded,Sporebound
 story_start: beat_3_2
+roster: headline=rattlehound,weepcap; support=rootling,bat,gutterwing; guest=hollow_helm; rattle_max=6; fodder_max=0.7; count=23
+threat: 9.9
 hints: Here lies Old Hobb. Planted crooked. Grew anyway.
 ---
 ######################################################################################################################################################################################################################################################################################################################################################

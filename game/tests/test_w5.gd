@@ -20,8 +20,10 @@ extends SceneTree
 ##     (a lamp in wind: counting the gusts it will lose, lit at any phase),
 ##     then it flickers DAWN_FLICKER and is air; its lamp is an anchor with
 ##     its nominal radius; the first-time barks wait for a stone landing;
-##   the levels: widths, altars, checkpoint gaps (<= 72), headers, the cast
-##   (the 5-3 share-cap ruling), the threat within 15% of 12 per 100 tiles,
+##   the levels: 5-4's width and altars, checkpoint gaps (<= 72), 3-5 altars
+##   in 5-1 to 5-3, headers, the cast (each regular level's roster: header,
+##   since Build 2; the 5-3 share-cap ruling), the threat within 10% of what
+##   each one's threat: header declares, ramping (tests/level_rules.gd),
 ##   the signs and inscriptions, an 11-wide stone island, the per-screen
 ##   caps, the Glassmite and Gustling placement checks, the arena; no air
 ##   under glass cut off from the level; every stone stretch in a gust zone
@@ -41,6 +43,7 @@ extends SceneTree
 ##     godot --headless --path game --script res://tests/test_w5.gd
 
 const LevelData := preload("res://scripts/level_data.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const Reach := preload("res://scripts/reach.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
 const Arena := preload("res://scripts/boss_arena.gd")
@@ -49,19 +52,17 @@ const GLASS := "res://scripts/features/glass.gd"
 const TILE := 32
 const DT := 1.0 / 120.0
 const IDS := ["5-1", "5-2", "5-3", "5-4"]
-# spec §3.3 / §3.6.3 (the altars' cells, the bell's column)
+# spec §3.3 / §3.6.3 (5-4's width, altars' cells and monsters; since Build 2
+# the regular levels' widths, altars, bell and cast are their own, held to
+# the rules and their roster: and threat: headers: tests/level_rules.gd)
 const SPEC := {
-	"5-1": {"name": "The Floating Aisle", "area": 23, "theme": "choirglass", "width": 338, "altars": [71, 139, 207, 273], "bell": 330,
-			"dread": "Queen Crackle|glassmite|Twinned,Glassed", "monsters": 30},
-	"5-2": {"name": "The Gale Gallery", "area": 24, "theme": "rosewind", "width": 344, "altars": [73, 143, 213, 279], "bell": 336,
-			"dread": "Glintwatch|refractor|Warded,Echoing", "monsters": 28},
-	"5-3": {"name": "The Dawnglass Bridges", "area": 26, "theme": "voidnave", "width": 344, "altars": [73, 143, 213, 279], "bell": 336,
-			"monsters": 20},
+	"5-1": {"name": "The Floating Aisle", "area": 23, "theme": "choirglass", "dread": "Queen Crackle|glassmite|Twinned,Glassed"},
+	"5-2": {"name": "The Gale Gallery", "area": 24, "theme": "rosewind", "dread": "Glintwatch|refractor|Warded,Echoing"},
+	"5-3": {"name": "The Dawnglass Bridges", "area": 26, "theme": "voidnave"},
 	"5-4": {"name": "The Lightwell", "area": 27, "theme": "prismheart", "width": 160, "altars": [63, 118], "monsters": 8},   # (altar 2 at the door: 118, test_content's rule; spec x 111)
 }
 const MAX_GAP := 72              # tiles between checkpoints in World 5 (spec §3.1)
 const STONE_EVERY := 14
-const THREAT := 12.0             # per 100 tiles, W5's target (+-15%)
 const COST := {"skeleton": 1.0, "bat": 1.0, "bonebow": 1.5, "dripkin": 1.0, "gutterwing": 1.0, "brinejaw": 1.0,
 		"thornback": 2.5, "hollow_helm": 3.0, "lidlurk": 3.0, "rootling": 1.0, "weepcap": 2.0, "rattlehound": 3.0,
 		"creepbone": 1.5, "tickwind": 1.5, "spurwheel": 2.5, "frostbuckle": 4.0, "hoarowl": 2.0, "glassmite": 1.0,
@@ -783,18 +784,22 @@ func _test_headers() -> void:
 		_check(lv.errors.is_empty() and lv.height == 15, "%s parses, 15 rows" % id)
 		_check(lv.title == sp["name"] and lv.area == int(sp["area"]) and lv.theme == sp["theme"] and lv.music == "sanctum",
 				"%s: %s, area %d, theme %s, music sanctum (%s, %d, %s, %s)" % [id, sp["name"], sp["area"], sp["theme"], lv.title, lv.area, lv.theme, lv.music])
-		_check(lv.width == int(sp["width"]), "%s is %d tiles (%d)" % [id, sp["width"], lv.width])
+		if sp.has("width"):
+			_check(lv.width == int(sp["width"]), "%s is %d tiles (%d)" % [id, sp["width"], lv.width])
 		_check(str(lv.story.get("start", "")) == "beat_%s" % id.replace("-", "_"), "%s opens with beat_%s" % [id, id.replace("-", "_")])
 		var xs := []
 		for a in _entities(lv, "altar"):
 			xs.append(int(a["cell"].x))
 		xs.sort()
-		_check(xs == sp["altars"], "%s: altars at %s (%s)" % [id, sp["altars"], xs])
+		if sp.has("altars"):
+			_check(xs == sp["altars"], "%s: altars at %s (%s)" % [id, sp["altars"], xs])
 		var marks: Array = [lv.start.x] + xs
-		if sp.has("bell"):
-			var bells := _entities(lv, "bell")
-			_check(bells.size() == 1 and int(bells[0]["cell"].x) == int(sp["bell"]), "%s: the bell at %d" % [id, sp["bell"]])
+		var bells := _entities(lv, "bell")
+		if not bells.is_empty():
+			_check(bells.size() == 1, "%s: one bell (%d)" % [id, bells.size()])
 			marks.append(int(bells[0]["cell"].x))
+			var cp := Rules.checkpoint_problems(lv, MAX_GAP)
+			_check(cp.is_empty(), "%s: 3-5 altars, an altar by every sealed door %s" % [id, cp])
 		else:
 			var boss := _entities(lv, "boss")
 			if not boss.is_empty():
@@ -818,6 +823,7 @@ func _test_headers() -> void:
 
 
 func _test_cast() -> void:
+	var regular := []
 	for id in IDS:
 		var lv: RefCounted = _levels[id]
 		var n := 0
@@ -836,11 +842,15 @@ func _test_cast() -> void:
 		var per := threat * 100.0 / float(lv.width)
 		print("  %s: %d monsters, threat %.1f (%.1f per 100 tiles)" % [id, n, threat, per])
 		if id != "5-4":
-			_check(n >= 20 and n <= 30, "%s: 20-30 monsters (%d)" % [id, n])
-			_check(absf(per - THREAT) <= THREAT * 0.15 + 0.001, "%s: threat within 15%% of %.0f per 100 tiles (%.1f)" % [id, THREAT, per])
+			regular.append(lv)
+			var rp := Rules.roster_problems(lv)
+			_check(not Rules.roster_of(lv).is_empty() and rp.is_empty(), "%s holds the cast its roster: declares %s" % [id, rp])
+			_check(Rules.declared_threat(lv) > 0.0, "%s declares its threat" % id)
 		else:
 			_check(n == int(SPEC[id]["monsters"]), "5-4: %d monsters on the approach (%d)" % [SPEC[id]["monsters"], n])
 		_check(brutes <= 3, "%s: at most 3 brutes" % id)
+	var tp := Rules.threat_problems(regular)
+	_check(tp.is_empty(), "5-1 to 5-3: each threat as declared (within 10%%), ramping %s" % [tp])
 	# The ruling for 5-3: no Frostbuckle, no Tickwind, no Hollow Helm (an
 	# Anointed one breaks the cap); its Paneguards stand where none can be
 	# anointed (the scan knows placement since the track B merge: w5.py

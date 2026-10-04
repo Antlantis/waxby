@@ -5,6 +5,8 @@ theme: choirglass
 area: 23
 dread: Queen Crackle|glassmite|Twinned,Glassed
 story_start: beat_5_1
+roster: headline=glassmite,gustling; support=bat,bonebow; guest=tickwind,thornback; rattle_max=7; fodder_max=0.94; count=30
+threat: 10.8
 hints: A girl with a candle came down alone. She was afraid.
 ---
 ###########

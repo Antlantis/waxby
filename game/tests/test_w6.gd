@@ -23,8 +23,11 @@ extends SceneTree
 ## shove and stalls, waits for a toll, ends at the end altar and resets on a
 ## snuff; the glow edges are at 0.30; outside W6 deep.gd plays no sound.
 ##
-## The levels (each check skipped until its file exists): widths, altars and
-## checkpoint gaps; the headers; the teaching signs and the inscriptions; no
+## The levels (each check skipped until its file exists): 6-4's width and
+## altars, checkpoint gaps, 3-5 altars in a regular level; since Build 2 each
+## regular level's cast (its roster: header) and threat (its threat:,
+## ramping 6-1 to 6-3: tests/level_rules.gd) as declared, and 6-3's chases
+## altar to altar; the headers; the teaching signs and the inscriptions; no
 ## wall sconces; the per-screen caps; 6-1's Hushlings; every grasp with a
 ## stone waiting spot just outside its reach; every buoy on the path reached
 ## from stone, a float or the still water of the buoy before; safe first;
@@ -47,6 +50,7 @@ extends SceneTree
 ## hands up where he is.
 
 const LevelData := preload("res://scripts/level_data.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const Reach := preload("res://scripts/reach.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
 const Route := preload("res://scripts/route.gd")
@@ -58,11 +62,13 @@ const DT := 1.0 / 120.0
 const DIFFS := ["dusk", "nightfall", "witching"]
 const DEEP_PATH := "res://scripts/features/deep.gd"
 const IDS := ["6-1", "6-2", "6-3", "6-4"]
-# Spec §3.7.3 (the section widths bind the altars and checkpoints).
+# Spec §3.7.3 (6-4's width and altars; since Build 2 the regular levels'
+# widths and altars are their own, held to the rules: tests/level_rules.gd;
+# chases: how many tide runs, each altar to altar).
 const SPEC := {
-	"6-1": {"width": 370, "altars": [79, 157, 231, 299], "theme": "stillshore", "area": 28},
-	"6-2": {"width": 368, "altars": [79, 157, 229, 297], "theme": "drownbell", "area": 29, "secret": "6-S"},
-	"6-3": {"width": 360, "altars": [59, 133, 199, 275], "theme": "hushquiet", "area": 30, "chase": [[59, 133], [199, 275]]},
+	"6-1": {"theme": "stillshore", "area": 28},
+	"6-2": {"theme": "drownbell", "area": 29, "secret": "6-S"},
+	"6-3": {"theme": "hushquiet", "area": 30, "chases": 2},
 	"6-4": {"width": 196, "altars": [71, 147], "theme": "husheye", "area": 31, "boss": "hush"},   # (altars at 71 and 147: the door altar within 8 tiles of the arena, test_content, and W6 checkpoints 78 apart at most; spec x 63 and 139)
 }
 # The teaching signs left by the sign cut (the floats, buoys, grasps and
@@ -139,12 +145,21 @@ func _initialize() -> void:
 	await _test_candles_resume()
 	await _test_tide()
 	_test_edges()
+	var regular := []
 	for id in IDS:
 		var path := "res://levels/%s.txt" % id
 		if not FileAccess.file_exists(path):
 			_skip("levels/%s.txt missing (WL6)" % id)
 			continue
-		_test_layout(LevelData.load_file(path))
+		var lv: RefCounted = LevelData.load_file(path)
+		_test_layout(lv)
+		if lv.boss == "":
+			regular.append(lv)
+	if regular.size() == 3:
+		# Build 2: each regular level's threat within 10% of its threat:
+		# header, 6-1 to 6-3 ramping (W6 had no threat check before).
+		var tp := Rules.threat_problems(regular)
+		_check(tp.is_empty(), "6-1 to 6-3: each threat as declared, ramping %s" % [tp])
 	if FileAccess.file_exists("res://levels/6-4.txt"):
 		_test_arena(LevelData.load_file("res://levels/6-4.txt"))
 	if OS.get_environment("WAXBY_FAST") == "":
@@ -885,7 +900,8 @@ func _test_layout(lv: RefCounted) -> void:
 	var sp: Dictionary = SPEC[id]
 	_check(lv.errors.is_empty(), "%s parses (%s)" % [id, lv.errors])
 	_check(lv.height == 15, "%s is 15 rows" % id)
-	_check(lv.width == int(sp["width"]), "%s is %d tiles (%d)" % [id, sp["width"], lv.width])
+	if sp.has("width"):
+		_check(lv.width == int(sp["width"]), "%s is %d tiles (%d)" % [id, sp["width"], lv.width])
 	_check(lv.world == 6 and lv.theme == sp["theme"] and lv.area == int(sp["area"]) and lv.music == "hushdeep", "%s: world 6, theme %s, area %d, music hushdeep" % [id, sp["theme"], sp["area"]])
 	var altars := []
 	var bell_x := -1
@@ -896,7 +912,14 @@ func _test_layout(lv: RefCounted) -> void:
 			"bell":
 				bell_x = (e["cell"] as Vector2i).x
 	altars.sort()
-	_check(altars == sp["altars"], "%s: altars at %s (%s)" % [id, sp["altars"], altars])
+	if sp.has("altars"):
+		_check(altars == sp["altars"], "%s: altars at %s (%s)" % [id, sp["altars"], altars])
+	else:
+		var cp := Rules.checkpoint_problems(lv, MAX_GAP)
+		_check(cp.is_empty(), "%s: 3-5 altars, an altar by every sealed door %s" % [id, cp])
+		var rp := Rules.roster_problems(lv)
+		_check(not Rules.roster_of(lv).is_empty() and rp.is_empty(), "%s holds the cast its roster: declares %s" % [id, rp])
+		_check(Rules.declared_threat(lv) > 0.0, "%s declares its threat (%.1f per 100 tiles)" % [id, Rules.threat_of(lv)])
 	var marks: Array = [lv.start.x] + altars
 	if bell_x >= 0:
 		marks.append(bell_x)
@@ -915,7 +938,7 @@ func _test_layout(lv: RefCounted) -> void:
 	var chase: Array = []
 	for r in lv.chase:
 		chase.append([int(r["x0"]), int(r["x1"])])
-	_check(chase == sp.get("chase", []), "%s: chase ranges %s (%s)" % [id, sp.get("chase", []), chase])
+	_check(chase.size() == int(sp.get("chases", 0)), "%s: %d chase ranges (%s)" % [id, sp.get("chases", 0), chase])
 	for r in chase:
 		_check(altars.has(r[0]) and altars.has(r[1]), "%s: each chase runs altar to altar (%s)" % [id, r])
 	# Signs: the teaching signs and the inscription (the Hush's, lowercase),

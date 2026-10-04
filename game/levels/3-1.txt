@@ -5,6 +5,8 @@ theme: orchard
 area: 13
 dread: Mister Mandrake|rootling|Twinned,Sporebound
 story_start: beat_3_1
+roster: headline=rootling,weepcap; support=bat,bonebow,dripkin; rattle_max=14; fodder_max=0.94; count=29
+threat: 9.9
 hints: On a vine, slide up to climb. Arrow and jump to leap|Here lies Brother Pim. He kept the soup warm.
 ---
 ##############################################################################################################################################################################################################################################################################################################################################

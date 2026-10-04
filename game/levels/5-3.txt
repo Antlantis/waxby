@@ -6,6 +6,8 @@ area: 26
 dread: Dame Vitrail|skeleton|Swift,Vengeful
 secret: 5-S
 story_start: beat_5_3
+roster: headline=paneguard,refractor; support=glassmite,gustling,gutterwing,bat,bonebow; guest=rattlehound,thornback; rattle_max=2; fodder_max=0.6; count=22
+threat: 12.4
 gusts: 86-103:L:A, 114-131:L:B, 337-343:R:A
 hints: She sang, and the dark slept.
 ---

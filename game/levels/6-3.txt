@@ -6,6 +6,8 @@ area: 30
 dread: The Long Shadow|unwick|Swift,Warded
 story_start: beat_6_3
 chase: 59-133, 199-275
+roster: headline=hushling,unwick; support=stillmaw,brinejaw; guest=refractor,rattlehound,frostbuckle,hollow_helm,paneguard; rattle_max=3; fodder_max=0.68; count=25
+threat: 11
 hush: 38-55, 70-79, 210-220, 333-344
 hints: i ate the bells. they tasted of nothing.
 ---

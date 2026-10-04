@@ -7,6 +7,8 @@ dread: The Grindstone|spurwheel|Burning,Echoing
 tick: 0.536
 story_start: beat_4_3
 weight_phase: 119=0.5
+roster: headline=tickwind,hoarowl; support=frostbuckle,spurwheel,bat,bonebow; guest=hollow_helm,thornback,rattlehound; rattle_max=8; fodder_max=0.68; count=25
+threat: 11.2
 hints: I was one minute late. If I hold it, I never was. — T.
 ---
 ############################################################################################################################################################################################################################################################################################################################################################################################

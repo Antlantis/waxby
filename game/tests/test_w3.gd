@@ -2,6 +2,10 @@ extends SceneTree
 ## World 3, the Bone Orchard (WL3): the orchard's feature numbers
 ## (features/orchard.gd, spec §3.2), the four levels' layout rules (spec
 ## §3.1, §3.4), the star routes of 3-1 ... 3-3, and 3-4's approach replayed.
+## Since Build 2 the regular levels are held to what their own headers
+## declare (tests/level_rules.gd: their roster:, their threat: and its ramp,
+## 3-5 altars at most 90 tiles apart), not to fixed counts and widths; 3-4
+## keeps its pins.
 ##
 ##     godot --headless --path game --script res://tests/test_w3.gd
 ##
@@ -16,6 +20,7 @@ extends SceneTree
 ## instead of failing.
 
 const LevelData := preload("res://scripts/level_data.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const Reach := preload("res://scripts/reach.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
 const Route := preload("res://scripts/route.gd")
@@ -27,7 +32,7 @@ const MAX_GAP := 90                  # checkpoints (spec §3.1, World 3)
 const STONE_EVERY := 14
 const KNOT_EVERY := 4                # vines between root knots over a pit
 const HANG_ROWS := 7                 # a ceiling pod over its floor
-const THREAT_TARGET := 10.0          # per 100 tiles, World 3
+const THREAT_TARGET := 10.0          # per 100 tiles, 3-4's approach (the others declare theirs: threat:)
 const THREAT_SLACK := 0.15
 # The threat cost table (spec §4.2; v2's kinds p_monsters §4.1).
 const COST := {"skeleton": 1.0, "bat": 1.0, "bonebow": 1.5, "dripkin": 1.0, "gutterwing": 1.0, "brinejaw": 1.0,
@@ -38,8 +43,9 @@ const COST := {"skeleton": 1.0, "bat": 1.0, "bonebow": 1.5, "dripkin": 1.0, "gut
 const TAUGHT := {"rootling": ["3-1", "BG_MOUNDS", 186], "weepcap": ["3-1", "BG_BELL", 294],
 	"rattlehound": ["3-2", "HO_HOUND", 62], "creepbone": ["3-3", "SW_CREEP", 58],
 	"rotten": ["3-2", "HO_ROTTEN", 256], "pod": ["3-2", "HO_SPORES", 100], "vine": ["3-1", "BG_START", 0]}
-# The spec's monster counts (§3.4.3; a nest counts as its Gutterwing).
-const MONSTERS := {"3-1": 29, "3-2": 23, "3-3": 24, "3-4": 11}
+# 3-4's monsters on the approach (spec §3.4.3; the regular levels declare
+# their cast: roster:, a nest counted as its Gutterwing).
+const MONSTERS := {"3-4": 11}
 # Each regular level's star sigil (sigil 3, by the bell), the landings its
 # route takes (tight: a lone one-tile stone, a crumble, a rotten run of 3 or
 # fewer, a one-tile root knot), and where the bot starts.
@@ -613,13 +619,13 @@ func _test_headers(levels: Dictionary) -> void:
 	var themes := {"3-1": "orchard", "3-2": "rootvault", "3-3": "sporewood", "3-4": "rootheart"}
 	var dreads := {"3-1": "Mister Mandrake|rootling|Twinned,Sporebound", "3-2": "The Widow Cap|weepcap|Warded,Sporebound",
 		"3-3": "Old Tatterjaw|rattlehound|Swift,Burning"}
-	var widths := {"3-1": 334, "3-2": 342, "3-3": 334, "3-4": 172}
+	var widths := {"3-4": 172}     # (the regular levels' widths are their own since Build 2)
 	var Story = load("res://scripts/story.gd")
 	for id in levels:
 		var lv = levels[id]
 		_check(lv.errors.is_empty(), "%s parses cleanly %s" % [id, lv.errors])
 		_check(lv.title == names[id] and lv.area == areas[id] and lv.theme == themes[id] and lv.world == 3, "%s: its name, area, theme and world" % id)
-		_check(lv.width == widths[id] and lv.height == 15, "%s is %d x 15" % [id, widths[id]])
+		_check(lv.width == int(widths.get(id, lv.width)) and lv.height == 15, "%s is %d x 15" % [id, widths.get(id, lv.width)])
 		_check(str(lv.headers.get("music", "")) == "orchard", "%s plays the orchard" % id)
 		_check(str(lv.story.get("start", "")) == "beat_3_%s" % id.right(1), "%s opens on beat_3_%s" % [id, id.right(1)])
 		if dreads.has(id):
@@ -682,8 +688,11 @@ func _test_layout(levels: Dictionary) -> void:
 		for i in range(1, marks.size()):
 			worst = maxi(worst, marks[i] - marks[i - 1])
 		_check(worst <= MAX_GAP, "%s: checkpoints %d tiles apart at most (%s)" % [id, worst, marks])
-		var altars: int = lv.count("altar")
-		_check(altars == (2 if lv.boss != "" else 3), "%s has %d altars" % [id, altars])
+		if lv.boss != "":
+			_check(lv.count("altar") == 2, "%s has 2 altars" % id)
+		else:
+			var cp := Rules.checkpoint_problems(lv, MAX_GAP)
+			_check(cp.is_empty(), "%s: 3-5 altars, an altar by every sealed door %s" % [id, cp])
 		# Over a pit: stone every 14 tiles, a root knot after 4 vines at most.
 		var cols := _cols_of(lv)
 		var last_safe := -1
@@ -741,12 +750,17 @@ func _test_layout(levels: Dictionary) -> void:
 			if y - c.y > HANG_ROWS:
 				high.append(c)
 		_check(high.is_empty(), "%s: every ceiling pod hangs %d rows or less over its floor %s" % [id, HANG_ROWS, high])
-		# Monster counts (spec §3.4.3).
-		var n := 0
-		for e in lv.entities:
-			if COST.has(str(e["kind"])):
-				n += 1
-		_check(n == int(MONSTERS[id]), "%s holds the spec's %d monsters (%d)" % [id, MONSTERS[id], n])
+		# The cast: a regular level's is what its roster: declares (Build 2),
+		# 3-4's the spec's count (§3.4.3).
+		if MONSTERS.has(id):
+			var n := 0
+			for e in lv.entities:
+				if COST.has(str(e["kind"])):
+					n += 1
+			_check(n == int(MONSTERS[id]), "%s holds the spec's %d monsters (%d)" % [id, MONSTERS[id], n])
+		else:
+			var rp := Rules.roster_problems(lv)
+			_check(not Rules.roster_of(lv).is_empty() and rp.is_empty(), "%s holds the cast its roster: declares %s" % [id, rp])
 		# A Creepbone never rides a rotten run: its lane is fixed when it
 		# spawns, and the run would snap from under it.
 		var on_rot := []
@@ -767,23 +781,29 @@ func _test_layout(levels: Dictionary) -> void:
 
 
 func _test_threat(levels: Dictionary) -> void:
-	## Threat cost per 100 tiles within 15% of World 3's 10 (a boss level's
-	## approach only: the arena's threat is the boss).
+	## Each regular level's threat within 10% of what its threat: header
+	## declares, 3-1 to 3-3 ramping (tests/level_rules.gd); 3-4's approach
+	## within 15% of World 3's 10 (the arena's threat is the boss).
+	var regular := []
+	for id in levels:
+		if levels[id].boss == "":
+			regular.append(levels[id])
+			_check(Rules.declared_threat(levels[id]) > 0.0, "%s declares its threat" % id)
+	var tp := Rules.threat_problems(regular)
+	_check(tp.is_empty(), "3-1 to 3-3: each threat as declared, ramping %s" % [tp])
 	for id in levels:
 		var lv = levels[id]
+		if lv.boss == "":
+			continue
 		var cost := 0.0
+		var bx := 0
 		for e in lv.entities:
 			cost += float(COST.get(str(e["kind"]), 0.0))
-		var tiles: float = lv.width
-		if lv.boss != "":
-			var bx := 0
-			for e in lv.entities:
-				if e["kind"] == "boss":
-					bx = e["cell"].x
-			var a = preload("res://scripts/boss_arena.gd").find(lv, LevelData.cell_floor(Vector2i(bx, 12)))
-			tiles = float(int(a["left"]) / TILE - 2)
-		var per := cost * 100.0 / tiles
-		_check(absf(per - THREAT_TARGET) <= THREAT_TARGET * THREAT_SLACK, "%s: threat %.1f per 100 tiles (World 3: %.0f +-15%%)" % [id, per, THREAT_TARGET])
+			if e["kind"] == "boss":
+				bx = e["cell"].x
+		var a = preload("res://scripts/boss_arena.gd").find(lv, LevelData.cell_floor(Vector2i(bx, 12)))
+		var per := cost * 100.0 / float(int(a["left"]) / TILE - 2)
+		_check(absf(per - THREAT_TARGET) <= THREAT_TARGET * THREAT_SLACK, "%s: threat %.1f per 100 tiles on the approach (%.0f +-15%%)" % [id, per, THREAT_TARGET])
 
 
 func _test_teaching(levels: Dictionary) -> void:

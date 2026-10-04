@@ -6,6 +6,8 @@ area: 18
 dread: Sergeant Sprocket|tickwind|Swift,Twinned
 tick: 0.536
 story_start: beat_4_1
+roster: headline=tickwind,spurwheel; support=bonebow,bat; guest=rootling; rattle_max=15; fodder_max=0.94; count=31
+threat: 10.4
 hints: Wind at eleven. Oil at half past. NEVER be late. — T.
 ---
 ##########################################################################################################################################################################################################################################################################################################################################################################################
