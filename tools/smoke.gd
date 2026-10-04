@@ -2,7 +2,10 @@
 # calling, the --autoplay bot (autoplay_bot.gd) at the controls, headless, on
 # a fixed 1/120 tick. The hero comes in at the level's entry level (W1-W2's
 # first-run pacing, as test_integration.gd). One line a run: the bell rung,
-# the boss woken, the furthest x, snuffs, script errors; then a summary.
+# the boss woken, the furthest x, snuffs, script errors; then a summary. A
+# shaped level (the bot goes by route: a tower's goal is overhead, a mirrored
+# level's behind) reports its route progress too: the fewest moves from the
+# goal it got to, of the start's (route_field.gd), as x means nothing there.
 #   godot --headless --path game --script res://../tools/smoke.gd -- [levels|all] [callings|all] [seconds]
 #   e.g. -- all all 150          -- 2-4 knight,witch 90
 # Exits non-zero when any run logs a script error. A run the bot can't finish
@@ -93,6 +96,7 @@ func _initialize() -> void:
 			w.set_physics_process(false)
 			await process_frame
 			var far := 0.0
+			var route := Vector2i(-1, -1)   # by route: (the start's moves from the goal, the fewest it got to)
 			var woke := false
 			var t := 0.0
 			var ticks := int(secs / DT)
@@ -103,6 +107,13 @@ func _initialize() -> void:
 				w._read_pad()
 				w.tick(DT)
 				far = maxf(far, w.player.position.x)
+				var fl = null
+				if w._bot.get("by_route"):
+					# (the level's goal's field, not a room's other deck's while it fights there)
+					fl = w._bot.get("_level_field") if w._bot.goal.get("room", false) else w._bot.get("field")
+				if fl != null:
+					var d: int = fl.at(w.player.position)
+					route = Vector2i(d if route.x < 0 else route.x, d if route.y < 0 else mini(route.y, d))
 				if w.boss != null and is_instance_valid(w.boss) and str(w.boss.get("state")) not in ["sleep", ""]:
 					woke = true
 				if i % 600 == 0:
@@ -114,8 +125,9 @@ func _initialize() -> void:
 			var r := {"cls": cls, "id": id, "bell": w.state == "clear", "t": t, "far": far / 32.0, "snuffs": int(w.snuffs),
 					"boss": w.boss != null, "woke": woke, "errors": errs}
 			rows.append(r)
-			print("[smoke] %-7s %-5s %s in %5.1f s, x %5.1f tiles, snuffs %d%s%s" % [cls, id,
-					"BELL" if r["bell"] else "----", t, r["far"], r["snuffs"],
+			print("[smoke] %-7s %-5s %s in %5.1f s, x %5.1f tiles%s, snuffs %d%s%s" % [cls, id,
+					"BELL" if r["bell"] else "----", t, r["far"],
+					(", route %d of %d moves left" % [route.y, route.x]) if route.x >= 0 else "", r["snuffs"],
 					(", boss woke" if woke else ", boss asleep") if r["boss"] else "",
 					(", %d SCRIPT ERRORS: %s" % [errs.size(), errs[0]]) if not errs.is_empty() else ""])
 			w.queue_free()

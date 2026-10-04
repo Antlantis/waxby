@@ -98,6 +98,7 @@ var _attacks := 0
 var arena_left := 0.0
 var arena_right := 0.0
 var door: Array[Vector2i] = []
+var door_side := -1                # the door's wall: -1 left, 1 right (boss_arena.gd find)
 var home := Vector2.ZERO
 var _window_dmg := 0.0
 var _rung_phase := 0          # the last phase he was rung in
@@ -142,6 +143,7 @@ func _ready() -> void:
 	arena_left = a["left"]
 	arena_right = a["right"]
 	door.assign(a["door"])
+	door_side = int(a["side"])
 	if rush and ResourceLoader.exists(BELL_TEX):
 		_bell_tex = load(BELL_TEX)
 	if rush and sprite:
@@ -322,7 +324,7 @@ func think(dt: float, player: Node2D) -> void:
 	match state:
 		"sleep":
 			show_frame("boss_idle")
-			if player.alive and player.position.x > arena_left + 48.0 and absf(dx) < 420.0:
+			if player.alive and Arena.past_door(door_side, arena_left, arena_right, player.position.x, 48.0) and absf(dx) < 420.0:
 				state = "roar"
 				timer = 1.3
 				Arena.seal(world, level, door)

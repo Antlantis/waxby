@@ -277,7 +277,9 @@ func _test_rules() -> void:
 		with_rooms.append(str(lv.id))
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms == [LAB], "only the lab has rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	# (and the shape labs' rooms: lab_shapes.py's mirror and decks, test_shaped.gd's)
+	var mine := with_rooms.filter(func(id): return not str(id).begins_with("lab-shape-"))
+	_check(mine == [LAB], "only the lab has rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.

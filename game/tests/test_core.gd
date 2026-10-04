@@ -28,7 +28,11 @@ const Reach := preload("res://scripts/reach.gd")
 const Movers := preload("res://scripts/movers.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
 const Rules := preload("res://tests/level_rules.gd")
-const LAB_LEVELS := ["res://levels/lab-0.txt", "res://levels/lab-1.txt"]
+const LAB_LEVELS := ["res://levels/lab-0.txt", "res://levels/lab-1.txt",
+		# Build 2's shape labs (tools/levels/lab_shapes.py: a 36-row tower, 24-row
+		# levels, a mirrored strip): the bot proves the shapes' engine work on them.
+		"res://levels/lab-shape-tower.txt", "res://levels/lab-shape-climb.txt", "res://levels/lab-shape-bowl.txt",
+		"res://levels/lab-shape-loop.txt", "res://levels/lab-shape-mirror.txt", "res://levels/lab-shape-decks.txt"]
 const TILE := 32
 const DT := 1.0 / 120.0
 
@@ -123,7 +127,8 @@ func _test_levels_parse() -> void:
 	for path in _all_level_files():
 		var lv = LevelData.load_file(path)
 		_check(lv.errors.is_empty(), "%s parses cleanly: %s" % [lv.id, ", ".join(lv.errors)])
-		_check(lv.height == 15, "%s is 15 rows" % lv.id)
+		# (a shape lab may be taller: up to the approved 3-2 tower's 36 rows)
+		_check(lv.height == 15 or (str(lv.id).begins_with("lab-shape-") and lv.height <= 36), "%s is 15 rows" % lv.id)
 		_check(lv.title != "" and lv.subtitle != "", "%s has a title" % lv.id)
 		var start: Vector2i = lv.start
 		_check(LevelData.is_solid(lv.tile(start.x, start.y + 1)), "%s: Wick starts on the floor" % lv.id)

@@ -5,6 +5,10 @@ extends RefCounted
 ## setup(level, start, opts) then run(max_sims, budget_ms) until it returns
 ## true (it can be spread over frames). found: goal what -> {node, action,
 ## dmax}; path_to(node) walks the route back; capped means STATE_CAP was hit.
+## Greedy with a field (route_field.gd: a shaped level's goal by the way
+## there) orders the states by their moves to the goal instead, and stops
+## once a state is stop_d moves or fewer from it (the bot's horizon by the
+## way there, not by x: a tower's goal is straight overhead).
 
 const Reach := preload("res://scripts/reach.gd")
 const LevelData := preload("res://scripts/level_data.gd")
@@ -23,6 +27,8 @@ var mode := "bfs"
 var target := Vector2.ZERO    # greedy: where to head
 var stop_on := ""             # greedy: stop once this goal is found
 var stop_x := NAN             # greedy: ...or once a state gets past this x (toward target.x)
+var field: RefCounted = null  # greedy: route_field.gd toward the target (then the order is its moves)
+var stop_d := -1              # greedy with a field: ...or once a state is this many moves from it
 var best := 0                 # greedy: the state nearest the target so far
 var _stop_dir := 0.0
 var live_t0 := NAN            # a live check: bw.movers move from this ftime on (the autoplay's timing)
@@ -42,6 +48,7 @@ var done := false
 var _timed := {}
 var _floor_actions := []
 var _vine_actions := []
+var _fall_extra := 0.0        # s a sim runs past its time while he's still falling (Reach.fall_extra: a tall level's)
 var _cur := -1                # the state being expanded (run() stopped halfway through it), or -1
 var _cur_a := 0               # ...and its next action
 
@@ -53,12 +60,15 @@ func setup(level: RefCounted, start: Vector2, opts := {}) -> void:
 	target = opts.get("target", Vector2.ZERO)
 	stop_on = str(opts.get("stop_on", ""))
 	stop_x = float(opts.get("stop_x", NAN))
+	field = opts.get("field", null)
+	stop_d = int(opts.get("stop_d", -1))
 	_stop_dir = signf(target.x - start.x)
 	cap = int(opts.get("cap", Reach.STATE_CAP))
 	touch_rects = opts.get("touch", {})
 	_timed = opts.get("timed", {})
-	_floor_actions = Reach.floor_actions()
-	_vine_actions = Reach.vine_actions()
+	_floor_actions = Reach.floor_actions(Reach.drops_of(level) or bool(opts.get("drops", false)))
+	_vine_actions = Reach.vine_actions(level.tall())
+	_fall_extra = Reach.fall_extra(level)
 	bw = Reach.BotWorld.new()
 	bw.level = lv
 	bw.rotten_hold = float(opts.get("rotten_hold", Reach.ROTTEN_HOLD))
@@ -90,12 +100,19 @@ func _add(pos: Vector2, climb: bool, col: int, parent: int, action: Dictionary, 
 			best = idx
 		if not is_nan(stop_x) and (pos.x - stop_x) * _stop_dir >= 0.0:
 			done = true
+		if field != null and stop_d >= 0 and int(field.at(pos)) <= stop_d:
+			done = true
 	else:
 		queue.append(idx)
 
 
 func _prio(pos: Vector2) -> float:
-	return absf(pos.x - target.x) + 0.5 * absf(pos.y - target.y)
+	var crow := absf(pos.x - target.x) + 0.5 * absf(pos.y - target.y)
+	if field != null:
+		# By the way there (a tile a move), the crow's way only between equals
+		# (and after every state that has a way, for one that has none).
+		return float(field.at(pos)) * TILE + crow * 0.01
+	return crow
 
 func run(max_sims := 1 << 30, budget_ms := 1 << 30, budget_us := 0) -> bool:
 	## Search on; true once it's finished (every state tried, the cap hit,
@@ -180,7 +197,8 @@ func simulate(node: Dictionary, a: Dictionary, record := false) -> Dictionary:
 	var pads := []
 	var t_end := SIM_TIME + (float(a.get("t", 0.0)) if a.get("vine", false) else 0.0)
 	var live := not is_nan(live_t0)
-	while t < t_end:
+	# (a tall level's fall runs on past t_end while he's still falling: _fall_extra)
+	while t < t_end or (t < t_end + _fall_extra and Reach.still_falling(p)):
 		if live:
 			for m in bw.movers:
 				m.update(live_t0 + t, DT)

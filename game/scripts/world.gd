@@ -53,6 +53,7 @@ const PauseScript := preload("res://scripts/pause_menu.gd")
 const FeaturesScript := preload("res://scripts/level_features.gd")
 const Movers := preload("res://scripts/movers.gd")
 const AutoBot := preload("res://scripts/autoplay_bot.gd")
+const TallCam := preload("res://scripts/tall_cam.gd")
 const Relics := preload("res://scripts/relics.gd")
 const Combat := preload("res://scripts/combat.gd")
 const Classes := preload("res://scripts/classes.gd")
@@ -212,6 +213,7 @@ var _feet_y := -1.0             # feet_line(), refreshed every half second
 var _feet_t := 0.0
 var _ui_cover := {}             # _ui_shapes() for in_plain_view (view px), refreshed with _feet_y
 var _head_y := FEET_TOP         # the stop in use (head_top, eased when it comes down mid-air)
+var tall_cam: RefCounted = null  # a level taller than a strip: the camera's tall rules (tall_cam.gd); null in a strip
 var _ember_streak := 0
 var _ember_streak_t := 0.0
 var _phoenix_used := false      # the Phoenix Wick has risen in this level (a new level is a new World)
@@ -350,6 +352,7 @@ func _build() -> void:
 		strength = str(mode.strength())
 	area = level_area()
 	world_n = int(level.world)
+	tall_cam = TallCam.new(self) if level.tall() else null
 	flask_charges = flask_max()
 	floaters.mode = str(Game.setting("numbers"))
 	var view := _view_size()
@@ -2105,17 +2108,21 @@ func _spur_outline(e: Node2D) -> void:
 
 func _check_boss_near() -> void:
 	## boss_near, once: Waxby at (or past) the last altar before the boss's
-	## arena, else 20 tiles short of the boss where there's none.
-	var bx := float(boss.position.x)
+	## arena, else 20 tiles short of the boss where there's none. An arena
+	## whose door is on its right (boss_arena.gd side: a level played right
+	## to left) is come to from the right: the same, mirrored.
+	var ds = boss.get("door_side")
+	var s := -1.0 if ds != null and int(ds) > 0 else 1.0
+	var bx := float(boss.position.x) * s
 	var x := bx - 20.0 * TILE
 	var last := -INF
 	for a in altars:
-		var ax: float = (a["pos"] as Vector2).x
+		var ax: float = (a["pos"] as Vector2).x * s
 		if ax < bx:
 			last = maxf(last, ax)
 	if last > -INF:
 		x = last - TILE
-	if player.position.x >= x:
+	if player.position.x * s >= x:
 		_near_sent = true
 		boss_near.emit()
 
@@ -4533,7 +4540,8 @@ func look_up() -> float:
 			for ic in cw.get("icicles"):
 				var st := str(ic["state"])
 				var hang: Vector2 = ic["hang"]
-				if (st == "hang" or st == "tell" or st == "grow") and hang.x > x0 and hang.x < x1 and hang.y < feet:
+				if (st == "hang" or st == "tell" or st == "grow") and hang.x > x0 and hang.x < x1 and hang.y < feet \
+						and (tall_cam == null or tall_cam.icicle_near(feet, hang)):
 					need = _lean(need, feet - hang.y + 4.0, line, 30.0)
 	for e in enemies:
 		if not e.alive or e.gone:
@@ -4673,8 +4681,16 @@ func _update_camera(dt: float) -> void:
 			_cam_y_target = feet_at - _head_y
 		elif feet_view > low:
 			_cam_y_target = feet_at - low
-	var target_y: float = _clamp_cam(Vector2(cam.x, _cam_y_target)).y
-	cam.y = lerpf(cam.y, target_y, 1.0 - exp(-dt * (9.0 if player.velocity.y > 400.0 else 4.5)))
+	var aim_y := _cam_y_target
+	var rate := 9.0 if player.velocity.y > 400.0 else 4.5
+	if tall_cam != null:
+		# A level taller than a strip (tall_cam.gd): a fall or a vine slide
+		# looks ahead, a lift carries the camera, Down held looks down.
+		aim_y = tall_cam.aim(_cam_y_target, feet_at, settled, dt)
+		rate = tall_cam.rate(rate)
+		cam.y += tall_cam.ride()
+	var target_y: float = _clamp_cam(Vector2(cam.x, aim_y)).y
+	cam.y = lerpf(cam.y, target_y, 1.0 - exp(-dt * rate))
 	if state == "play" and player.alive:
 		# The easing never lags his flame off the top or under a HUD block:
 		# over the stop the camera goes up with him.

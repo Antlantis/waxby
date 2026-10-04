@@ -74,6 +74,7 @@ extends RefCounted
 ## (sealed fight rooms) is read raw by features/sealed.gd.
 
 const TILE := 32
+const STRIP_ROWS := 15           # the strip levels' height: a taller level is shaped (tall())
 
 enum {AIR, STONE, BRICK, LEDGE, CRUMBLE, BLOCK, SPENT, SPIKES_UP, SPIKES_DOWN, LAVA, WATER, FALSE_STONE,   # v2: 0..11
 	VINE, ROTTEN_VINE, ICE, FROST_LEDGE, RIME, BELT_L, BELT_R, GLASS, DAWNGLASS, DAWN_ON, STILL}   # v3: 12..22
@@ -559,6 +560,12 @@ func hurts_at(x: int, y: int, r: Rect2) -> bool:
 
 func pixel_size() -> Vector2:
 	return Vector2(width * TILE, height * TILE)
+
+
+func tall() -> bool:
+	## Taller than a strip (STRIP_ROWS): a shaped level, where the camera's
+	## tall rules (tall_cam.gd) and the bots' shaped ones (reach.gd, route_field.gd) apply.
+	return height > STRIP_ROWS
 
 
 static func cell_center(cell: Vector2i) -> Vector2:

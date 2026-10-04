@@ -71,7 +71,7 @@ const STOMP_MULT := 3.0
 const STOMPS_FULL := 1              # stomps a window pays STOMP_MULT for (later ones chip)
 const PART_SCALE := 0.25            # a part's texture is twice its frame: 2 frame units a pixel
 const BOSS_MODS := "res://scripts/boss_mods.gd"
-const WAKE_IN := 40.0               # px into the arena past its left wall that wakes it
+const WAKE_IN := 40.0               # px into the arena past its door's wall (the left, or door_side's) that wakes it
 
 var boss_id := ""
 var boss_name := ""
@@ -84,6 +84,7 @@ var arena_left := 0.0
 var arena_right := 0.0
 var floor_y := 0.0
 var door: Array[Vector2i] = []
+var door_side := -1                 # the door's wall: -1 left, 1 right (boss_arena.gd find)
 var home := Vector2.ZERO
 var anchors: Array = []             # the arena's `+` cells (Vector2i), sorted by (x, y)
 var rush := false
@@ -122,6 +123,7 @@ func _ready() -> void:
 		arena_left = float(a["left"])
 		arena_right = float(a["right"])
 		door.assign(a["door"])
+		door_side = int(a["side"])
 		for e in level.entities:
 			if str(e.get("kind", "")) != "anchor":
 				continue
@@ -234,7 +236,8 @@ func wake_check(player: Node2D) -> bool:
 	if player == null or not player.alive:
 		return false
 	var px: float = player.position.x
-	if px <= arena_left + WAKE_IN or px >= arena_right or absf(player.position.y - floor_y) > 400.0:
+	if not Arena.past_door(door_side, arena_left, arena_right, px, WAKE_IN) or px >= arena_right or px <= arena_left \
+			or absf(player.position.y - floor_y) > 400.0:
 		return false
 	if level != null:
 		Arena.seal(world, level, door)
