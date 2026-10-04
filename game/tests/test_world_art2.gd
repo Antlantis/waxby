@@ -416,7 +416,8 @@ func _test_tall() -> void:
 	## inside the budget; the strip's composition at the top as it was (every
 	## element of a 15-row level's upper half drawn the same, the far lights
 	## where the strip has them); the band only a tall level shows filled in
-	## the mid and near layers (test_world_art.gd's measure), but where the
+	## the mid and near layers (test_world_art.gd's measure, at least each
+	## style's own floor: WA.deep_floor), but where the
 	## style keeps it empty by design: the Hushdeep's mid layer there is the
 	## lake, the hushquiet has nothing. W6 still has no lights.
 	var Backdrop = load("res://scripts/backdrop.gd")
@@ -463,8 +464,8 @@ func _test_tall() -> void:
 				var band: Vector2 = WA.deep_band(i, rows)
 				var old: float = WA.tall_cover(style, bd.colors(), bd.span(i), i, 0.0, band.x, band.y)
 				var now: float = WA.tall_cover(style, bd.colors(), bd.span(i), i, bd.tall(i), band.x, band.y)
-				_check(now >= WA.DEEP_MIN and now >= old, "%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f; drawn as a strip, %.3f)"
-						% [id, rows, ["far", "mid", "near"][i], band.x, band.y, now, old])
+				_check(now >= WA.deep_floor(id, i) and now >= old, "%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f, at least %.3f; drawn as a strip, %.3f)"
+						% [id, rows, ["far", "mid", "near"][i], band.x, band.y, now, WA.deep_floor(id, i), old])
 			bd.queue_free()
 		strip.queue_free()
 	await process_frame

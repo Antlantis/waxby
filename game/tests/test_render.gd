@@ -26,7 +26,12 @@ extends SceneTree
 ##   them laid out as before; the four painters' levels and their tall render
 ##   labs (levels/tall, 24 and 36 rows) paint exactly what whole columns did,
 ##   each chunk inside the budget; the World's grid, its bedrock and what a
-##   redraw asks for (chunks_at); edge lines chunk the same way.
+##   redraw asks for (chunks_at); edge lines chunk the same way. And in the
+##   order whole columns drew it (_test_chunk_seams): a taller level's
+##   chunks hand their shapes to Shapes layers after their column's rects
+##   (so a shape hanging past its chunk is never under the next chunk's
+##   stone), and no two shapes that overlap across a seam swap which is on
+##   top, but two from diagonal cells at a corner.
 ## - glow.gd: flame(..., pal), sparks in one batch, the mirror hook.
 ## - perf_meter.gd's line; the grep rule: no draw_circle,
 ##   draw_colored_polygon or draw_polyline in the new render files.
@@ -70,6 +75,7 @@ func _initialize() -> void:
 	await _test_backdrop_and_tiles()
 	await _test_edges_and_ambient()
 	await _test_cell_chunks()
+	await _test_chunk_seams()
 	await _test_glow()
 	_test_perf_meter()
 	print("test_render: %d passed, %d failed" % [_passed, _failed])
@@ -959,6 +965,212 @@ func _test_edges_and_ambient() -> void:
 	await process_frame
 
 
+const SEAM_GLYPHS := "#B=%^v:F{}I_Z<>GA."
+
+
+func _seam_cases() -> Array:
+	## The four painters' tall render labs (24 and 36 rows) and 3-2's
+	## rootvault tower: every painter at every chunk seam they have. And for
+	## each painter's themes a level drawn here with every pair of tiles over
+	## the seam (one on row 15 over one on row 16, side by side: a vine's
+	## foot on stone, a ledge's drips over brick, ice over glass ...).
+	var LevelData = load("res://scripts/level_data.gd")
+	var out := []
+	for id in ["3-1", "3-2", "4-1", "5-3", "6-1"]:
+		for rows in [24, 36]:
+			var path := "res://levels/tall/lab-tall-%s-%d.txt" % [id, rows]
+			if FileAccess.file_exists(path):
+				out.append(LevelData.load_file(path))
+	var top := ""
+	var low := ""
+	for u in SEAM_GLYPHS:
+		for d in SEAM_GLYPHS:
+			top += u
+			low += d
+	for theme in ["orchard", "rootvault", "clockface", "voidnave", "stillshore"]:
+		var rows := []
+		for y in 24:
+			if y == 0:
+				rows.append("#".repeat(top.length()))
+			elif y == 15:
+				rows.append(top)
+			elif y == 16:
+				rows.append(low)
+			elif y >= 17:
+				rows.append("#".repeat(top.length()))
+			else:
+				rows.append(".".repeat(top.length()))
+		rows[14] = "P" + rows[14].substr(1)
+		rows[14] = rows[14].substr(0, 4) + "E" + rows[14].substr(5)
+		var lv = LevelData.new()
+		lv.id = "seam-" + theme
+		lv.parse("title: t\nsubtitle: t\ntheme: %s\n---\n%s\n" % [theme, "\n".join(rows)])
+		out.append(lv)
+	return out
+
+
+func _bbox(p: PackedVector2Array) -> Rect2:
+	var r := Rect2(p[0], Vector2.ZERO)
+	for q in p:
+		r = r.expand(q)
+	return r
+
+
+func _test_chunk_seams() -> void:
+	## The chunks draw in the order whole columns did, where it shows. A
+	## taller level's chunk draws its rects itself and its shapes on its
+	## Shapes layer, laid after every chunk of its column (world.gd), so a
+	## shape that hangs past its chunk's last row (a vine's roots splayed on
+	## the stone under it: 2 px) is over the next chunk row's stone as it was,
+	## never under it; a strip's chunks keep one layer. And no two shapes that
+	## overlap across a seam swap which is on top, but for two from cells
+	## diagonal to each other (whole columns drew down each column in turn,
+	## the chunks across each row of chunks: where a lower-left cell's shape
+	## and an upper-right one's touch at the corner, a pixel or two). Every
+	## triangle as whole columns drew it and as the 16 x 16 chunks draw it,
+	## matched by its corners and colour; with each painter's themes, a level
+	## with every pair of tiles over the seam too.
+	var LevelData = load("res://scripts/level_data.gd")
+	var probe := Node2D.new()
+	root.add_child(probe)
+	var cases := _seam_cases()
+	_check(cases.size() == 15, "the painters' tall labs and every pair of tiles over a seam (%d)" % cases.size())
+	var res := {}
+	probe.draw.connect(func():
+		for lv in cases:
+			var painter: Script = Themes.painter(str(lv.theme))
+			var pal: Dictionary = Themes.palette(str(lv.theme))
+			var whole := SeqLog.new()
+			var cells := SeqLog.new()
+			for x0 in range(0, lv.width, 16):
+				whole.tag = Vector2i(x0 / 16, 0)
+				painter.paint_chunk(probe, whole, lv, x0, mini(x0 + 16, lv.width), pal, null)
+				for y0 in range(0, lv.height, 16):
+					cells.tag = Vector2i(x0 / 16, y0 / 16)
+					painter.paint_chunk(probe, cells, lv, x0, mini(x0 + 16, lv.width), pal, null, y0, mini(y0 + 16, lv.height))
+			# Each triangle's own cell, painted alone, near the seams.
+			var one := SeqLog.new()
+			var src := {}
+			for seam in range(16, lv.height, 16):
+				for y in range(seam - 2, mini(seam + 2, lv.height)):
+					for x in lv.width:
+						one.tris = []
+						painter.paint_chunk(probe, one, lv, x, x + 1, pal, null, y, y + 1)
+						for t in one.tris:
+							src[t[0]] = Vector2i(x, y)
+			res[lv.id] = _seam_flips(whole.tris, cells.tris, src)
+	)
+	probe.queue_redraw()
+	await process_frame
+	await process_frame
+	var diag := 0
+	for id in res:
+		var f: Dictionary = res[id]
+		diag += (f["diagonal"] as Array).size()
+		_check((f["flips"] as Array).is_empty(), "%s: no two shapes across a seam swap which is on top but diagonal neighbours' (%d: %s)" % [id, (f["flips"] as Array).size(), (f["flips"] as Array).slice(0, 3)])
+	print("  (chunk seams: %d pairs of shapes from diagonal neighbours swap at a corner, every pair of tiles drawn)" % diag)
+	probe.queue_free()
+	# A tall World lays every chunk's Shapes layer after its column's chunks;
+	# a strip's chunks draw their own shapes. And v2's tile path (tile_view.gd's
+	# own stone, World 1-2's themes: crypt, waxfall) at 24 rows: every chunk
+	# draws, in the same layout (its rects only: no shapes to hand on).
+	var ws: Script = load("res://scripts/world.gd")
+	for path in ["res://levels/3-1.txt", "res://levels/tall/lab-tall-3-1-36.txt", "res://levels/tall/lab-tall-1-2-24.txt", "res://levels/tall/lab-tall-2-1-24.txt"]:
+		var lv = LevelData.load_file(path)
+		var w: Node = ws.new()
+		w.setup(lv, true)
+		root.add_child(w)
+		await process_frame
+		await process_frame
+		var m: int = w.chunk_rows
+		var ok := true
+		for k in w.chunks.size():
+			var tv: Node = w.chunks[k]
+			if m == 1:
+				ok = ok and tv.shapes == null
+				continue
+			var col0: int = (k / m) * m
+			var last: Node = w.chunks[col0 + m - 1]
+			ok = ok and tv.shapes != null and tv.shapes.get_index() > last.get_index() \
+					and (int((k / m) + 1) * m >= w.chunks.size() or tv.shapes.get_index() < w.chunks[col0 + m].get_index())
+		_check(ok, "%s: %s" % [lv.id, "its chunks draw their own shapes (one layer, as before)" if m == 1 else "each chunk's shapes on a layer after its column's chunks, before the next column's"])
+		if m > 1 and Themes.has_theme(str(lv.theme)):
+			var drawn := 0
+			for tv in w.chunks:
+				drawn += (tv.shapes.tris as Array).size()
+			_check(drawn > 0, "%s: the Shapes layers hold the chunks' triangles (%d batches)" % [lv.id, drawn])
+		elif m > 1:
+			var count := {}
+			for k in w.chunks.size():
+				count[k] = 0
+				w.chunks[k].draw.connect(func(): count[k] += 1)
+				w.chunks[k].queue_redraw()
+			await process_frame
+			await process_frame
+			var all_drew: bool = count.values().all(func(v): return int(v) > 0)
+			_check(all_drew and w.chunks.all(func(tv): return (tv.shapes.tris as Array).is_empty()),
+					"%s (v2's tile path, %d rows): every one of its %d chunks draws, no shapes to hand on" % [lv.id, lv.height, w.chunks.size()])
+		w.queue_free()
+		await process_frame
+
+
+func _seam_flips(whole: Array, cells: Array, src: Dictionary) -> Dictionary:
+	## {flips, diagonal}: the pairs of overlapping triangles from two chunk
+	## rows of one column of chunks drawn in the other order than whole
+	## columns drew them; those from cells diagonal to each other apart.
+	var at := {}
+	for t in whole:
+		if not at.has(t[0]):
+			at[t[0]] = []
+		(at[t[0]] as Array).append(t[2])
+	var seen := {}
+	var spill := []        # the chunked triangles that leave their chunk row
+	var by_col := {}       # column chunk -> its triangles, chunked (for the pairs)
+	for t in cells:
+		var n: int = int(seen.get(t[0], 0))
+		seen[t[0]] = n + 1
+		var wseq: int = int((at[t[0]] as Array)[n]) if at.has(t[0]) and n < (at[t[0]] as Array).size() else -1
+		var e: Array = [t[0], t[1], t[2], t[3], wseq, _bbox(t[1])]
+		var k: int = (t[3] as Vector2i).x
+		if not by_col.has(k):
+			by_col[k] = []
+		(by_col[k] as Array).append(e)
+		var y0 := float((t[3] as Vector2i).y * 16 * 32)
+		var bb: Rect2 = e[5]
+		if bb.position.y < y0 - 0.01 or bb.end.y > y0 + 16.0 * 32.0 + 0.01:
+			spill.append(e)
+	var flips := []
+	var diag := []
+	for a in spill:
+		for b in by_col.get((a[3] as Vector2i).x, []):
+			if (b[3] as Vector2i).y == (a[3] as Vector2i).y or not (a[5] as Rect2).intersects(b[5] as Rect2):
+				continue
+			if Geometry2D.intersect_polygons(a[1], b[1]).is_empty():
+				continue
+			if (int(a[2]) < int(b[2])) == (int(a[4]) < int(b[4])):
+				continue
+			var key: String = "%s/%s" % [_corners(a[1]), _corners(b[1])]
+			# The cells they come from (each painted alone), else each one's
+			# middle, inside the chunk that drew it.
+			var ca: Vector2i = src.get(a[0], _cell_in(a))
+			var cb: Vector2i = src.get(b[0], _cell_in(b))
+			var into: Array = diag if (ca.x != cb.x and ca.y != cb.y) else flips
+			if not into.has(key):
+				into.append(key)
+	return {"flips": flips, "diagonal": diag}
+
+
+func _cell_in(e: Array) -> Vector2i:
+	## A chunked triangle's cell: its middle's, clamped into its chunk.
+	var c := Vector2i(((e[5] as Rect2).get_center() / 32.0).floor())
+	var k: Vector2i = e[3]
+	return Vector2i(clampi(c.x, k.x * 16, k.x * 16 + 15), clampi(c.y, k.y * 16, k.y * 16 + 15))
+
+
+func _corners(p: PackedVector2Array) -> String:
+	return "(%.0f,%.0f %.0f,%.0f %.0f,%.0f)" % [p[0].x, p[0].y, p[1].x, p[1].y, p[2].x, p[2].y]
+
+
 func _test_glow() -> void:
 	var Glow = load("res://scripts/glow.gd")
 	var g = Glow.new()
@@ -1011,6 +1223,25 @@ class TriLog extends "res://scripts/tri_batch.gd":
 			for q in 3:
 				s += "%s %s|" % [points[indices[t + q]], colors[indices[t + q]]]
 			tris.append(s)
+		clear()
+
+
+class SeqLog extends "res://scripts/tri_batch.gd":
+	## A batch that keeps every triangle it flushes, in draw order, with the
+	## chunk that drew it: [key, PackedVector2Array corners, seq, tag].
+	var tris: Array = []
+	var tag := Vector2i.ZERO
+	var seq := 0
+
+	func flush(ci: CanvasItem) -> void:
+		for t in range(0, indices.size(), 3):
+			var s := ""
+			var pts := PackedVector2Array()
+			for q in 3:
+				s += "%s %s|" % [points[indices[t + q]], colors[indices[t + q]]]
+				pts.append(points[indices[t + q]])
+			tris.append([s, pts, seq, tag])
+			seq += 1
 		clear()
 
 

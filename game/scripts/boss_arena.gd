@@ -5,10 +5,14 @@ extends RefCounted
 ## The doorway is on the side he comes in by (Build 2's shapes, E10): the
 ## left wall's, as every arena before the shapes has it; else the right
 ## wall's (a level played right to left, 4-3's); where both walls are open,
-## the side the level starts him on. find's side says which (-1 left, 1
-## right) and past_door asks whether he's in past it.
+## in a strip the side the level starts him on, in a taller level the side
+## its route comes in by (WalkMap.entry_of, as the level rules' room_entry:
+## a fold-back storey walked right to left is entered from the right though
+## it starts left). find's side says which (-1 left, 1 right) and past_door
+## asks whether he's in past it.
 
 const LevelData := preload("res://scripts/level_data.gd")
+const WalkMap := preload("res://scripts/walk_map.gd")
 const TILE := LevelData.TILE
 
 
@@ -32,6 +36,10 @@ static func find(level: RefCounted, feet: Vector2, door_on_floor := false) -> Di
 	var side := -1
 	var start = level.get("start")
 	var from_right: bool = start is Vector2i and (start as Vector2i).x > r
+	if level.get("height") != null and level.get("headers") is Dictionary and not WalkMap.strip(level):
+		# A taller level: the side its route comes in by (the arena's box,
+		# wall to wall, its floor's rows up to the probe's).
+		from_right = WalkMap.entry_of(level, l - 2, r + 2, Vector2i(probe, ty)).x > 0
 	if door.is_empty() or from_right:
 		var east := _doorway(level, [r + 1, r + 2], range(ty - 3, ty), door_on_floor)
 		if not east.is_empty():

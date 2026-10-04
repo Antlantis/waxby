@@ -36,7 +36,11 @@ const LAB_LEVELS := ["res://levels/lab-0.txt", "res://levels/lab-1.txt",
 		# a clockwork strip mirrored whole): the bot proves the shapes on them.
 		"res://levels/lab-shape-tower.txt", "res://levels/lab-shape-climb.txt", "res://levels/lab-shape-bowl.txt",
 		"res://levels/lab-shape-loop.txt", "res://levels/lab-shape-mirror.txt", "res://levels/lab-shape-decks.txt",
-		"res://levels/lab-shapes.txt", "res://levels/lab-mirror.txt"]
+		"res://levels/lab-shapes.txt", "res://levels/lab-mirror.txt",
+		# the shape review's: split roads, a switchback, terraces, islands in the
+		# wind (a gust zone on its rows), the works' turn, the rootvault tower
+		"res://levels/lab-shape-roads.txt", "res://levels/lab-shape-switchback.txt", "res://levels/lab-shape-terraces.txt",
+		"res://levels/lab-shape-islands.txt", "res://levels/lab-shape-works.txt", "res://levels/lab-shape-rootvault.txt"]
 const TILE := 32
 const DT := 1.0 / 120.0
 
@@ -131,7 +135,7 @@ func _test_levels_parse() -> void:
 	for path in _all_level_files():
 		var lv = LevelData.load_file(path)
 		_check(lv.errors.is_empty(), "%s parses cleanly: %s" % [lv.id, ", ".join(lv.errors)])
-		_check(Rules.height_ok(lv), "%s is %d-%d rows (%d)" % [lv.id, Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.height])
+		_check(Rules.height_ok(lv), "%s is %s rows (%d)" % [lv.id, "%d" % LevelData.STRIP_ROWS if Rules.strip_only(lv.id) else "%d-%d" % [Rules.HEIGHT_MIN, Rules.HEIGHT_MAX], lv.height])
 		_check(lv.title != "" and lv.subtitle != "", "%s has a title" % lv.id)
 		var start: Vector2i = lv.start
 		_check(LevelData.is_solid(lv.tile(start.x, start.y + 1)), "%s: Wick starts on the floor" % lv.id)
@@ -144,6 +148,24 @@ func _test_levels_parse() -> void:
 		_check(hp.is_empty(), "%s: its Build 2 headers keep their rules %s" % [lv.id, hp])
 		var sp := Rules.shape_problems(lv)
 		_check(sp.is_empty(), "%s keeps the shape rules %s" % [lv.id, sp])
+	# The modes' files are cut 15 rows (make_rooms.py, make_modes.py,
+	# make_trials.py): a rush arena, a trial, every Descent room a strip, as
+	# the boss and secret levels they're cut from (Rules.strip_only).
+	var short := []
+	for dir in ["res://levels/rush", "res://levels/trials"]:
+		if DirAccess.dir_exists_absolute(dir):
+			for f in DirAccess.get_files_at(dir):
+				if f.ends_with(".txt") and LevelData.load_file(dir + "/" + f).height != LevelData.STRIP_ROWS:
+					short.append(f)
+	var Rooms = load("res://scripts/modes/rooms.gd")
+	var n_rooms := 0
+	for biome in ["cathedral", "tallow"]:
+		if Rooms.exists(biome):
+			for rm in Rooms.load_bundle(biome):
+				n_rooms += 1
+				if (rm["rows"] as Array).size() != LevelData.STRIP_ROWS:
+					short.append(str(rm.get("name", biome)))
+	_check(short.is_empty() and n_rooms > 0, "every rush arena, trial and Descent room is %d rows (%d rooms; not: %s)" % [LevelData.STRIP_ROWS, n_rooms, short])
 	# Each world's regular levels (not its boss level, not its secret) against
 	# their rules across them: the threat ramp, the roles, the variety.
 	for wn in range(1, 7):

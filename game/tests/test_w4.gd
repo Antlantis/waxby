@@ -883,12 +883,12 @@ func _test_rules(ids: Array) -> void:
 					fy = y
 					break
 			_check(LevelData.is_solid(lv.tile(c.x, c.y - 1)) and fy > 0 and fy - c.y <= 7, "%s: the icicle at %s hangs within 7 rows of a floor" % [id, c])
-		# Per 27-tile screen (a taller level's 12 rows tall: Rules.screen_rows):
-		# cogs <= 3, weights and swings <= 5.
+		# Per 27-tile screen (a taller level's the views over the rows he
+		# stands on in it: Rules.screen_rows): cogs <= 3, weights and swings <= 5.
 		var cmax := 0
 		var wmax := 0
 		for x0 in range(0, lv.width - 26):
-			for ys in Rules.screen_rows(lv):
+			for ys in Rules.screen_rows(lv, x0, 27):
 				var nc := 0
 				var nw := 0
 				for e in lv.entities:

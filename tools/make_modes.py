@@ -85,7 +85,8 @@ def cut(level_id, header, rows):
     assert ks, '%s: no altar before the boss: make_modes.py needs "... K ... door ... X arena"' % level_id
     x0 = max(ks) - 4
     part = [''.join('.' if ch in STRIP and ch != 'X' else ch for ch in r[x0:]) for r in rows]
-    assert len(part) == H, '%s: %d rows' % (level_id, len(part))
+    assert len(part) == H, ('%s: %d rows: a boss level stays a 15-row strip (the Waxworks cuts its rush arena from it; '
+                            'common.STRIP_ONLY)' % (level_id, len(part)))
     out_rows = [CELLAR[i] + part[i] for i in range(H)]
     hints = [CELLAR_SIGN]   # the only sign left
     out = [('title', NAMES.get(boss, boss.capitalize())), ('subtitle', 'The Waxworks'),

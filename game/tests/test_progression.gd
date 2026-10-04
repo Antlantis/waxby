@@ -97,6 +97,7 @@ func _initialize() -> void:
 	_test_defence_guards()
 	_test_share_caps()
 	_test_forced_anointed()
+	_test_road_xp()
 	_test_combat_v3()
 	_test_xp_v3()
 	_test_item_rolls()
@@ -210,20 +211,26 @@ func _test_curve() -> void:
 
 # ---------------------------------------------------------------- XP budget
 
-func _first_run_events(lv: RefCounted) -> Array:
+func _first_run_events(lv: RefCounted, road := -1) -> Array:
 	## Everything that pays XP on a first Dusk clear, as [x, what, kind, share]
 	## in the order a hero running right meets it: every monster, the Dread,
 	## half an Anointed (none in 1-1), every forced Anointed (its anoint:
 	## cell, Build 2) in full, 2 of the 3 sigils, altars, reliquaries, and the
-	## first-clear bell.
+	## first-clear bell. In a level taller than a strip x is how far along
+	## its route on foot (the order he meets it); with roads (two ways
+	## through: Rules.road_of) road picks one: what's on the other road alone
+	## isn't on his way (-1: everything, as v2's walk).
 	var ev := []
 	var sigils := []
 	var dread_x := -1
 	var kinds := {}
 	var forced := Rules.forced_cells(lv)
+	var along := _along(lv, road)
 	for e in lv.entities:
 		var k: String = e["kind"]
-		var x: int = e["cell"].x
+		if road >= 0 and not Rules.road_of(lv, e["cell"]).has(road):
+			continue
+		var x: int = along.call(e["cell"])
 		if k == "boss":
 			ev.append([x, "kill", lv.boss if lv.boss != "" else "tollgrave", 1.0])
 		elif Progression.BASE_XP.has(k):
@@ -239,7 +246,8 @@ func _first_run_events(lv: RefCounted) -> Array:
 		elif k == "altar":
 			ev.append([x, "altar", "", 1.0])
 	for cell in lv.blocks:
-		ev.append([cell.x, "reliquary", "", 1.0])
+		if road < 0 or Rules.road_of(lv, cell).has(road):
+			ev.append([along.call(cell), "reliquary", "", 1.0])
 	sigils.sort()
 	for i in mini(2, sigils.size()):
 		ev.append([sigils[i], "sigil", "", 1.0])
@@ -257,10 +265,36 @@ func _first_run_events(lv: RefCounted) -> Array:
 	return ev
 
 
-func _play(lv: RefCounted, xp: int) -> int:
-	## The hero's XP after a first clear of lv, leveling as it arrives.
+func _along(lv: RefCounted, road := -1) -> Callable:
+	## A cell's place in the walk's order: its x in a strip; in a taller
+	## level its distance on foot along the route (road's, with roads: the
+	## nearest state of WalkMap.roads()'s path; common.road_gaps measures so).
+	if lv.height <= LevelData.STRIP_ROWS:
+		return func(c: Vector2i) -> int: return c.x
+	var m = load("res://scripts/walk_map.gd").of(lv)
+	var path: Array = m.roads()[maxi(road, 0)]["path"]
+	if path.is_empty():
+		return func(c: Vector2i) -> int: return c.x
+	var run: Array = m.run_lengths(path)
+	return func(c: Vector2i) -> int: return int(run[Rules._nearest(m, path, c)])
+
+
+func road_xp(lv: RefCounted, xp: int) -> Array:
+	## [the XP after a first clear by each road] (one entry: no roads).
+	var n: int = load("res://scripts/walk_map.gd").of(lv).roads().size() if lv.height > LevelData.STRIP_ROWS else 1
+	if n < 2:
+		return [_play(lv, xp)]
+	var out := []
+	for r in n:
+		out.append(_play(lv, xp, r))
+	return out
+
+
+func _play(lv: RefCounted, xp: int, road := -1) -> int:
+	## The hero's XP after a first clear of lv, leveling as it arrives (road:
+	## by that road only; _first_run_events).
 	var a: int = Combat.area_level(lv.area, "dusk")
-	for e in _first_run_events(lv):
+	for e in _first_run_events(lv, road):
 		var lvl := Progression.level_of(xp)
 		var what: String = e[1]
 		var kind: String = e[2]
@@ -301,9 +335,12 @@ func _test_xp_budget() -> void:
 		var slack := EXIT_SLACK if int(info["world"]) <= 2 else EXIT_SLACK_DEEP
 		if FileAccess.file_exists(info["path"]):
 			var lv: RefCounted = LevelData.load_file(info["path"])
-			xp = _play(lv, xp)
+			# Two roads: the poorer road's XP is what a run is sure of (and
+			# the gap between them is reported: their XP parity).
+			var by: Array = road_xp(lv, xp)
+			xp = by.min()
 			var got := Progression.level_frac(xp)
-			rows.append("%s %.2f (spec %.1f)" % [id, got, want])
+			rows.append("%s %.2f (spec %.1f)%s" % [id, got, want, "" if by.size() < 2 else " roads %s" % [by.map(func(v): return "%.2f" % Progression.level_frac(v))]])
 			if want > 0.0:
 				_check(absf(got - want) <= slack, "XP budget: leaving %s at L%.2f, spec says %.1f (+-%.1f)" % [id, got, want, slack])
 		elif int(info["world"]) >= 3 and (fx.get("placements", {}) as Dictionary).has(id):
@@ -319,6 +356,27 @@ func _test_xp_budget() -> void:
 				% [", ".join(missing), missing.size(), ", ".join(model_rows)])
 		if pure_model:
 			_check(model_off.is_empty(), "the spec's model of W3-W6 (§3.10's monsters, today's BASE_XP) lands every exit within +-%.1f (%s)" % [EXIT_SLACK_DEEP, model_off])
+
+
+func _test_road_xp() -> void:
+	## The XP walk in a level with two roads (the shape labs' split roads,
+	## tools/levels/lab_shaped.py): each road's walk pays its own monsters
+	## and sigil and the ones they share, never the other road's; the level's
+	## budget is the poorer road's; a strip's walk is unchanged.
+	var lv: RefCounted = LevelData.load_file("res://levels/lab-shape-roads.txt")
+	var kills := func(r: int) -> Array:
+		return _first_run_events(lv, r).filter(func(e): return e[1] == "kill").map(func(e): return e[2])
+	var all_k: Array = _first_run_events(lv).filter(func(e): return e[1] == "kill")
+	var hi: Array = kills.call(0)
+	var lo: Array = kills.call(1)
+	_check(all_k.size() == 4 and hi.size() == 2 and lo.size() == 2 and hi.count("skeleton") == 2 and lo.has("bat"),
+			"two roads: the high road's walk pays its two Rattles, the low road's its Rattle and bat, never both (%s, %s)" % [hi, lo])
+	var sig := func(r: int) -> int: return _first_run_events(lv, r).filter(func(e): return e[1] == "sigil").size()
+	_check(sig.call(0) == 2 and sig.call(1) == 2, "each road's walk takes 2 of its 3 sigils on its way (%d, %d)" % [sig.call(0), sig.call(1)])
+	var by: Array = road_xp(lv, 0)
+	_check(by.size() == 2 and by.min() < _play(lv, 0), "the budget is the poorer road's (%s; both counted: %d)" % [by, _play(lv, 0)])
+	var strip: RefCounted = LevelData.load_file("res://levels/1-2.txt")
+	_check(road_xp(strip, 0) == [_play(strip, 0)], "a strip's walk is as it was")
 
 
 func _test_forced_anointed() -> void:

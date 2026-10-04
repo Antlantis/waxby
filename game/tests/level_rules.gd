@@ -42,7 +42,20 @@ extends RefCounted
 ## level's checkpoints are measured along its route, its screens are
 ## SCREEN_ROWS tall, and its sealed rooms are met by the door its route
 ## comes in by (scripts/walk_map.gd); a strip's as before (x, its height,
-## its left door; facing left its right).
+## its left door; facing left its right). A taller level's threat is per
+## tile of its route on foot, not of its width (a loop's two storeys, a
+## switchback's tiers, a tower's climb are walked); its screens are the
+## views over the rows he can stand on (two roads or decks a screen apart
+## never count together); a door altar stands on the deck he comes in on.
+## A level with two ways through names its roads (`roads:`, WalkMap.roads):
+## its threat, gaps and XP are each road's own (road_of: a cell's nearest
+## road; the stretches they share, every road's), the heavier road's
+## threat, the widest gap. The boss and secret levels (x-4, x-S) stay
+## strips (STRIP_ONLY). A level's own descent keys (max_drop:, landing:,
+## lit_drops:; common.descent_limits), drops: where its route drops through
+## a one-way ledge, a taller level's waxfalls off its drops, a dark level's
+## roads lit apart, and its clockwork's column keys kept apart
+## (clockwork_problems) are held as common.py writes them.
 
 const LevelData := preload("res://scripts/level_data.gd")
 const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
@@ -92,6 +105,15 @@ const BELOW_PX := 160.0
 const HUD_LEFT := Rect2(0, 0, 237, 58)
 const HUD_RIGHT := Rect2(672, 0, 172, 44)
 const GIVE_WAY := [LevelData.CRUMBLE, LevelData.DAWNGLASS, LevelData.GLASS, LevelData.ROTTEN_VINE]
+const FEET_UP := 5                 # rows the camera shows over his feet's row, standing (common.FEET_UP)
+const FEET_DOWN := 6               # ...and under it
+const DESCENT_KEYS := ["max_drop", "landing", "lit_drops"]
+# A lit landing's lights (common.LIGHTS): kind -> [radius px, the light's
+# height over the cell's floor]; a sconce's flame hangs 7 px under its
+# cell's top (world.gd).
+const LIGHTS := {"lantern": [140.0, 33.0], "altar": [150.0, 30.0], "vigil": [90.0, 30.0], "sconce": [110.0, 25.0]}
+const ONE_WAY_TILES := [LevelData.LEDGE, LevelData.CRUMBLE, LevelData.FROST_LEDGE, LevelData.DAWNGLASS]
+const STOREY_ROWS := 6             # a taller level's belt_flip: its belts within these rows (common.STOREY_ROWS)
 # A doorway's cells: air, or what never opens (stone, a reliquary or a spent
 # one, wax-ice, a belt: common.py DOOR_SOLID).
 const DOOR_SOLID := [LevelData.STONE, LevelData.BLOCK, LevelData.SPENT, LevelData.ICE, LevelData.BELT_L, LevelData.BELT_R]
@@ -404,13 +426,33 @@ static func threat_of(lv: RefCounted, tiles := -1.0) -> float:
 	## common.threat_of counts it: each monster at the bodies it comes to in
 	## play (in_play: its pack's extras at its kind's cost), an anoint: cell
 	## itself at TIER_COST's x2.5. tiles: the stretch it's spread over (the
-	## level's width; a boss level's approach).
+	## level's width; a boss level's approach). A taller level's tiles are its
+	## route's length on foot (WalkMap.run_lengths), each road's its own with
+	## its own monsters (road_of), the heavier road's the level's.
 	var forced := forced_cells(lv)
-	var cost := 0.0
+	var bodies := []
 	for p in in_play(lv):
 		var k: String = p[1]
-		cost += EnemyKinds.cost(k, "anointed" if forced.has(p[0]) else "") + EnemyKinds.cost(k) * (float(p[2]) - 1.0)
-	return cost * 100.0 / (float(lv.width) if tiles <= 0.0 else tiles)
+		bodies.append([p[0], EnemyKinds.cost(k, "anointed" if forced.has(p[0]) else "") + EnemyKinds.cost(k) * (float(p[2]) - 1.0)])
+	var cost := 0.0
+	for b in bodies:
+		cost += float(b[1])
+	if tiles > 0.0 or WalkMap.strip(lv):
+		return cost * 100.0 / (float(lv.width) if tiles <= 0.0 else tiles)
+	var m = WalkMap.of(lv)
+	var best := -1.0
+	var roads: Array = m.roads()
+	for i in roads.size():
+		var path: Array = roads[i]["path"]
+		var run: float = float(m.run_lengths(path).back()) if not path.is_empty() else 0.0
+		if run <= 0.0:
+			continue
+		var c := 0.0
+		for b in bodies:
+			if (m.road_of(b[0]) as Array).has(i):
+				c += float(b[1])
+		best = maxf(best, c * 100.0 / run)
+	return best if best >= 0.0 else cost * 100.0 / float(lv.width)
 
 
 static func declared_threat(lv: RefCounted) -> float:
@@ -478,29 +520,74 @@ static func checkpoint_gaps(lv: RefCounted) -> Dictionary:
 	## strip's by x (either way), a taller level's along the walk map's route
 	## (each at its nearest index, WalkMap.proj; the columns walked and rows
 	## climbed between: run_lengths; common.checkpoint_gaps). marks: x in a
-	## strip, the distance along the route in a taller level.
+	## strip, the distance along the route in a taller level. With roads,
+	## the road with the widest gap's (road_gaps has each).
+	var best := {}
+	for g in road_gaps(lv):
+		if best.is_empty() or int(g["worst"]) > int(best["worst"]):
+			best = g
+	return best
+
+
+static func road_gaps(lv: RefCounted) -> Array:
+	## [{road, marks, gaps, worst}]: checkpoint_gaps along each road (its own
+	## checkpoints: road_of), "" the one road (common.road_gaps).
 	var cells: Array = [lv.start]
 	for e in lv.entities:
 		if e["kind"] in ["altar", "bell", "boss"]:
 			cells.append(e["cell"])
-	var marks := []
+	var out := []
 	if WalkMap.strip(lv):
+		var xs := []
 		for c in cells:
-			marks.append(int(c.x))
-	else:
-		var m = WalkMap.of(lv)
-		if m.route().is_empty():
-			return {"marks": [], "gaps": [1000000], "worst": 1000000}
-		var run: Array = m.run_lengths()
+			xs.append(int(c.x))
+		out.append(_gaps("", xs))
+		return out
+	var m = WalkMap.of(lv)
+	var roads: Array = m.roads()
+	for i in roads.size():
+		var path: Array = roads[i]["path"]
+		if path.is_empty():
+			out.append({"road": roads[i]["name"], "marks": [], "gaps": [1000000], "worst": 1000000})
+			continue
+		var run: Array = m.run_lengths(path)
+		var marks := []
 		for c in cells:
-			marks.append(int(run[m.proj(c)]))
+			if (m.road_of(c) as Array).has(i):
+				marks.append(int(run[_nearest(m, path, c)]))
+		out.append(_gaps(str(roads[i]["name"]), marks))
+	return out
+
+
+static func _nearest(m: RefCounted, path: Array, cell: Vector2i) -> int:
+	## The index on path nearest cell (as WalkMap.proj; ties to the earlier).
+	var best := -1
+	var bi := 0
+	for i in path.size():
+		var c: Vector2i = m.cell_of(path[i])
+		var d := absi(c.x - cell.x) + 2 * absi(c.y - cell.y)
+		if best < 0 or d < best:
+			best = d
+			bi = i
+	return bi
+
+
+static func _gaps(road: String, marks: Array) -> Dictionary:
 	marks.sort()
 	var gaps := []
 	var worst := 0
 	for i in range(1, marks.size()):
 		gaps.append(int(marks[i]) - int(marks[i - 1]))
 		worst = maxi(worst, int(gaps.back()))
-	return {"marks": marks, "gaps": gaps, "worst": worst}
+	return {"road": road, "marks": marks, "gaps": gaps, "worst": worst}
+
+
+static func road_of(lv: RefCounted, cell: Vector2i) -> Array:
+	## The roads a cell is on (indices into WalkMap.roads(); a strip's and a
+	## level with no roads: [0]).
+	if WalkMap.strip(lv):
+		return [0]
+	return WalkMap.of(lv).road_of(cell)
 
 
 static func room_rows(lv: RefCounted, spec: Dictionary) -> Vector2i:
@@ -514,42 +601,81 @@ static func room_entry(lv: RefCounted, x0: int, x1: int, ys: Vector2i) -> int:
 	## strip's left door (facing left, its right); a taller level's where the
 	## walk map's route first steps inside the room's box, from the side it
 	## comes from (one it never enters: the way the route runs past it;
-	## common.room_entry).
-	if WalkMap.strip(lv):
-		return -int(lv.facing)
-	var m = WalkMap.of(lv)
-	var r: Array = m.route()
-	for i in r.size():
-		var c: Vector2i = m.cell_of(r[i])
-		if c.x >= x0 and c.x <= x1 and c.y >= ys.x and c.y <= ys.y:
-			var px: int = m.cell_of(r[i - 1]).x if i > 0 else c.x
-			if px < x0 or px > x1:
-				return -1 if px < x0 else 1
-			return -1 if c.x - x0 <= x1 - c.x else 1
-	return -m.dir_at(m.proj(Vector2i((x0 + x1) / 2, (ys.x + ys.y) / 2)))
+	## common.room_entry; WalkMap.entry_of, which boss_arena.gd asks too).
+	return WalkMap.entry_of(lv, x0, x1, ys).x
+
+
+static func door_rows(lv: RefCounted, x: int, ys: Vector2i, row: int) -> Vector2i:
+	## The doorway run (its rows) of column x between ys.x and ys.y that the
+	## route's entry row comes in at (the run holding it, else the nearest),
+	## or (-1, -1): a two-deck room's door on the deck he comes in on
+	## (common.door_rows).
+	var runs := []
+	var y := ys.x
+	while y <= ys.y:
+		if not LevelData.is_solid(lv.tile(x, y)):
+			var a := y
+			while y + 1 <= ys.y and not LevelData.is_solid(lv.tile(x, y + 1)):
+				y += 1
+			runs.append(Vector2i(a, y))
+		y += 1
+	if runs.is_empty() or row < 0:
+		return Vector2i(-1, -1)
+	var best: Vector2i = runs[0]
+	var bd := 1 << 20
+	for r in runs:
+		var d := 0 if (row >= r.x and row <= r.y) else mini(absi(row - r.x), absi(row - r.y))
+		if d < bd:
+			bd = d
+			best = r
+	return best
+
+
+static func deck_altar(lv: RefCounted, x0: int, x1: int, ys: Vector2i, cells: Array) -> String:
+	## A taller level's sealed room: of the altar cells before its door (cells),
+	## is one on the deck he comes in on (in that door's rows, or the row
+	## over them)? "" when one is (or in a strip), else the problem.
+	var e := WalkMap.entry_of(lv, x0, x1, ys)
+	if WalkMap.strip(lv) or e.y < 0 or cells.is_empty():
+		return ""
+	var door := x0 if e.x < 0 else x1
+	var band := door_rows(lv, door, ys, e.y)
+	if band.x < 0:
+		return ""
+	for c in cells:
+		if (c as Vector2i).y >= band.x - 1 and (c as Vector2i).y <= band.y:
+			return ""
+	return "no altar on the deck of its door at %d (its doorway rows %d-%d; altars %s)" % [door, band.x, band.y, cells]
 
 
 static func checkpoint_problems(lv: RefCounted, max_gap: int, band := ALTARS) -> Array:
 	## A regular level's checkpoints (start, altars, bell): at most max_gap
-	## apart along its route (checkpoint_gaps: x in a strip), band altars
-	## (ALTARS), and an altar at most DOOR_ALTAR tiles before every sealed
-	## room's door (the one its route comes in by: room_entry; a strip's left
-	## column, as features/sealed.gd reads it).
+	## apart along its route (checkpoint_gaps: x in a strip; with roads, along
+	## each road), band altars (ALTARS), and an altar at most DOOR_ALTAR tiles
+	## before every sealed room's door (the one its route comes in by:
+	## room_entry; a strip's left column, as features/sealed.gd reads it), in
+	## a taller level on the deck he comes in on (deck_altar).
 	var altars := altars_of(lv)
-	var cg := checkpoint_gaps(lv)
 	var out := []
-	if int(cg["worst"]) > max_gap:
-		out.append("checkpoints %d tiles apart (at most %d): %s" % [cg["worst"], max_gap, cg["marks"]])
+	for g in road_gaps(lv):
+		if int(g["worst"]) > max_gap:
+			out.append("checkpoints %d tiles apart%s (at most %d): %s" % [g["worst"], (" on the %s road" % g["road"]) if str(g["road"]) != "" else "", max_gap, g["marks"]])
 	if altars.size() < band.x or altars.size() > band.y:
 		out.append("%d altars (%d-%d)" % [altars.size(), band.x, band.y])
 	for room in Sealed.parse(str(lv.headers.get("room", ""))):
 		var side := room_entry(lv, int(room["x0"]), int(room["x1"]), room_rows(lv, room))
 		var door := int(room["x0"]) if side < 0 else int(room["x1"])
-		var near := false
-		for a in altars:
-			near = near or ((door - int(a)) * -side >= 0 and (door - int(a)) * -side <= DOOR_ALTAR)
-		if not near:
+		var near := []
+		for e in lv.entities:
+			var a: Vector2i = e["cell"]
+			if e["kind"] == "altar" and (door - a.x) * -side >= 0 and (door - a.x) * -side <= DOOR_ALTAR:
+				near.append(a)
+		if near.is_empty():
 			out.append("no altar within %d tiles of the %s door at %d (altars %s)" % [DOOR_ALTAR, room["kind"], door, altars])
+		else:
+			var deck := deck_altar(lv, int(room["x0"]), int(room["x1"]), room_rows(lv, room), near)
+			if deck != "":
+				out.append("the %s: %s" % [room["kind"], deck])
 	return out
 
 
@@ -597,16 +723,31 @@ static func roles_problems(levels: Array) -> Array:
 
 # ---------------------------------------------------------------- a re-cut world's variety
 
-static func screen_rows(lv: RefCounted) -> Array:
+static func screen_rows(lv: RefCounted, x0 := -1, width := SCREEN) -> Array:
 	## [Vector2i(y0, y1)]: the rows a screen spans (inclusive): a strip's one
 	## screen is its whole height (its camera shows it all as it goes); a
-	## taller level's SCREEN_ROWS tall (the view), from every row
-	## (common.screen_rows). A test's per-screen caps count in these.
+	## taller level's are the views over each row he can stand on
+	## (WalkMap.stand) in the columns x0..x0+width-1 (every column with x0 <
+	## 0): FEET_UP rows over it and FEET_DOWN under (SCREEN_ROWS in all; at
+	## the level's top the camera stops, so its first SCREEN_ROWS rows), so
+	## two roads or decks a screen apart never count together where he can't
+	## see both (common.screen_rows). A test's per-screen caps count in these.
 	if int(lv.height) <= STRIP_ROWS:
 		return [Vector2i(0, lv.height - 1)]
+	var m = WalkMap.of(lv)
+	var feet := {}
+	for x in range(maxi(x0, 0) if x0 >= 0 else 0, mini(x0 + width, int(lv.width)) if x0 >= 0 else int(lv.width)):
+		for y in int(lv.height):
+			if m.stand(x, y):
+				feet[y] = true
+	var ys := feet.keys()
+	ys.sort()
 	var out := []
-	for y0 in range(0, int(lv.height) - SCREEN_ROWS + 1):
-		out.append(Vector2i(y0, y0 + SCREEN_ROWS - 1))
+	for f in ys:
+		var y0 := maxi(0, int(f) - FEET_UP)
+		var y1 := mini(int(lv.height) - 1, (y0 + SCREEN_ROWS - 1) if int(f) - FEET_UP < 0 else int(f) + FEET_DOWN)
+		if not out.has(Vector2i(y0, y1)):
+			out.append(Vector2i(y0, y1))
 	return out
 
 
@@ -627,12 +768,11 @@ static func mixed_screens(lv: RefCounted) -> int:
 		if not cols.has(x):
 			cols[x] = []
 		(cols[x] as Array).append([e["cell"], k])
-	var bands := screen_rows(lv)
 	var n := 0
 	var x0 := 0
 	while x0 < int(lv.width):
 		var most := 0
-		for ys in bands:
+		for ys in screen_rows(lv, x0):
 			var kinds := {}
 			for x in range(x0, x0 + SCREEN):
 				for ck in cols.get(x, []):
@@ -659,7 +799,7 @@ static func crowded_screens(lv: RefCounted) -> Array:
 		(at[x] as Array).append(p)
 	var out := []
 	for x0 in range(0, maxi(int(lv.width) - SCREEN, 0) + 1):
-		for ys in screen_rows(lv):
+		for ys in screen_rows(lv, x0):
 			var n := 0.0
 			for x in range(x0, x0 + SCREEN):
 				for p in at.get(x, []):
@@ -753,8 +893,17 @@ static func room_problems(lv: RefCounted) -> Array:
 		if not near.is_empty():
 			out.append("%s has monsters within %d columns of a door %s" % [tag, Sealed.DOOR_CLEAR, near])
 		var side := room_entry(lv, x0, x1, Vector2i(y0, y1))
-		if not altars.any(func(ax): return (ax >= x0 - Sealed.ALTAR_REACH and ax < x0) if side < 0 else (ax > x1 and ax <= x1 + Sealed.ALTAR_REACH)):
+		var before := []
+		for e in lv.entities:
+			var ax: int = e["cell"].x
+			if e["kind"] == "altar" and ((ax >= x0 - Sealed.ALTAR_REACH and ax < x0) if side < 0 else (ax > x1 and ax <= x1 + Sealed.ALTAR_REACH)):
+				before.append(e["cell"])
+		if before.is_empty():
 			out.append("%s has no altar within %d tiles before its %s door (altars %s)" % [tag, Sealed.ALTAR_REACH, "left" if side < 0 else "right", altars])
+		else:
+			var deck := deck_altar(lv, x0, x1, Vector2i(y0, y1), before)
+			if deck != "":
+				out.append("%s has %s" % [tag, deck])
 	return out
 
 
@@ -762,14 +911,63 @@ static func room_problems(lv: RefCounted) -> Array:
 
 static func header_problems(lv: RefCounted) -> Array:
 	## A level file's own Build 2 headers, whatever level it is (test_core's
-	## sweep): its anoint:, twist: and lesson:, roster: and room: rules.
-	return anoint_problems(lv) + twist_problems(lv) + roster_problems(lv) + room_problems(lv)
+	## sweep): its anoint:, twist: and lesson:, roster: and room: rules, and
+	## its clockwork's column keys (clockwork_problems).
+	return anoint_problems(lv) + twist_problems(lv) + roster_problems(lv) + room_problems(lv) + clockwork_problems(lv)
+
+
+static func clockwork_problems(lv: RefCounted) -> Array:
+	## What its clockwork headers can't tell apart (common.clockwork_problems):
+	## cog_phase and weight_phase are keyed by column (level_data.gd), so no
+	## two cog hubs share a column, nor two weights or swings (a swing by its
+	## first); in a taller level a belt_flip span reverses one storey's belts
+	## (features/clockwork.gd reverse_belts takes its every column: its belts
+	## within STOREY_ROWS rows of each other).
+	var out := []
+	var hubs := {}
+	var keys := {}
+	for e in lv.entities:
+		var c: Vector2i = e["cell"]
+		var into = hubs if e["kind"] == "cog" else (keys if e["kind"] in ["weight", "swing"] else null)
+		if into == null:
+			continue
+		if not into.has(c.x):
+			into[c.x] = []
+		(into[c.x] as Array).append(c.y)
+	for x in hubs:
+		if (hubs[x] as Array).size() > 1:
+			out.append("%s: two cog hubs in column %d (rows %s): cog_phase is keyed by column" % [lv.id, x, hubs[x]])
+	for x in keys:
+		if (keys[x] as Array).size() > 1:
+			out.append("%s: two weights or swings in column %d (rows %s): weight_phase is keyed by column" % [lv.id, x, keys[x]])
+	if not WalkMap.strip(lv):
+		for r in ranges_of(str(lv.headers.get("belt_flip", ""))):
+			var lo := 1 << 20
+			var hi := -1
+			for x in range(r.x, r.y + 1):
+				for y in lv.height:
+					if lv.tile(x, y) in [LevelData.BELT_L, LevelData.BELT_R]:
+						lo = mini(lo, y)
+						hi = maxi(hi, y)
+			if hi - lo > STOREY_ROWS:
+				out.append("%s: belt_flip %d-%d reverses belts on rows %d and %d (two storeys)" % [lv.id, r.x, r.y, lo, hi])
+	return out
 
 
 # ---------------------------------------------------------------- shapes
 
 static func height_ok(lv: RefCounted) -> bool:
+	## 15 to 36 rows, and a boss or secret level (strip_only) a strip.
+	if strip_only(str(lv.id)):
+		return int(lv.height) == STRIP_ROWS
 	return int(lv.height) >= HEIGHT_MIN and int(lv.height) <= HEIGHT_MAX
+
+
+static func strip_only(id: String) -> bool:
+	## The boss and secret levels (x-4, x-S) stay strips: their rooms, doors,
+	## root walls and Warden rooms are cut for 15 rows (common.STRIP_ONLY;
+	## the plan reshapes the 18 regular levels only).
+	return id.length() == 3 and "123456789".contains(id[0]) and id[1] == "-" and (id[2] == "4" or id[2] == "S")
 
 
 static func goal_rects(lv: RefCounted) -> Array:
@@ -908,16 +1106,205 @@ static func catch_problems(lv: RefCounted) -> Array:
 	return out
 
 
+static func descent_limits(lv: RefCounted) -> Dictionary:
+	## {max_drop, landing: Vector2i(columns, rows), lit_drops, problems}: the
+	## level's own descent keys read (-1 / (-1, -1) where it has none) and
+	## what doesn't read (common.descent_limits).
+	var out := {"max_drop": -1, "landing": Vector2i(-1, -1), "lit_drops": -1, "problems": []}
+	var hd: Dictionary = lv.headers
+	for k in ["max_drop", "lit_drops"]:
+		var v := str(hd.get(k, "")).strip_edges()
+		if v == "":
+			continue
+		if v.is_valid_int() and int(v) >= 1 and int(v) <= MAX_DROP:
+			out[k] = int(v)
+		else:
+			(out["problems"] as Array).append("%s '%s' (a number of rows, 1-%d)" % [k, v, MAX_DROP])
+	var ld := str(hd.get("landing", "")).strip_edges()
+	if ld != "":
+		var ab := ld.split("/")
+		if ab.size() == 2 and ab[0].strip_edges().is_valid_int() and ab[1].strip_edges().is_valid_int():
+			out["landing"] = Vector2i(int(ab[0]), int(ab[1]))
+		else:
+			(out["problems"] as Array).append("landing '%s' (columns/rows: 6/2)" % ld)
+	return out
+
+
+static func lit_cells(lv: RefCounted) -> Dictionary:
+	## {Vector2i: true}: the cells where his middle, standing in them, is in
+	## a light's reach (LIGHTS; common.lit_cells).
+	var srcs := []
+	for e in lv.entities:
+		var k := str(e["kind"])
+		if LIGHTS.has(k):
+			var c: Vector2i = e["cell"]
+			var cy: float = c.y * 32.0 + 7.0 if k == "sconce" else (c.y + 1) * 32.0 - float(LIGHTS[k][1])
+			srcs.append([Vector2(c.x * 32.0 + 16.0, cy), float(LIGHTS[k][0])])
+	var out := {}
+	for y in lv.height:
+		for x in lv.width:
+			var p := Vector2(x * 32.0 + 16.0, (y + 1) * 32.0 - 22.0)
+			for sr in srcs:
+				if p.distance_squared_to(sr[0]) <= float(sr[1]) * float(sr[1]):
+					out[Vector2i(x, y)] = true
+					break
+	return out
+
+
+static func limit_allow(m: RefCounted, lim: Dictionary, lit: Dictionary) -> Callable:
+	## allow(from, to, drop) for WalkMap.reach: the landing and lit_drops
+	## rules (descent_limits; common.limit_allow).
+	var ld: Vector2i = lim["landing"]
+	var ln: int = int(lim["lit_drops"])
+	return func(s: int, t: int, drop: int) -> bool:
+		if drop <= 0:
+			return true
+		var a: Vector2i = m.cell_of(s)
+		var b: Vector2i = m.cell_of(t)
+		if ld.x >= 0 and absi(b.x - a.x) > ld.x and drop > ld.y:
+			return false
+		if ln >= 0 and not m.on_vine(t) and not m.band_at(b.x, b.y + 1):
+			return drop <= ln and lit.has(b)
+		return true
+
+
+static func own_descent_problems(lv: RefCounted) -> Array:
+	## A level's own descent keys kept (its goal reached by falls within
+	## them), and drops: where its route drops through a one-way ledge (the
+	## bots drop through only then: reach.gd drops_of; common's).
+	var lim := descent_limits(lv)
+	var out: Array = (lim["problems"] as Array).duplicate()
+	var m = WalkMap.of(lv)
+	var g: Vector2i = m.goal()
+	if out.is_empty() and (int(lim["max_drop"]) >= 0 or (lim["landing"] as Vector2i).x >= 0 or int(lim["lit_drops"]) >= 0):
+		var lit := lit_cells(lv) if int(lim["lit_drops"]) >= 0 else {}
+		var fair: Dictionary = m.reach(int(lim["max_drop"]), limit_allow(m, lim, lit))
+		if not fair.keys().any(func(s): return m.touches(s, [g])):
+			var keys := []
+			for k in DESCENT_KEYS:
+				if str(lv.headers.get(k, "")).strip_edges() != "":
+					keys.append("%s %s" % [k, lv.headers[k]])
+			out.append("its goal needs a fall past its own descent rules (%s)" % ", ".join(keys))
+	var drops := str(lv.headers.get("drops", "")).strip_edges().to_lower() not in ["", "0", "no", "false"]
+	var r: Array = m.route()
+	for i in range(1, r.size()):
+		var a: Vector2i = m.cell_of(r[i - 1])
+		var b: Vector2i = m.cell_of(r[i])
+		if not m.on_vine(r[i - 1]) and b.x == a.x and b.y > a.y and ONE_WAY_TILES.has(lv.tile(a.x, a.y + 1)) and not drops:
+			out.append("its route drops through the one-way ledge at %d,%d: write drops: yes (the bots drop through only then)" % [a.x, a.y + 1])
+			break
+	return out
+
+
+static func waxfall_columns(lv: RefCounted) -> Array:
+	## [Vector3i(x, y0, y1)]: each waxfall's douse column, its head's row down
+	## to the first solid row under it (level_features.gd; common's).
+	var out := []
+	for e in lv.entities:
+		if e["kind"] == "waxfall":
+			var c: Vector2i = e["cell"]
+			var b := c.y + 1
+			while b < lv.height and not LevelData.is_solid(lv.tile(c.x, b)):
+				b += 1
+			out.append(Vector3i(c.x, c.y, b - 1))
+	return out
+
+
+static func fall_secs(rows_down: int) -> float:
+	## The seconds a fall of rows_down rows takes (player.gd GRAVITY_DOWN to
+	## MAX_FALL; common._fall_secs).
+	var P = load("res://scripts/player.gd")
+	var g := float(P.GRAVITY_DOWN)
+	var top := float(P.MAX_FALL)
+	var d := rows_down * 32.0
+	var t1 := top / g
+	var d1 := 0.5 * g * t1 * t1
+	return sqrt(2.0 * d / g) if d <= d1 else t1 + (d - d1) / top
+
+
+static func waxfall_problems(lv: RefCounted) -> Array:
+	## A taller level's waxfalls off its drops (common.waxfall_problems): its
+	## goal reached with no fall landing in a douse column (one never covers
+	## the only landing), and a fall on its route through one fits its off
+	## window (the fall and a step out of the column at a run).
+	var cols := waxfall_columns(lv)
+	if cols.is_empty():
+		return []
+	var m = WalkMap.of(lv)
+	var under := func(c: Vector2i) -> bool:
+		for k in cols:
+			if (k as Vector3i).x == c.x and c.y >= (k as Vector3i).y and c.y <= (k as Vector3i).z:
+				return true
+		return false
+	var out := []
+	var dry: Dictionary = m.reach(-1, func(_s: int, t: int, drop: int) -> bool: return drop <= 0 or not under.call(m.cell_of(t)))
+	if not dry.keys().any(func(s): return m.touches(s, [m.goal()])):
+		out.append("a waxfall's column covers the only landing of a drop on the way to the goal")
+	var LF = load("res://scripts/level_features.gd")
+	var P = load("res://scripts/player.gd")
+	var step := 32.0 / float(P.RUN_SPEED)
+	var r: Array = m.route()
+	for i in range(1, r.size()):
+		var a: Vector2i = m.cell_of(r[i - 1])
+		var b: Vector2i = m.cell_of(r[i])
+		var drop := b.y - a.y
+		if drop <= 0:
+			continue
+		for k in cols:
+			if (k as Vector3i).x == b.x and (k as Vector3i).y <= b.y and (k as Vector3i).z >= a.y and fall_secs(drop) + step > float(LF.FALL_OFF):
+				out.append("the drop at %d,%d through a waxfall takes %.2f s and a step (its off window %.1f s)" % [b.x, a.y, fall_secs(drop), float(LF.FALL_OFF)])
+				break
+	return out
+
+
+static func light_problems(lv: RefCounted) -> Array:
+	## A dark level's roads lit apart (common.light_problems): no lantern on
+	## one road alone lights a cell of another's way that's its alone.
+	if str(lv.headers.get("twist", "")).strip_edges().to_lower() != "dark":
+		return []
+	var m = WalkMap.of(lv)
+	var roads: Array = m.roads()
+	if roads.size() < 2:
+		return []
+	var rad := float(LIGHTS["lantern"][0])
+	var out := []
+	for e in lv.entities:
+		if e["kind"] != "lantern":
+			continue
+		var c: Vector2i = e["cell"]
+		var mine: Array = m.road_of(c)
+		if mine.size() != 1:
+			continue
+		var lp := Vector2(c.x * 32.0 + 16.0, (c.y + 1) * 32.0 - float(LIGHTS["lantern"][1]))
+		for j in roads.size():
+			if mine.has(j):
+				continue
+			for st in roads[j]["path"]:
+				var sc: Vector2i = m.cell_of(st)
+				if (m.road_of(sc) as Array).has(mine[0]):
+					continue
+				if Vector2(sc.x * 32.0 + 16.0, (sc.y + 1) * 32.0 - 22.0).distance_to(lp) <= rad:
+					out.append("the lantern at %s on the %s road lights the %s road's way at %s" % [c, roads[mine[0]]["name"], roads[j]["name"], sc])
+					break
+	return out
+
+
 static func shape_problems(lv: RefCounted) -> Array:
 	## A level's shape rules, whatever its shape (common.shape_problems): its
 	## height, the HUD's corners, its facing; a taller level's descent and
 	## catch rules too.
 	var out := []
 	if not height_ok(lv):
-		out.append("%s: %d rows (%d-%d)" % [lv.id, lv.height, HEIGHT_MIN, HEIGHT_MAX])
+		out.append("%s: %d rows (%d-%d%s)" % [lv.id, lv.height, HEIGHT_MIN, HEIGHT_MAX, "; a boss or secret level stays a strip" if strip_only(str(lv.id)) else ""])
 	out += hud_problems(lv)
 	if not WalkMap.strip(lv):
-		out += descent_problems(lv) + catch_problems(lv)
+		out += descent_problems(lv) + catch_problems(lv) + own_descent_problems(lv) + waxfall_problems(lv) + light_problems(lv)
+		var m = WalkMap.of(lv)
+		for r in m.roads():
+			if str(r["name"]) != "" and (r["path"] as Array).is_empty():
+				out.append("the %s road finds no way to the goal by its cells" % r["name"])
+	else:
+		out += descent_limits(lv)["problems"]
 	var f := str(lv.headers.get("facing", "right")).strip_edges()
 	if f != "left" and f != "right":
 		out.append("facing '%s' (left or right)" % f)

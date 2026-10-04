@@ -30,6 +30,18 @@ extends RefCounted
 ## either way, a cog's teeth its ring (radius 3). The goal (the bell, else
 ## the boss, else a silver bell) is touched from its cell, the cells either
 ## side and the two over it (the rope hangs 70 px).
+##
+## A level with two ways through (2-2's split roads, 5-3's decks) names
+## them, each by the cells it passes (header `roads: high 120,10 200,10;
+## low 120,21`): roads() is each one's route, start to goal by way of its
+## cells in turn, and road_of() which a cell is on (the nearest; on the
+## common stretches every road's), so the rules measure a run along the one
+## road it takes (tests/level_rules.gd: the threat, the gaps, the screens,
+## the XP walk). With none, the one road is route(). entry_of is the door
+## the route comes into a box by (a sealed room's, a boss arena's).
+## The search is a queue per cost over flat arrays, falls and bodies worked
+## out once a cell (the map is built at a tall level's load: clockwork.gd's
+## and deep.gd's first-time barks; a 36-row level's route in a few ms).
 
 const LevelData := preload("res://scripts/level_data.gd")
 const STRIP_ROWS := 15
@@ -55,8 +67,14 @@ var _hazard := PackedByteArray()
 var _climb := PackedByteArray()
 var _support := PackedByteArray()
 var _oneway := PackedByteArray()
+var _body := PackedByteArray()     # body(x, y), worked out once
+var _band := PackedByteArray()     # a mover's swept band (band_at)
+var _falls: Array = []             # per cell: falls(x, y) once asked (null till then)
 var _route: Array = []
 var _routed := false
+var _by_col := {}                  # proj(): the route's indices by column
+var _roads: Array = []             # roads(): [{name, path}]
+var _roaded := false
 
 
 static func of(level: RefCounted) -> RefCounted:
@@ -107,11 +125,53 @@ static func dir_of(level: RefCounted, cell: Vector2i) -> int:
 	return m.dir_at(m.proj(cell))
 
 
+static func roads_of(level: RefCounted) -> Array:
+	## The level's roads (header `roads: high 120,10 200,10; low 120,21`):
+	## [{name, via: [Vector2i]}] in the header's order, [] for none (a part
+	## that doesn't read is left out; common.roads_of).
+	var hd = level.get("headers")
+	var raw := str((hd as Dictionary).get("roads", "")) if hd is Dictionary else ""
+	var out := []
+	for part in raw.split(";", false):
+		var bits := part.strip_edges().split(" ", false)
+		if bits.size() < 2:
+			continue
+		var via: Array = []
+		for b in bits.slice(1):
+			var xy := (b as String).split(",")
+			if xy.size() == 2 and xy[0].strip_edges().is_valid_int() and xy[1].strip_edges().is_valid_int():
+				via.append(Vector2i(int(xy[0]), int(xy[1])))
+		if not via.is_empty():
+			out.append({"name": bits[0], "via": via})
+	return out
+
+
+static func entry_of(level: RefCounted, x0: int, x1: int, ys: Vector2i) -> Vector2i:
+	## The door the route comes into the box x0..x1, ys.x..ys.y by: (side,
+	## row), side -1 the left (x0), +1 the right (x1), row the route's first
+	## cell inside (-1 where there's none). A strip's left door (facing left,
+	## its right); a taller level's where the walk map's route first steps
+	## inside, from the side it comes from (one it never enters: the way the
+	## route runs past it; common.room_entry).
+	if strip(level):
+		return Vector2i(-int(level.get("facing")) if level.get("facing") != null else -1, -1)
+	var m = of(level)
+	var r: Array = m.route()
+	for i in r.size():
+		var c: Vector2i = m.cell_of(r[i])
+		if c.x >= x0 and c.x <= x1 and c.y >= ys.x and c.y <= ys.y:
+			var px: int = m.cell_of(r[i - 1]).x if i > 0 else c.x
+			if px < x0 or px > x1:
+				return Vector2i(-1 if px < x0 else 1, c.y)
+			return Vector2i(-1 if c.x - x0 <= x1 - c.x else 1, c.y)
+	return Vector2i(-m.dir_at(m.proj(Vector2i((x0 + x1) / 2, (ys.x + ys.y) / 2))), -1)
+
+
 func setup(level: RefCounted) -> void:
 	lv = level
 	w = int(level.width)
 	h = int(level.height)
-	for a in [_solid, _break, _hazard, _climb, _support, _oneway]:
+	for a in [_solid, _break, _hazard, _climb, _support, _oneway, _band]:
 		a.resize(w * h)
 		a.fill(0)
 	var floats := {}
@@ -152,6 +212,13 @@ func setup(level: RefCounted) -> void:
 			var sup := solid or ONE_WAY.has(t) or floats.has(Vector2i(x, y)) or band.has(Vector2i(x, y))
 			_support[i] = 1 if sup else 0
 			_oneway[i] = 1 if sup and not solid else 0
+			_band[i] = 1 if band.has(Vector2i(x, y)) else 0
+	_body.resize(w * h)
+	for i in w * h:
+		var up := i - w
+		var ok := _solid[i] == 0 and _hazard[i] == 0 and (up < 0 or (_solid[up] == 0 and _hazard[up] == 0))
+		_body[i] = 1 if ok else 0
+	_falls.resize(w * h)
 
 
 # -- cells
@@ -184,13 +251,19 @@ func one_way(x: int, y: int) -> bool:
 	return x >= 0 and x < w and y >= 0 and y < h and _oneway[y * w + x] == 1
 
 
+func band_at(x: int, y: int) -> bool:
+	## (x, y) is in a mover's swept band (a lift's, a moving ledge's, a
+	## swing's, a cog's ring): something carries him there.
+	return x >= 0 and x < w and y >= 0 and y < h and _band[y * w + x] == 1
+
+
 func breaks(x: int, y: int) -> bool:
 	return x >= 0 and x < w and y >= 0 and y < h and _break[y * w + x] == 1
 
 
 func body(x: int, y: int) -> bool:
 	## His body fits at (x, y): it and the cell over it clear, no hazard.
-	return y >= 0 and y < h and not solid(x, y) and not solid(x, y - 1) and not hazard(x, y) and not hazard(x, y - 1)
+	return y >= 0 and y < h and x >= 0 and x < w and _body[y * w + x] == 1
 
 
 func stand(x: int, y: int) -> bool:
@@ -215,8 +288,15 @@ func on_vine(s: int) -> bool:
 
 func falls(x: int, y: int) -> Array:
 	## Where a fall from body cell (x, y) ends: the first vine cell it passes
-	## (caught), then the floor (down held past it); [] a snuff.
+	## (caught), then the floor (down held past it); [] a snuff. Worked out
+	## once a cell (the caller only reads it).
+	var i := y * w + x
+	var inside := x >= 0 and x < w and y >= 0 and y < h
+	if inside and _falls[i] != null:
+		return _falls[i]
 	var out := []
+	if inside:
+		_falls[i] = out
 	var caught := false
 	var yy := y
 	while yy < h:
@@ -352,12 +432,28 @@ func route() -> Array:
 	if _routed:
 		return _route
 	_routed = true
-	var s0 := start()
 	var g := goal()
-	if s0 < 0 or g.x < 0:
-		return _route
-	var dist := {s0: 0}
-	var parent := {s0: -1}
+	if g.x >= 0:
+		_route = _search(start(), [g], false)
+	return _route
+
+
+func _search(s0: int, cells: Array, exact: bool) -> Array:
+	## The cheapest way from state s0 to one touching cells (exact: standing
+	## or hanging in one of them), as states; [] when there's none.
+	if s0 < 0:
+		return []
+	var n := w * h * 2
+	var dist := PackedInt32Array()
+	dist.resize(n)
+	dist.fill(-1)
+	var parent := PackedInt32Array()
+	parent.resize(n)
+	parent.fill(-1)
+	var want := {}
+	for c in cells:
+		want[c] = true
+	dist[s0] = 0
 	var buckets := {0: [s0]}
 	var c := 0
 	var top := 0
@@ -371,15 +467,15 @@ func route() -> Array:
 			continue
 		heads[c] = i + 1
 		var s: int = b[i]
-		if int(dist[s]) < c:
+		if dist[s] < c:
 			continue
-		if touches(s, [g]):
+		if (want.has(cell_of(s)) if exact else touches(s, cells)):
 			end = s
 			break
 		for mv in moves(s):
 			var t: int = mv[0]
 			var nc: int = c + int(mv[1])
-			if not dist.has(t) or nc < int(dist[t]):
+			if dist[t] < 0 or nc < dist[t]:
 				dist[t] = nc
 				parent[t] = s
 				if not buckets.has(nc):
@@ -387,35 +483,106 @@ func route() -> Array:
 				(buckets[nc] as Array).append(t)
 				top = maxi(top, nc)
 	if end < 0:
-		return _route
+		return []
 	var path := [end]
-	while int(parent[path.back()]) >= 0:
-		path.append(int(parent[path.back()]))
+	while parent[path.back()] >= 0:
+		path.append(parent[path.back()])
 	path.reverse()
-	_route = path
-	return _route
+	return path
+
+
+func route_via(via: Array) -> Array:
+	## The cheapest way from the start to the goal by way of the cells via in
+	## turn (standing or hanging in each), as states; [] when a leg has none.
+	var g := goal()
+	var s0 := start()
+	if s0 < 0 or g.x < 0:
+		return []
+	var path := [s0]
+	for c in via:
+		var leg := _search(path.back(), [c], true)
+		if leg.is_empty():
+			return []
+		path += leg.slice(1)
+	var last := _search(path.back(), [g], false)
+	if last.is_empty():
+		return []
+	return path + last.slice(1)
+
+
+func roads() -> Array:
+	## [{name, path}]: each road's route (roads_of; a road whose way isn't
+	## there keeps an empty path), or the one road, route(), named "".
+	if _roaded:
+		return _roads
+	_roaded = true
+	var named := roads_of(lv)
+	if named.is_empty():
+		_roads = [{"name": "", "path": route()}]
+	else:
+		for r in named:
+			_roads.append({"name": r["name"], "path": route_via(r["via"])})
+	return _roads
+
+
+func near(path: Array, cell: Vector2i) -> int:
+	## How far cell is from a route (columns, and rows twice over, as proj):
+	## its nearest state's; a large number for an empty one.
+	var best := 1 << 20
+	for s in path:
+		var c := cell_of(s)
+		best = mini(best, absi(c.x - cell.x) + 2 * absi(c.y - cell.y))
+	return best
+
+
+func road_of(cell: Vector2i) -> Array:
+	## The roads (indices into roads()) a cell is on: the nearest, every one
+	## as near (the stretches they share: all of them).
+	var rs := roads()
+	var d := []
+	var best := 1 << 20
+	for r in rs:
+		d.append(near(r["path"], cell))
+		best = mini(best, int(d.back()))
+	var out := []
+	for i in rs.size():
+		if int(d[i]) == best:
+			out.append(i)
+	return out
 
 
 func proj(cell: Vector2i) -> int:
 	## The index on the route nearest cell (columns, and rows twice over: his
-	## own storey first); ties to the earlier.
+	## own storey first); ties to the earlier. Searched out from cell's
+	## column (the route's states by column, made once).
+	var r := route()
+	if r.is_empty():
+		return 0
+	if _by_col.is_empty():
+		for i in r.size():
+			var cx := cell_of(r[i]).x
+			if not _by_col.has(cx):
+				_by_col[cx] = []
+			(_by_col[cx] as Array).append(i)
 	var best := -1
 	var bi := 0
-	var r := route()
-	for i in r.size():
-		var c := cell_of(r[i])
-		var d := absi(c.x - cell.x) + 2 * absi(c.y - cell.y)
-		if best < 0 or d < best:
-			best = d
-			bi = i
+	for dx in w + absi(cell.x) + 1:
+		if best >= 0 and dx > best:
+			break
+		for x in ([cell.x] if dx == 0 else [cell.x - dx, cell.x + dx]):
+			for i in _by_col.get(x, []):
+				var d: int = dx + 2 * absi(cell_of(r[i]).y - cell.y)
+				if best < 0 or d < best or (d == best and i < bi):
+					best = d
+					bi = i
 	return bi
 
 
-func run_lengths() -> Array:
-	## The route's length on foot to each of its states: columns walked and
-	## rows climbed (a fall's rows are free).
+func run_lengths(path: Array = []) -> Array:
+	## The route's (or path's) length on foot to each of its states: columns
+	## walked and rows climbed (a fall's rows are free).
 	var out := [0]
-	var r := route()
+	var r := route() if path.is_empty() else path
 	for i in range(1, r.size()):
 		var a := cell_of(r[i - 1])
 		var b := cell_of(r[i])
@@ -435,9 +602,11 @@ func dir_at(i: int) -> int:
 	return 1
 
 
-func reach(max_drop := -1) -> Dictionary:
+func reach(max_drop := -1, allow := Callable()) -> Dictionary:
 	## Every state reachable from the start ({state: [[next, drop]]}), only by
-	## falls of max_drop rows or less when it's given.
+	## falls of max_drop rows or less when it's given, and only by the moves
+	## allow(from, to, drop) passes when it's given (a level's own descent
+	## rules: tests/level_rules.gd descent_limits).
 	var s0 := start()
 	if s0 < 0:
 		return {}
@@ -447,6 +616,8 @@ func reach(max_drop := -1) -> Dictionary:
 		var s: int = todo.pop_back()
 		for mv in moves(s):
 			if max_drop >= 0 and int(mv[2]) > max_drop:
+				continue
+			if allow.is_valid() and not bool(allow.call(s, int(mv[0]), int(mv[2]))):
 				continue
 			(edges[s] as Array).append([mv[0], mv[2]])
 			if not edges.has(mv[0]):

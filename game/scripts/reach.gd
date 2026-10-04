@@ -31,8 +31,10 @@ extends RefCounted
 ## fall the level's whole height (fall_extra), so a tower's long fall back
 ## down is a state too. A level whose routes drop through one-way ledges
 ## (header `drops`, drops_of: down a ledge stack, or a lift laid out as one)
-## adds pure down held DROP_HOLD s (player.gd's DROP_HOLD is 0.15 s) to the
-## floor actions. A strip has none of them, so it searches exactly as before.
+## adds a drop through the ledge he stands on (down held DROP_HOLD s with
+## jump pressed: player.gd's down + jump, as a taller level drops; pure down
+## held there looks down) to the floor actions. A strip has none of them, so
+## it searches exactly as before.
 
 const LevelData := preload("res://scripts/level_data.gd")
 const PlayerScript := preload("res://scripts/player.gd")
@@ -45,7 +47,7 @@ const ROTTEN_HOLD := 1.2
 const STILL_REACH := 6              # tiles of still water either side of a buoy
 const SIM_TIME := 2.2
 const TALL_CLIMB := 3.0             # s: a tall level's long climb (12 rows at CLIMB_SPEED)
-const DROP_HOLD := 0.3              # s of pure down: a drop through a one-way ledge (drops_of)
+const DROP_HOLD := 0.3              # s of down (jump pressed with it): a drop through a one-way ledge (drops_of)
 # The timed surfaces' Dusk lives (s) for the dwell rule: the fallbacks; the
 # rule reads life(k), from the feature modules' own DIFF_KNOBS (WL5's, WL6's
 # and WLS's requests, the track B merge): glass 1.09 s after one landing,
@@ -315,7 +317,10 @@ static func action_pad(a: Dictionary, t: float, st: Dictionary) -> Dictionary:
 		pd["jump"] = t >= float(st["leap_t"]) and t - float(st["leap_t"]) < 0.6
 		return pd
 	if a.get("drop", false):
-		pd["down"] = t < float(a["walk"])   # pure down: through the ledge he stands on
+		# Down, and jump pressed with it: through the ledge he stands on (in
+		# a level taller than a strip pure down held only looks down).
+		pd["down"] = t < float(a["walk"])
+		pd["jump"] = t >= DT and t < 3.0 * DT
 		return pd
 	if dir < 0:
 		pd["left"] = true

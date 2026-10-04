@@ -918,12 +918,13 @@ func _test_layout() -> void:
 				else:
 					run = 0
 		_check(wide or id == "5-4", "%s has a stone island 11 wide" % id)
-		# Per 27-tile screen (a taller level's 12 rows tall: Rules.screen_rows;
-		# a gust zone is whole columns): glass 60, dawnglass 40, gust columns
-		# 24, lamps 14, monsters 12.
+		# Per 27-tile screen (a taller level's the views over the rows he
+		# stands on in it: Rules.screen_rows; a gust zone is whole columns, or
+		# a taller level's its rows): glass 60, dawnglass 40, gust columns 24,
+		# lamps 14, monsters 12.
 		var worst := {"glass": 0, "dawn": 0, "gust": 0, "lamp": 0, "monster": 0}
 		for x0 in range(0, maxi(1, lv.width - 26)):
-			for ys in Rules.screen_rows(lv):
+			for ys in Rules.screen_rows(lv, x0, 27):
 				var n := {"glass": 0, "dawn": 0, "gust": 0, "lamp": 0, "monster": 0}
 				for x in range(x0, x0 + 27):
 					for y in range(ys.x, ys.y + 1):
@@ -933,7 +934,7 @@ func _test_layout() -> void:
 						elif t == LevelData.DAWNGLASS:
 							n["dawn"] += 1
 					for z in lv.gusts:
-						if x >= int(z["x0"]) and x <= int(z["x1"]):
+						if x >= int(z["x0"]) and x <= int(z["x1"]) and int(z.get("y0", 0)) <= ys.y and int(z.get("y1", lv.height - 1)) >= ys.x:
 							n["gust"] += 1
 				for e in lv.entities:
 					if int(e["cell"].x) >= x0 and int(e["cell"].x) < x0 + 27 and Rules.in_rows(e["cell"], ys):
@@ -945,9 +946,10 @@ func _test_layout() -> void:
 					worst[k] = maxi(int(worst[k]), int(n[k]))
 		_check(int(worst["glass"]) <= 60 and int(worst["dawn"]) <= 40 and int(worst["gust"]) <= 24 and int(worst["lamp"]) <= 14 and int(worst["monster"]) <= 12,
 				"%s: per screen at most 60 glass, 40 dawnglass, 24 gust columns, 14 lamps, 12 monsters (%s)" % [id, worst])
-		# Glass in the wind: no run of more than 4 panes without stone.
+		# Glass in the wind (its rows, a taller level's zone): no run of more
+		# than 4 panes without stone.
 		for z in lv.gusts:
-			for y in lv.height:
+			for y in range(int(z.get("y0", 0)), int(z.get("y1", lv.height - 1)) + 1):
 				var run := 0
 				for x in range(int(z["x0"]), int(z["x1"]) + 1):
 					run = run + 1 if lv.tile(x, y) == LevelData.GLASS else 0
@@ -1111,7 +1113,7 @@ func _test_posts(id: String) -> void:
 	var bad := []
 	for z in glass.zones:
 		var dir := int(z["dir"])
-		for y in range(2, lv.height):
+		for y in range(maxi(int(z.get("y0", 0)), 2), int(z.get("y1", lv.height - 1)) + 1):
 			var x := int(z["x0"])
 			while x <= int(z["x1"]):
 				if not _stone_top(lv, x, y):

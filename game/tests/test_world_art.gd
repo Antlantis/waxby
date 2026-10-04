@@ -239,6 +239,7 @@ func _initialize() -> void:
 	_test_seams()
 	_test_arena_clocks()
 	await _test_tall()
+	await _test_tall_v2()
 	await _test_world()
 	print("test_world_art: %d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)
@@ -931,6 +932,25 @@ static func _long_arena(width: int) -> Array:
 const TALL_ROWS := [24, 36]
 const FACTORS := [0.12, 0.35, 0.65]   # backdrop.gd's
 const DEEP_MIN := 0.008          # the least of the deep band a tall level's mid and near layers fill (calibrated: the sparsest, 3-3's moss, 1.5%)
+# Each style's own floor for its deep band, [far, mid, near]: about 60% of
+# what it draws there at 24 and 36 rows (the lesser), so a style that loses
+# its storeys' things below the strip fails, not only one gone bare (a
+# near layer drawn sparse by design keeps its own low floor). The by-eye
+# sign-off, with the dark on, waits for the real levels (the shapes plan).
+const DEEP_FLOOR := {
+	"orchard": [0.0, 0.068, 0.039], "rootvault": [0.0, 0.119, 0.126], "sporewood": [0.0, 0.161, 0.009],
+	"clockface": [0.0, 0.048, 0.033], "gearworks": [0.0, 0.116, 0.009], "icebells": [0.0, 0.086, 0.009],
+	"escapement": [0.0, 0.043, 0.009], "choirglass": [0.0, 0.05, 0.029], "rosewind": [0.0, 0.019, 0.009],
+	"voidnave": [0.0, 0.008, 0.013], "stillshore": [0.0, 0.0, 0.011], "drownbell": [0.0, 0.0, 0.011],
+	"trialhall": [0.0, 0.139, 0.065],
+	"nave": [0.0, 0.13, 0.065], "crypt": [0.0, 0.13, 0.065], "choir": [0.0, 0.13, 0.065], "chandlery": [0.0, 0.13, 0.065],
+	"waxfall": [0.0, 0.754, 0.124], "garden": [0.0, 0.736, 0.123]}
+
+
+static func deep_floor(style: String, i: int) -> float:
+	## The least style's layer i must fill of its deep band: its own floor,
+	## never under DEEP_MIN.
+	return maxf(DEEP_MIN, float((DEEP_FLOOR.get(style, [0.0, 0.0, 0.0]) as Array)[i]))
 
 
 static func tall_elements(style: Script, colors: Dictionary, sp: Vector2, i: int, tall: float, y_top := INF) -> PackedStringArray:
@@ -1000,7 +1020,8 @@ func _test_tall() -> void:
 	## the strip's composition at the top as it was (every element of a
 	## 15-row level's upper half drawn the same: nothing stretches), its far
 	## set pieces where they were; the band only a tall level shows filled
-	## (mid and near: no bare wall where the strip's elements ran out); and
+	## (mid and near: at least the style's own floor, DEEP_FLOOR: no bare
+	## wall where the strip's elements ran out); and
 	## 3-2's tower (E11) at 36 rows: the canopy over the top, roots in the
 	## bottom storey's view, the ossuary between.
 	var Backdrop = load("res://scripts/backdrop.gd")
@@ -1063,8 +1084,8 @@ func _test_tall() -> void:
 				var band := deep_band(i, rows)
 				var old := tall_cover(style, bd.colors(), bd.span(i), i, 0.0, band.x, band.y)
 				var now := tall_cover(style, bd.colors(), bd.span(i), i, bd.tall(i), band.x, band.y)
-				_check(now >= DEEP_MIN and now >= old,
-						"%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f; drawn as a strip, %.3f)" % [id, rows, ["far", "mid", "near"][i], band.x, band.y, now, old])
+				_check(now >= deep_floor(id, i) and now >= old,
+						"%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f, at least %.3f; drawn as a strip, %.3f)" % [id, rows, ["far", "mid", "near"][i], band.x, band.y, now, deep_floor(id, i), old])
 			bd.queue_free()
 		strip.queue_free()
 	await process_frame
@@ -1122,6 +1143,199 @@ func _test_tall() -> void:
 			deep.append(n)
 			b.queue_free()
 		_check(deep[0] == 0 and deep[1] > 0, "%s: the arcade's glass storey below the strip's at 36 rows (%d), none at 15" % [th, deep[1]])
+	await process_frame
+
+
+# ---------------------------------------------------------------- v2's backdrops at 24 and 36 rows
+
+const V2_TALL := ["nave", "crypt", "choir", "waxfall", "chandlery", "garden"]   # W1-2's regular levels' themes
+const V2_BUDGET := 32768         # a v2 layer's tall batch: one per layer, never past TriBatch's ceiling
+const TOP_STEP := 8.0            # px between the points the top's composition is compared at
+const TOP_X := 2400.0            # ...across this much of the layer
+
+
+static func v2_log(bd: Node2D, i: int, flat := false) -> Array:
+	## What v2's layer i draws (backdrop_layer.gd's log: [kind, ...]); flat:
+	## as a strip's would at the same span (its tall band left out).
+	var layer = bd._layers[i]
+	layer.log = []
+	layer.flat = flat
+	layer._draw()
+	var out: Array = layer.log
+	layer.log = null
+	layer.flat = false
+	return out
+
+
+static func _v2_box(e: Array) -> Rect2:
+	match str(e[0]):
+		"rect":
+			return (e[1] as Rect2).abs()
+		"poly", "pline":
+			var r := Rect2((e[1] as PackedVector2Array)[0], Vector2.ZERO)
+			for q in e[1]:
+				r = r.expand(q)
+			return r.grow(float(e[3]) * 0.5 + 1.0 if str(e[0]) == "pline" else 0.0)
+		"circle", "arc":
+			return Rect2(e[1] - Vector2(e[2], e[2]), Vector2(e[2], e[2]) * 2.0).grow(2.0)
+		"line":
+			return Rect2(e[1], Vector2.ZERO).expand(e[2]).grow(maxf(float(e[4]), 1.0) * 0.5 + 1.0)
+	return Rect2()
+
+
+static func _v2_hit(e: Array, p: Vector2) -> bool:
+	## Does the draw e cover the point p?
+	match str(e[0]):
+		"rect":
+			return (e[1] as Rect2).abs().has_point(p)
+		"poly":
+			return Geometry2D.is_point_in_polygon(p, e[1])
+		"circle":
+			return p.distance_to(e[1]) <= float(e[2])
+		"arc":
+			return absf(p.distance_to(e[1]) - float(e[2])) <= maxf(float(e[4]), 1.0) * 0.5
+		"line":
+			return p.distance_to(Geometry2D.get_closest_point_to_segment(p, e[1], e[2])) <= maxf(float(e[4]), 1.0) * 0.5
+		"pline":
+			var pts: PackedVector2Array = e[1]
+			for k in pts.size() - 1:
+				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, pts[k], pts[k + 1])) <= maxf(float(e[3]), 1.0) * 0.5:
+					return true
+	return false
+
+
+static func v2_top(log: Array, y1: float) -> PackedColorArray:
+	## The colour on top at each point over the layer's top (x 0..TOP_X, y
+	## 0..y1, TOP_STEP apart): what its composition shows there.
+	var items := []
+	for e in log:
+		if str(e[0]) == "tris":
+			var pts: PackedVector2Array = e[1]
+			var idx: PackedInt32Array = e[2]
+			for t in range(0, idx.size(), 3):
+				var tri := PackedVector2Array([pts[idx[t]], pts[idx[t + 1]], pts[idx[t + 2]]])
+				var box := Rect2(tri[0], Vector2.ZERO).expand(tri[1]).expand(tri[2])
+				if box.position.y < y1 and box.position.x < TOP_X:
+					items.append(["tri", tri, (e[3] as PackedColorArray)[idx[t]], box])
+		else:
+			var box := _v2_box(e)
+			if box.position.y < y1 and box.position.x < TOP_X:
+				items.append([e, null, null, box])
+	var out := PackedColorArray()
+	var y := 0.0
+	while y < y1:
+		var x := 0.0
+		while x < TOP_X:
+			var p := Vector2(x, y)
+			var top := Color(0, 0, 0, 0)
+			for it in items:
+				if not (it[3] as Rect2).has_point(p):
+					continue
+				if it[0] is String:
+					if Geometry2D.point_is_inside_triangle(p, it[1][0], it[1][1], it[1][2]):
+						top = it[2]
+				elif _v2_hit(it[0], p):
+					var e: Array = it[0]
+					top = e[3] if str(e[0]) == "circle" or str(e[0]) == "arc" or str(e[0]) == "line" else (e[2] if str(e[0]) != "pline" else e[2])
+			out.append(top)
+			x += TOP_STEP
+		y += TOP_STEP
+	return out
+
+
+static func v2_cover(log: Array, sp: Vector2, y0: float, y1: float) -> float:
+	## How much of the band y0..y1 across the layer its things cover (not its
+	## fills: rects as wide as 500 px), 0..1, as tall_cover measures a style.
+	var area := 0.0
+	for e in log:
+		match str(e[0]):
+			"rect":
+				var r: Rect2 = (e[1] as Rect2).abs()
+				if r.size.x >= 500.0 or (e[2] as Color).a < 0.02:
+					continue
+				var a := maxf(r.position.y, y0)
+				var b := minf(r.end.y, y1)
+				if b > a:
+					area += (b - a) * r.size.x
+			"poly":
+				var pts: PackedVector2Array = e[1]
+				var idx := Geometry2D.triangulate_polygon(pts)
+				for t in range(0, idx.size(), 3):
+					var c := (pts[idx[t]] + pts[idx[t + 1]] + pts[idx[t + 2]]) / 3.0
+					if c.y >= y0 and c.y < y1:
+						area += absf((pts[idx[t + 1]] - pts[idx[t]]).cross(pts[idx[t + 2]] - pts[idx[t]])) * 0.5
+			"circle":
+				if float((e[1] as Vector2).y) >= y0 and float((e[1] as Vector2).y) < y1:
+					area += PI * float(e[2]) * float(e[2])
+			"line":
+				var m: Vector2 = ((e[1] as Vector2) + (e[2] as Vector2)) * 0.5
+				if m.y >= y0 and m.y < y1:
+					area += (e[1] as Vector2).distance_to(e[2]) * maxf(float(e[4]), 1.0)
+			"pline":
+				var pts: PackedVector2Array = e[1]
+				for k in pts.size() - 1:
+					var m := (pts[k] + pts[k + 1]) * 0.5
+					if m.y >= y0 and m.y < y1:
+						area += pts[k].distance_to(pts[k + 1]) * maxf(float(e[3]), 1.0)
+			"tris":
+				var pts: PackedVector2Array = e[1]
+				var idx: PackedInt32Array = e[2]
+				for t in range(0, idx.size(), 3):
+					var c := (pts[idx[t]] + pts[idx[t + 1]] + pts[idx[t + 2]]) / 3.0
+					if c.y >= y0 and c.y < y1:
+						area += absf((pts[idx[t + 1]] - pts[idx[t]]).cross(pts[idx[t + 2]] - pts[idx[t]])) * 0.5
+	return area / (sp.x * (y1 - y0))
+
+
+func _test_tall_v2() -> void:
+	## v2's cathedral and cavern (backdrop_layer.gd: World 1-2's regular
+	## levels' six themes) at 24 and 36 rows, as A1's styles are held: the
+	## layer's tall batch within its budget (nothing dropped); the strip's
+	## composition at the top as it was (the colour on top at every point of
+	## a 15-row level's upper half the same: nothing stretches, no tall
+	## level's storey reaches up into it); the band only a tall level shows
+	## filled in the mid and near layers (at least DEEP_MIN and its own
+	## floor, DEEP_FLOOR, and never less than the strip drawn that deep).
+	var Backdrop = load("res://scripts/backdrop.gd")
+	for th in V2_TALL:
+		var strip: Node2D = Backdrop.new()
+		root.add_child(strip)
+		strip.build(th, Vector2(380 * 32, 480), Vector2(844, 390))
+		for rows in TALL_ROWS:
+			var bd: Node2D = Backdrop.new()
+			root.add_child(bd)
+			bd.build(th, Vector2(380 * 32, rows * 32), Vector2(844, 390))
+			var worst := 0
+			var dropped := 0
+			var kept := true
+			var off := 0
+			for i in 3:
+				var log := v2_log(bd, i)
+				for e in log:
+					if str(e[0]) == "tris":
+						worst = maxi(worst, int(e[4]))
+						dropped += int(e[5])
+				var y1: float = strip.span(i).y * 0.5
+				var a := v2_top(v2_log(strip, i), y1)
+				var b := v2_top(log, y1)
+				for k in a.size():
+					if not a[k].is_equal_approx(b[k]):
+						off += 1
+				kept = kept and off == 0
+				if i == 0:
+					continue
+				var band := deep_band(i, rows)
+				var old := v2_cover(v2_log(bd, i, true), bd.span(i), band.x, band.y)
+				var now := v2_cover(log, bd.span(i), band.x, band.y)
+				var floor_: float = deep_floor(th, i)
+				# (as a strip drawn this deep, less 1% of the band: a curtain's
+				# waves kept at the strip's step cover a hair less than stretched)
+				_check(now >= floor_ and now >= old - 0.01, "%s, %d rows: the %s layer's deep band (%.0f-%.0f) filled (%.3f, at least %.3f; drawn as a strip, %.3f)"
+						% [th, rows, ["far", "mid", "near"][i], band.x, band.y, now, floor_, old])
+			_check(worst <= V2_BUDGET and dropped == 0, "%s, %d rows: a layer's tall batch within %d vertices, nothing dropped (%d)" % [th, rows, V2_BUDGET, worst])
+			_check(kept, "%s, %d rows: the strip's composition stays at the top, nothing stretched (%d points differ)" % [th, rows, off])
+			bd.queue_free()
+		strip.queue_free()
 	await process_frame
 
 

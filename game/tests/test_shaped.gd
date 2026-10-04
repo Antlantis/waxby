@@ -55,6 +55,14 @@ extends SceneTree
 ## - a crumble on lab-shapes giving way, and its duel's doors sealing,
 ##   redraw their own chunks only, never the row of chunks under them.
 ##
+## The shape review's (the last section): a fold-back's arena by the door
+## its route comes in by; a lift's stale step not ridden while time is
+## stopped; down held on a ledge looks down in a taller level (down + jump
+## drops); the storey over his never wakes; the altar snapshot relights the
+## altars lit, in a level played right to left too; glass reforms ahead of a
+## fall facing left; the playlog's snuffs by row and route; the decks' hold
+## fought a deck at a time; the review's labs played by the bot.
+##
 ##     godot --headless --path game --script res://tests/test_shaped.gd
 
 const TILE := 32
@@ -71,6 +79,7 @@ var RouteField: GDScript
 var AutoBot: GDScript
 var Arena: GDScript
 var TallCam: GDScript
+var Rules: GDScript
 var game: Node
 var _passed := 0
 var _failed := 0
@@ -97,6 +106,7 @@ func _initialize() -> void:
 	AutoBot = load("res://scripts/autoplay_bot.gd")
 	Arena = load("res://scripts/boss_arena.gd")
 	TallCam = load("res://scripts/tall_cam.gd")
+	Rules = load("res://tests/level_rules.gd")
 	game = root.get_node("Game")
 	game.save_path = "user://test_shaped_save.json"
 	game.settings_path = "user://test_shaped_settings.json"
@@ -123,7 +133,16 @@ func _initialize() -> void:
 	await _test_arena_sides()
 	await _test_room_from_right()
 	await _test_room_two_decks()
+	await _test_room_hold_decks()
 	await _test_room_tall_lab()
+	await _test_arena_fold_back()
+	await _test_lift_stopped()
+	await _test_ledge_look_down()
+	await _test_wake_storeys()
+	await _test_resume_route()
+	await _test_glass_fall_left()
+	await _test_snuff_rows()
+	await _test_gust_rows()
 	await _test_tall_chunks()
 	for p in [game.save_path, game.settings_path]:
 		for suffix in ["", ".bak", ".tmp"]:
@@ -134,7 +153,10 @@ func _initialize() -> void:
 
 # ---------------------------------------------------------------- helpers
 
-const LABS := ["lab-shape-tower", "lab-shape-climb", "lab-shape-bowl", "lab-shape-loop", "lab-shape-mirror", "lab-shape-decks"]
+const LABS := ["lab-shape-tower", "lab-shape-climb", "lab-shape-bowl", "lab-shape-loop", "lab-shape-mirror", "lab-shape-decks",
+		# the shape review's (lab_shaped.py): split roads, a switchback, terraces,
+		# islands in the wind, the works' turn, the rootvault tower
+		"lab-shape-roads", "lab-shape-switchback", "lab-shape-terraces", "lab-shape-islands", "lab-shape-works", "lab-shape-rootvault"]
 # The shape tools' labs (tools/levels/lab_shapes.py, test_shapes.gd's): lab-shapes
 # 24 rows, placed and stacked storeys, its upper storey's duel met by its right
 # door; lab-mirror a clockwork strip mirrored whole (facing: left).
@@ -643,7 +665,8 @@ func _test_autoplay() -> void:
 		var r: Dictionary = await _play(_lab(id), 120.0)
 		_check(r["clear"] and r["by_route"], "%s: the bot rings the bell by route (%.1f s)" % [id, r["t"]])
 		if id == "lab-shape-decks":
-			_check(r["shut"] == [0] and r["won"] == ["clear"], "the decks: it walks into the ambush two decks tall and clears it (%s, %s)" % [r["shut"], r["won"]])
+			_check(r["shut"] == [0, 1] and r["won"] == ["clear", "time"] or r["won"] == ["clear", "clear"],
+					"the decks: it clears the ambush two decks tall, then holds the hold (%s, %s)" % [r["shut"], r["won"]])
 		if id == "lab-shape-mirror" or id in TOOL_LABS:
 			_check(r["shut"] == [0] and r["won"] == ["clear"], "%s: it walks into the duel from the right and wins it (%s, %s)" % [id, r["shut"], r["won"]])
 	var x: Dictionary = await _play(_lab("lab-shape-loop"), 40.0, false)
@@ -807,7 +830,61 @@ func _test_room_two_decks() -> void:
 	var decks := {}
 	for e in m.counted(r):
 		decks[int(e.position.y / TILE) < 15] = true
-	_check(decks.has(true) and decks.has(false), "foes on both decks (%s)" % [decks.keys()])
+	var waiting: Array = (r["drops"] as Array).filter(func(d): return not d["on"])
+	_check(decks.has(false) and not decks.has(true) and waiting.size() == 2 and waiting.all(func(d): return (d["en"] as Node2D).position.y < 15 * TILE),
+			"its lower deck's foes drop in, the upper deck's wait for him there (%s; %d waiting)" % [decks.keys(), waiting.size()])
+	for e in m.counted(r):
+		e.hp = 0.0
+		e._kill({"how": "slash", "from_x": e.position.x - 20.0})
+	_ticks(w, 0.2)
+	var post = m.bot_target(w.player)
+	_check(post is Vector2 and (post as Vector2).y < 15 * TILE, "with none left on his deck, the bot's way is to a post on the other, off the glass (%s)" % [post])
+	w.player.reset_at(Vector2(30 * TILE, 11 * TILE))
+	var dropped := false
+	for i in 240:
+		_ticks(w, DT)
+		if m.counted(r).any(func(e): return e.position.y < 15 * TILE):
+			dropped = true
+			break
+	_check(dropped, "on the upper deck, its foes drop in")
+	await _done(w)
+
+
+func _test_room_hold_decks() -> void:
+	## The decks' hold, two decks tall, entered by its upper door: each wave
+	## fought on his own deck (the lower deck's foes wait till he's down
+	## there, never dropping in off the glass), the clock runs out and the
+	## doors open; its door altar is on the deck he comes in on.
+	var lv = _lab("lab-shape-decks")
+	var w = await _world(lv, false)
+	var m = w.features.module("sealed")
+	_ticks(w, 0.5)
+	var r: Dictionary = m.rooms[1]
+	_check(str(r["kind"]) == "hold" and Rules.room_problems(lv).is_empty(), "the decks' hold reads, its altar by its upper door %s" % [Rules.room_problems(lv)])
+	w.player.reset_at(Vector2(57 * TILE, 11 * TILE))
+	for i in 360:
+		_ticks(w, DT, {"right": w.player.position.x < 63 * TILE})
+		if str(r["phase"]) == "fight":
+			break
+	_ticks(w, 3.0)
+	var on_mine: int = m.counted(r).filter(func(e): return e.position.y < 15 * TILE).size()
+	var low_waiting: Array = (r["drops"] as Array).filter(func(d): return not d["on"] and (d["en"] as Node2D).position.y > 15 * TILE)
+	_check(str(r["phase"]) == "fight" and on_mine == 2 and low_waiting.size() == 2, "in by its upper door: the upper deck's foes drop in, the lower deck's wait (%s, %d, %d)" % [r["phase"], on_mine, low_waiting.size()])
+	# Down the stair: they drop in once he's on their deck, never off the glass.
+	w.player.reset_at(Vector2(80 * TILE, 22 * TILE))
+	var off_glass := false
+	var down := false
+	for i in 360:
+		var was: Array = (r["drops"] as Array).filter(func(d): return not d["on"])
+		_ticks(w, DT)
+		for d in was:
+			if d["on"] and not w.in_plain_view((d["en"] as Node2D).rect()):
+				off_glass = true
+		if (r["drops"] as Array).filter(func(d): return not d["on"]).is_empty():
+			down = true
+	_check(down and not off_glass, "down on the lower deck its foes drop in, each on the glass (%s, %s)" % [down, off_glass])
+	_ticks(w, 20.0)
+	_check(str(r["phase"]) == "won" and str(r["won"]) == "time" and (r["sealed"] as Array).is_empty(), "the clock runs out and the doors open (%s, %s)" % [r["phase"], r["won"]])
 	await _done(w)
 
 
@@ -933,4 +1010,252 @@ func _test_room_tall_lab() -> void:
 		e._kill({"how": "slash", "from_x": e.position.x - 20.0})
 	_ticks(w, 0.5)
 	_check(str(r["phase"]) == "won" and (r["sealed"] as Array).is_empty(), "its foe falls and the doors open (%s)" % r["phase"])
+	await _done(w)
+
+
+# ---------------------------------------------------------------- the shape review's
+
+func _fold_rows() -> Array:
+	## A 24-row fold-back: start bottom left, up at the far end, the boss
+	## arena on the upper storey (columns 10-29, walls 8-9 and 30-31), its
+	## doorways open in both walls: entered from the right, as the route comes.
+	var rows := []
+	for y in 24:
+		var r := ""
+		for x in 48:
+			var c := "."
+			var wall: bool = (x >= 8 and x <= 9) or (x >= 30 and x <= 31)
+			if y == 0 or y >= 22 or ((y == 11 or y == 12) and x <= 37):
+				c = "#"
+			elif wall and y >= 1 and y <= 7:
+				c = "#"
+			elif y == 19 and x >= 39 and x <= 42:
+				c = "="
+			elif y == 16 and x >= 43 and x <= 46:
+				c = "="
+			elif y == 13 and x >= 39 and x <= 42:
+				c = "="
+			elif y == 10 and x == 20:
+				c = "X"
+			elif y == 21 and x == 3:
+				c = "P"
+			elif y == 21 and x == 6:
+				c = "K"
+			elif y == 10 and x == 35:
+				c = "K"
+			r += c
+		rows.append(r)
+	return rows
+
+
+func _test_arena_fold_back() -> void:
+	## Arena.find in a taller level: the door the route comes in by (the
+	## walk map's entry, as the rules' room_entry), not the start's side: a
+	## fold-back's upper storey is walked right to left, so its arena (both
+	## walls open) is entered by its right door though the level starts left.
+	var lv = _drawn("lab-fold-arena", _fold_rows(), {"boss": "tollgrave"})
+	var feet: Vector2 = LevelData.cell_floor(Vector2i(20, 10))
+	var a: Dictionary = Arena.find(lv, feet)
+	var xs := {}
+	for c in a["door"]:
+		xs[(c as Vector2i).x] = true
+	var ks := xs.keys()
+	ks.sort()
+	_check(lv.tall() and lv.start.x < 10 and int(a["side"]) == 1 and ks == [30, 31],
+			"a fold-back's upper-storey arena, both walls open, start on the left: its door the right one, as the route comes (side %d, %s)" % [a["side"], ks])
+	_check(Rules.room_entry(lv, 8, 31, Vector2i(7, 10)) == 1, "the level rules agree (room_entry)")
+
+
+func _test_lift_stopped() -> void:
+	## While a boss has time stopped (world.stop_time) the lifts stand still,
+	## each still holding its last step's delta: the tall camera doesn't ride
+	## that (it stays on him), and rides again once time runs.
+	var w = await _world(_lab("lab-shape-tower"))
+	var lift = null
+	for mv in w.movers:
+		if str(mv.kind) == "y":
+			lift = mv
+	var guard := 0
+	while guard < 2000 and float(lift.delta.y) >= -0.01:
+		_ticks(w, DT)
+		guard += 1
+	w.player.reset_at(Vector2(float(lift.pos.x) + float(lift.w()) * 0.5, float(lift.pos.y)))
+	w.player.velocity = Vector2.ZERO
+	_ticks(w, 0.1)
+	w.cam = w.cam_on(w.player.position)
+	w._cam_y_target = w.cam.y
+	_ticks(w, 0.05)
+	var rode: bool = w.player.riding != null and absf(float(lift.delta.y)) > 0.0
+	w.stop_time(1.0)
+	var cam0: float = w.cam.y
+	var feet0 := _feet(w)
+	_ticks(w, 0.9)
+	_check(rode and w.time_stopped() and absf(float(lift.delta.y)) > 0.0 and absf(_feet(w) - feet0) < 6.0 and absf(w.cam.y - cam0) < 6.0,
+			"time stopped on a lift: the camera holds on him, not the lift's stale step (cam %.1f px, his feet %.1f px; the delta %.2f)" % [w.cam.y - cam0, _feet(w) - feet0, lift.delta.y])
+	_check(w.tall_cam.ride() == 0.0, "ride() is 0 while time is stopped")
+	_ticks(w, 0.3)
+	_check(not w.time_stopped() and w.tall_cam.ride() != 0.0 or w.player.riding == null, "and rides again once it runs (%.2f)" % w.tall_cam.ride())
+	await _done(w)
+
+
+func _test_ledge_look_down() -> void:
+	## In a taller level down held on a one-way ledge looks down (2-2's
+	## shelves over the low road) and never drops him; down + jump drops him
+	## through. In a strip down held drops him through, as ever.
+	var rows := _column(24, 4)
+	rows[12] = "##" + ".".repeat(8) + "=====" + ".".repeat(11) + "##"
+	var w = await _world(_drawn("lab-ledge-look", rows))
+	_stand(w, 12, 11)
+	var line := _feet(w)
+	_ticks(w, 1.5, {"down": true})
+	_check(w.player.on_floor and int(w.player.position.y / TILE) <= 12 and str(w.tall_cam.looking) == "down" and _feet(w) < line - 50.0,
+			"down held on a ledge in a taller level looks down, and he stays on it (feet %.0f, the line %.0f)" % [_feet(w), line])
+	_ticks(w, 0.5)
+	var y0: float = w.player.position.y
+	for i in 30:
+		_ticks(w, DT, {"down": true, "jump": i < 3})
+	_check(w.player.position.y > y0 + 16.0, "down + jump drops him through it (%.0f px)" % (w.player.position.y - y0))
+	await _done(w)
+	var srows := _column(15, 3)
+	srows[8] = "##" + ".".repeat(8) + "=====" + ".".repeat(11) + "##"
+	var ws = await _world(_drawn("lab-ledge-strip", srows))
+	_stand(ws, 12, 7)
+	var sy: float = ws.player.position.y
+	_ticks(ws, 0.6, {"down": true})
+	_check(ws.player.position.y > sy + 16.0, "in a strip down held drops him through, as ever (%.0f px)" % (ws.player.position.y - sy))
+	await _done(ws)
+
+
+func _test_wake_storeys() -> void:
+	## A monster on the storey over his (lab-shape-loop's, 11 rows up) stays
+	## asleep while he walks the lower storey under it, though it's within 6
+	## tiles of the view's top; it wakes once it's in the view's rows.
+	var w = await _world(_lab("lab-shape-loop"), false)
+	var e: Node2D = w.spawn_enemy("skeleton", LevelData.cell_floor(Vector2i(30, 10)), {"cell": Vector2i(30, 10)})
+	e.active = false
+	_stand(w, 30, 21)
+	var v: Rect2 = w.view_rect()
+	_check(e.position.y < v.position.y and e.position.y > v.position.y - TILE * 6.0, "the upper storey's Rattle is over the view, within 6 tiles of it (%.0f, the view's top %.0f)" % [e.position.y, v.position.y])
+	_ticks(w, 0.5)
+	_check(not e.active, "it sleeps: the storey over his doesn't wake")
+	w.player.reset_at(LevelData.cell_floor(Vector2i(34, 10)))
+	_ticks(w, 1.0)
+	_check(e.active, "on its storey, it wakes")
+	await _done(w)
+
+
+func _test_resume_route() -> void:
+	## The altar snapshot in a level played right to left (the mirror lab: its
+	## altars at x 92, 70 and 35, the file's order 35, 70, 92): lit at the
+	## first on the route, the resume lights it alone, not every altar before
+	## it in reading order; an older snapshot (no lit) lights those the route
+	## meets up to it.
+	var lv = _lab("lab-shape-mirror")
+	var w = await _world(lv, false)
+	var first := -1
+	for i in w.altars.size():
+		if (w.altars[i]["cell"] as Vector2i).x == 92:
+			first = i
+	var lit: Array = w.altars.map(func(a): return bool(a["lit"]))
+	await _done(w)
+	var w2 = WorldScript.new()
+	w2.setup(_lab("lab-shape-mirror"), true)
+	w2.resume = {"level": "lab-shape-mirror", "diff": game.diff(), "altar": first, "lit": [first], "killed": [], "taken": [], "sigils": [false, false, false]}
+	root.add_child(w2)
+	await process_frame
+	var now: Array = w2.altars.filter(func(a): return bool(a["lit"])).map(func(a): return (a["cell"] as Vector2i).x)
+	_check(first == 2 and not lit.has(true) and now == [92], "lit at its first altar (x 92, the file's last), the resume lights that one only (%s)" % [now])
+	_check(w2.player.position.distance_to(w2.altars[first]["pos"]) < 2.0, "and starts him there")
+	w2.queue_free()
+	await process_frame
+	var mid := -1
+	for i in lv.entities.filter(func(e): return e["kind"] == "altar").size():
+		if (lv.entities.filter(func(e): return e["kind"] == "altar")[i]["cell"] as Vector2i).x == 70:
+			mid = i
+	var w3 = WorldScript.new()
+	w3.setup(_lab("lab-shape-mirror"), true)
+	w3.resume = {"level": "lab-shape-mirror", "diff": game.diff(), "altar": mid, "killed": [], "taken": [], "sigils": [false, false, false]}
+	root.add_child(w3)
+	await process_frame
+	var old: Array = w3.altars.filter(func(a): return bool(a["lit"])).map(func(a): return (a["cell"] as Vector2i).x)
+	old.sort()
+	_check(old == [70, 92], "an older snapshot at its second altar lights the route's first two (%s), not the file's" % [old])
+	w3.queue_free()
+	await process_frame
+
+
+func _test_glass_fall_left() -> void:
+	## A fall into the void in a level played right to left (facing: left):
+	## the panes gone ahead of him (to his left) come back, those behind him
+	## stay gone; facing right the other way round (glass.gd on_fall).
+	for left in [true, false]:
+		var rows := []
+		for y in 15:
+			var r := ""
+			for x in 80:
+				var c := "."
+				if y >= 13:
+					c = "G" if (x >= 20 and x <= 60) else "#"
+				elif y == 12 and x == (76 if left else 3):
+					c = "P"
+				elif y == 12 and x == (3 if left else 76):
+					c = "E"
+				r += c
+			rows.append(r)
+		var heads := {"facing": "left"} if left else {}
+		var w = await _world(_drawn("lab-glass-" + ("l" if left else "r"), rows, heads), false)
+		var glass = w.features.module("glass")
+		_ticks(w, 0.2)
+		for c in [Vector2i(30, 13), Vector2i(50, 13)]:
+			glass.panes[c]["state"] = "gone"
+		glass.on_fall(Vector2(40 * TILE, 13 * TILE))
+		var ahead: Vector2i = Vector2i(30, 13) if left else Vector2i(50, 13)
+		var behind: Vector2i = Vector2i(50, 13) if left else Vector2i(30, 13)
+		_check(str(glass.panes[ahead]["state"]) != "gone" and str(glass.panes[behind]["state"]) == "gone",
+				"facing %s: the pane ahead comes back, the one behind stays gone (%s, %s)" % ["left" if left else "right", glass.panes[ahead]["state"], glass.panes[behind]["state"]])
+		await _done(w)
+
+
+func _test_snuff_rows() -> void:
+	## The playlog's snuffs in a taller level: the row too, and how far along
+	## the route on foot (run), its 16-tile bands by that: two storeys over
+	## the same columns told apart.
+	var lv = _lab("lab-shape-loop")
+	var w = await _world(lv, false)
+	var Playlog = load("res://scripts/playlog.gd")
+	for at in [Vector2i(30, 21), Vector2i(30, 10)]:
+		var t := 0.0
+		while (not w.player.alive or w.state != "play") and t < 8.0:
+			_ticks_dead(w, 0.1)
+			t += 0.1
+		w.player.reset_at(LevelData.cell_floor(at))
+		w.player.invuln = 0.0
+		w.player.hp = 0.2 * w.player.max_hp
+		w.hurt_player(99999.0, w.player.position.x + 5.0, "hit")
+		_ticks_dead(w, 0.1)
+	var e: Dictionary = Playlog.entry(w, false, {})
+	var ss: Array = e["sections"]
+	_check(ss.size() == 2 and int(ss[0]["y"]) == 21 and int(ss[1]["y"]) == 10 and int(ss[1]["run"]) > int(ss[0]["run"]) + 30 and int(ss[0]["x"]) == int(ss[1]["x"]),
+			"a snuff on each storey of one column: rows 21 and 10, %s and %s tiles along the route" % [ss[0].get("run"), ss[1].get("run") if ss.size() > 1 else "-"])
+	_check((e["by_section"] as Dictionary).size() == 2, "the playlog's bands tell them apart (%s)" % [e["by_section"]])
+	await _done(w)
+
+
+func _ticks_dead(w: Node, seconds: float) -> void:
+	## Ticks with no pad and his life left as it is (a snuff runs its course).
+	for i in int(round(seconds / DT)):
+		w.test_pad = {}
+		w._read_pad()
+		w.tick(DT)
+
+
+func _test_gust_rows() -> void:
+	## A taller level's gust zone on its rows (gusts x0-x1:R:A:y0-y1: the
+	## islands lab's over its middle islands): glass.gd blows it there only,
+	## and the bots' push (reach_search.gd) the same.
+	var w = await _world(_lab("lab-shape-islands"), false)
+	var glass = w.features.module("glass")
+	var inside: Dictionary = glass.zone_at(Vector2(32 * TILE, 10 * TILE))
+	var under: Dictionary = glass.zone_at(Vector2(32 * TILE, 19 * TILE))
+	_check(not inside.is_empty() and under.is_empty(), "its wind blows over the islands, not under them (%s, %s)" % [inside, under])
 	await _done(w)

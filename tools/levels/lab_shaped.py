@@ -22,9 +22,37 @@ tests/test_shaped.gd plays them.
   lab-shape-mirror  15 x 100: 4-3 played right to left (facing: left). The
                     start at the right end, a duel entered from the right
                     (the doors seal at both ends), the bell at the far left.
-  lab-shape-decks   24 x 80: 5-3's hold room. An ambush two decks tall:
-                    in at the bottom left, foes on both decks, out at the
-                    top right onto the upper deck and the bell.
+  lab-shape-decks   24 x 130: 5-3's rooms two decks tall. An ambush: in at
+                    the bottom left, foes on both decks, out at the top
+                    right onto the upper deck; then a hold (20 s), in at the
+                    top left, down a stair of ledges to the lower deck and
+                    out at its bottom right to the bell. Each deck's foes
+                    drop in only once he's on it (features/sealed.gd).
+And the shape review's labs, each a shape the redraw needs proved first:
+  lab-shape-roads   24 x 110: 2-2's split roads. A high road of shelves
+                    and lanterns over a dark low road, apart from x 20 to
+                    80 and joined again at an altar (roads: high, low; the
+                    dark twist; its threat per road, its gaps per road).
+  lab-shape-switchback  24 x 72: 2-3's three tiers, the middle one the
+                    mirror of the bottom (mirror_rows): right, back left,
+                    right again to the bell, a climb at each turn.
+  lab-shape-terraces    24 x 90: 2-1's terraced descent. Three terraces,
+                    each a drop of 4 or 5 rows beside a waxfall, never into
+                    its column (waxfall_problems).
+  lab-shape-islands     22 x 80: 5-2's islands in the wind. Islands 2-4
+                    rows apart over the void, a gust zone on its own rows
+                    (gusts x0-x1:R:A:y0-y1), landing: 6/2.
+  lab-shape-works   24 x 76: 4-2's turn. A loop of clockwork storeys: belts,
+                    a weight and a swing on each (never in one column), a
+                    belt_flip on the lower storey's belts only, and at the
+                    far end a stack of two short lifts and a cog up to the
+                    upper storey.
+  lab-shape-rootvault   36 x 60: 3-2's tower in the rootvault (the orchard
+                    painter): a gallery along the bottom, then the wall in
+                    two storeys, each with a catch floor and an altar, up
+                    two vine lanes (a Creepbone on one, a pod on the other),
+                    a rotten run to sigil 3, ledges to the bell's shelf. The
+                    phone's perf route through the storeys (run_phone.sh).
 
 They are drawn on a Grid of their own height, cell by cell (lab_shapes.py
 proves the shape tools' sections, placed and stacked: common.block(s, h),
@@ -273,15 +301,18 @@ def decks():
     """An ambush two decks tall (columns 14-45, rows 1-22: its ceiling and
     floor included): in through its left door on the lower deck (rows
     19-21), foes on both decks, a stair of ledges between them, out through
-    its right door on the upper deck (rows 8-10) to the bell."""
-    W, H = 80, 24
+    its right door on the upper deck (rows 8-10). Then a hold two decks tall
+    (columns 60-95): in through its left door on the upper deck (the altar
+    at 55 by it, on that deck), down a stair of ledges inside (3 rows a
+    step), out through its right door on the lower deck to the bell."""
+    W, H = 130, 24
     g = Grid(W, H)
     g.fill(0, W - 1, 0, 0)
     g.fill(0, W - 1, 22, 23)               # the lower deck (stand 21)
     g.put(2, 21, 'P')
     g.put(8, 21, 'K')
     g.put(11, 21, '@')
-    # -- the room's shell: the ceiling (row 1), its left wall down to the
+    # -- the ambush's shell: the ceiling (row 1), its left wall down to the
     #    lower door, its right wall above and below the upper door
     g.fill(14, 45, 1, 1)
     g.col(14, 1, 18, '#')
@@ -296,16 +327,290 @@ def decks():
     g.put(39, 21, 's')
     g.put(33, 10, 's')
     g.put(39, 10, 's')
-    # -- outside, on the upper deck: solid under it, the bell at its end
-    g.fill(46, W - 1, 11, 23)
+    # -- between them, on the upper deck: solid under it, the altar by the
+    #    hold's door
+    g.fill(46, 60, 11, 23)
     g.put(55, 10, 'K')
-    g.put(74, 10, 'E')
+    # -- the hold's shell: its ceiling, its left wall above the upper door,
+    #    its right wall down to the lower door
+    g.fill(60, 95, 1, 1)
+    g.col(60, 1, 7, '#')
+    g.col(95, 1, 18, '#')
+    # -- inside: the upper deck (stand 10) to 75, a stair of ledges down
+    #    (3 rows a step, a walk off each), the lower deck to its door
+    g.fill(61, 75, 11, 11)
+    g.put(76, 14, '====')
+    g.put(80, 17, '====')
+    g.put(84, 20, '====')
+    g.put(66, 10, 's')
+    g.put(71, 10, 's')
+    g.put(72, 21, 's')
+    g.put(86, 21, 's')
+    # -- out on the lower deck: the bell
+    g.put(110, 21, 'K')
+    g.put(124, 21, 'E')
     return g.out()
 
 
 lab({'id': 'lab-shape-decks', 'name': 'The Two Decks', 'subtitle': 'lab-shape-decks', 'music': 'chapel',
-     'theme': 'nave', 'area': 3, 'room': 'ambush 14-45 rows 1-22',
-     'hints': ['An ambush two decks tall: in at the bottom, out at the top']}, decks())
+     'theme': 'nave', 'area': 3, 'room': 'ambush 14-45 rows 1-22; hold 60-95 rows 1-22 @20',
+     'hints': ['Two rooms two decks tall: in at the bottom, out at the top, and back down']}, decks())
+
+
+# ============================================================ the split roads (24 rows)
+
+ROADS = 'high 50,10; low 50,21'
+
+
+def roads():
+    """One road in (stand 21), then from x 20 a high road of shelves (stand
+    10) with lanterns, Rattles and a sigil over a dark low road (stand 21)
+    with a Rattle, a bat and a sigil, the high road 11 rows up (its lights
+    never reach the low road: light_problems), joined again at x 84 (an
+    altar), then the bell."""
+    W, H = 110, 24
+    g = Grid(W, H)
+    g.fill(0, W - 1, 0, 0)
+    g.fill(0, W - 1, 22, 23)               # the low road and the common floor (stand 21)
+    g.put(2, 21, 'P')
+    g.put(6, 21, 'K')
+    g.put(9, 21, '@')
+    # -- up to the high road: ledges 3 rows apart at its start
+    g.put(15, 19, '===')
+    g.put(17, 16, '===')
+    g.put(15, 13, '===')
+    g.fill(20, 78, 11, 12)                 # the high road (stand 10)
+    g.put(28, 10, 'L')
+    g.put(44, 10, 'L')
+    g.put(62, 10, 'L')
+    g.put(36, 10, 's')
+    g.put(54, 10, 's')
+    g.put(48, 7, '1')
+    # -- down from it at its end
+    g.put(80, 13, '===')
+    g.put(82, 16, '===')
+    g.put(80, 19, '===')
+    # -- the low road, dark: shorter and faster
+    g.put(40, 21, 's')
+    g.put(58, 18, 'b')
+    g.put(66, 20, '2')
+    # -- together again
+    g.put(88, 21, 'K')
+    g.put(96, 19, '3')
+    g.put(104, 21, 'E')
+    return g.out()
+
+
+_roads = roads()
+lab({'id': 'lab-shape-roads', 'name': 'The Two Roads', 'subtitle': 'lab-shape-roads', 'music': 'chapel',
+     'theme': 'nave', 'area': 3, 'twist': 'dark', 'roads': ROADS,
+     'threat': round(common.threat_of(_roads, roads=ROADS), 2),
+     'hints': ['Two roads: the lit shelves above, the dark water road below']}, _roads)
+
+
+# ============================================================ the switchback (24 rows)
+
+def _tier(w, hole, climb):
+    """One tier of the switchback, 8 rows, going right: 6 rows of air over
+    its 2 floor rows (rows 6-7), its floor open over columns hole (the
+    climb up from the tier under it comes through there), and at its right
+    end a climb to the tier over it: ledges 3 rows apart (climb: their x)."""
+    rows = [['.'] * w for _ in range(8)]
+    for y in (6, 7):
+        for x in range(w):
+            if x not in hole:
+                rows[y][x] = '#'
+    for x, y in climb:
+        for k in range(3):
+            rows[y][x + k] = '='
+    return common.Section(''.join(r) for r in rows)
+
+
+def switchback():
+    """Three tiers (floors on rows 6-7, 14-15 and 22-23): along the bottom
+    to the right, up through the middle tier's floor at its right end, back
+    left along it (the bottom tier mirrored: mirror_rows), up through the top
+    tier's floor at its left end, right again to the bell."""
+    W = 72
+    climb = [(W - 9, 3), (W - 5, 0)]
+    bottom = _tier(W, range(0, 0), climb)
+    # the bottom tier with a way up through its floor's left end, mirrored:
+    # its way up at the right (over the bottom's climb), its climb at the left
+    middle = common.mirror_rows(_tier(W, range(1, 8), climb))
+    top = _tier(W, range(1, 8), [])
+    rows = [list(r) for r in list(top) + list(middle) + list(bottom)]
+    g = Grid(W, 24)
+    g.rows = rows
+    g.fill(0, W - 1, 0, 0)                 # the roof
+    g.put(2, 21, 'P')
+    g.put(6, 21, 'K')
+    g.put(9, 21, '@')
+    g.put(30, 21, 's')
+    g.put(40, 13, 's')
+    g.put(36, 13, 'K')
+    g.put(22, 11, '1')
+    g.put(44, 5, 's')
+    g.put(30, 5, 'K')
+    g.put(66, 5, 'E')
+    return g.out()
+
+
+lab({'id': 'lab-shape-switchback', 'name': 'The Switchback', 'subtitle': 'lab-shape-switchback', 'music': 'chapel',
+     'theme': 'nave', 'area': 3,
+     'hints': ['A switchback: right, back left over it, right again']}, switchback())
+
+
+# ============================================================ the terraces (24 rows)
+
+def terraces():
+    """Three terraces (stand 12, 16 and 21) down to the right, each drop a
+    walk-off beside a waxfall pouring over the terrace's lip one column on
+    (never into its column: waxfall_problems), drip spouts over the first."""
+    W, H = 90, 24
+    g = Grid(W, H)
+    g.fill(0, W - 1, 0, 0)
+    g.fill(0, 29, 13, 23)                  # terrace 1 (stand 12)
+    g.fill(30, 59, 17, 23)                 # terrace 2 (stand 16): a 4-row drop
+    g.fill(60, W - 1, 22, 23)              # terrace 3 (stand 21): a 5-row drop
+    g.put(2, 12, 'P')
+    g.put(6, 12, 'K')
+    g.put(9, 12, '@')
+    g.put(14, 1, 'd')
+    g.put(22, 1, 'd')
+    g.put(31, 1, '!')                      # pours onto terrace 2, beside the drop off 1
+    g.put(61, 1, '!')                      # pours onto terrace 3, beside the drop off 2
+    g.put(40, 16, 's')
+    g.put(44, 16, 'K')
+    g.put(36, 13, '1')
+    g.put(70, 21, 's')
+    g.put(76, 21, 'K')
+    g.put(84, 21, 'E')
+    return g.out()
+
+
+lab({'id': 'lab-shape-terraces', 'name': 'The Terraces', 'subtitle': 'lab-shape-terraces', 'music': 'chapel',
+     'theme': 'waxfall', 'area': 3,
+     'hints': ['Terraces: step off beside the falls, never under them']}, terraces())
+
+
+# ============================================================ the islands (22 rows)
+
+def islands():
+    """Stone islands over the void (no floor under them: a fall is a pit),
+    their tops 2 to 4 rows apart and 3 or 4 columns, a gust zone over the
+    middle islands' rows only, landing: 6/2 (no drop or wind jump lands more
+    than 6 columns on and more than 2 rows lower)."""
+    W, H = 80, 22
+    g = Grid(W, H)
+    g.fill(0, W - 1, 0, 0)
+    for x0, x1, top in ((0, 12, 12), (16, 24, 14), (28, 36, 11), (40, 50, 13), (54, 62, 12), (66, W - 1, 13)):
+        g.fill(x0, x1, top, top + 3)
+    g.put(2, 11, 'P')
+    g.put(6, 11, 'K')
+    g.put(9, 11, '@')
+    g.put(20, 13, 's')
+    g.put(32, 10, 'K')
+    g.put(31, 7, '1')
+    g.put(46, 12, 's')
+    g.put(58, 11, 'K')
+    g.put(74, 12, 'E')
+    return g.out()
+
+
+lab({'id': 'lab-shape-islands', 'name': 'The Islands', 'subtitle': 'lab-shape-islands', 'music': 'chapel',
+     'theme': 'nave', 'area': 3, 'landing': '6/2', 'gusts': '26-52:R:A:4-16',
+     'hints': ['Islands in the wind: it blows only up here']}, islands())
+
+
+# ============================================================ the works (24 rows)
+
+def works():
+    """lab-shape-loop's fold-back in clockwork: the lower storey (stand 21)
+    right, belts carrying right and a weight under the upper floor; at the
+    far end two short lifts one over the other and a cog; the upper storey
+    (stand 10) left, belts carrying left, a weight under the roof and a
+    swing, every one in a column of its own (cog_phase and weight_phase are
+    keyed by column), the bell over the start; belt_flip on the lower
+    storey's belts only."""
+    W, H = 76, 24
+    g = Grid(W, H)
+    g.fill(0, W - 1, 0, 0)
+    g.fill(0, W - 1, 22, 23)
+    g.fill(0, 63, 11, 12)
+    g.put(3, 21, 'P')
+    g.put(8, 21, 'K')
+    g.put(11, 21, '@')
+    g.put(20, 22, '>>>>>>')
+    g.put(34, 13, 'Y')                     # a weight under the upper floor
+    g.put(44, 21, 'K')
+    # -- the turn: two lifts (each sweeps 3 rows up and down) and a cog
+    g.put(64, 18, '|||')                   # 15-21: from the floor up
+    g.put(67, 12, '|||')                   # 9-15: from the first up past the upper floor's end
+    g.put(72, 18, 'O')                     # (112 px clear of the floor and the wall: its teeth's ring)
+    # -- back along the top
+    g.put(40, 11, '<<<<<<')
+    g.put(26, 1, 'Y')                      # a weight under the roof
+    g.put(14, 5, 'TTT')                    # a swing
+    g.put(50, 10, 'K')
+    g.put(30, 8, '1')
+    g.put(4, 10, 'E')
+    return g.out()
+
+
+lab({'id': 'lab-shape-works', 'name': 'The Works', 'subtitle': 'lab-shape-works', 'music': 'chapel',
+     'theme': 'clockface', 'area': 3, 'belt_flip': '20-25=8',
+     'hints': ['The works: round and up the lifts, back along the top']}, works())
+
+
+# ============================================================ the rootvault tower (36 rows)
+
+def rootvault():
+    """3-2's tower in the rootvault (36 rows): a gallery along the bottom
+    (stand 33), then the wall: two vine lanes (a Creepbone on one, a pod on
+    the other) up 12 rows to storey 1's catch floor (stand 21) with its
+    altar, a vine up 12 more to storey 2's (stand 9) with its altar, a
+    rotten run up from it to sigil 3, ledges up to the bell's shelf (stand
+    3) in the middle of the wall."""
+    W, H = 60, 36
+    g = Grid(W, H)
+    g.fill(0, W - 1, 0, 0)
+    g.fill(0, 1, 0, H - 1)
+    g.fill(W - 1, W - 1, 0, H - 1)
+    g.fill(0, W - 1, 34, 35)               # the gallery's floor (stand 33)
+    g.put(3, 33, 'P')
+    g.put(7, 33, 'K')
+    g.put(10, 33, '@')
+    g.put(18, 33, 'r')
+    g.put(26, 33, 's')
+    g.put(24, 30, '2')
+    # -- the wall's foot: two vine lanes up to storey 1 (through a gap in its floor)
+    g.col(37, 21, 33, '{')
+    g.col(39, 21, 33, '{')
+    g.put(37, 27, 'i')                     # a Creepbone on the first lane
+    g.put(39, 25, '*')                     # a pod on the second
+    g.fill(40, W - 2, 22, 22)              # storey 1's catch floor (stand 21)
+    g.fill(34, 36, 22, 22)
+    g.put(50, 21, 'K')
+    g.put(46, 21, 's')
+    # -- up to storey 2: a vine through the gap at its floor's right end
+    g.col(56, 10, 21, '{')
+    g.put(56, 15, '8')                     # a glowfruit on it
+    g.fill(34, 55, 10, 10)                 # storey 2's catch floor (stand 9)
+    g.put(46, 9, 'K')
+    # -- a rotten run up from storey 2 to sigil 3 (a snap: back onto the floor)
+    g.col(38, 7, 9, '}')
+    g.put(38, 6, '3')
+    # -- ledges up to the bell's shelf (stand 3)
+    g.put(51, 7, '===')
+    g.fill(40, 49, 4, 4)
+    g.put(44, 3, 'E')
+    g.put(42, 1, '1')
+    return g.out()
+
+
+lab({'id': 'lab-shape-rootvault', 'name': 'The Rootvault Tower', 'subtitle': 'lab-shape-rootvault', 'music': 'chapel',
+     'theme': 'rootvault', 'area': 13,
+     'hints': ['The wall: up the lanes, a catch floor and an altar each storey']}, rootvault())
 
 
 def write_levels():

@@ -54,6 +54,7 @@ const FeaturesScript := preload("res://scripts/level_features.gd")
 const Movers := preload("res://scripts/movers.gd")
 const AutoBot := preload("res://scripts/autoplay_bot.gd")
 const TallCam := preload("res://scripts/tall_cam.gd")
+const WalkMap := preload("res://scripts/walk_map.gd")
 const Relics := preload("res://scripts/relics.gd")
 const Combat := preload("res://scripts/combat.gd")
 const Classes := preload("res://scripts/classes.gd")
@@ -278,7 +279,7 @@ var _boss_opts := {}            # what configure() was handed (a mode's boss)
 var secret_found := ""          # the secret level a silver bell opened here
 var secret_new := false         # its bell opened it just now, the first time (find_secret at the ring)
 var phase_reached := 0          # the boss's highest phase
-var snuff_sections: Array = []  # [{x, cause, move}]
+var snuff_sections: Array = []  # [{x, y, cause, move, feature}] (playlog.gd adds a taller level's run)
 var _hollin_ready := true       # Hollin's Ember: once per altar
 # v3's Legendary and relic powers (their numbers are in stats.flags: items.gd
 # LEGENDS fx, relics.gd; PR's request, wired at the wave-1 merge).
@@ -293,7 +294,7 @@ var _mode_after_snuff := ""     # what the mode said to a snuff: "" | "restart" 
 # "Continue from the altar" (spec §9.1, P1): main sets resume (Game.suspended())
 # before add_child to start the level at the altar it was left at; the World
 # writes the snapshot as each altar is lit and drops it when the level is left.
-var resume := {}                # {level, diff, altar, time, sigils, embers_carried, killed, taken, opened, at}
+var resume := {}                # {level, diff, altar, lit, time, sigils, embers_carried, killed, taken, opened, at}
 var _killed: Array = []         # level.entities indices of the placed monsters killed so far
 var _taken: Array = []          # ...and of the placed embers and wax taken
 var _opened: Array = []         # the reliquaries opened ([x, y])
@@ -367,6 +368,7 @@ func _build() -> void:
 	var n := ceili(float(level.width) / TileView.CHUNK)
 	chunk_rows = ceili(float(level.height) / TileView.CHUNK)
 	for i in n:
+		var col: Array = []
 		for j in chunk_rows:
 			var tv := TileView.new()
 			tv.level = level
@@ -375,6 +377,15 @@ func _build() -> void:
 			tv.world = self
 			add_child(tv)
 			chunks.append(tv)
+			col.append(tv)
+		if chunk_rows > 1:
+			# A taller level: each chunk's shapes after every chunk's rects
+			# down the column (tile_view.gd Shapes: whole columns' layering).
+			for tv in col:
+				var sh := TileView.Shapes.new()
+				sh.name = "Shapes%d_%d" % [tv.col0 / TileView.CHUNK, tv.row0 / TileView.CHUNK]
+				add_child(sh)
+				tv.shapes = sh
 
 	var under := Node2D.new()
 	under.name = "Under"
@@ -506,6 +517,9 @@ func _build() -> void:
 	player = PlayerScript.new()
 	player.level = level
 	player.world = self
+	# A level taller than a strip: down held on a one-way ledge looks down
+	# (tall_cam.gd), and down + jump drops through it (player.gd hold_drops).
+	player.hold_drops = tall_cam == null
 	var info: Dictionary = Classes.info(cls)
 	var kit_path: String = info["kit"]
 	kit = load(kit_path).new() if ResourceLoader.exists(kit_path) else load("res://scripts/kits/kit.gd").new()
@@ -2144,10 +2158,22 @@ func _in_v3_arena(e: Node2D) -> bool:
 	return player.position.x > float(e.arena_left) and player.position.x < float(e.arena_right)
 
 
+const WAKE_ROWS := 1             # a taller level: rows over and under the view a monster wakes in (a strip's: 6, as v2's)
+
+
 func _update_enemies(dt: float) -> void:
 	var view := view_rect()
 	var wake := view.grow(TILE * 6)
 	var sleep := view.grow(view.size.x * 2.0)
+	if tall_cam != null:
+		# A level taller than a strip: 6 tiles each side still, but only a
+		# row over and under the view (the storey over his, 11 rows up, or a
+		# tier of a switchback, never wakes behind its floor: an Anointed's
+		# plate would show for a monster he can't see), and one asleep again
+		# a view's height off it (strips keep v2's: 6 tiles every way, two
+		# view-widths to sleep).
+		wake = view.grow_individual(TILE * 6, TILE * WAKE_ROWS, TILE * 6, TILE * WAKE_ROWS)
+		sleep = view.grow_individual(view.size.x * 2.0, view.size.y, view.size.x * 2.0, view.size.y)
 	for e in enemies:
 		if not e.active and (wake.has_point(e.position) or _in_v3_arena(e)):
 			e.active = true
@@ -3330,6 +3356,19 @@ func _resuming() -> bool:
 			and str(resume.get("diff", diff)) == diff
 
 
+func _altars_before(ai: int) -> Array:
+	## The altars (indices) the route meets at or before altar ai: a strip's
+	## by x in its facing, a taller level's along the walk map's route
+	## (WalkMap.first_of, two at a time).
+	var out := []
+	var c: Vector2i = altars[ai]["cell"]
+	for i in altars.size():
+		var ci: Vector2i = altars[i]["cell"]
+		if i == ai or WalkMap.first_of(level, [ci, c]) == 0:
+			out.append(i)
+	return out
+
+
 func _resume_has(key: String, ei: int) -> bool:
 	if resume.is_empty():
 		return false
@@ -3362,7 +3401,15 @@ func _write_suspend(a: Dictionary) -> void:
 				var d: Dictionary = m.snapshot()
 				if not d.is_empty():
 					feats[n] = d
-	var sus := {"level": level_id, "diff": diff, "altar": altars.find(a), "time": time,
+	# The altars lit, by index (the file's reading order): the ones the
+	# resume lights, exactly these (in a level whose later altars stand on
+	# higher rows, or one played right to left, reading order isn't the
+	# route's).
+	var lit_i := []
+	for i in altars.size():
+		if bool(altars[i]["lit"]):
+			lit_i.append(i)
+	var sus := {"level": level_id, "diff": diff, "altar": altars.find(a), "lit": lit_i, "time": time,
 			"sigils": sigils_got.duplicate(), "embers_carried": embers_carried, "killed": _killed.duplicate(),
 			"taken": _taken.duplicate(), "opened": _opened.duplicate(true), "at": int(Time.get_unix_time_from_system())}
 	if not feats.is_empty():
@@ -3378,9 +3425,11 @@ func _drop_suspend() -> void:
 
 
 func _apply_resume() -> void:
-	## Starts the level at the snapshot's altar: the altars up to it lit (no
-	## heal, XP or sound), its sigils back, its reliquaries spent, the clock
-	## where it was. The monsters and pickups in it were skipped at the build.
+	## Starts the level at the snapshot's altar: the altars it had lit lit
+	## again (no heal, XP or sound), its sigils back, its reliquaries spent,
+	## the clock where it was. The monsters and pickups in it were skipped at
+	## the build. A snapshot from before "lit" was kept lights the altars on
+	## the route up to its own (_altars_before: by route, not reading order).
 	if not _resuming():
 		resume = {}
 		return
@@ -3389,8 +3438,13 @@ func _apply_resume() -> void:
 		resume = {}
 		return
 	var lit := prop_path("altar_lit")
-	for i in ai + 1:
-		var a: Dictionary = altars[i]
+	var relit: Array = resume.get("lit") if resume.get("lit") is Array else _altars_before(ai)
+	if not relit.has(ai):
+		relit = relit + [ai]
+	for i in relit:
+		if int(i) < 0 or int(i) >= altars.size():
+			continue
+		var a: Dictionary = altars[int(i)]
 		a["lit"] = true
 		if ResourceLoader.exists(lit):
 			a["sprite"].texture = load(lit)
@@ -4206,6 +4260,8 @@ func _first_hurt_bark() -> void:
 const TIPS := {
 	"tip:drop": ["Slide your thumb down to drop", "Hold it a moment on a ledge, or slide down and jump"],
 	"tip:climb": ["Slide up to climb", "Left thumb up the vine; jump with an arrow held leaps off"],
+	# A level taller than a strip: down held on a ledge looks down (player.gd hold_drops).
+	"tip:look": ["Hold down to look below", "Here a ledge drops you only if you slide down and jump"],
 }
 
 
@@ -4217,13 +4273,15 @@ func _thumb_tips() -> void:
 	## a mode or the feel lab (it writes nothing).
 	if _tips_done or headless or autoplay or test_pad != null or on_pad.is_valid() or mode != null or is_lab() or hud == null:
 		return
-	var id := "tip:climb" if player.climbing else ("tip:drop" if player.on_ledge() else "")
+	# (in a level taller than a strip the first ledge teaches the look down)
+	var ledge := "tip:look" if tall_cam != null else "tip:drop"
+	var id := "tip:climb" if player.climbing else (ledge if player.on_ledge() else "")
 	if id == "":
 		return
 	if not Game.seen(id):
 		card(id, str(TIPS[id][0]), str(TIPS[id][1]))
 		Game.mark_seen(id)
-	_tips_done = Game.seen("tip:drop") and Game.seen("tip:climb")
+	_tips_done = Game.seen(ledge) and Game.seen("tip:climb")
 
 
 func _on_snuffed() -> void:
@@ -4245,11 +4303,13 @@ func _on_snuffed() -> void:
 	snuffs += 1
 	var cause: String = snuff_causes.get("_last", "hit")
 	snuff_causes[cause] = int(snuff_causes.get(cause, 0)) + 1
-	# For tuning on the owner's phone: where (the tile x), what and which move.
+	# For tuning on the owner's phone: where (the tile x and row: in a level
+	# taller than a strip the playlog adds how far along the route, at the
+	# line's writing), what and which move.
 	var feat := str(snuff_causes.get("_feature", ""))
 	if feat == "" and not _feature_note.is_empty() and ftime - float(_feature_note["t"]) <= FEATURE_BLAME:
 		feat = str(_feature_note["name"])
-	snuff_sections.append({"x": floori(player.position.x / TILE), "cause": cause,
+	snuff_sections.append({"x": floori(player.position.x / TILE), "y": floori((player.position.y - 1.0) / TILE), "cause": cause,
 			"move": str(snuff_causes.get("_move", "")), "feature": feat})
 	_mode_after_snuff = str(mode.on_snuffed(self)) if mode != null else ""
 	# The Guttered Pool: carried embers stay where he fell (last firm ground

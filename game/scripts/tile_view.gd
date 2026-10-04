@@ -6,7 +6,15 @@ extends Node2D
 ## The drawing is cached by the canvas and redone only when a tile changes,
 ## and the canvas culls a chunk off screen, so a redraw and the tiles drawn a
 ## frame scale with the screen, not the level's height (the shapes plan's E4:
-## a 15-row level is one row of chunks, drawn exactly as before).
+## a 15-row level is one row of chunks, drawn exactly as before). In a level
+## taller than that a chunk draws its rects itself and hands its shapes (the
+## TriBatch) to its Shapes layer, which world.gd lays after every chunk of
+## its column: all of a column's rects, then all its shapes, as whole
+## columns drew them, so a shape hanging over its chunk's last row (a
+## vine's roots splayed on the stone under it) is never under the next
+## chunk's stone. (Only shapes from two cells diagonal across a seam that
+## touch at the corner may change which is on top: tests/test_render.gd
+## _test_chunk_seams.)
 ## Reliquaries are sprites (the Block nodes) and lava animates on its own;
 ## water and false stone's crack are level_features' (false stone itself is
 ## drawn here exactly like stone, which is the point).
@@ -73,17 +81,39 @@ var level: RefCounted
 var col0 := 0
 var row0 := 0                    # the chunk's first row (world.gd lays chunks out CHUNK rows apart)
 var world: Node          # for the crumbling ledges' state (may be null)
+var shapes: Node2D = null        # a taller level's: the Shapes layer that draws this chunk's shapes
 var _p: Dictionary = PALETTES["cathedral"]
 var _tb = null                   # a TriBatch, made the first time a chunk needs one
+
+
+class Shapes extends Node2D:
+	## A chunk's shapes in a level taller than a strip: the triangles its
+	## TileView batched at its last draw, drawn here (after its column's rects).
+	var tris: Array = []
+
+	func _draw() -> void:
+		for t in tris:
+			RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), t[0], t[1], t[2])
 
 
 func _batch():
 	if _tb == null:
 		_tb = TriBatch.new()
+	_tb.keep = shapes != null
 	return _tb
 
 
 func _draw() -> void:
+	_paint()
+	if shapes != null:
+		# Its shapes to its Shapes layer (redrawn with it: same frame).
+		shapes.tris = _tb.kept if _tb != null else []
+		if _tb != null:
+			_tb.kept = []
+		shapes.queue_redraw()
+
+
+func _paint() -> void:
 	var th := str(level.theme)
 	var col1 := mini(col0 + CHUNK, level.width)
 	var row1 := mini(row0 + CHUNK, level.height)

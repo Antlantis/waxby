@@ -441,7 +441,7 @@ func _test_exits() -> void:
 func _test_level_rules(lv: RefCounted) -> void:
 	var id: String = lv.id
 	_check(lv.errors.is_empty(), "%s parses cleanly %s" % [id, lv.errors])
-	_check(lv.width == 250 and Rules.height_ok(lv), "%s is 250 wide, %d-%d rows (%d x %d)" % [id, Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.width, lv.height])
+	_check(lv.width == 250 and lv.height == LevelData.STRIP_ROWS and Rules.height_ok(lv), "%s is 250 x %d, a strip (%d x %d)" % [id, LevelData.STRIP_ROWS, lv.width, lv.height])
 	_check(lv.subtitle == id and lv.title != "", "%s: its title and subtitle" % id)
 	_check(str(lv.theme).ends_with("_gilt") and lv.music == "secret", "%s: a gilt theme, music secret (%s, %s)" % [id, lv.theme, lv.music])
 	var areas: Dictionary = (game.get_script() as Script).get_script_constant_map().get("AREAS", {})

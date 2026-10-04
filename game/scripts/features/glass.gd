@@ -86,6 +86,7 @@ extends "res://scripts/features/feature.gd"
 ## the step runs only the panes that aren't whole (a break, a reform).
 
 const Arena := preload("res://scripts/boss_arena.gd")
+const WalkMap := preload("res://scripts/walk_map.gd")
 const Themes := preload("res://scripts/themes/loader.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
 
@@ -127,7 +128,7 @@ const TILE_F := 32.0
 const CHUNK := 16                # columns per bucket
 
 var panes := {}                  # Vector2i -> {strain, state: whole|flash|gone|shimmer, t, stage, arena}
-var zones: Array = []            # {x0, x1, dir, phase}
+var zones: Array = []            # {x0, x1, dir, phase[, y0, y1]} (a taller level's zone: its rows too)
 var dawn := {}                   # Vector2i -> {lit, flicker, remain, lamps: [lantern indices]}
 var arena_x := Vector2(-1.0, -1.0)   # the boss arena's span in px (left, right), or (-1, -1)
 var arena := false               # the level has a boss arena
@@ -188,6 +189,10 @@ func build(w: Node, lv: RefCounted) -> void:
 					var c := Vector2i(x, y)
 					dawn[c] = {"lit": false, "flicker": -1.0, "remain": INF, "lamps": []}
 					_bucket(_dchunk, c)
+	if not panes.is_empty() and not WalkMap.strip(lv):
+		# A taller level's route, now at the build: on_fall asks it which
+		# way is ahead (never a route solved mid-play).
+		WalkMap.of(lv).route()
 	zones = lv.gusts.duplicate(true)
 	_zstate.resize(zones.size())
 	_zstate.fill("calm")
@@ -441,13 +446,19 @@ func on_fall(at: Vector2) -> void:
 	## A fall into the void put him back at firm ground: the panes gone within
 	## FALL_REFORM tiles ahead of him come back at once, as a snuff's do (the
 	## rev5 review: after a fall in 5-1's arches he faced missing capitals,
-	## and walked off onto them). Never the boss arena's (its own rule).
+	## and walked off onto them). Ahead is the way the route runs there
+	## (WalkMap.dir_of: a strip's its facing, so right to left facing left;
+	## a taller level's the walk map's, its leftward storey's too). Never the
+	## boss arena's (its own rule).
 	var c0 := floori(at.x / TILE)
+	var d := WalkMap.dir_of(level, Vector2i(c0, floori((at.y - 1.0) / TILE)))
+	var lo := c0 - 2 if d > 0 else c0 - FALL_REFORM
+	var hi := c0 + FALL_REFORM if d > 0 else c0 + 2
 	for c in panes:
 		var p: Dictionary = panes[c]
 		if p["arena"] or p["state"] == "whole" or _body_in(c):
 			continue
-		if (c as Vector2i).x >= c0 - 2 and (c as Vector2i).x <= c0 + FALL_REFORM:
+		if (c as Vector2i).x >= lo and (c as Vector2i).x <= hi:
 			_reform(c)
 
 
@@ -536,10 +547,18 @@ func lamp_left(i: int) -> float:
 
 func _zone_at(p: Vector2) -> int:
 	var x := floori(p.x / TILE)
+	var y := floori(p.y / TILE)
 	for i in zones.size():
-		if x >= int(zones[i]["x0"]) and x <= int(zones[i]["x1"]):
+		if x >= int(zones[i]["x0"]) and x <= int(zones[i]["x1"]) and in_rows(zones[i], y):
 			return i
 	return -1
+
+
+static func in_rows(z: Dictionary, y: int) -> bool:
+	## A zone's rows hold row y: every row, but a taller level's zone with
+	## rows (y0, y1: its section's own) only those (another deck's wind never
+	## blows on this one).
+	return not z.has("y0") or (y >= int(z["y0"]) and y <= int(z["y1"]))
 
 
 func zone_at(p: Vector2) -> Dictionary:

@@ -15,10 +15,13 @@ extends RefCounted
 ##   the buttons, the prototype found). He lands and it eases back.
 ## - A lift carries the camera with it (ride), so its easing never lags his
 ##   floor under the thumb buttons (the strip camera trails a lift's sweep:
-##   on its way down his floor sinks under the Special's top).
-## - A look down: down held DOWN_HOLD s standing still on stone eases his
-##   feet up to DOWN_FEET (about two more rows under him), back when let go.
-##   (On a one-way ledge down drops him through first: player.gd DROP_HOLD.)
+##   on its way down his floor sinks under the Special's top); not while a
+##   boss has time stopped (the lift stands still then).
+## - A look down: down held DOWN_HOLD s standing still eases his feet up to
+##   DOWN_FEET (about two more rows under him), back when let go: on stone,
+##   and on a one-way ledge too (2-2's shelves over the low road), where in
+##   a taller level down held never drops him through (player.gd
+##   hold_drops: down + jump does).
 ## - The top band at a tower's top: where the camera stops at the level's
 ##   top edge, a goal there must show clear of the HUD's top band (its
 ##   corner blocks and the pause button): band_hits, with the camera where
@@ -96,9 +99,13 @@ func rate(base: float) -> float:
 
 
 func ride() -> float:
-	## The y the lift he stands on moved this step (the camera moves with it).
+	## The y the lift he stands on moved this step (the camera moves with it):
+	## none while time is stopped (world.gd stop_time: the movers stand still
+	## then, each still holding its last step's delta).
 	var m = w.player.riding if w.player != null else null
-	return float(m.delta.y) if m != null and w.state == "play" else 0.0
+	if m == null or w.state != "play" or (w.has_method("time_stopped") and w.time_stopped()):
+		return 0.0
+	return float(m.delta.y)
 
 
 func icicle_near(feet: float, hang: Vector2) -> bool:

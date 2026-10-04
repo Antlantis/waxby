@@ -838,8 +838,8 @@ func _test_teaching(levels: Dictionary) -> void:
 
 
 func _test_screens(levels: Dictionary) -> void:
-	## Per 27-tile window (spec §3.1; a taller level's 12 rows tall:
-	## Rules.screen_rows): pods <= 8, glowfruit <= 6, feature lights <= 14
+	## Per 27-tile window (spec §3.1; a taller level's the views over the
+	## rows he stands on in it: Rules.screen_rows): pods <= 8, glowfruit <= 6, feature lights <= 14
 	## (glowfruit and lanterns, and each pod's dim glow counted too), placed
 	## monsters <= 12. The live-cloud cap (5) is counted in play (_test_smoke).
 	for id in levels:
@@ -866,10 +866,10 @@ func _test_screens(levels: Dictionary) -> void:
 
 
 func _windows(lv: RefCounted) -> Array:
-	## [Vector3i(x0, y0, y1)]: every 27-tile window, each screen_rows tall.
+	## [Vector3i(x0, y0, y1)]: every 27-tile window, each of its screen_rows.
 	var out := []
 	for x0 in range(0, maxi(lv.width - 26, 1)):
-		for ys in Rules.screen_rows(lv):
+		for ys in Rules.screen_rows(lv, x0, 27):
 			out.append(Vector3i(x0, ys.x, ys.y))
 	return out
 

@@ -587,6 +587,6 @@ func _route_pad(pl: Node2D) -> Dictionary:
 		return pd
 	pd["jump"] = (_i / (20 if hd.y < 0 else 60)) % 3 == 0
 	if hd.x == 0 and hd.y > 0 and pl.on_floor:
-		pd["down"] = true   # (pure down: through a one-way ledge)
-		pd["jump"] = false
+		pd["down"] = true   # (down + jump: through a one-way ledge; a taller level's pure down only looks down)
+		pd["jump"] = (_i / 6) % 2 == 0
 	return pd

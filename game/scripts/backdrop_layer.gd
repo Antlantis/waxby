@@ -25,11 +25,67 @@ var x0 := 0.0
 var x1 := 0.0
 var style: Script = null
 var _tb = null
+var log = null                   # a test's record of a v2 layer's drawing (tests/test_world_art.gd): set to [], _draw()
+                                 #   only appends [kind, ...] for each draw (rect, poly, circle, line, pline, arc, tris)
+var flat := false                # a test's: draw as a strip's would at this span (no tall band)
 const STOREY := 250.0            # a tall level's storey down the arcade (mid)
 const NEAR_STOREY := 300.0       # and down the near pillars, the cavern's ledges
 
 func _ready() -> void:
 	queue_redraw()
+
+
+# -- v2's draws, recorded instead when a test asks (log)
+
+func _d_rect(r: Rect2, col: Color, filled := true, width := -1.0) -> void:
+	if log != null:
+		log.append(["rect", r, col, filled])
+		return
+	draw_rect(r, col, filled, width)
+
+
+func _d_poly(pts: PackedVector2Array, col: Color) -> void:
+	if log != null:
+		log.append(["poly", pts, col])
+		return
+	draw_colored_polygon(pts, col)
+
+
+func _d_circle(p: Vector2, r: float, col: Color) -> void:
+	if log != null:
+		log.append(["circle", p, r, col])
+		return
+	draw_circle(p, r, col)
+
+
+func _d_line(a: Vector2, b: Vector2, col: Color, width := -1.0) -> void:
+	if log != null:
+		log.append(["line", a, b, col, width])
+		return
+	draw_line(a, b, col, width)
+
+
+func _d_pline(pts: PackedVector2Array, col: Color, width := -1.0) -> void:
+	if log != null:
+		log.append(["pline", pts, col, width])
+		return
+	draw_polyline(pts, col, width)
+
+
+func _d_arc(p: Vector2, r: float, a0: float, a1: float, n: int, col: Color, width := -1.0) -> void:
+	if log != null:
+		log.append(["arc", p, r, col, width])
+		return
+	draw_arc(p, r, a0, a1, n, col, width)
+
+
+func _flush(tb) -> void:
+	## A tall level's batch: drawn (one call), or recorded.
+	if log != null:
+		log.append(["tris", tb.points.duplicate(), tb.indices.duplicate(), tb.colors.duplicate(), tb.vertex_count(), tb.dropped])
+		tb.clear()
+		return
+	tb.flush(self)
 
 
 func _h(i: int, salt: int = 0) -> float:
@@ -49,15 +105,15 @@ func _draw() -> void:
 		style.draw(self, _tb, index, c, span, x0, x1, backdrop.tall(index))
 		_tb.flush(self)
 		return
-	var tall: float = backdrop.tall(index) if backdrop.has_method("tall") else 0.0
+	var tall: float = backdrop.tall(index) if backdrop.has_method("tall") and not flat else 0.0
 	if str(c.get("style", "cathedral")) == "cavern":
 		match index:
 			0:
-				_cave_far(c, span)
+				_cave_far(c, span, tall)   # (the far layer shows a little more of a taller level too)
 			1:
 				_cave_terraces(c, span, tall)
 			2:
-				_cave_near(c, span)
+				_cave_near(c, span, tall)
 		if tall > 0.0 and index > 0:
 			_tall_cavern(c, span, tall)
 		return
@@ -86,11 +142,11 @@ func _arch(x: float, w: float, top: float, bottom: float, col: Color) -> void:
 		var th := deg_to_rad(60.0 - 60.0 * k / 8.0)
 		pts.append(Vector2(x + w * cos(th), spring - w * sin(th)))
 	pts.append(Vector2(x + w, bottom))
-	draw_colored_polygon(pts, col)
+	_d_poly(pts, col)
 
 
 func _far(c: Dictionary, span: Vector2) -> void:
-	draw_rect(Rect2(Vector2(-200, -200), span + Vector2(400, 600)), c["sky"])
+	_d_rect(Rect2(Vector2(-200, -200), span + Vector2(400, 600)), c["sky"])
 	# Vaults: big faint arches all along.
 	var w := 260.0
 	var n := int(span.x / w) + 2
@@ -104,8 +160,8 @@ func _far(c: Dictionary, span: Vector2) -> void:
 	while x2 < span.x + 200:
 		var center := Vector2(x2, 120.0 + _h(i2, 3) * 30.0)
 		var r := 58.0
-		draw_circle(center, r + 8.0, c["far"].darkened(0.35))
-		draw_circle(center, r, c["mid"].darkened(0.2))
+		_d_circle(center, r + 8.0, c["far"].darkened(0.35))
+		_d_circle(center, r, c["mid"].darkened(0.2))
 		_rose(center, r, c["glass"])
 		backdrop.windows.append({"layer": 0, "rose": true, "center": center, "radius": r, "colors": c["glass"]})
 		x2 += every
@@ -117,13 +173,13 @@ func _arcade(c: Dictionary, span: Vector2) -> void:
 	var wall_top := 60.0
 	var bay := 200.0
 	var n := int(span.x / bay) + 2
-	draw_rect(Rect2(Vector2(-200, wall_top + 40.0), Vector2(span.x + 400, span.y + 400)), c["mid"].darkened(0.25))
+	_d_rect(Rect2(Vector2(-200, wall_top + 40.0), Vector2(span.x + 400, span.y + 400)), c["mid"].darkened(0.25))
 	for i in n:
 		var x := i * bay
 		# Pillar.
-		draw_rect(Rect2(x - 16, wall_top - 20, 32, span.y + 300), c["mid"])
-		draw_rect(Rect2(x - 22, wall_top + 30, 44, 10), c["mid"].lightened(0.08))
-		draw_rect(Rect2(x + 8, wall_top - 20, 8, span.y + 300), c["mid"].darkened(0.2))
+		_d_rect(Rect2(x - 16, wall_top - 20, 32, span.y + 300), c["mid"])
+		_d_rect(Rect2(x - 22, wall_top + 30, 44, 10), c["mid"].lightened(0.08))
+		_d_rect(Rect2(x + 8, wall_top - 20, 8, span.y + 300), c["mid"].darkened(0.2))
 		# Window between pillars.
 		if _h(i, 7) > 0.2:
 			var wx := x + bay * 0.5 - 26.0
@@ -144,15 +200,15 @@ func _near(c: Dictionary, span: Vector2) -> void:
 			continue
 		var x := i * gap + _h(i, 5) * 120.0
 		# A heavy pillar silhouette.
-		draw_rect(Rect2(x - 26, -60, 52, span.y + 400), c["near"])
-		draw_rect(Rect2(x - 34, 90 + _h(i) * 40.0, 68, 14), c["near"].lightened(0.06))
+		_d_rect(Rect2(x - 26, -60, 52, span.y + 400), c["near"])
+		_d_rect(Rect2(x - 34, 90 + _h(i) * 40.0, 68, 14), c["near"].lightened(0.06))
 		# Chains hanging from the dark.
 		if _h(i, 9) > 0.35:
 			var cx := x + 90.0 + _h(i, 2) * 80.0
 			var len := 60.0 + _h(i, 4) * 90.0
 			var y := -10.0
 			while y < len:
-				draw_arc(Vector2(cx, y), 3.5, 0.0, TAU, 10, c["near"].lightened(0.12), 1.6)
+				_d_arc(Vector2(cx, y), 3.5, 0.0, TAU, 10, c["near"].lightened(0.12), 1.6)
 				y += 8.0
 		# A banner.
 		if _h(i, 11) > 0.45:
@@ -160,12 +216,12 @@ func _near(c: Dictionary, span: Vector2) -> void:
 			var bw := 34.0
 			var bh := 90.0 + _h(i, 8) * 40.0
 			var ban := PackedVector2Array([Vector2(bx, 20), Vector2(bx + bw, 20), Vector2(bx + bw, 20 + bh), Vector2(bx + bw * 0.5, 20 + bh - 16), Vector2(bx, 20 + bh)])
-			draw_colored_polygon(ban, c["banner"].darkened(0.35))
-			draw_rect(Rect2(bx - 4, 16, bw + 8, 5), c["near"].lightened(0.15))
+			_d_poly(ban, c["banner"].darkened(0.35))
+			_d_rect(Rect2(bx - 4, 16, bw + 8, 5), c["near"].lightened(0.15))
 			# A pale flame emblem.
 			var e := Vector2(bx + bw * 0.5, 20 + bh * 0.45)
 			var fl := PackedVector2Array([e + Vector2(0, -12), e + Vector2(6, 2), e + Vector2(0, 8), e + Vector2(-6, 2)])
-			draw_colored_polygon(fl, c["banner"].lightened(0.2).darkened(0.2))
+			_d_poly(fl, c["banner"].lightened(0.2).darkened(0.2))
 
 
 func _rose(c: Vector2, r: float, cols: Array) -> void:
@@ -177,12 +233,12 @@ func _rose(c: Vector2, r: float, cols: Array) -> void:
 		var pts := PackedVector2Array([c + Vector2(cos(a0), sin(a0)) * r * 0.3, c + Vector2(cos(a0), sin(a0)) * r * 0.92,
 				c + Vector2(cos((a0 + a1) * 0.5), sin((a0 + a1) * 0.5)) * r * 0.98, c + Vector2(cos(a1), sin(a1)) * r * 0.92,
 				c + Vector2(cos(a1), sin(a1)) * r * 0.3])
-		draw_colored_polygon(pts, col.darkened(0.15))
-	draw_circle(c, r * 0.26, (cols[0] as Color).lightened(0.1))
-	draw_arc(c, r * 0.28, 0, TAU, 24, Color(0, 0, 0, 0.6), 2.5)
+		_d_poly(pts, col.darkened(0.15))
+	_d_circle(c, r * 0.26, (cols[0] as Color).lightened(0.1))
+	_d_arc(c, r * 0.28, 0, TAU, 24, Color(0, 0, 0, 0.6), 2.5)
 	for i in 12:
 		var a := TAU * i / 12.0
-		draw_line(c + Vector2(cos(a), sin(a)) * r * 0.28, c + Vector2(cos(a), sin(a)) * r * 0.95, Color(0, 0, 0, 0.6), 2.5)
+		_d_line(c + Vector2(cos(a), sin(a)) * r * 0.28, c + Vector2(cos(a), sin(a)) * r * 0.95, Color(0, 0, 0, 0.6), 2.5)
 
 
 func _lancet(rr: Rect2, cols: Array, seed: int) -> void:
@@ -193,7 +249,7 @@ func _lancet(rr: Rect2, cols: Array, seed: int) -> void:
 	for row in rows:
 		for colm in 2:
 			var col: Color = cols[(seed * 7 + row * 3 + colm) % cols.size()]
-			draw_rect(Rect2(rr.position.x + colm * rr.size.x * 0.5 + 2.0, spring + row * ph + 2.0, rr.size.x * 0.5 - 4.0, ph - 4.0), col.darkened(0.2))
+			_d_rect(Rect2(rr.position.x + colm * rr.size.x * 0.5 + 2.0, spring + row * ph + 2.0, rr.size.x * 0.5 - 4.0, ph - 4.0), col.darkened(0.2))
 	var w2 := rr.size.x
 	var pts := PackedVector2Array()
 	for k in range(0, 9):
@@ -206,7 +262,7 @@ func _lancet(rr: Rect2, cols: Array, seed: int) -> void:
 	var ctr := Vector2(rr.get_center().x, spring - w2 * 0.3)
 	for q in pts:
 		inner.append(ctr + (q - ctr) * 0.82)
-	draw_colored_polygon(inner, (cols[seed % cols.size()] as Color).darkened(0.1))
+	_d_poly(inner, (cols[seed % cols.size()] as Color).darkened(0.1))
 
 
 # ---------------------------------------------------------------- a tall level (E9)
@@ -302,7 +358,7 @@ func _tall_cathedral(c: Dictionary, span: Vector2, tall: float) -> void:
 					tb.convex(PackedVector2Array([Vector2(cx - 7.0, y), Vector2(cx + 7.0, y), Vector2(cx + 5.0, y + 16.0), Vector2(cx - 5.0, y + 16.0)]),
 							near.lightened(0.1))
 			k += 1
-	tb.flush(self)
+	_flush(tb)
 
 
 func _tall_cavern(c: Dictionary, span: Vector2, tall: float) -> void:
@@ -363,7 +419,7 @@ func _tall_cavern(c: Dictionary, span: Vector2, tall: float) -> void:
 					else:
 						tb.tri(Vector2(sx - 6.0, y + 18.0), Vector2(sx + 6.0, y + 18.0), Vector2(sx, y + 18.0 + ln), near.lightened(0.05))
 			k += 1
-	tb.flush(self)
+	_flush(tb)
 
 
 # ---------------------------------------------------------------- the cavern (World 2)
@@ -372,17 +428,26 @@ func _theme() -> String:
 	return str(backdrop.theme)
 
 
-func _wavy_band(x: float, w: float, top: float, bottom: float, col: Color, seed: int) -> void:
-	## A curtain of wax running down: wavy sides, a rounded foot.
+func _wavy_band(x: float, w: float, top: float, bottom: float, col: Color, seed: int, strip_bottom := INF) -> void:
+	## A curtain of wax running down: wavy sides, a rounded foot. Its waves
+	## are 12 to the strip's length (strip_bottom: in a taller level the
+	## strip's own bottom; the curtain runs on down at the same step, so its
+	## top is drawn as the strip's).
 	var pts := PackedVector2Array()
+	var sb := minf(strip_bottom, bottom)
 	var n := 12
+	var ys: Array[float] = []
 	for k in n + 1:
-		var y := lerpf(top, bottom, float(k) / n)
+		ys.append(lerpf(top, sb, float(k) / n))
+	var step := (sb - top) / n
+	while ys[ys.size() - 1] < bottom - 0.001:
+		ys.append(minf(ys[ys.size() - 1] + step, bottom))
+	for y in ys:
 		pts.append(Vector2(x - w * 0.5 + sin(y * 0.035 + seed) * w * 0.12, y))
-	for k in range(n, -1, -1):
-		var y := lerpf(top, bottom, float(k) / n)
+	for k in range(ys.size() - 1, -1, -1):
+		var y: float = ys[k]
 		pts.append(Vector2(x + w * 0.5 + sin(y * 0.03 + seed * 1.7) * w * 0.12, y))
-	draw_colored_polygon(pts, col)
+	_d_poly(pts, col)
 
 
 func _candles(at: Vector2, n: int, c: Dictionary, layer: int, seed: int) -> void:
@@ -392,14 +457,17 @@ func _candles(at: Vector2, n: int, c: Dictionary, layer: int, seed: int) -> void
 	for k in n:
 		var x := at.x + (k - n * 0.5) * 7.0 + _h(seed, k) * 3.0
 		var h := 8.0 + _h(seed, k + 7) * 12.0
-		draw_rect(Rect2(x - 2.5, at.y - h, 5, h), wax.darkened(0.35))
-		draw_rect(Rect2(x - 2.5, at.y - h, 2, h), wax.darkened(0.15))
-		draw_circle(Vector2(x, at.y - h - 3.0), 2.2, (glass[(seed + k) % glass.size()] as Color))
+		_d_rect(Rect2(x - 2.5, at.y - h, 5, h), wax.darkened(0.35))
+		_d_rect(Rect2(x - 2.5, at.y - h, 2, h), wax.darkened(0.15))
+		_d_circle(Vector2(x, at.y - h - 3.0), 2.2, (glass[(seed + k) % glass.size()] as Color))
 	backdrop.windows.append({"layer": layer, "rose": true, "center": at + Vector2(0, -14), "radius": 16.0 + n * 2.0, "colors": glass})
 
 
-func _cave_far(c: Dictionary, span: Vector2) -> void:
-	draw_rect(Rect2(Vector2(-200, -200), span + Vector2(400, 600)), c["sky"])
+func _cave_far(c: Dictionary, span: Vector2, tall := 0.0) -> void:
+	## (tall: how much more a taller level shows; the strip's things keep the
+	## strip's sizes, its ground stays at the bottom.)
+	var sy := span.y - tall
+	_d_rect(Rect2(Vector2(-200, -200), span + Vector2(400, 600)), c["sky"])
 	var far: Color = c["far"]
 	var wax: Color = c.get("wax", Color("cdb88e"))
 	var th := _theme()
@@ -420,39 +488,39 @@ func _cave_far(c: Dictionary, span: Vector2) -> void:
 					var dip := sin(k * 1.7 + i) * 5.0 + (14.0 if k == 0 or k == 12 else 0.0) + (6.0 if k == 1 or k == 11 else 0.0)
 					pts.append(Vector2(xx, top + dip))
 				pts.append(Vector2(x + w * 0.5, span.y + 300))
-				draw_colored_polygon(pts, body)
-				draw_rect(Rect2(x + w * 0.22, top + 10, w * 0.28, span.y + 300), far.darkened(0.1))
+				_d_poly(pts, body)
+				_d_rect(Rect2(x + w * 0.22, top + 10, w * 0.28, span.y + 300), far.darkened(0.1))
 				for k in 7:
 					var dx := x - w * 0.5 + 8.0 + (k + 0.5) * (w - 16.0) / 7.0
 					var len := 30.0 + _h(i, k + 10) * 110.0
 					var dc := body.lightened(0.05) if dx < x + w * 0.2 else far.darkened(0.04)
-					draw_rect(Rect2(dx - 6, top + 4, 12, len), dc)
-					draw_circle(Vector2(dx, top + 4 + len), 6.0, dc)
-				draw_line(Vector2(x, top + 2), Vector2(x + 5, top - 22), Color("0e0a14"), 5.0)
+					_d_rect(Rect2(dx - 6, top + 4, 12, len), dc)
+					_d_circle(Vector2(dx, top + 4 + len), 6.0, dc)
+				_d_line(Vector2(x, top + 2), Vector2(x + 5, top - 22), Color("0e0a14"), 5.0)
 				var glass: Array = c["glass"]
-				draw_circle(Vector2(x + 5, top - 25), 4.0, (glass[1] as Color).darkened(0.35))
+				_d_circle(Vector2(x + 5, top - 25), 4.0, (glass[1] as Color).darkened(0.35))
 				backdrop.windows.append({"layer": 0, "rose": true, "center": Vector2(x + 5, top - 26), "radius": 26.0, "colors": glass})
 				x += 1100.0 + _h(i, 4) * 300.0
 			"garden":
 				# Pale wax lilies taller than the cave.
-				var base := Vector2(x, span.y + 40)
+				var base := Vector2(x, sy + 40)
 				var tip := Vector2(x + (_h(i, 5) - 0.5) * 120.0, 60.0 + _h(i, 6) * 60.0)
 				var pts := PackedVector2Array()
 				for k in 11:
 					var s := k / 10.0
 					pts.append(base.lerp(tip, s) + Vector2(sin(s * PI) * 40.0 * (1.0 if i % 2 == 0 else -1.0), 0))
-				draw_polyline(pts, far.lightened(0.07), 9.0)
+				_d_pline(pts, far.lightened(0.07), 9.0)
 				var bell := PackedVector2Array([tip + Vector2(-34, 30), tip + Vector2(-22, -6), tip + Vector2(0, -14), tip + Vector2(22, -6), tip + Vector2(34, 30), tip + Vector2(10, 18), tip + Vector2(-10, 18)])
-				draw_colored_polygon(bell, far.lightened(0.13))
+				_d_poly(bell, far.lightened(0.13))
 				var glass2: Array = c["glass"]
-				draw_circle(tip + Vector2(0, 16), 5.0, (glass2[0] as Color).darkened(0.35))
+				_d_circle(tip + Vector2(0, 16), 5.0, (glass2[0] as Color).darkened(0.35))
 				backdrop.windows.append({"layer": 0, "rose": true, "center": tip + Vector2(0, 14), "radius": 24.0, "colors": glass2})
 				x += 520.0 + _h(i, 4) * 260.0
 			_:
 				# Far waxfalls, pale against the rock.
 				var w2 := 40.0 + _h(i, 2) * 50.0
-				_wavy_band(x, w2, -20.0, span.y + 200, far.lightened(0.09), i)
-				_wavy_band(x - w2 * 0.12, w2 * 0.35, -20.0, span.y + 200, far.lightened(0.16), i + 3)
+				_wavy_band(x, w2, -20.0, span.y + 200, far.lightened(0.09), i, sy + 200)
+				_wavy_band(x - w2 * 0.12, w2 * 0.35, -20.0, span.y + 200, far.lightened(0.16), i + 3, sy + 200)
 				x += 380.0 + _h(i, 4) * 300.0
 		i += 1
 	# The cave's roof: rock with drips hanging off it.
@@ -468,7 +536,7 @@ func _cave_far(c: Dictionary, span: Vector2) -> void:
 		rx += 40.0
 		k2 += 1
 	roof.append(Vector2(span.x + 240, -200))
-	draw_colored_polygon(roof, far.darkened(0.25))
+	_d_poly(roof, far.darkened(0.25))
 	# Its floor: heaped wax and rock.
 	var fl := PackedVector2Array([Vector2(-200, span.y + 300)])
 	var fx := -200.0
@@ -478,7 +546,7 @@ func _cave_far(c: Dictionary, span: Vector2) -> void:
 		fx += 60.0
 		k3 += 1
 	fl.append(Vector2(span.x + 240, span.y + 300))
-	draw_colored_polygon(fl, far.darkened(0.12))
+	_d_poly(fl, far.darkened(0.12))
 	# Candles someone left down here.
 	var cx := 180.0
 	var n := 0
@@ -501,40 +569,43 @@ func _cave_terraces(c: Dictionary, span: Vector2, tall := 0.0) -> void:
 		if th != "garden" and _h(i, 2) > 0.35:
 			var wx := x + bay * 0.5
 			var w := 22.0 + _h(i, 3) * 16.0
-			_wavy_band(wx, w, -40.0, span.y - 120.0, mid.lightened(0.10), i)
-			_wavy_band(wx - w * 0.15, w * 0.3, -40.0, span.y - 120.0, mid.lightened(0.18), i + 5)
-			draw_circle(Vector2(wx, span.y - 116.0), w * 0.6, mid.lightened(0.10))
+			_wavy_band(wx, w, -40.0, span.y - 120.0, mid.lightened(0.10), i, span.y - tall - 120.0)
+			_wavy_band(wx - w * 0.15, w * 0.3, -40.0, span.y - 120.0, mid.lightened(0.18), i + 5, span.y - tall - 120.0)
+			_d_circle(Vector2(wx, span.y - 116.0), w * 0.6, mid.lightened(0.10))
 		elif th == "garden":
 			var vx := x + bay * 0.5
 			var pts := PackedVector2Array()
 			for k in 12:
 				var y := -20.0 + k * ((span.y - tall) * 0.06)   # (a tall level's vines: the strip's length)
 				pts.append(Vector2(vx + sin(k * 0.8 + i) * 10.0, y))
-			draw_polyline(pts, mid.lightened(0.08), 3.0)
+			_d_pline(pts, mid.lightened(0.08), 3.0)
 			for k in range(1, 12, 2):
-				draw_colored_polygon(PackedVector2Array([pts[k], pts[k] + Vector2(12, -4), pts[k] + Vector2(6, 4)]), mid.lightened(0.12))
+				_d_poly(PackedVector2Array([pts[k], pts[k] + Vector2(12, -4), pts[k] + Vector2(6, 4)]), mid.lightened(0.12))
 		# The terrace: three rounded tiers.
 		var ground := span.y - 30.0
 		for tier in 3:
 			var tw := 190.0 - tier * 50.0
 			var tt := ground - (tier + 1) * 44.0 - _h(i, 4 + tier) * 10.0
 			var tx := x - tw * 0.5 + tier * 14.0
-			draw_rect(Rect2(tx, tt, tw, ground - tt + 200.0), mid.darkened(0.08 * tier))
-			draw_rect(Rect2(tx - 4, tt - 4, tw + 8, 10), mid.lightened(0.08))
-			draw_circle(Vector2(tx, tt + 1), 6.0, mid.lightened(0.08))
-			draw_circle(Vector2(tx + tw, tt + 1), 6.0, mid.lightened(0.08))
+			_d_rect(Rect2(tx, tt, tw, ground - tt + 200.0), mid.darkened(0.08 * tier))
+			_d_rect(Rect2(tx - 4, tt - 4, tw + 8, 10), mid.lightened(0.08))
+			_d_circle(Vector2(tx, tt + 1), 6.0, mid.lightened(0.08))
+			_d_circle(Vector2(tx + tw, tt + 1), 6.0, mid.lightened(0.08))
 			# Drips off each lip.
 			for d in 4:
 				var dx := tx + 10.0 + _h(i * 3 + tier, d) * (tw - 20.0)
 				var len := 6.0 + _h(i + tier, d + 20) * 16.0
-				draw_rect(Rect2(dx - 2.5, tt + 4, 5, len), wax.darkened(0.55))
-				draw_circle(Vector2(dx, tt + 4 + len), 3.0, wax.darkened(0.55))
+				_d_rect(Rect2(dx - 2.5, tt + 4, 5, len), wax.darkened(0.55))
+				_d_circle(Vector2(dx, tt + 4 + len), 3.0, wax.darkened(0.55))
 			if tier == 2 and _h(i, 9) > 0.45:
 				_candles(Vector2(tx + tw * 0.5, tt - 2), 2 + int(_h(i, 10) * 2.0), c, 1, i + 40)
 
 
-func _cave_near(c: Dictionary, span: Vector2) -> void:
-	## Stalactites, drip columns and (in the garden) hanging roots.
+func _cave_near(c: Dictionary, span: Vector2, tall := 0.0) -> void:
+	## Stalactites, drip columns and (in the garden) hanging roots. A full
+	## column pinches at the strip's middle (tall: in a taller level it then
+	## flares on down to the floor; its top is the strip's).
+	var mid_y := (span.y - tall) * 0.5
 	var near: Color = c["near"]
 	var wax: Color = c.get("wax", Color("cdb88e"))
 	var th := _theme()
@@ -548,21 +619,21 @@ func _cave_near(c: Dictionary, span: Vector2) -> void:
 		var w := 46.0 + _h(i, 1) * 40.0
 		if _h(i, 7) > 0.62:
 			# A full column: roof to floor, pinched in the middle.
-			var pts := PackedVector2Array([Vector2(x - w, -60), Vector2(x + w, -60), Vector2(x + w * 0.35, span.y * 0.5),
-					Vector2(x + w, span.y + 300), Vector2(x - w, span.y + 300), Vector2(x - w * 0.35, span.y * 0.5)])
-			draw_colored_polygon(pts, near)
-			draw_colored_polygon(PackedVector2Array([Vector2(x + w * 0.35, -60), Vector2(x + w, -60), Vector2(x + w * 0.35, span.y * 0.5),
-					Vector2(x + w, span.y + 300), Vector2(x + w * 0.6, span.y + 300), Vector2(x + w * 0.15, span.y * 0.5)]), near.lightened(0.05))
+			var pts := PackedVector2Array([Vector2(x - w, -60), Vector2(x + w, -60), Vector2(x + w * 0.35, mid_y),
+					Vector2(x + w, span.y + 300), Vector2(x - w, span.y + 300), Vector2(x - w * 0.35, mid_y)])
+			_d_poly(pts, near)
+			_d_poly(PackedVector2Array([Vector2(x + w * 0.35, -60), Vector2(x + w, -60), Vector2(x + w * 0.35, mid_y),
+					Vector2(x + w, span.y + 300), Vector2(x + w * 0.6, span.y + 300), Vector2(x + w * 0.15, mid_y)]), near.lightened(0.05))
 		else:
 			# A stalactite with a drip hanging at its point.
 			var len := 90.0 + _h(i, 2) * 110.0
 			var tip := Vector2(x + (_h(i, 3) - 0.5) * 20.0, len)
-			draw_colored_polygon(PackedVector2Array([Vector2(x - w * 0.5, -60), Vector2(x + w * 0.5, -60), tip]), near)
-			draw_colored_polygon(PackedVector2Array([Vector2(x + w * 0.1, -60), Vector2(x + w * 0.5, -60), tip]), near.lightened(0.05))
-			draw_circle(tip + Vector2(0, 6), 3.5, wax.darkened(0.6))
+			_d_poly(PackedVector2Array([Vector2(x - w * 0.5, -60), Vector2(x + w * 0.5, -60), tip]), near)
+			_d_poly(PackedVector2Array([Vector2(x + w * 0.1, -60), Vector2(x + w * 0.5, -60), tip]), near.lightened(0.05))
+			_d_circle(tip + Vector2(0, 6), 3.5, wax.darkened(0.6))
 			# And a stubby mound under it.
 			var mw := 50.0 + _h(i, 4) * 40.0
-			draw_colored_polygon(PackedVector2Array([Vector2(tip.x - mw, span.y + 300), Vector2(tip.x - mw * 0.3, span.y - 40.0 - _h(i, 8) * 60.0),
+			_d_poly(PackedVector2Array([Vector2(tip.x - mw, span.y + 300), Vector2(tip.x - mw * 0.3, span.y - 40.0 - _h(i, 8) * 60.0),
 					Vector2(tip.x + mw * 0.2, span.y - 30.0 - _h(i, 9) * 40.0), Vector2(tip.x + mw, span.y + 300)]), near)
 		if th == "garden" and _h(i, 11) > 0.3:
 			# Roots hanging down, with pale leaves.
@@ -572,13 +643,13 @@ func _cave_near(c: Dictionary, span: Vector2) -> void:
 			for k in 9:
 				var y := -20.0 + k * rl / 8.0
 				pts2.append(Vector2(rx + sin(k * 1.1 + i) * 8.0, y))
-			draw_polyline(pts2, near.lightened(0.1), 3.0)
+			_d_pline(pts2, near.lightened(0.1), 3.0)
 			for k in range(2, 9, 2):
-				draw_colored_polygon(PackedVector2Array([pts2[k], pts2[k] + Vector2(-10, 3), pts2[k] + Vector2(-4, -3)]), near.lightened(0.16))
+				_d_poly(PackedVector2Array([pts2[k], pts2[k] + Vector2(-10, 3), pts2[k] + Vector2(-4, -3)]), near.lightened(0.16))
 		elif th != "garden" and _h(i, 14) > 0.5:
 			# Wax strings hanging from the roof.
 			var sx := x + 170.0 + _h(i, 15) * 90.0
 			for k in 3:
 				var l2 := 30.0 + _h(i, k + 16) * 70.0
-				draw_line(Vector2(sx + k * 9.0, -20), Vector2(sx + k * 9.0, l2), wax.darkened(0.62), 3.0)
-				draw_circle(Vector2(sx + k * 9.0, l2), 3.5, wax.darkened(0.62))
+				_d_line(Vector2(sx + k * 9.0, -20), Vector2(sx + k * 9.0, l2), wax.darkened(0.62), 3.0)
+				_d_circle(Vector2(sx + k * 9.0, l2), 3.5, wax.darkened(0.62))

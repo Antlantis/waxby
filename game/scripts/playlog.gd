@@ -5,8 +5,10 @@ extends RefCounted
 ## A line: level, diff, calling, hero_level, cleared, snuffs, causes (what
 ## snuffed him, by cause: a monster's kind, a boss's id, "pit", "spikes"...),
 ## time, flask, altar_hp, xp, and (v3) sections (the snuffs where they
-## happened: [{x, cause, move, feature}], x in tiles), by_section (snuffs per
-## 16-tile band, "0-15": n), moves (snuffs by move id, "rootmother:sweep_high":
+## happened: [{x, y, cause, move, feature}], x and y in tiles; in a level
+## taller than a strip run too, the tiles along the route on foot to there:
+## its storeys, tiers and roads over the same columns told apart), by_section
+## (snuffs per 16-tile band, "0-15": n: of x, a taller level's of run), moves (snuffs by move id, "rootmother:sweep_high":
 ## n), features (snuffs by terrain: "vine_snap", "glass", "gust", "tide",
 ## "float", "still", "dawnglass": n; any name a feature notes is kept), phase (the boss phase reached, 0 without a boss),
 ## and mode (a mode's id, "" for the story). Build 1's loot and embers:
@@ -23,8 +25,17 @@ const BAND := 16                  # tiles per by_section band
 
 
 static func entry(w: Node, cleared: bool, causes: Dictionary) -> Dictionary:
-	## The line for a World's attempt (world.gd _log).
+	## The line for a World's attempt (world.gd _log). A taller level's snuffs
+	## get their run here, as the line is written (the walk map's route then,
+	## never in play: walk_map.gd).
 	var sections: Array = w.snuff_sections.duplicate(true)
+	var lv = w.get("level")
+	if lv != null and lv.tall() and not sections.is_empty():
+		var wm = load("res://scripts/walk_map.gd").of(lv)
+		var run: Array = wm.run_lengths()
+		if run.size() > 1:
+			for s in sections:
+				s["run"] = int(run[wm.proj(Vector2i(int(s.get("x", 0)), int(s.get("y", 0))))])
 	var moves := {}
 	var feats := {}
 	var bands := {}
@@ -37,7 +48,7 @@ static func entry(w: Node, cleared: bool, causes: Dictionary) -> Dictionary:
 			f = str(s["cause"])
 		if f != "":
 			feats[f] = int(feats.get(f, 0)) + 1
-		var b0 := int(s.get("x", 0)) / BAND * BAND
+		var b0 := int(s.get("run", s.get("x", 0))) / BAND * BAND
 		var key := "%d-%d" % [b0, b0 + BAND - 1]
 		bands[key] = int(bands.get(key, 0)) + 1
 	var g = w.get_node_or_null("/root/Game")

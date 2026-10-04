@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_test_tall(tall)
 	_test_mirror(mirror, plain)
 	_test_rules()
+	_test_review_rules()
 	_test_deep_barks()
 	_test_bot(tall)
 	_test_bot(mirror)
@@ -126,7 +127,9 @@ func _test_tall(lv: RefCounted) -> void:
 	_check(Rules.room_entry(lv, room["x0"], room["x1"], Rules.room_rows(lv, room)) == 1, "the duel room is met by its right door")
 	_check(Rules.header_problems(lv).is_empty(), "lab-shapes keeps its headers' rules, its room's altar right of it %s" % [Rules.header_problems(lv)])
 	_check(Rules.shape_problems(lv).is_empty(), "lab-shapes keeps the shape rules %s" % [Rules.shape_problems(lv)])
-	_check(Rules.screen_rows(lv).size() == 13 and Rules.screen_rows(lv)[0] == Vector2i(0, 11), "a tall level's screens are 12 rows, from every row")
+	var sr: Array = Rules.screen_rows(lv, 0)
+	_check(sr == [Vector2i(13, 23), Vector2i(16, 23)] and Rules.screen_rows(lv, 76).has(Vector2i(4, 15)) and Rules.screen_rows(lv, 76).has(Vector2i(16, 23)),
+			"a tall level's screens are the views over the rows he stands on: its start's (%s), both storeys' over the duel (%s)" % [sr, Rules.screen_rows(lv, 76)])
 
 
 # ---------------------------------------------------------------- lab-mirror
@@ -263,6 +266,219 @@ func _test_rules() -> void:
 	_put(strip, 3, 12, "s")
 	_put(strip, 3, 2, "b")
 	_check(Rules.screen_rows(_rows(strip)) == [Vector2i(0, 14)], "a strip's screen is its whole height")
+
+
+func _fill(rows: Array, x0: int, x1: int, y0: int, y1: int, ch := "#") -> void:
+	for y in range(y0, y1 + 1):
+		_put(rows, x0, y, ch.repeat(x1 - x0 + 1))
+
+
+func _hd(extra: Dictionary) -> String:
+	var t := "title: t\nsubtitle: t\n"
+	for k in extra:
+		t += "%s: %s\n" % [k, extra[k]]
+	return t
+
+
+func _two_roads() -> Array:
+	## common.review_check's two roads: a high road (stand 10) over the low
+	## one (stand 21), split from x 14 to 45, rejoining for the bell.
+	var r := _blank(60, 24)
+	_fill(r, 0, 59, 0, 0)
+	_fill(r, 0, 59, 22, 23)
+	_fill(r, 14, 45, 11, 12)
+	for xy in [Vector2i(10, 19), Vector2i(12, 16), Vector2i(10, 13), Vector2i(47, 13), Vector2i(49, 16), Vector2i(47, 19)]:
+		_put(r, xy.x, xy.y, "===")
+	_put(r, 2, 21, "P")
+	_put(r, 56, 21, "E")
+	_put(r, 5, 21, "K")
+	_put(r, 52, 21, "K")
+	_put(r, 20, 10, "s")
+	_put(r, 30, 10, "s")
+	_put(r, 25, 21, "s")
+	return r
+
+
+func _test_review_rules() -> void:
+	## The rules the shape review asked for, as common.review_check proves
+	## the generator's (the same levels, the same verdicts): threat per tile
+	## of the route on foot and per road; gaps per road; screens over the
+	## rows he stands on; a level's own descent keys; drops:; waxfalls off
+	## the drops; a dark level's roads lit apart; the clockwork's column
+	## keys; the boss and secret levels kept strips; a two-deck room's door
+	## altar on his deck; a Creepbone at a rotten run's foot; a deck's gusts.
+	var c := func(k: String) -> float: return float(load("res://scripts/enemy_kinds.gd").COST[k])
+	# A loop: threat per tile of the route on foot.
+	var loop := _blank(40, 24)
+	_fill(loop, 0, 39, 0, 0)
+	_fill(loop, 0, 39, 22, 23)
+	_fill(loop, 0, 31, 11, 12)
+	_put(loop, 2, 21, "P")
+	_put(loop, 3, 10, "E")
+	_put(loop, 34, 19, "====")
+	_put(loop, 36, 16, "===")
+	_put(loop, 34, 13, "====")
+	_put(loop, 12, 21, "s")
+	_put(loop, 20, 10, "s")
+	var ll := _rows(loop)
+	var run: int = WalkMap.of(ll).run_lengths().back()
+	_check(run > 60 and is_equal_approx(Rules.threat_of(ll), 2.0 * c.call("skeleton") * 100.0 / run),
+			"a loop's threat is per tile of its route on foot (%.2f over %d tiles, %d wide)" % [Rules.threat_of(ll), run, ll.width])
+	# Two roads: each road's threat, the heavier the level's; gaps per road.
+	var roads := "high 30,10; low 30,21"
+	var two := _two_roads()
+	var tl := _rows(two, _hd({"roads": roads}))
+	var m = WalkMap.of(tl)
+	var rs: Array = m.roads()
+	_check(rs.size() == 2 and not (rs[0]["path"] as Array).is_empty() and not (rs[1]["path"] as Array).is_empty() and m.road_of(Vector2i(20, 10)) == [0]
+			and m.road_of(Vector2i(25, 21)) == [1] and m.road_of(Vector2i(2, 21)) == [0, 1], "two roads: each its route, road_of the nearest (both where they share)")
+	var hi: float = 2.0 * c.call("skeleton") * 100.0 / float(m.run_lengths(rs[0]["path"]).back())
+	var lo: float = c.call("skeleton") * 100.0 / float(m.run_lengths(rs[1]["path"]).back())
+	_check(is_equal_approx(Rules.threat_of(tl), maxf(hi, lo)), "two roads: the heavier road's threat (%.2f)" % Rules.threat_of(tl))
+	var rg: Array = Rules.road_gaps(tl)
+	_check(rg.size() == 2 and str(rg[0]["road"]) == "high" and str(rg[1]["road"]) == "low", "the gaps along each road %s" % [rg])
+	var tight: int = maxi(int(rg[0]["worst"]), int(rg[1]["worst"])) - 1
+	_check(str(Rules.checkpoint_problems(tl, tight, Vector2i(2, 2))).contains("road"), "a gap too wide on a road is named by its road")
+	_check(str(Rules.shape_problems(_rows(two, _hd({"roads": "high 30,10; nowhere 30,5"})))).contains("no way to the goal"), "a road that goes nowhere")
+	# Screens over the rows he stands on: the roads apart.
+	var crowd := two.duplicate()
+	for x in [16, 18, 22, 24, 26, 28, 32]:
+		_put(crowd, x, 10, "s")
+		_put(crowd, x, 21, "s")
+	var cl := _rows(crowd)
+	var sr: Array = Rules.screen_rows(cl, 16)
+	_check(sr.has(Vector2i(5, 16)) and sr.has(Vector2i(16, 23)) and not sr.any(func(b): return b.x <= 10 and b.y >= 21), "screen_rows: the roads apart (%s)" % [sr])
+	_check(not Rules.crowded_screens(cl).is_empty() and Rules.crowded_screens(_rows(two)).is_empty(), "eight a road crowds its screen")
+	# A level's own descent keys.
+	var dr := _blank(40, 24)
+	_fill(dr, 0, 39, 22, 23)
+	_fill(dr, 0, 17, 17, 23)
+	_put(dr, 2, 16, "P")
+	_put(dr, 30, 21, "E")
+	_check(not str(Rules.shape_problems(_rows(dr))).contains("descent"), "a 5-row drop keeps the shape rules")
+	_check(str(Rules.shape_problems(_rows(dr, _hd({"max_drop": 4})))).contains("own descent rules (max_drop 4)")
+			and not str(Rules.shape_problems(_rows(dr, _hd({"max_drop": 5})))).contains("descent"), "max_drop 4 catches it, 5 passes")
+	_check(str(Rules.shape_problems(_rows(dr, _hd({"lit_drops": 3})))).contains("lit_drops 3"), "lit_drops: a 5-row drop is too far")
+	var lit := dr.duplicate()
+	_put(lit, 18, 19, "======")
+	_put(lit, 23, 18, "L")
+	_put(lit, 26, 20, "L")
+	_check(not str(Rules.shape_problems(_rows(lit, _hd({"lit_drops": 3})))).contains("descent"), "lit_drops: lit 3- and 2-row drops pass %s" % [Rules.shape_problems(_rows(lit, _hd({"lit_drops": 3})))])
+	var dark := lit.duplicate()
+	_put(dark, 23, 18, ".")
+	_put(dark, 26, 20, ".")
+	_check(str(Rules.shape_problems(_rows(dark, _hd({"lit_drops": 3})))).contains("lit_drops 3"), "lit_drops: the same in the dark fails")
+	_check(str(Rules.shape_problems(_rows(lit, _hd({"landing": "0/0"})))).contains("landing 0/0")
+			and not str(Rules.shape_problems(_rows(lit, _hd({"landing": "1/0"})))).contains("descent")
+			and Rules.shape_problems(_rows(lit, _hd({"landing": "x"}))).any(func(p): return str(p).begins_with("landing 'x'")), "landing: walk-offs land a column ahead; one that doesn't read")
+	# drops: where the route drops through a ledge.
+	var led := _blank(30, 24)
+	_fill(led, 0, 29, 22, 23)
+	_fill(led, 0, 9, 13, 23)
+	_put(led, 10, 13, "=====")
+	_fill(led, 15, 29, 13, 21)
+	_put(led, 2, 12, "P")
+	_put(led, 12, 21, "E")
+	_check(str(Rules.shape_problems(_rows(led))).contains("drops: yes") and not str(Rules.shape_problems(_rows(led, _hd({"drops": "yes"})))).contains("drops:"),
+			"drops: required where the route drops through a ledge")
+	# Waxfalls: one over the only landing.
+	var wx := _blank(40, 24)
+	_fill(wx, 0, 39, 22, 23)
+	_fill(wx, 0, 17, 17, 23)
+	_fill(wx, 19, 39, 17, 19)
+	_put(wx, 2, 16, "P")
+	_put(wx, 30, 21, "E")
+	_put(wx, 18, 12, "!")
+	_check(str(Rules.shape_problems(_rows(wx))).contains("only landing"), "a waxfall over the only landing")
+	var beside := wx.duplicate()
+	_fill(beside, 25, 27, 17, 19, ".")
+	_check(not str(Rules.shape_problems(_rows(beside))).contains("waxfall"), "another way down beside it: not its only landing")
+	_check(Rules.fall_secs(5) + 32.0 / 205.0 < 1.2, "a 5-row drop and a step fit a waxfall's off window (%.2f s)" % Rules.fall_secs(5))
+	# The dark: a lantern on a high road 3 rows up lights the low road.
+	var nr := two.duplicate()
+	_fill(nr, 14, 45, 11, 12, ".")
+	_fill(nr, 14, 45, 19, 19)
+	_put(nr, 34, 18, "L")
+	var nroads := "high 30,18; low 30,21"
+	_check(str(Rules.shape_problems(_rows(nr, _hd({"roads": nroads, "twist": "dark"})))).contains("lights the low road")
+			and not str(Rules.shape_problems(_rows(nr, _hd({"roads": nroads})))).contains("lights"), "a dark level's roads lit apart (and only in the dark)")
+	var far := two.duplicate()
+	_put(far, 34, 10, "L")
+	_check(not str(Rules.shape_problems(_rows(far, _hd({"roads": roads, "twist": "dark"})))).contains("lights"), "a lantern 11 rows up: apart")
+	# The clockwork's column keys.
+	var ck := loop.duplicate()
+	_put(ck, 10, 5, "O")
+	_put(ck, 10, 17, "Q")
+	_check(str(Rules.clockwork_problems(_rows(ck))).contains("two cog hubs in column 10"), "two cogs in a column")
+	_put(ck, 10, 17, ".")
+	_put(ck, 12, 8, "Y")
+	_put(ck, 12, 19, "T")
+	_check(str(Rules.clockwork_problems(_rows(ck))).contains("two weights or swings in column 12"), "a weight over a swing")
+	var bf := loop.duplicate()
+	_put(bf, 5, 11, ">>>>")
+	_put(bf, 5, 22, "<<<<")
+	_check(str(Rules.clockwork_problems(_rows(bf, _hd({"belt_flip": "5-8=8"})))).contains("two storeys")
+			and Rules.clockwork_problems(_rows(bf, _hd({"belt_flip": "20-24=8"}))).is_empty(), "a belt_flip over both storeys")
+	# The boss and secret levels stay strips.
+	var boss := _level(_hd({}) + "---\n" + "\n".join(loop), "4-4")
+	var reg := _level(_hd({}) + "---\n" + "\n".join(loop), "4-2")
+	_check(not Rules.height_ok(boss) and str(Rules.shape_problems(boss)).contains("stays a strip") and Rules.height_ok(reg)
+			and not Rules.height_ok(_level(_hd({}) + "---\n" + "\n".join(loop), "3-S")), "a boss or secret level stays a strip, a regular one may be taller")
+	# A two-deck room: its door altar on the deck he comes in on.
+	var deck := _blank(60, 24)
+	_fill(deck, 0, 59, 0, 0)
+	_fill(deck, 0, 59, 22, 23)
+	_fill(deck, 20, 50, 1, 1)
+	_fill(deck, 20, 20, 1, 18)
+	_fill(deck, 50, 50, 1, 7)
+	_fill(deck, 50, 50, 11, 21)
+	for xy in [Vector2i(24, 19), Vector2i(29, 16), Vector2i(24, 13)]:
+		_put(deck, xy.x, xy.y, "====")
+	_fill(deck, 31, 49, 11, 11)
+	_fill(deck, 51, 59, 11, 21)
+	_put(deck, 2, 21, "P")
+	_put(deck, 56, 10, "E")
+	_put(deck, 36, 21, "s")
+	_put(deck, 40, 10, "s")
+	_put(deck, 14, 21, "K")
+	var room := _hd({"room": "ambush 20-50 rows 1-22"})
+	_check(Rules.room_problems(_rows(deck, room)).is_empty(), "the altar by its lower door, on its deck %s" % [Rules.room_problems(_rows(deck, room))])
+	var up := deck.duplicate()
+	_put(up, 14, 21, ".")
+	_fill(up, 10, 18, 9, 9)
+	_put(up, 14, 8, "K")
+	_check(str(Rules.room_problems(_rows(up, room))).contains("no altar on the deck of its door"), "an altar over the lower door, on another deck %s" % [Rules.room_problems(_rows(up, room))])
+	# A Creepbone at a rotten run's foot: the run's foot, as common.py reads it now.
+	var rv := _blank(20, 24)
+	_fill(rv, 0, 19, 22, 23)
+	_fill(rv, 0, 19, 0, 0)
+	for y in range(3, 6):
+		_put(rv, 6, y, "}")
+	_put(rv, 6, 6, "i")
+	_put(rv, 2, 21, "P")
+	_put(rv, 15, 21, "E")
+	_fill(rv, 0, 5, 3, 3)
+	_check(str(Rules.catch_problems(_rows(rv))).contains("lands 15 rows down"), "a Creepbone at a rotten run's foot: the foot (common.py agrees) %s" % [Rules.catch_problems(_rows(rv))])
+	# The review's labs as the generator wrote them (lab_shaped.py): the
+	# roads' threat per road as common.threat_of measured it, its gaps per
+	# road; the islands' gust zone on its rows; every one keeping its rules.
+	var rl = LevelData.load_file("res://levels/lab-shape-roads.txt")
+	_check(Rules.declared_threat(rl) > 0.0 and absf(Rules.threat_of(rl) - Rules.declared_threat(rl)) <= 0.011,
+			"lab-shape-roads: its threat per road as the generator wrote it (%.3f, declared %.2f)" % [Rules.threat_of(rl), Rules.declared_threat(rl)])
+	var want_gaps := [{"road": "high", "marks": [0, 4, 97, 112], "gaps": [4, 93, 15], "worst": 93},
+			{"road": "low", "marks": [0, 4, 86, 101], "gaps": [4, 82, 15], "worst": 82}]
+	_check(str(Rules.road_gaps(rl)) == str(want_gaps) and Rules.checkpoint_problems(rl, 100, Vector2i(2, 2)).is_empty(),
+			"its gaps along each road, as the generator measured them %s" % [Rules.road_gaps(rl)])
+	var il = LevelData.load_file("res://levels/lab-shape-islands.txt")
+	_check(il.gusts.size() == 1 and int(il.gusts[0]["y0"]) == 4 and int(il.gusts[0]["y1"]) == 16, "lab-shape-islands: its gust zone on its rows (%s)" % [il.gusts])
+	for id in ["lab-shape-roads", "lab-shape-switchback", "lab-shape-terraces", "lab-shape-islands", "lab-shape-works", "lab-shape-rootvault", "lab-shape-decks"]:
+		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		_check(lv.errors.is_empty() and Rules.shape_problems(lv).is_empty() and Rules.header_problems(lv).is_empty(),
+				"%s keeps the shape and header rules %s %s" % [id, Rules.shape_problems(lv), Rules.header_problems(lv)])
+	# A deck's gusts on its rows.
+	var gl := _level(_hd({"gusts": "4-7:L:A:0-11, 20-23:R:B"}) + "---\n" + "\n".join(loop))
+	_check(gl.gusts.size() == 2 and int(gl.gusts[0]["y0"]) == 0 and int(gl.gusts[0]["y1"]) == 11 and not (gl.gusts[1] as Dictionary).has("y0"),
+			"a gust zone's rows read (%s)" % [gl.gusts])
 
 
 func _test_deep_barks() -> void:

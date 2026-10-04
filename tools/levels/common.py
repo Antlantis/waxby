@@ -19,7 +19,9 @@ the same width as the section, '.' everywhere else, and
     [ ]  a gust column blowing left / right on phase B (2.4 s later)
     ;    a Hush-zone column
 The tool turns the joined overlay into the gusts: and hush: headers (tile
-columns, absolute, inclusive) and never writes it into the rows.
+columns, absolute, inclusive) and never writes it into the rows. In a level
+taller than a strip a gust zone also names its section's rows (x0-x1:R:A:
+y0-y1: level_gusts_header), so a deck's wind stays on its deck.
 
 Reach, for laying out jumps: a held jump clears 3 tiles up (not 4) and
 about 4 tiles across; 2-3 tile gaps are comfortable. A ceiling of spikes 5
@@ -51,6 +53,11 @@ room cells still name the section as drawn (x_of, y_of). A tall level's
 route is the walk map's (WalkMap: the hints' order, its checkpoints' gaps on
 foot) and it keeps the shape rules as it's written (shape_problems: the
 descent and catch rules, the HUD band); a strip's route is x, in its facing.
+A shaped level's entry may add 'drops': 'yes' (its route drops through a
+one-way ledge: the bots drop through then too, by down + jump), 'roads' (two
+ways through, each by the cells it passes: its threat, gaps and screens are
+each road's), and its own descent rules ('max_drop': 4, 'landing': '6/2',
+'lit_drops': 3): see the shape rules below.
 
 or, for the v2 levels (kept byte for byte), an explicit ordered 'header'
 list of (key, value) pairs. Header values holding x (cog_phase,
@@ -148,9 +155,16 @@ SIGN_BUDGET = True
 # (world_tables), roles (a re-cut level's section roles: world_problems),
 # room (the sealed rooms: rooms_header) and belt_flip (span(): x0-x1=N).
 # facing (left: a level played right to left, mirror_rows) follows the area.
+# A shaped level's keys follow the overlay's: drops (yes: its routes drop
+# through one-way ledges, the bots too: reach.gd drops_of; shape_problems
+# asks for it where the walk map's route does), roads (its two ways
+# through, each by the cells it passes: 'high 120,10 200,10; low 120,21',
+# WalkMap.roads) and its own descent rules (max_drop, landing, lit_drops:
+# descent_limits).
 HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'facing', 'boss', 'boss_music', 'dread', 'warden',
                 'secret', 'secret_prize', 'tick', 'story_start', 'story_boss', 'story_end', 'par', 'rush',
-                'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'warden_room', 'elite_behave', 'anoint', 'twist',
+                'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'drops', 'roads', 'max_drop', 'landing', 'lit_drops',
+                'warden_room', 'elite_behave', 'anoint', 'twist',
                 'lesson', 'roster', 'threat', 'roles', 'room', 'belt_flip', 'hints']
 
 
@@ -317,6 +331,43 @@ def gusts_header(line):
     return ', '.join('%d-%d:%s:%s' % (a, b, kinds[c][0], kinds[c][1]) for a, b, c in overlay_runs(line, '()[]'))
 
 
+def level_gusts_header(rows):
+    """A level's gusts header: gusts_header of its joined overlay; in a
+    taller level each zone also names the rows its wind blows in, its
+    section's own (':y0-y1', the rows the section drew, wherever place,
+    crop or stack put it), so a storey's or a deck's wind never blows on the
+    one over or under it (features/glass.gd gust_at; level_data.gd reads it).
+    A zone over the level's whole height is written as before."""
+    over = getattr(rows, 'overlay', None)
+    if over is None:
+        return ''
+    h = len(rows)
+    parts = getattr(rows, 'parts', ())
+    if h <= H or not parts:
+        return gusts_header(over)
+    kinds = {'(': ('L', 'A'), ')': ('R', 'A'), '[': ('L', 'B'), ']': ('R', 'B')}
+    zones = []
+    for b, x0, y0 in parts:
+        o = getattr(b, 'overlay', None)
+        if o is None:
+            continue
+        dy = getattr(b, 'dy', 0)
+        r0 = y0 + max(0, dy)
+        r1 = y0 + min(len(b) - 1, dy + len(_root(b)) - 1)
+        for a, c, ch in overlay_runs(o, '()[]'):
+            zones.append([x0 + a, x0 + c, ch, r0, r1])
+    zones.sort(key=lambda z: (z[3], z[4], z[0]))
+    merged = []
+    for z in zones:
+        if merged and merged[-1][2] == z[2] and merged[-1][3:] == z[3:] and merged[-1][1] + 1 == z[0]:
+            merged[-1][1] = z[1]
+        else:
+            merged.append(z)
+    merged.sort(key=lambda z: (z[0], z[3]))
+    return ', '.join('%d-%d:%s:%s%s' % (a, c, kinds[ch][0], kinds[ch][1], '' if (r0, r1) == (0, h - 1) else ':%d-%d' % (r0, r1))
+                     for a, c, ch, r0, r1 in merged)
+
+
 def hush_header(line):
     """'52-75, 200-227' from an overlay line, or ''."""
     return ', '.join('%d-%d' % (a, b) for a, b, _c in overlay_runs(line, ';'))
@@ -422,17 +473,42 @@ def room_entry(rows, x0, x1, y0, y1, facing=1):
     taller level's is where the walk map's route first steps inside the
     room's box, from the side it comes from (a room it never enters: the
     way the route runs past it)."""
+    return room_entry_at(rows, x0, x1, y0, y1, facing)[0]
+
+
+def room_entry_at(rows, x0, x1, y0, y1, facing=1):
+    """(side, row): room_entry's door, and the row of the route's first cell
+    inside the box (None in a strip, or where it never enters; walk_map.gd
+    entry_of)."""
     if len(rows) <= H:
-        return -facing
+        return -facing, None
     wm = WalkMap(rows)
     path = wm.route() or []
     for i, (_k, x, y) in enumerate(path):
         if x0 <= x <= x1 and y0 <= y <= y1:
             px = path[i - 1][1] if i else x
             if px < x0 or px > x1:
-                return -1 if px < x0 else 1
-            return -1 if x - x0 <= x1 - x else 1
-    return -wm.dir_at(wm.proj(((x0 + x1) // 2, (y0 + y1) // 2)))
+                return (-1 if px < x0 else 1), y
+            return (-1 if x - x0 <= x1 - x else 1), y
+    return -wm.dir_at(wm.proj(((x0 + x1) // 2, (y0 + y1) // 2))), None
+
+
+def deck_door_rows(rows, x, y0, y1, row):
+    """The doorway run (its rows, inclusive) of column x between rows y0 and
+    y1 that the route's entry row comes in at (the run holding it, else the
+    nearest), or None: a two-deck room's door on the deck he comes in on."""
+    runs = []
+    y = y0
+    while y <= y1:
+        if _tile(rows, x, y, 'solid') != 'solid':
+            a = y
+            while y + 1 <= y1 and _tile(rows, x, y + 1, 'solid') != 'solid':
+                y += 1
+            runs.append((a, y))
+        y += 1
+    if not runs or row is None:
+        return None
+    return min(runs, key=lambda r: 0 if r[0] <= row <= r[1] else min(abs(row - r[0]), abs(row - r[1])))
 
 
 def room_problems(rows, value, facing=1):
@@ -475,10 +551,17 @@ def room_problems(rows, value, facing=1):
         near = [(x, y) for x, y in mons if x - x0 <= ROOM_DOOR_CLEAR or x1 - x <= ROOM_DOOR_CLEAR]
         if near:
             out.append('%s has monsters within %d columns of a door at %s' % (room, ROOM_DOOR_CLEAR, near))
-        side = room_entry(rows, x0, x1, y0, y1, facing)
-        if not any((x0 - ROOM_ALTAR_REACH <= x < x0) if side < 0 else (x1 < x <= x1 + ROOM_ALTAR_REACH) for x in altars):
+        side, row = room_entry_at(rows, x0, x1, y0, y1, facing)
+        before = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == 'K'
+                  and ((x0 - ROOM_ALTAR_REACH <= x < x0) if side < 0 else (x1 < x <= x1 + ROOM_ALTAR_REACH))]
+        if not before:
             out.append('%s has no altar within %d tiles before its %s door (altars at %s)'
                        % (room, ROOM_ALTAR_REACH, 'left' if side < 0 else 'right', altars))
+        else:
+            band = deck_door_rows(rows, x0 if side < 0 else x1, y0, y1, row)
+            if band is not None and not any(band[0] - 1 <= ay <= band[1] for _ax, ay in before):
+                out.append('%s has no altar on the deck of its %s door (its doorway rows %d-%d; altars at %s)'
+                           % (room, 'left' if side < 0 else 'right', band[0], band[1], before))
     return out
 
 
@@ -537,11 +620,14 @@ def _order_hints(kv, rows, facing=1):
     return (key, '|'.join(text[p] for p in reading))
 
 
-def _report(name, rows):
+def _report(name, rows, roads=''):
     """Where the start, altars, bell and boss are, for the checkpoint-gap rule
-    (a taller level's along its route: checkpoint_gaps)."""
-    marks, gaps = checkpoint_gaps(rows)
-    return 'checkpoints %s %s (gaps %s)' % ('at' if len(rows) <= H else 'along the route at', marks, gaps)
+    (a taller level's along its route: checkpoint_gaps; each road's)."""
+    if len(rows) <= H:
+        marks, gaps = checkpoint_gaps(rows)
+        return 'checkpoints at %s (gaps %s)' % (marks, gaps)
+    return '; '.join('checkpoints along the %sroute at %s (gaps %s)' % (('%s road\'s ' % n) if n else '', m, g)
+                     for n, m, g in road_gaps(rows, roads))
 
 
 def check_legend(name, rows):
@@ -570,7 +656,7 @@ def write(name, header, rows, out_dir=None, world=None):
     over = getattr(rows, 'overlay', None)
     if over is not None:
         extra = []
-        g = gusts_header(over)
+        g = level_gusts_header(rows)
         if g and 'gusts' not in keys:
             extra.append(('gusts', g))
         hz = hush_header(over)
@@ -587,7 +673,7 @@ def write(name, header, rows, out_dir=None, world=None):
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, name + '.txt'), 'w') as f:
         f.write(text)
-    print('%s: %d x %d  %s' % (name, max(len(r) for r in rows), len(rows), _report(name, rows)))
+    print('%s: %d x %d  %s' % (name, max(len(r) for r in rows), len(rows), _report(name, rows, dict(header).get('roads', ''))))
     return text
 
 
@@ -933,17 +1019,54 @@ HAZARD_GLYPHS = set('^v~')
 WALK_SUPPORT = SOLID_GLYPHS | set('=%_A')
 
 
+def roads_of(value):
+    """[(name, [(x, y), ...])] from a written roads header ('high 120,10
+    200,10; low 120,21'): each road by the cells it passes, in turn (a part
+    that doesn't read is left out; walk_map.gd roads_of reads it the same)."""
+    out = []
+    for part in str(value or '').split(';'):
+        bits = part.split()
+        if len(bits) < 2:
+            continue
+        via = []
+        for b in bits[1:]:
+            xy = b.split(',')
+            if len(xy) == 2 and xy[0].strip().lstrip('-').isdigit() and xy[1].strip().lstrip('-').isdigit():
+                via.append((int(xy[0]), int(xy[1])))
+        if via:
+            out.append((bits[0], via))
+    return out
+
+
 class WalkMap(object):
     """The walk map of a level's rows (see above). route() is the cheapest
     way from the start to the goal (the bell, else the boss, else a silver
     bell), as states (kind, x, y); proj(cell) the index on it nearest a
-    cell; reach() every state reachable and the edges between them."""
+    cell; reach() every state reachable and the edges between them. A level
+    with two ways through names its roads (a 'roads' header: roads_of):
+    roads() is each one's route, by way of its cells in turn, and road_of()
+    which a cell is on (the nearest; the stretches they share, every one's).
+    t is the rows as the game reads their tiles: a pod, glowfruit, Creepbone
+    or Dread drawn in a vine column is that vine (level_data.gd: the vine
+    over it first, else the one under it), so the catch rules find a rotten
+    run's foot where the game does."""
 
-    def __init__(self, rows):
+    def __init__(self, rows, roads=''):
         self.w = max(len(r) for r in rows)
         self.h = len(rows)
         self.g = [r.ljust(self.w, '.') for r in rows]
         w, h = self.w, self.h
+        t = [list(r) for r in self.g]
+        for y in range(h):
+            for x in range(w):
+                if self.g[y][x] in CARRIERS:
+                    for dy in (-1, 1):
+                        if 0 <= y + dy < h and t[y + dy][x] in CLIMB:
+                            t[y][x] = t[y + dy][x]
+                            break
+        self.t = [''.join(r) for r in t]
+        self.roads_spec = roads_of(roads)
+        self._roads = None
         self.cls = [[_tile(self.g, x, y, 'solid') for x in range(w)] for y in range(h)]
         self.band = set()
         for y, r in enumerate(self.g):
@@ -1133,10 +1256,16 @@ class WalkMap(object):
         there's none). Ties go to the state found first (the moves' order)."""
         if self._route is not None:
             return self._route or None
-        start, goal = self.start(), self.goal()
-        self._route = []
-        if start is None or goal is None:
+        goal = self.goal()
+        self._route = (self._search(self.start(), [goal], False) if goal else None) or []
+        return self._route or None
+
+    def _search(self, start, cells, exact):
+        """The cheapest way from state start to one touching cells (exact:
+        standing or hanging in one of them), [(kind, x, y)]; None for none."""
+        if start is None:
             return None
+        want = {(c[-2], c[-1]) for c in cells}
         dist = {start: 0}
         parent = {start: None}
         pq = [(0, 0, start)]
@@ -1146,7 +1275,7 @@ class WalkMap(object):
             c, _i, s = heapq.heappop(pq)
             if c > dist[s]:
                 continue
-            if self.touches(s):
+            if ((s[1], s[2]) in want) if exact else self.touches(s, cells):
                 goal = s
                 break
             for t, cost, _drop in self.moves(s):
@@ -1161,8 +1290,44 @@ class WalkMap(object):
         path = [goal]
         while parent[path[-1]] is not None:
             path.append(parent[path[-1]])
-        self._route = path[::-1]
-        return self._route
+        return path[::-1]
+
+    def route_via(self, via):
+        """The cheapest way from the start to the goal by way of the cells via
+        in turn (standing or hanging in each); None when a leg has none."""
+        start, goal = self.start(), self.goal()
+        if start is None or goal is None:
+            return None
+        path = [start]
+        for c in via:
+            leg = self._search(path[-1], [c], True)
+            if leg is None:
+                return None
+            path += leg[1:]
+        last = self._search(path[-1], [goal], False)
+        return None if last is None else path + last[1:]
+
+    def roads(self):
+        """[(name, path)]: each named road's route (a road whose way isn't
+        there: an empty path), or the one road, route(), named ''."""
+        if self._roads is None:
+            if not self.roads_spec:
+                self._roads = [('', self.route() or [])]
+            else:
+                self._roads = [(name, self.route_via(via) or []) for name, via in self.roads_spec]
+        return self._roads
+
+    @staticmethod
+    def near(path, cell):
+        """How far cell is from a route (columns, and rows twice over, as
+        proj): its nearest state's; a large number for an empty one."""
+        return min([abs(x - cell[0]) + 2 * abs(y - cell[1]) for _k, x, y in path] or [1 << 20])
+
+    def road_of(self, cell):
+        """The roads (indices into roads()) a cell is on: the nearest, every
+        one as near."""
+        d = [self.near(p, cell) for _n, p in self.roads()]
+        return [i for i, v in enumerate(d) if v == min(d)]
 
     def proj(self, cell):
         """The index on the route nearest cell (columns, and rows twice over:
@@ -1174,11 +1339,11 @@ class WalkMap(object):
                 best, bi = d, i
         return bi
 
-    def run_lengths(self):
-        """The route's length on foot to each of its states: columns walked
-        and rows climbed (a fall's rows are free)."""
+    def run_lengths(self, path=None):
+        """The route's (or path's) length on foot to each of its states:
+        columns walked and rows climbed (a fall's rows are free)."""
         out = [0]
-        path = self.route() or []
+        path = (self.route() or []) if path is None else path
         for a, b in zip(path, path[1:]):
             out.append(out[-1] + abs(b[1] - a[1]) + max(0, a[2] - b[2]))
         return out
@@ -1192,9 +1357,11 @@ class WalkMap(object):
                 return 1 if path[j1][1] > path[j0][1] else -1
         return 1
 
-    def reach(self, max_drop=None):
+    def reach(self, max_drop=None, allow=None):
         """Every state reachable from the start ({state: [(next, drop)]}), only
-        by falls of max_drop rows or less when it's given."""
+        by falls of max_drop rows or less when it's given, and only by the
+        moves allow(from, to, drop) passes when it's given (a level's own
+        descent rules: descent_limits)."""
         start = self.start()
         if start is None:
             return {}
@@ -1204,6 +1371,8 @@ class WalkMap(object):
             s = todo.pop()
             for t, _c, drop in self.moves(s):
                 if max_drop is not None and drop > max_drop:
+                    continue
+                if allow is not None and not allow(s, t, drop):
                     continue
                 edges[s].append((t, drop))
                 if t not in edges:
@@ -1273,6 +1442,28 @@ def facing_of(header):
 # lands within CATCH_ROWS rows (a catch floor, not the bottom of the climb)
 # or snuffs, and no monster stands within CATCH_CLEAR columns of where it
 # lands. A strip's falls are pits (a snuff), as before.
+#
+# A level may hold itself to more (its header; descent_limits, and
+# tests/level_rules.gd reads the same keys back):
+#   max_drop: 4     its goal reached with no fall over 4 rows (1-2, 3-3,
+#                   6-1: a teaching level's every drop lands in view)
+#   landing: 6/2    ...and none landing more than 6 columns off and more
+#                   than 2 rows lower (5-2's wind jumps: further and lower is
+#                   under the right thumb's buttons; 6-1's 5/0: in view ahead)
+#   lit_drops: 3    ...and every fall onto a floor (a vine or a lift is no
+#                   fall) at most 3 rows, onto a lit landing: in a lantern's,
+#                   an altar's, a Vigil candle's or a sconce's light (LIGHTS;
+#                   6-2: no blind drops)
+#   drops: yes      the bots drop through one-way ledges (reach.gd drops_of):
+#                   a taller level whose route drops through one must say so
+# A taller level with waxfalls ('!', level_features.gd: on FALL_ON s, off
+# FALL_OFF) keeps its drops clear of them (waxfall_problems): its goal
+# reached with no fall landing in a douse column (one never covers the only
+# landing), and a fall through one fits its off window (the fall and a step
+# out of the column). A level with roads and the dark twist keeps its roads'
+# lights apart (light_problems: no lantern of one road lights the other's
+# way). The boss and secret levels (x-4, x-S) stay strips (STRIP_ONLY:
+# their rooms and doors are cut for 15 rows).
 MAX_DROP = 5
 CATCH_ROWS = 10
 CATCH_CLEAR = 3
@@ -1378,7 +1569,7 @@ def catch_problems(rows, wm=None):
     mons = game()['monsters']
     out = []
     seen = set()
-    for y, r in enumerate(wm.g):
+    for y, r in enumerate(wm.t):
         for x, ch in enumerate(r):
             # A floor he stands on that gives way, or the foot of a rotten run.
             if ch not in GIVE_WAY or (ch == '}' and wm.climb(x, y + 1)) or (ch != '}' and not wm.body(x, y - 1)):
@@ -1397,16 +1588,190 @@ def catch_problems(rows, wm=None):
     return out
 
 
+# The level's own descent keys (see above), and the lights a lit landing
+# counts: glyph -> (radius px, the light's height over the cell's floor; a
+# sconce's flame hangs 7 px under its cell's top: world.gd).
+DESCENT_KEYS = ('max_drop', 'landing', 'lit_drops')
+LIGHTS = {'L': (140, 33), 'K': (150, 30), 'C': (90, 30), 'c': (110, 25)}
+STRIP_ONLY = re.compile(r'^\d-[4S]$')
+ONE_WAY_GLYPHS = set('=%_A')
+STOREY_ROWS = 6       # a belt_flip's belts in a taller level: one storey (within these rows)
+
+
+def descent_limits(header):
+    """(max_drop, landing, lit_drops, problems): a header's own descent keys
+    read (None where it has none) and what doesn't read, as strings."""
+    hd = dict(header)
+    out = []
+    md = ld = lit = None
+    if str(hd.get('max_drop', '')).strip():
+        v = str(hd['max_drop']).strip()
+        if v.isdigit() and 1 <= int(v) <= MAX_DROP:
+            md = int(v)
+        else:
+            out.append('max_drop %r (a number of rows, 1-%d)' % (v, MAX_DROP))
+    if str(hd.get('landing', '')).strip():
+        ab = str(hd['landing']).strip().split('/')
+        if len(ab) == 2 and ab[0].strip().isdigit() and ab[1].strip().isdigit():
+            ld = (int(ab[0]), int(ab[1]))
+        else:
+            out.append('landing %r (columns/rows: 6/2)' % hd['landing'])
+    if str(hd.get('lit_drops', '')).strip():
+        v = str(hd['lit_drops']).strip()
+        if v.isdigit() and 1 <= int(v) <= MAX_DROP:
+            lit = int(v)
+        else:
+            out.append('lit_drops %r (a number of rows, 1-%d)' % (v, MAX_DROP))
+    return md, ld, lit, out
+
+
+def lit_cells(wm):
+    """{(x, y)}: the cells where his middle, standing in them, is in a
+    light's reach (LIGHTS)."""
+    srcs = []
+    for y, r in enumerate(wm.g):
+        for x, ch in enumerate(r):
+            if ch in LIGHTS:
+                rad, up = LIGHTS[ch]
+                cy = y * 32 + 7 if ch == 'c' else (y + 1) * 32 - up
+                srcs.append((x * 32 + 16, cy, rad))
+    out = set()
+    for y in range(wm.h):
+        for x in range(wm.w):
+            px, py = x * 32 + 16, (y + 1) * 32 - 22
+            if any((px - sx) ** 2 + (py - sy) ** 2 <= rad * rad for sx, sy, rad in srcs):
+                out.add((x, y))
+    return out
+
+
+def limit_allow(wm, landing=None, lit_drops=None):
+    """allow(from, to, drop) for WalkMap.reach: a level's landing and
+    lit_drops rules (descent_limits); None with neither."""
+    if landing is None and lit_drops is None:
+        return None
+    lit = lit_cells(wm) if lit_drops is not None else set()
+
+    def allow(s, t, drop):
+        if drop <= 0:
+            return True
+        if landing is not None and abs(t[1] - s[1]) > landing[0] and drop > landing[1]:
+            return False
+        if lit_drops is not None and t[0] == 'S' and (t[1], t[2] + 1) not in wm.band:
+            return drop <= lit_drops and (t[1], t[2]) in lit
+        return True
+    return allow
+
+
+def own_descent_problems(rows, header, wm):
+    """A level's own descent keys (descent_limits) kept: its goal reached by
+    falls within them; and a taller level whose route drops through a
+    one-way ledge says drops: (the bots drop through only then)."""
+    md, ld, lit, out = descent_limits(header)
+    if out or (md, ld, lit) == (None, None, None):
+        pass
+    elif not any(wm.touches(s) for s in wm.reach(md, limit_allow(wm, ld, lit))):
+        keys = ', '.join('%s %s' % (k, dict(header)[k]) for k in DESCENT_KEYS if str(dict(header).get(k, '')).strip())
+        out.append('its goal needs a fall past its own descent rules (%s)' % keys)
+    hd = dict(header)
+    drops = str(hd.get('drops', '')).strip().lower() not in ('', '0', 'no', 'false')
+    path = wm.route() or []
+    for a, b in zip(path, path[1:]):
+        if a[0] == 'S' and b[1] == a[1] and b[2] > a[2] and wm.g[a[2] + 1][a[1]] in ONE_WAY_GLYPHS and not drops:
+            out.append('its route drops through the one-way ledge at %d,%d: write drops: yes (the bots drop through only then)' % (a[1], a[2] + 1))
+            break
+    return out
+
+
+def _fall_secs(rows_down):
+    """The seconds a fall of rows_down rows takes (player.gd GRAVITY_DOWN to
+    MAX_FALL)."""
+    g, top = float(_gd_const('player.gd', 'GRAVITY_DOWN')), float(_gd_const('player.gd', 'MAX_FALL'))
+    d = rows_down * 32.0
+    t1 = top / g
+    d1 = 0.5 * g * t1 * t1
+    return math.sqrt(2.0 * d / g) if d <= d1 else t1 + (d - d1) / top
+
+
+def waxfall_columns(wm):
+    """[(x, y0, y1)]: each waxfall's douse column, its head's row down to the
+    first solid row under it (level_features.gd)."""
+    out = []
+    for y, r in enumerate(wm.g):
+        for x, ch in enumerate(r):
+            if ch == '!':
+                b = y + 1
+                while b < wm.h and _tile(wm.g, x, b, 'solid') != 'solid':
+                    b += 1
+                out.append((x, y, b - 1))
+    return out
+
+
+def waxfall_problems(wm):
+    """A taller level's waxfalls kept off its drops (see above), as strings."""
+    cols = waxfall_columns(wm)
+    if not cols:
+        return []
+
+    def under(x, y):
+        return any(cx == x and y0 <= y <= y1 for cx, y0, y1 in cols)
+    out = []
+    if not any(wm.touches(s) for s in wm.reach(None, lambda s, t, drop: drop <= 0 or not under(t[1], t[2]))):
+        out.append("a waxfall's column covers the only landing of a drop on the way to the goal")
+    off = float(_gd_const('level_features.gd', 'FALL_OFF'))
+    step = 32.0 / float(_gd_const('player.gd', 'RUN_SPEED'))
+    path = wm.route() or []
+    for a, b in zip(path, path[1:]):
+        drop = b[2] - a[2]
+        if drop > 0 and any(cx == b[1] and y0 <= b[2] and y1 >= a[2] for cx, y0, y1 in cols) and _fall_secs(drop) + step > off:
+            out.append('the drop at %d,%d through a waxfall takes %.2f s and a step (its off window %.1f s)' % (b[1], a[2], _fall_secs(drop), off))
+    return out
+
+
+def light_problems(wm, header):
+    """A dark level's roads kept apart (see above): no lantern on one road
+    alone lights a cell of another's way that's its alone."""
+    hd = dict(header)
+    if str(hd.get('twist', '')).strip().lower() != 'dark' or len(wm.roads()) < 2:
+        return []
+    rad, up = LIGHTS['L']
+    out = []
+    roads = wm.roads()
+    for y, r in enumerate(wm.g):
+        for x, ch in enumerate(r):
+            if ch != 'L':
+                continue
+            mine = wm.road_of((x, y))
+            if len(mine) != 1:
+                continue
+            lx, ly = x * 32 + 16, (y + 1) * 32 - up
+            for j, (name, path) in enumerate(roads):
+                if j in mine:
+                    continue
+                for _k, sx, sy in path:
+                    if mine[0] in wm.road_of((sx, sy)):
+                        continue
+                    if (sx * 32 + 16 - lx) ** 2 + ((sy + 1) * 32 - 22 - ly) ** 2 <= rad * rad:
+                        out.append("the lantern at %d,%d on the %s road lights the %s road's way at %d,%d" % (x, y, roads[mine[0]][0], name, sx, sy))
+                        break
+    return out
+
+
 def shape_problems(name, rows, header=()):
     """What breaks a level's shape rules (see above), as strings."""
     out = []
     if not H_MIN <= len(rows) <= H_MAX:
         out.append('%d rows (%d-%d)' % (len(rows), H_MIN, H_MAX))
+    if STRIP_ONLY.match(name) and len(rows) != H:
+        out.append('%d rows: a boss or secret level stays a strip (%d)' % (len(rows), H))
     out += hud_problems(rows)
-    if len(rows) > H:
-        wm = WalkMap(rows)
-        out += descent_problems(rows, wm) + catch_problems(rows, wm)
     hd = dict(header)
+    if len(rows) > H:
+        wm = WalkMap(rows, hd.get('roads', ''))
+        out += descent_problems(rows, wm) + catch_problems(rows, wm) + own_descent_problems(rows, header, wm)
+        out += waxfall_problems(wm) + light_problems(wm, header)
+        out += ['the %s road finds no way to the goal by its cells' % n for n, path in wm.roads() if n and not path]
+    else:
+        out += descent_limits(header)[3]
     f = str(hd.get('facing', 'right')).strip()
     if f not in ('left', 'right'):
         out.append("facing %r (left or right)" % f)
@@ -1999,17 +2364,36 @@ def in_play(rows, anoint=(), twist='', world=0, pack_leaders=None):
     return [tuple(p) for p in placed]
 
 
-def threat_of(rows, anoint=(), twist='', world=0, pack_leaders=None):
+def threat_of(rows, anoint=(), twist='', world=0, pack_leaders=None, roads=''):
     """Threat cost per 100 tiles (EnemyKinds.COST, the Dread aside): each
     placed monster at the bodies it comes to in play (in_play: its pack's
     extras at its kind's cost), a forced Anointed (a cell in anoint) itself
-    at TIER_COST's x2.5 (tests/level_rules.gd threat_of counts the same)."""
+    at TIER_COST's x2.5 (tests/level_rules.gd threat_of counts the same).
+    A strip's tiles are its width. A taller level's are its route's length
+    on foot (WalkMap.run_lengths: a loop's two storeys, a switchback's
+    tiers and a tower's climb are all walked), and with roads (its 'roads'
+    header: two ways through) each road is counted on its own, its monsters
+    (WalkMap.road_of: the nearest road's; on the stretches they share,
+    every road's) over its length, and the heavier road is the level's: a
+    run takes one road, so the two are never added up."""
     g = game()
     forced = set(anoint)
-    cost = 0.0
+    bodies = []
     for x, y, k, n in in_play(rows, anoint, twist, world, pack_leaders):
-        cost += g['cost'][k] * ((g['tier_cost']['anointed'] if (x, y) in forced else 1.0) + n - 1.0)
-    return cost * 100.0 / max(len(r) for r in rows)
+        bodies.append(((x, y), g['cost'][k] * ((g['tier_cost']['anointed'] if (x, y) in forced else 1.0) + n - 1.0)))
+    if len(rows) <= H:
+        return sum(c for _cell, c in bodies) * 100.0 / max(len(r) for r in rows)
+    wm = WalkMap(rows, roads)
+    best = None
+    for i, (_name, path) in enumerate(wm.roads()):
+        tiles = wm.run_lengths(path)[-1] if path else 0
+        if tiles <= 0:
+            continue
+        cost = sum(c for cell, c in bodies if i in wm.road_of(cell))
+        best = max(best or 0.0, cost * 100.0 / tiles)
+    if best is None:
+        return sum(c for _cell, c in bodies) * 100.0 / max(len(r) for r in rows)
+    return best
 
 
 def _band(v):
@@ -2139,10 +2523,10 @@ def check_roster(name, rows, roster, world=None):
     assert not probs, '%s breaks its roster: %s' % (name, '; '.join(probs))
 
 
-def check_threat(name, rows, target, anoint=(), twist='', world=0, pack_leaders=None):
+def check_threat(name, rows, target, anoint=(), twist='', world=0, pack_leaders=None, roads=''):
     """Asserts a level's threat (threat_of) within THREAT_SLACK of its
     declared one, and returns it."""
-    got = threat_of(rows, anoint, twist, world, pack_leaders)
+    got = threat_of(rows, anoint, twist, world, pack_leaders, roads)
     assert abs(got - target) <= target * THREAT_SLACK + 1e-9, \
         '%s: threat %.2f per 100 tiles, declared %s (within %d%%)' % (name, got, _num(target), round(THREAT_SLACK * 100))
     return got
@@ -2165,6 +2549,40 @@ def lesson_problems(value):
     return out
 
 
+def clockwork_problems(rows, header=()):
+    """What a level's clockwork headers can't tell apart, as strings: they're
+    keyed by column (cog_phase by a hub's, weight_phase by a weight's or a
+    swing's first: level_data.gd), so no two cog hubs share a column, nor two
+    weights or swings; and in a taller level a belt_flip span reverses the
+    belts of one storey only (features/clockwork.gd reverse_belts takes
+    every belt in its columns: within STOREY_ROWS rows of each other), so a
+    storey stacked over another (4-2's loop) never flips its own with it."""
+    out = []
+    hubs = {}
+    keys = {}
+    for y, r in enumerate(rows):
+        x = 0
+        while x < len(r):
+            ch = r[x]
+            if ch in 'OQ':
+                hubs.setdefault(x, []).append(y)
+            elif ch == 'Y':
+                keys.setdefault(x, []).append(y)
+            elif ch == 'T':
+                keys.setdefault(x, []).append(y)
+                while x + 1 < len(r) and r[x + 1] == 'T':
+                    x += 1
+            x += 1
+    out += ['two cog hubs in column %d (rows %s): cog_phase is keyed by column' % (x, ys) for x, ys in sorted(hubs.items()) if len(ys) > 1]
+    out += ['two weights or swings in column %d (rows %s): weight_phase is keyed by column' % (x, ys) for x, ys in sorted(keys.items()) if len(ys) > 1]
+    if len(rows) > H:
+        for x0, x1 in ranges_of(dict(header).get('belt_flip', '')):
+            ys = sorted({y for y, r in enumerate(rows) for x in range(x0, min(x1, len(r) - 1) + 1) if r[x] in '<>'})
+            if ys and ys[-1] - ys[0] > STOREY_ROWS:
+                out.append('belt_flip %d-%d reverses belts on rows %d and %d (two storeys)' % (x0, x1, ys[0], ys[-1]))
+    return out
+
+
 def check_headers(name, rows, header, world=None):
     """The Build 2 keys of a header about to be written, whoever wrote it (a
     world's tables, an explicit v2 header list, a lab): a spelling the spec
@@ -2179,6 +2597,8 @@ def check_headers(name, rows, header, world=None):
     hd = dict(header)
     for k in hd:
         assert k not in SPEC_KEYS, '%s: a %r header: %s' % (name, k, SPEC_KEYS[k])
+    probs = clockwork_problems(rows, header)
+    assert not probs, '%s: %s' % (name, '; '.join(probs))
     check_rooms(name, rows, hd.get('room', ''), facing_of(header))
     if hd.get('anoint', '').strip():
         probs = anoint_problems(rows, hd['anoint'], world, name)
@@ -2200,7 +2620,7 @@ def check_headers(name, rows, header, world=None):
             '%s: its roster names stamps %s, its sections hold %s' % (name, sorted(set(roster.get('stamps', []))), used)
     if hd.get('threat', '').strip():
         anoint = [(x, y) for x, y, _o, _n in anoint_cells(hd.get('anoint', ''))]
-        check_threat(name, rows, float(hd['threat']), anoint, tw.lower(), world, roster.get('pack_leaders'))
+        check_threat(name, rows, float(hd['threat']), anoint, tw.lower(), world, roster.get('pack_leaders'), hd.get('roads', ''))
     parts = [sec for sec, _x, _y in parts_in_route_order(rows, facing_of(header))]
     if hd.get('roles', '').strip() and parts:
         assert ' '.join(hd['roles'].split()) == roles_of(parts), \
@@ -2229,44 +2649,68 @@ def landmarks_of(roles):
     return ' '.join(out)
 
 
-def checkpoint_gaps(rows):
+def checkpoint_gaps(rows, roads=''):
     """(marks, gaps): a level's checkpoints (start, altars, bell or boss) in
     the route's order and how far apart they are on it: a strip's by x
     (either way), a taller level's along the walk map's route (each
     checkpoint at its nearest index, WalkMap.proj; the columns walked and
     rows climbed between: run_lengths). marks: their x in a strip, their
-    distance along the route in a taller level."""
+    distance along the route in a taller level. With roads (two ways
+    through), along each road its own checkpoints (WalkMap.road_of) and the
+    road with the widest gap's: a run takes one road, so the slower road is
+    held to the gap too (road_gaps has them all)."""
+    worst = None
+    for _name, marks, gaps in road_gaps(rows, roads):
+        if worst is None or max(gaps or [0]) > max(worst[1] or [0]):
+            worst = (marks, gaps)
+    return worst or ([], [10 ** 6])
+
+
+def road_gaps(rows, roads=''):
+    """[(road, marks, gaps)]: checkpoint_gaps along each road ('' the one
+    road; a strip's by x)."""
     cells = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch in 'PKEX']
     if len(rows) <= H:
         marks = sorted(x for x, _y in cells)
-    else:
-        wm = WalkMap(rows)
-        if wm.route() is None:
-            return [], [10 ** 6]
-        run = wm.run_lengths()
-        marks = sorted(run[wm.proj(c)] for c in cells)
-    return marks, [b - a for a, b in zip(marks, marks[1:])]
+        return [('', marks, [b - a for a, b in zip(marks, marks[1:])])]
+    wm = WalkMap(rows, roads)
+    out = []
+    for i, (name, path) in enumerate(wm.roads()):
+        if not path:
+            out.append((name, [], [10 ** 6]))
+            continue
+        run = wm.run_lengths(path)
+        mine = [c for c in cells if i in wm.road_of(c)]
+        marks = sorted(run[min(range(len(path)), key=lambda j: (abs(path[j][1] - c[0]) + 2 * abs(path[j][2] - c[1]), j))] for c in mine)
+        out.append((name, marks, [b - a for a, b in zip(marks, marks[1:])]))
+    return out
 
 
 def checkpoint_problems(rows, header, max_gap, altar_band=ALTARS):
     """A regular level's checkpoints (start, altars, bell): at most max_gap
-    apart along its route (checkpoint_gaps: x in a strip), altar_band
-    altars (ALTARS; World 1-2's own, w1.py and w2.py), and an altar at most
-    DOOR_ALTAR tiles before every sealed room's door (the one the route
-    comes in by: room_entry; rooms_of)."""
-    marks, gaps = checkpoint_gaps(rows)
-    altars = sorted(x for r in rows for x, ch in enumerate(r) if ch == 'K')
+    apart along its route (checkpoint_gaps: x in a strip; with roads, along
+    each road), altar_band altars (ALTARS; World 1-2's own, w1.py and
+    w2.py), and an altar at most DOOR_ALTAR tiles before every sealed room's
+    door (the one the route comes in by: room_entry; rooms_of), in a taller
+    level on the deck he comes in on (in that door's rows: door_rows)."""
     out = []
-    worst = max(gaps or [0])
-    if worst > max_gap:
-        out.append('checkpoints %d tiles apart (at most %d): %s' % (worst, max_gap, marks))
+    for name, marks, gaps in road_gaps(rows, header.get('roads', '')):
+        worst = max(gaps or [0])
+        if worst > max_gap:
+            out.append('checkpoints %d tiles apart (at most %d)%s: %s' % (worst, max_gap, ' on the %s road' % name if name else '', marks))
+    altars = sorted(x for r in rows for x, ch in enumerate(r) if ch == 'K')
+    cells = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == 'K']
     if not altar_band[0] <= len(altars) <= altar_band[1]:
         out.append('%d altars (%d-%d)' % (len(altars), altar_band[0], altar_band[1]))
     for kind, x0, x1, y0, y1 in _room_boxes(rows, header.get('room', '')):
-        side = room_entry(rows, x0, x1, y0, y1, facing_of(header))
+        side, row = room_entry_at(rows, x0, x1, y0, y1, facing_of(header))
         door = x0 if side < 0 else x1
-        if not any(0 <= (door - a) * -side <= DOOR_ALTAR for a in altars):
+        band = deck_door_rows(rows, door, y0, y1, row)
+        ok = [(ax, ay) for ax, ay in cells if 0 <= (door - ax) * -side <= DOOR_ALTAR]
+        if not ok:
             out.append('no altar within %d tiles of the %s door at %d (altars %s)' % (DOOR_ALTAR, kind, door, altars))
+        elif band is not None and not any(band[0] - 1 <= ay <= band[1] for _ax, ay in ok):
+            out.append('no altar on the deck of the %s door at %d (its doorway rows %d-%d; altars %s)' % (kind, door, band[0], band[1], ok))
     return out
 
 
@@ -2288,13 +2732,30 @@ def _room_boxes(rows, value):
     return out
 
 
-def screen_rows(rows):
+FEET_UP, FEET_DOWN = 5, 6   # rows the camera shows over and under his feet's row, standing (FEET_LINE of VIEW_H)
+
+
+def screen_rows(rows, x0=None, width=SCREEN):
     """[(y0, y1)]: the rows a screen spans (inclusive): a strip's one screen
     is its whole height (its camera shows it all as it goes); a taller
-    level's SCREEN_ROWS tall (the view), from every row."""
-    if len(rows) <= H:
-        return [(0, len(rows) - 1)]
-    return [(y0, y0 + SCREEN_ROWS - 1) for y0 in range(0, len(rows) - SCREEN_ROWS + 1)]
+    level's are the views over each row he can stand on (WalkMap.stand) in
+    the columns x0..x0+width-1 (every column with no x0): FEET_UP rows over
+    it and FEET_DOWN under (SCREEN_ROWS in all; at the level's top the
+    camera stops, so the first SCREEN_ROWS rows), so two roads or decks a
+    screen apart are never counted together where he can't see both."""
+    h = rows.h if isinstance(rows, WalkMap) else len(rows)
+    if h <= H:
+        return [(0, h - 1)]
+    wm = rows if isinstance(rows, WalkMap) else WalkMap(rows)
+    xs = range(wm.w) if x0 is None else range(max(x0, 0), min(x0 + width, wm.w))
+    feet = sorted({y for x in xs for y in range(h) if wm.stand(x, y)})
+    out = []
+    for f in feet:
+        y0 = max(0, f - FEET_UP)
+        y1 = min(h - 1, (y0 + SCREEN_ROWS - 1) if f - FEET_UP < 0 else f + FEET_DOWN)
+        if (y0, y1) not in out:
+            out.append((y0, y1))
+    return out
 
 
 def mixed_screens(rows):
@@ -2308,12 +2769,12 @@ def mixed_screens(rows):
             if ch in mons:
                 at.setdefault(x, []).append((y, mons[ch]))
     width = max(len(r) for r in rows)
-    bands = screen_rows(rows)
+    wm = WalkMap(rows) if len(rows) > H else rows
     n = 0
     x0 = 0
     while x0 < width:
         best = 0
-        for y0, y1 in bands:
+        for y0, y1 in screen_rows(wm, x0):
             kinds = set()
             for x in range(x0, x0 + SCREEN):
                 kinds |= {k for y, k in at.get(x, ()) if y0 <= y <= y1}
@@ -2333,9 +2794,10 @@ def crowded_screens(rows, anoint=(), twist='', world=0, pack_leaders=None):
     for x, y, _k, n in in_play(rows, anoint, twist, world, pack_leaders):
         at.setdefault(x, []).append((y, n))
     width = max(len(r) for r in rows)
+    wm = WalkMap(rows) if len(rows) > H else rows
     out = []
     for x0 in range(0, max(width - SCREEN, 0) + 1):
-        for y0, y1 in screen_rows(rows):
+        for y0, y1 in screen_rows(wm, x0):
             n = sum(m for x in range(x0, x0 + SCREEN) for y, m in at.get(x, ()) if y0 <= y <= y1)
             if n > AWAKE_MAX + 1e-9:
                 out.append((x0, n))
@@ -2691,4 +3153,243 @@ def shapes_check():
     corner = swap(block('\n'.join(['.' * 40] * 13 + ['#' * 40] * 2)), {(38, 1): '1', (1, 12): 'P', (6, 12): 'E'})
     assert any('top right corner' in p for p in hud_problems(corner)) and hud_problems(swap(corner, {(38, 1): '.'})) == [], 'the HUD rule'
     assert shape_problems('x', ['.'] * 14) and shape_problems('x', corner, [('facing', 'left')]) and shape_problems('x', corner, [('facing', 'up')]), 'shape_problems'
-    assert screen_rows(flat) == [(0, 14)] and screen_rows(['.'] * 24)[-1] == (12, 23), 'screen_rows'
+    assert screen_rows(flat) == [(0, 14)] and screen_rows(['.'] * 24) == [], 'screen_rows'
+    review_check()
+
+
+def _grid(w, h):
+    """A blank level of w x h air, for the checks below: (rows, put, fill)."""
+    g = [['.'] * w for _ in range(h)]
+
+    def put(x, y, s):
+        for i, ch in enumerate(s):
+            g[y][x + i] = ch
+
+    def fill(x0, x1, y0, y1, ch='#'):
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                g[y][x] = ch
+    return g, put, fill
+
+
+def _rows_of(g):
+    return [''.join(r) for r in g]
+
+
+def review_check():
+    """The shape rules the shape review asked for, each passing what it
+    should and catching what it shouldn't (shapes_check runs it): a taller
+    level's threat per tile of its route on foot, and per road; the gaps
+    along each road; screens anchored on the rows he stands on; a level's
+    own descent keys; drops: where the route drops through a ledge;
+    waxfalls off the drops; a dark level's roads lit apart; the clockwork's
+    column keys; the boss and secret levels kept strips; a two-deck room's
+    door altar on his deck; a carrier at a rotten run's foot; a deck's
+    gusts on its rows."""
+    c = game()['cost']
+    # A loop: right along the bottom (stand 21), up at the far end, back left
+    # along the top (stand 10) to the bell over the start: its threat is per
+    # tile of the route (about twice its width), not of its width.
+    g, put, fill = _grid(40, 24)
+    fill(0, 39, 0, 0)
+    fill(0, 39, 22, 23)
+    fill(0, 31, 11, 12)
+    put(2, 21, 'P')
+    put(3, 10, 'E')
+    put(34, 19, '====')
+    put(36, 16, '===')
+    put(34, 13, '====')
+    put(12, 21, 's')
+    put(20, 10, 's')
+    loop = _rows_of(g)
+    wm = WalkMap(loop)
+    run = wm.run_lengths()[-1]
+    assert run > 60 and abs(threat_of(loop) - 2 * c['skeleton'] * 100.0 / run) < 1e-9, \
+        'a loop\'s threat is per tile of its route on foot (%.2f over %d tiles)' % (threat_of(loop), run)
+    # Two roads (split by a wall, rejoining): each road's threat on its own,
+    # the heavier the level's; the gaps along each road.
+    g, put, fill = _grid(60, 24)
+    fill(0, 59, 0, 0)
+    fill(0, 59, 22, 23)
+    fill(14, 45, 11, 12)                   # the high road's floor (stand 10)
+    for x, y in ((10, 19), (12, 16), (10, 13)):
+        put(x, y, '===')                   # up to the high road at its start
+    for x, y in ((47, 13), (49, 16), (47, 19)):
+        put(x, y, '===')                   # down from it at its end
+    put(2, 21, 'P')
+    put(56, 21, 'E')
+    put(5, 21, 'K')
+    put(52, 21, 'K')
+    put(20, 10, 's')
+    put(30, 10, 's')
+    put(25, 21, 's')
+    two = _rows_of(g)
+    roads = 'high 30,10; low 30,21'
+    wr = WalkMap(two, roads)
+    hi, lo = wr.roads()
+    assert hi[1] and lo[1] and wr.road_of((20, 10)) == [0] and wr.road_of((25, 21)) == [1] and set(wr.road_of((2, 21))) == {0, 1}, 'road_of'
+    t_hi = 2 * c['skeleton'] * 100.0 / wr.run_lengths(hi[1])[-1]
+    t_lo = c['skeleton'] * 100.0 / wr.run_lengths(lo[1])[-1]
+    assert abs(threat_of(two, roads=roads) - max(t_hi, t_lo)) < 1e-9 and threat_of(two, roads=roads) < threat_of(two) * 1.01 + 1.0, \
+        'two roads: the heavier road\'s threat (%.2f; both counted on one: %.2f)' % (threat_of(two, roads=roads), threat_of(two))
+    gaps = road_gaps(two, roads)
+    assert [n for n, _m, _g in gaps] == ['high', 'low'] and all(m for _n, m, _g in gaps), 'road_gaps names each road %s' % (gaps,)
+    assert any('on the high road' in p for p in checkpoint_problems(two, {'roads': roads}, max(g2 for _n, _m, gg in gaps for g2 in gg) - 1)), \
+        'a gap too wide on a road is named by its road'
+    assert any('no way to the goal' in p for p in shape_problems('lab-x', two, [('roads', 'high 30,10; nowhere 30,5')])), 'a road that goes nowhere'
+    # Screens: the views over the rows he stands on, so two roads 11 rows
+    # apart never count together; four Rattles on each is no crowd, eight on
+    # one road is.
+    crowd = [list(r) for r in two]
+    for x in (16, 18, 22, 24, 26, 28, 32):
+        crowd[10][x] = 's'
+    for x in (16, 18, 22, 24, 26, 28, 32):
+        crowd[21][x] = 's'
+    crowd = [''.join(r) for r in crowd]
+    sr = screen_rows(crowd, 16)
+    assert (5, 16) in sr and (16, 23) in sr and not any(a <= 10 and b >= 21 for a, b in sr), 'screen_rows: the roads apart (%s)' % (sr,)
+    assert crowded_screens(crowd) and not crowded_screens(two), 'eight a road crowds its screen'
+    # A level's own descent keys: a 5-row drop the only way on passes the
+    # shape rules but not max_drop 4; a long low leap fails landing 6/2; a
+    # dark drop fails lit_drops 3, a lantern by its landing passes it.
+    g, put, fill = _grid(40, 24)
+    fill(0, 39, 22, 23)
+    fill(0, 17, 17, 23)                    # the upper floor (stand 16), a 5-row drop off its end
+    put(2, 16, 'P')
+    put(30, 21, 'E')
+    dr = _rows_of(g)
+    assert not [p for p in shape_problems('lab-x', dr) if 'descent' in p or 'drop' in p], 'a 5-row drop keeps the shape rules'
+    assert any('own descent rules (max_drop 4)' in p for p in shape_problems('lab-x', dr, [('max_drop', '4')])), 'max_drop 4 catches it'
+    assert not [p for p in shape_problems('lab-x', dr, [('max_drop', '5')]) if 'descent' in p], 'max_drop 5 passes it'
+    assert any('own descent rules (lit_drops 3)' in p for p in shape_problems('lab-x', dr, [('lit_drops', '3')])), 'lit_drops: a 5-row drop is too far'
+    g2 = [list(r) for r in dr]
+    for x in range(18, 24):
+        g2[19][x] = '='                    # a ledge 3 rows down, then 2 more to the floor
+    g2[18][23] = 'L'
+    g2[20][26] = 'L'
+    lit = [''.join(r) for r in g2]
+    assert not [p for p in shape_problems('lab-x', lit, [('lit_drops', '3')]) if 'descent' in p], 'lit_drops: lit 3- and 2-row drops pass'
+    dark = [r.replace('L', '.') for r in lit]
+    assert any('lit_drops 3' in p for p in shape_problems('lab-x', dark, [('lit_drops', '3')])), 'lit_drops: the same in the dark fails'
+    assert any('landing 0/0' in p for p in shape_problems('lab-x', lit, [('landing', '0/0')])) and \
+        not [p for p in shape_problems('lab-x', lit, [('landing', '1/0')]) if 'descent' in p], 'landing: walk-offs land a column ahead'
+    g3 = [list(r) for r in lit]
+    for x in range(18, 24):
+        g3[19][x] = '.'
+    leap = _rows_of(g3)
+    assert not [p for p in shape_problems('lab-x', leap, [('landing', '6/2')]) if 'descent' in p], 'landing 6/2: a walk-off 5 down lands a column ahead'
+    assert any("landing 'x'" in p for p in shape_problems('lab-x', lit, [('landing', 'x')])), 'a landing that does not read'
+    # drops: a route down through a ledge says so.
+    g, put, fill = _grid(30, 24)
+    fill(0, 29, 22, 23)
+    fill(0, 9, 13, 23)
+    put(10, 13, '=====')
+    fill(15, 29, 13, 21)
+    put(2, 12, 'P')
+    put(12, 21, 'E')
+    led = _rows_of(g)
+    assert any('drops: yes' in p for p in shape_problems('lab-x', led)) and \
+        not [p for p in shape_problems('lab-x', led, [('drops', 'yes')]) if 'drops' in p], 'drops: required where the route drops through a ledge'
+    # Waxfalls: one pouring onto the only landing of a drop is caught; beside
+    # it, it passes.
+    g, put, fill = _grid(40, 24)
+    fill(0, 39, 22, 23)
+    fill(0, 17, 17, 23)                    # the upper floor (stand 16)
+    fill(19, 39, 17, 19)                   # a roof over the corridor below (stand 21)
+    put(2, 16, 'P')
+    put(30, 21, 'E')
+    put(18, 12, '!')                       # pours down the one way down
+    wx = _rows_of(g)
+    assert any("only landing" in p for p in shape_problems('lab-x', wx)), 'a waxfall over the only landing (%s)' % shape_problems('lab-x', wx)
+    assert not [p for p in shape_problems('lab-x', [r.replace('!', '.') for r in wx]) if 'waxfall' in p], 'without it, none'
+    assert _fall_secs(5) + 32.0 / float(_gd_const('player.gd', 'RUN_SPEED')) < float(_gd_const('level_features.gd', 'FALL_OFF')), \
+        'a 5-row drop and a step fit a waxfall\'s off window'
+    assert not [p for p in waxfall_problems(WalkMap(wx)) if 'off window' in p], 'so the drop through it fits'
+    for x in range(25, 28):
+        for y in (17, 18, 19):
+            g[y][x] = '.'
+    beside = _rows_of(g)
+    assert not [p for p in shape_problems('lab-x', beside) if 'waxfall' in p], 'another way down beside it: not its only landing'
+
+    # The dark: a lantern on the high road lighting the low road's way.
+    hd = [('roads', roads), ('twist', 'dark')]
+    lamp = [list(r) for r in two]
+    lamp[10][34] = 'L'
+    assert not light_problems(WalkMap(_rows_of(lamp), roads), hd), 'a lantern on the high road, 11 rows up: apart'
+    near_rows = [list(r) for r in two]
+    for x in range(14, 46):
+        near_rows[11][x] = '.'
+        near_rows[12][x] = '.'
+        near_rows[19][x] = '#'
+    near_rows[18][34] = 'L'
+    nr = _rows_of(near_rows)
+    nroads = 'high 30,18; low 30,21'
+    assert all(p for _n, p in WalkMap(nr, nroads).roads()) and \
+        any('lights the low road' in p for p in light_problems(WalkMap(nr, nroads), [('roads', nroads), ('twist', 'dark')])), \
+        'a lantern on a high road 3 rows up lights the low one'
+    assert not light_problems(WalkMap(nr, nroads), [('roads', nroads)]), 'only in the dark'
+    # The clockwork's column keys.
+    ck = [list(r) for r in loop]
+    ck[5][10] = 'O'
+    ck[17][10] = 'Q'
+    assert any('two cog hubs in column 10' in p for p in clockwork_problems(_rows_of(ck))), 'two cogs in a column'
+    ck[17][10] = '.'
+    ck[8][12] = 'Y'
+    ck[19][12] = 'T'
+    assert any('two weights or swings in column 12' in p for p in clockwork_problems(_rows_of(ck))), 'a weight over a swing'
+    bf = [list(r) for r in loop]
+    for x in range(5, 9):
+        bf[11][x] = '>'
+        bf[22][x] = '<'
+    assert any('two storeys' in p for p in clockwork_problems(_rows_of(bf), [('belt_flip', '5-8=8')])) and \
+        not clockwork_problems(_rows_of(bf), [('belt_flip', '20-24=8')]), 'a belt_flip over both storeys'
+    # The boss and secret levels stay strips.
+    assert any('stays a strip' in p for p in shape_problems('4-4', loop)) and any('stays a strip' in p for p in shape_problems('3-S', loop)) \
+        and not any('stays a strip' in p for p in shape_problems('4-2', loop)), 'STRIP_ONLY'
+    # A two-deck room: its door altar on the deck he comes in on.
+    g, put, fill = _grid(60, 24)
+    fill(0, 59, 0, 0)
+    fill(0, 59, 22, 23)
+    fill(20, 50, 1, 1)
+    fill(20, 20, 1, 18)
+    fill(50, 50, 1, 7)
+    fill(50, 50, 11, 21)
+    for x, y in ((24, 19), (29, 16), (24, 13)):
+        put(x, y, '====')
+    fill(31, 49, 11, 11)
+    fill(51, 59, 11, 21)
+    put(2, 21, 'P')
+    put(56, 10, 'E')
+    put(36, 21, 's')
+    put(40, 10, 's')
+    put(14, 21, 'K')
+    deck = _rows_of(g)
+    assert not room_problems(deck, 'ambush 20-50 rows 1-22'), room_problems(deck, 'ambush 20-50 rows 1-22')
+    up = [list(r) for r in deck]
+    up[21][14] = '.'
+    for x in range(10, 19):
+        up[9][x] = '#'
+    up[8][14] = 'K'
+    up = _rows_of(up)
+    assert any('on the deck of its left door' in p for p in room_problems(up, 'ambush 20-50 rows 1-22')), \
+        'an altar over the lower door, on another deck (%s)' % room_problems(up, 'ambush 20-50 rows 1-22')
+    # A Creepbone at a rotten run's foot is the run (as level_data.gd reads it):
+    # the catch rule finds the foot there.
+    g, put, fill = _grid(20, 24)
+    fill(0, 19, 22, 23)
+    fill(0, 19, 0, 0)
+    for y in range(3, 6):
+        put(6, y, '}')
+    put(6, 6, 'i')
+    put(2, 21, 'P')
+    put(15, 21, 'E')
+    fill(0, 5, 3, 3)
+    rv = _rows_of(g)
+    assert WalkMap(rv).t[6][6] == '}' and any('lands' in p for p in catch_problems(rv)), \
+        'a Creepbone at a rotten run\'s foot: the run\'s foot, 15 rows over the floor (%s)' % catch_problems(rv)
+    # Gusts: a deck's wind on its rows (a stacked level), a strip's whole columns.
+    windy = block('\n'.join(['.' * 20] * 13 + ['#' * 20] * 2) + '\n Z|....((((............\n')
+    calm = block('\n'.join(['.' * 20] * 13 + ['#' * 20] * 2))
+    st2 = stack(join(crop(windy, 3)), join(crop(calm, 3)))
+    assert level_gusts_header(st2) == '4-7:L:A:0-11' and level_gusts_header(join(windy)) == '4-7:L:A', \
+        'a deck\'s gusts on its rows (%s)' % level_gusts_header(st2)

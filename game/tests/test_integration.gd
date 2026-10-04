@@ -1,8 +1,10 @@
 extends SceneTree
 ## The seams between the parts, played for real: every level (1-1 to 2-4)
 ## with every calling, in the real World with its HUD, touch layer, sounds
-## and the calling's kit, driven by a simple two-thumb bot (hold right, jump
-## on a timer, swing and use the Special often, drink the flask when low).
+## and the calling's kit, driven by a simple two-thumb bot (hold the way on:
+## right, left in a level facing left, a taller level's by its route field;
+## jump on a timer, swing and use the Special often, drink the flask when
+## low; _test_bot_ways proves its ways on the shape labs).
 ## Then each boss fought by each calling. Checks: no script errors (a
 ## Logger catches them) and no unknown sound names; the hero deals damage;
 ## Specials fire and cost their resource; XP and embers come in; items drop
@@ -135,6 +137,7 @@ func _initialize() -> void:
 	var auto_equip = game.setting("auto_equip")
 	var t0 := Time.get_ticks_msec()
 	await _test_play_all()
+	await _test_bot_ways()
 	await _test_full_satchel()
 	await _test_legends()
 	await _test_special_in_freeze()
@@ -196,10 +199,16 @@ func _step(w: Node2D, pad: Dictionary) -> void:
 # ---------------------------------------------------------------- the bot
 
 class Bot:
-	## Two thumbs: the left one holds right (backing off and hopping when
-	## stuck), the right one taps jump on a beat, swings, and presses the
-	## Special for 0.6 s every couple of seconds. The flask when low.
+	## Two thumbs: the left one holds the way on (backing off and hopping
+	## when stuck), the right one taps jump on a beat, swings, and presses
+	## the Special for 0.6 s every couple of seconds. The flask when low. The
+	## way on is right, as v2's held; a level played right to left (facing:
+	## left) holds left, and a taller one heads the way its route field goes
+	## (route_field.gd heading, as autoplay_bot.gd's _route_pad: right round
+	## a loop, up a tower), its last way kept where it says none.
 	var i := 0
+	var dir := 1                    # the way on: 1 right, -1 left
+	var field: RefCounted = null    # a taller level's route field toward its goal
 	var cls := ""
 	var last_x := 0.0
 	var unstick := 0
@@ -213,6 +222,14 @@ class Bot:
 	var wait := 0                   # ticks to stand still (a dropped item landing)
 	var rng := RandomNumberGenerator.new()
 
+	func _way(pl: Node2D) -> int:
+		## The way on now: a taller level's route field's heading, else dir.
+		if field != null:
+			var hd: Vector2i = field.heading(pl.position)
+			if hd.x != 0:
+				dir = 1 if hd.x > 0 else -1
+		return dir
+
 	func _foe_ahead(w: Node2D, pl: Node2D) -> Node2D:
 		## The nearest live monster just ahead at about his height.
 		var reach := 230.0 if ranged else 70.0
@@ -221,7 +238,7 @@ class Bot:
 		for e in w.enemies:
 			if not e.alive or not e.active or e == w.boss:
 				continue
-			var dx: float = e.position.x - pl.position.x
+			var dx: float = (e.position.x - pl.position.x) * dir
 			if dx < -6.0 or dx > bd or absf(e.center().y - pl.center().y) > 44.0:
 				continue
 			bd = dx
@@ -244,6 +261,9 @@ class Bot:
 		var pl: Node2D = w.player
 		var p := {}
 		var t := i * DT
+		_way(pl)
+		var fwd := "right" if dir > 0 else "left"
+		var bwd := "left" if dir > 0 else "right"
 		var foe: Node2D = null if target != null else _foe_ahead(w, pl)
 		var loot: Dictionary = {} if target != null else _loot_near(w, pl)
 		if not loot.is_empty() and foe == null and unstick <= 0:
@@ -253,8 +273,8 @@ class Bot:
 			p["left"] = lx < -4.0
 		elif foe != null and unstick <= 0:
 			# Something in the way: stand and fight it (a stomp now and then).
-			var dx: float = foe.position.x - pl.position.x
-			p["right"] = dx > (110.0 if ranged else 26.0) or (i / 30) % 4 == 0
+			var dx: float = (foe.position.x - pl.position.x) * dir
+			p[fwd] = dx > (110.0 if ranged else 26.0) or (i / 30) % 4 == 0
 			p["jump"] = (i / 45) % 5 == 0 and not ranged
 		elif target != null and is_instance_valid(target) and target.alive:
 			var dx: float = target.center().x - pl.position.x
@@ -281,11 +301,11 @@ class Bot:
 			if unstick > 0:
 				unstick -= 1
 				var back := unstick > 70
-				p["left"] = back
-				p["right"] = not back
+				p[bwd] = back
+				p[fwd] = not back
 				p["jump"] = not back and unstick > 8 and (unstick < 62 or (stuck_n % 3 == 2 and unstick < 68))
 			else:
-				p["right"] = true
+				p[fwd] = true
 				p["jump"] = fmod(t, 0.9) < 0.34 or (stuck_n % 2 == 1 and fmod(t, 0.9) < 0.6)
 		if wait > 0:
 			wait -= 1
@@ -343,7 +363,7 @@ func _play(cls: String, id: String) -> Dictionary:
 	await process_frame
 	var pl: Node2D = w.player
 	_check(w.kit != null and str(w.kit.cls) == cls, "%s on %s: the %s kit is on" % [cls, id, cls])
-	var bot := Bot.new()
+	var bot := _bot_for(w)
 	bot.cls = cls
 	bot.ranged = cls in RANGED
 	bot.rng.seed = hash(cls + id)
@@ -354,13 +374,13 @@ func _play(cls: String, id: String) -> Dictionary:
 	var was_down := false
 	var forced := false
 	var ticks := int(_run_s / DT)
-	# One Rattle a few tiles ahead on firm floor, so every run has a fight
-	# in its first seconds (the level's own monsters come after).
-	var cell := _floor_ahead(w, pl.position, 4, 9)
+	# One Rattle a few tiles ahead on firm floor (the way on), so every run
+	# has a fight in its first seconds (the level's own monsters come after).
+	var cell := _floor_ahead(w, pl.position, 4, 9, bot._way(pl))
 	if cell.x >= 0:
 		var rattle: Node2D = w.spawn_enemy("skeleton", LevelData.cell_floor(cell), {"cell": cell})
 		if rattle:
-			rattle.facing = -1
+			rattle.facing = -bot.dir
 	for i in ticks:
 		var under: int = w.level.tile(floori(pl.position.x / 32.0), floori((pl.position.y + 2.0) / 32.0))
 		if i >= 90 and not forced and pl.alive and pl.on_floor and pl.riding == null and w.state == "play" \
@@ -388,7 +408,7 @@ func _play(cls: String, id: String) -> Dictionary:
 			if wt["left"] <= 0 and wt["min"] < wt["res"] - maxf(0.2, 0.01 * pl.res_max):
 				r["spent"] += 1
 		watch = watch.filter(func(wt): return wt["left"] > 0)
-		r["far"] = maxf(r["far"], pl.position.x)
+		r["far"] = maxf(r["far"], pl.position.x * bot.dir)
 		if i % 40 == 0:
 			await process_frame
 		if w.state == "clear":
@@ -421,13 +441,31 @@ func _play(cls: String, id: String) -> Dictionary:
 	return r
 
 
-func _floor_ahead(w: Node2D, feet: Vector2, from: int, to: int) -> Vector2i:
-	## The first air cell on solid floor at his height, from..to tiles ahead.
+func _bot_for(w: Node2D) -> Bot:
+	## The two-thumb bot for a World's level: its way on right, facing left
+	## left; a taller level's by its route field toward the bell (or the boss
+	## arena), as autoplay_bot.gd builds it.
+	var bot := Bot.new()
+	bot.dir = int(w.level.facing)
+	if w.level.tall():
+		var Reach = load("res://scripts/reach.gd")
+		var goal := {}
+		for g in Reach.goals_of(w.level):
+			if g["what"] == "bell" or g["what"] == "boss arena":
+				goal = g
+		if not goal.is_empty():
+			bot.field = load("res://scripts/route_field.gd").new().build(Reach.static_copy(w.level), goal, Reach.drops_of(w.level))
+	return bot
+
+
+func _floor_ahead(w: Node2D, feet: Vector2, from: int, to: int, dir := 1) -> Vector2i:
+	## The first air cell on solid floor at his height, from..to tiles ahead
+	## (dir: the way on).
 	var lv = w.level
 	var y := floori((feet.y - 1.0) / 32.0)
 	var x0 := floori(feet.x / 32.0)
 	for dx in range(from, to + 1):
-		var x := x0 + dx
+		var x := x0 + dx * dir
 		if lv.tile(x, y) == LevelData.AIR and lv.tile(x, y - 1) == LevelData.AIR and LevelData.is_solid(lv.tile(x, y + 1)):
 			return Vector2i(x, y)
 	return Vector2i(-1, -1)
@@ -499,6 +537,53 @@ func _fight(w: Node2D, cls: String, bot: Bot, hp_seen: Dictionary, r: Dictionary
 
 
 # ---------------------------------------------------------------- the full satchel
+
+func _test_bot_ways() -> void:
+	## The two-thumb bot holds the way on: right to left in a level facing
+	## left (the shapes' mirror lab, 4-3's way), its warm-up Rattle on that
+	## side, and a fight; round a taller level's loop by its route field
+	## (right along the bottom, then up and back left over it).
+	var cls := "knight"
+	game.reset()
+	game.new_hero(cls)
+	var w := _world("lab-shape-mirror")
+	await process_frame
+	var pl: Node2D = w.player
+	var bot := _bot_for(w)
+	bot.cls = cls
+	var x0: float = pl.position.x
+	var cell := _floor_ahead(w, pl.position, 4, 9, bot._way(pl))
+	_check(bot.dir == -1 and cell.x >= 0 and cell.x < floori(x0 / 32.0), "facing left: the way on is left, the warm-up Rattle's floor on that side (%d, %s)" % [bot.dir, cell])
+	var rattle: Node2D = w.spawn_enemy("skeleton", LevelData.cell_floor(cell), {"cell": cell})
+	var hp_seen := {}
+	var r := {"dealt": 0.0, "drops": 0}
+	for i in int(8.0 / DT):
+		pl.invuln = 5.0
+		_step(w, bot.pad(w))
+		_observe(w, hp_seen, r, {})
+	_check(pl.position.x < x0 - 200.0 and float(r["dealt"]) > 0.0, "it heads left and fights (%.0f px, dealt %.0f)" % [x0 - pl.position.x, r["dealt"]])
+	_check(rattle != null and (not rattle.alive or float(rattle.hp) < float(rattle.max_hp)), "the Rattle it meets on the way is hit")
+	w.queue_free()
+	await process_frame
+	game.reset()
+	game.new_hero(cls)
+	w = _world("lab-shape-loop")
+	await process_frame
+	pl = w.player
+	bot = _bot_for(w)
+	bot.cls = cls
+	var far0: int = bot.field.at(pl.position)
+	var best := far0
+	for i in int(25.0 / DT):
+		pl.invuln = 5.0
+		pl.hp = pl.max_hp
+		_step(w, bot.pad(w))
+		best = mini(best, bot.field.at(pl.position))
+	_check(bot.field != null and best < far0 - 40, "a taller level: by its route field round the loop (%d moves from the bell at the start, %d at best)" % [far0, best])
+	w.queue_free()
+	await process_frame
+	game.reset()
+
 
 func _test_full_satchel() -> void:
 	## Satchel full, auto-equip off: a better item stays on the ground with

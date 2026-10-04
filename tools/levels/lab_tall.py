@@ -20,7 +20,8 @@ Sources, one a world, each shot in its world's other themes too
 (tools/shot_tall.gd): 1-2 crypt, 2-1 waxfall, 3-1 orchard (with 5-3 the
 slowest painters: the perf gate, tools/perf/paint_probe.gd), 3-2 rootvault
 (the 36-row tower's backdrop, backdrops/orchard.gd's tall rootvault), 4-1
-clockface, 5-3 voidnave, 6-1 stillshore.
+clockface (and 4-2 escapement: with 4-1 and 6-1 the levels whose load
+builds the walk map, the phone gate's), 5-3 voidnave, 6-1 stillshore.
 
     python3 tools/levels/lab_tall.py      (after make_levels.py; reads its output)
 """
@@ -33,7 +34,7 @@ sys.dont_write_bytecode = True
 
 import common  # noqa: E402
 
-SOURCES = ['1-2', '2-1', '3-1', '3-2', '4-1', '5-3', '6-1']
+SOURCES = ['1-2', '2-1', '3-1', '3-2', '4-1', '4-2', '5-3', '6-1']
 STACKS = {24: [15, 9], 36: [15, 12, 9]}       # rows: the level's bottom n rows, top storey first
 OUT = os.path.join(common.OUT, 'tall')
 # What the storeys above keep: terrain (common.TILE_GLYPHS), movers, and

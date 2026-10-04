@@ -147,6 +147,8 @@ var _coyote := 0.0
 var _buffer := 0.0
 var _attack_buffer := 0.0         # a press held for a moment (hitstop stretches a cooldown)
 var _down_t := 0.0                # pure down held standing (DROP_HOLD); -1 while a down held from the air or a vine waits to be let go
+var hold_drops := true            # pure down held DROP_HOLD on a ledge drops through it; false in a level taller than a strip
+                                  #   (world.gd): down held there looks down (tall_cam.gd), down + jump drops
 var _jump_held := false
 var _air_jumps := 0
 var _fall_peak := 0.0             # fastest fall since leaving the ground (for the landing thump)
@@ -417,9 +419,11 @@ func step(dt: float) -> void:
 			_jump(DOUBLE_JUMP_SPEED, true)
 		elif jump_pressed and kit != null and kit.air_jump():
 			_buffer = 0.0
-	elif _down_t >= DROP_HOLD and on_floor and _on_ledge_only():
+	elif hold_drops and _down_t >= DROP_HOLD and on_floor and _on_ledge_only():
 		# So does pure down held a moment (the lit thumb pad's slide down; on
-		# solid floor it does nothing).
+		# solid floor it does nothing). Not in a level taller than a strip:
+		# there down held looks down, from a ledge too (2-2's shelves over the
+		# low road); down + jump drops.
 		_drop_through()
 
 	# Gravity, heavier once the jump is let go, lighter at the apex (a vine

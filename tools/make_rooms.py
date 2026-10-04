@@ -76,7 +76,14 @@ def _import(name):
 
 def lift(section, strip=STORY, left=True, right=True):
     """A story section as a room: story glyphs out, seams on (its overlay
-    row, if it has one, padded to match)."""
+    row, if it has one, padded to match). A room is 15 rows: a section drawn
+    taller (block(s, 24): a shaped level's) can't be lifted, and room() says
+    which (the level keeps a 15-row section and place()s it instead:
+    common.place, its rows padded with rock above and under)."""
+    if len(section) != H:
+        out = common.Rows(section[:H])
+        out.lifted_rows = len(section)
+        return out
     rows = []
     for i in range(H):
         r = ''.join('.' if ch in strip else ch for ch in section[i])
@@ -101,6 +108,10 @@ def room(name, kind, rows, tier=0, tags='', mirror=None, src='', deep=None, hint
     cog_phase / weight_phase: {room x: turns} (a lifted section's dx + 2)."""
     if mirror is None:
         mirror = kind == 'challenge'
+    n = getattr(rows, 'lifted_rows', H)
+    assert n == H, ('%s: its section %s is %d rows: the Descent lifts 15-row sections (rooms are 15 rows). '
+                    'Keep %s drawn at 15 rows and place() it into the taller level (common.place), '
+                    'or lift a 15-row copy' % (name, src or '(unnamed)', n, src or 'it'))
     overlay = getattr(rows, 'overlay', None)
     rows = list(rows)
     for ch, x, y in (extra or []):
@@ -446,7 +457,20 @@ def tallow():
 BIOMES = {'cathedral': cathedral, 'tallow': tallow}
 
 
+def self_check():
+    """A section drawn taller than a room (a shaped level's block(s, 24))
+    is refused by name, never cut to its top 15 rows."""
+    tall = block('\n'.join(['.' * 24] * 22 + ['#' * 24] * 2), 24)
+    try:
+        room('tall_lab', 'challenge', lift(tall), 1, 'combat', src='lab.TALL')
+    except AssertionError as e:
+        assert 'lab.TALL is 24 rows' in str(e), str(e)
+    else:
+        raise AssertionError('make_rooms: a 24-row section was lifted')
+
+
 def main(names):
+    self_check()
     for name in names:
         write_bundle(name, BIOMES[name]())
 

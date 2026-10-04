@@ -476,6 +476,8 @@ static func gust_band(level: RefCounted, z: Dictionary, view: Rect2, hero := Rec
 	if x1 <= x0:
 		return Rect2()
 	var floor_y := band_floor(level, z, view, hero, feet)
+	if z.has("y0") and (floor_y <= float(z["y0"]) * TILE or floor_y > (float(z["y1"]) + 1.0) * TILE):
+		return Rect2()   # (a taller level's zone: his floor isn't in its rows, another deck's wind)
 	var top := maxf(floor_y - BAND_ROWS * TILE, view.position.y + HUD_TOP)
 	if floor_y - top < 24.0:
 		return Rect2()
@@ -653,11 +655,15 @@ static func _steady(level: RefCounted, x: int, y: int) -> bool:
 	return t == LevelData.STONE or t == LevelData.LEDGE
 
 
-static func path_floor(level: RefCounted, cx: int) -> int:
+static func path_floor(level: RefCounted, cx: int, z := {}) -> int:
 	## The path's floor in column cx at build (no hero yet): the lowest
 	## walkable top with two rows of air over it (so a roof or a spur over the
-	## path is never taken for it), or -1 over the void.
-	for ty in range(level.height - 1, 1, -1):
+	## path is never taken for it), or -1 over the void. A zone with rows
+	## (a taller level's: y0, y1) looks only in them (its floor the row under
+	## them at most).
+	var lo: int = mini(int(z.get("y1", level.height - 2)) + 1, level.height - 1)
+	var hi: int = maxi(int(z.get("y0", 0)) + 1, 1)
+	for ty in range(lo, hi, -1):
 		if _is_top(level, cx, ty) and not is_solid_id(level.tile(cx, ty - 2)):
 			return ty
 	return -1
@@ -682,7 +688,7 @@ static func pennant_anchors(level: RefCounted, z: Dictionary) -> Array:
 	while cx >= c0 and cx <= c1 and guard < 512:
 		guard += 1
 		var step := 1
-		var ft := path_floor(level, cx)
+		var ft := path_floor(level, cx, z)
 		if ft > 0:
 			# The roof nearest over that floor, with at least 2 rows of air under it.
 			var roof := -1

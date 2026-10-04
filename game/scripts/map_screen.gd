@@ -631,7 +631,11 @@ func _offer_resume() -> void:
 	var lid := str(sus["level"])
 	var title := str(Game.level_title(lid)) if Game.has_method("level_title") else ""
 	var d := str(sus.get("diff", Game.diff()))
-	var body := "%s %s · altar %d · %s" % [lid, title, int(sus.get("altar", 0)) + 1, str(Combat.diff(d)["name"])]
+	# The altar's number on the way: how many he'd lit (the file's index is
+	# reading order, not the route's: a level played right to left, or one
+	# whose later altars stand higher); an older snapshot's index.
+	var n: int = (sus["lit"] as Array).size() if sus.get("lit") is Array and not (sus["lit"] as Array).is_empty() else int(sus.get("altar", 0)) + 1
+	var body := "%s %s · altar %d · %s" % [lid, title, n, str(Combat.diff(d)["name"])]
 	card("", "Continue from the altar", body, func(): resume_altar.emit(sus), "Continue", "Not now")
 
 

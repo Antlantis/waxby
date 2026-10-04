@@ -27,6 +27,8 @@ var colors := PackedColorArray()
 var indices := PackedInt32Array()
 var origin := Vector2.ZERO        # the chunk's origin: concave() triangulates relative to it
 var dropped := 0                  # shapes refused for going past MAX_VERTICES
+var keep := false                 # flush() keeps the triangles (kept) instead of drawing them: a tall
+var kept: Array = []              #   level's tile chunk hands them to its shapes layer (tile_view.gd)
 
 
 func clear() -> void:
@@ -316,9 +318,13 @@ func append(other: RefCounted) -> void:
 func flush(ci: CanvasItem) -> void:
 	## Hands the batch to ci's canvas item as one draw call, then clears it.
 	## Call from ci's _draw (or a draw signal). An empty batch draws nothing
-	## and costs nothing.
+	## and costs nothing. With keep, the triangles go to kept instead
+	## ([indices, points, colors] a flush), for another canvas item to draw.
 	if not indices.is_empty():
-		RenderingServer.canvas_item_add_triangle_array(ci.get_canvas_item(), indices, points, colors)
+		if keep:
+			kept.append([indices.duplicate(), points.duplicate(), colors.duplicate()])
+		else:
+			RenderingServer.canvas_item_add_triangle_array(ci.get_canvas_item(), indices, points, colors)
 	clear()
 
 

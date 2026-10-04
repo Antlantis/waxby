@@ -76,7 +76,14 @@ extends RefCounted
 ## `facing: left` plays it right to left (tools/levels/common.py
 ## mirror_rows): he starts facing left, its monsters face right, and its
 ## route runs right to left (scripts/walk_map.gd: a taller level's route is
-## the walk map's).
+## the walk map's). A taller level's gusts zone may end in its rows
+## (`x0-x1:R:A:y0-y1`: its section's own, gust_at blows only there), and
+## its raw keys, read where they're used: drops (`drops: yes`: the bots drop
+## through one-way ledges, reach.gd drops_of; a level whose route drops
+## through one says so), roads (`roads: high 120,10 200,10; low 120,21`:
+## its two ways through, each by the cells it passes: walk_map.gd roads),
+## and its own descent rules for tests/level_rules.gd (max_drop: 4,
+## landing: 6/2, lit_drops: 3: common.py descent_limits).
 
 const TILE := 32
 const STRIP_ROWS := 15           # the strip levels' height: a taller level is shaped (tall())
@@ -194,7 +201,7 @@ var hints: PackedStringArray = []
 var tick := TICK          # W4: the period tick-locked features keep
 var secret := ""          # this level's silver bell opens that secret level
 var secret_prize := ""    # a secret level's prize Legendary
-var gusts: Array = []     # [{x0, x1, dir: -1 | 1, phase: "A" | "B"}] (tile columns, inclusive)
+var gusts: Array = []     # [{x0, x1, dir: -1 | 1, phase: "A" | "B"[, y0, y1]}] (tile columns and rows, inclusive)
 var hush_cols: Array = [] # [{x0, x1}]
 var chase: Array = []     # [{x0, x1}]: 6-3's tide ranges (start altar x, end altar x)
 var cog_phase := {}       # hub x -> turns
@@ -390,6 +397,12 @@ func _header(key: String, value: String) -> void:
 					continue
 				r["dir"] = -1 if bits[1].strip_edges().to_upper() == "L" else 1
 				r["phase"] = bits[2].strip_edges().to_upper() if bits.size() > 2 else "A"
+				if bits.size() > 3:
+					# A taller level's zone over its section's rows only (y0-y1).
+					var ys := _range(bits[3])
+					if not ys.is_empty():
+						r["y0"] = int(ys["x0"])
+						r["y1"] = int(ys["x1"])
 				gusts.append(r)
 		"hush":
 			hush_cols = _ranges(value)

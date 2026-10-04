@@ -9,15 +9,25 @@
 #   tools/perf/run_phone.sh --field quarter 2-4       # a level under Plan B
 #   tools/perf/run_phone.sh --no-build --vulkan spike:lights48   # reuse the last .ipa
 #
-# Tall levels (the shapes plan's E3, not run yet: it needs the phone): the
-# render labs at 24 and 36 rows (python3 tools/levels/lab_tall.py writes them
-# to game/levels/tall), the orchard and the glass, the slowest painters:
+# Tall levels (the shapes plan's E3, not run yet: it needs the phone, and the
+# owner runs it before the redraw): the render labs at 24 and 36 rows
+# (python3 tools/levels/lab_tall.py writes them to game/levels/tall), the
+# orchard and the glass, the slowest painters:
 #   tools/perf/run_phone.sh tall/lab-tall-3-1-24 tall/lab-tall-5-3-24 tall/lab-tall-3-1-36 tall/lab-tall-5-3-36
 # The bot plays the bottom storey (the level's lower nine rows; the storeys
 # above are its terrain and scenery, in view as the camera climbs), so the
 # frames carry the taller level's tiles, chunks and backdrop; the gate is the
 # same. tools/perf/paint_probe.gd has the Mac's painter numbers to set
-# against (a redraw's cost by height, both chunk layouts).
+# against (a redraw's cost by height, both chunk layouts). Then the route
+# that climbs and falls through the storeys, the orchard painter's Shapes
+# layers and the camera's look-ahead in the measured frames (the bot rings
+# its bell up the wall: tests/test_shaped.gd), and the levels whose load
+# builds the walk map (clockwork.gd's and deep.gd's first-time barks: about
+# 20-40 ms on the Mac at 24-36 rows; at the phone's 2-4x, read the load's
+# time in the log):
+#   tools/perf/run_phone.sh lab-shape-rootvault tall/lab-tall-4-1-24 tall/lab-tall-4-2-24 tall/lab-tall-6-1-24
+# and each real tall level as it lands: 3-2, 3-3, 5-3 (its hold room's glass)
+# and 2-2.
 #
 # Runs: a level id (1-1 ... 6-4, 1-S ...; <id>@<n> from its altar n, 0 the
 # first: 4-3@2 past W4's weights, 3-4@1 / 4-4@1 at the boss's door), spike:all | spike:lights48 |

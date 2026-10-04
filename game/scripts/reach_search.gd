@@ -248,8 +248,9 @@ func _gust_push(pl: Node2D) -> float:
 	if pl.climbing or pl.ledge_t >= 0.0:
 		return 0.0
 	var x := floori(pl.center().x / TILE)
+	var y := floori(pl.center().y / TILE)
 	for g in lv.gusts:
-		if x >= int(g["x0"]) and x <= int(g["x1"]):
+		if x >= int(g["x0"]) and x <= int(g["x1"]) and (not g.has("y0") or (y >= int(g["y0"]) and y <= int(g["y1"]))):
 			return float(g["dir"]) * (GUST_PUSH * 0.5 if pl.on_floor else GUST_PUSH)
 	return 0.0
 

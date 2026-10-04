@@ -34,7 +34,12 @@ extends "res://scripts/features/feature.gd"
 ##           over DROP_LEN s with dust (out of reach till it has). One never
 ##           drops while he stands within DROP_CLEAR px of its post (it waits,
 ##           so no drop lands on him: twists.gd RISE_CLEAR's rule), nor off
-##           the glass (world.in_plain_view) but for DROP_WAIT s at most
+##           the glass (world.in_plain_view) but for DROP_WAIT s at most; in
+##           a taller level one on another deck (its post more than DECK_ROWS
+##           rows over or under his feet: the camera holds his deck, never
+##           both) waits for him there, however long, and DROP_WAIT more for
+##           the glass once he's come: each wave is fought on his own deck
+##           (5-3's Hold the Glass), and the bot goes to it
 ##   hold    as an ambush, against the clock
 ## Wick wholly inside (DOOR_PAST past the door at either end, and between a
 ## rows room's ceiling and floor) and the doors grind shut: SEAL_TELL s of
@@ -84,6 +89,7 @@ const DROP_FIRST := 0.1          # ...the first this long after the doors shut
 const DROP_LEN := 0.45           # s each takes to fade in (out of reach till it has)
 const DROP_CLEAR := 96.0         # px: none drops this near him (3 tiles; twists.gd RISE_CLEAR)
 const DROP_WAIT := 2.0           # s one waits past its turn for its post to be on the glass
+const DECK_ROWS := 6             # a taller level: a post this many rows off his feet is another deck's (it waits for him)
 const DOOR_CLEAR := 3            # columns inside each end no room monster stands in (common.py check_rooms)
 const HOLD_SECS := 20.0          # a hold's clock when its header gives none (5-3's)
 const WON_FX := 1.0              # s the open doors glow after a win
@@ -503,7 +509,39 @@ func _drop_ready(d: Dictionary, pl: Node2D) -> bool:
 	var en: Node2D = d["en"]
 	if pl != null and pl.alive and pl.center().distance_to(en.center()) < DROP_CLEAR:
 		return false
-	return ftime() - float(d["at"]) >= DROP_WAIT or world.in_plain_view(en.rect())
+	if world.in_plain_view(en.rect()):
+		return true
+	if _off_deck(en, pl):
+		# Its turn comes again once he's on its deck: DROP_WAIT from then
+		# for the camera to show its post.
+		d["at"] = ftime()
+		return false
+	return ftime() - float(d["at"]) >= DROP_WAIT
+
+
+func _off_deck(en: Node2D, pl: Node2D) -> bool:
+	## A taller level's drop-in on another deck than his: its post more than
+	## DECK_ROWS rows over or under his feet (a strip's never is).
+	return pl != null and level.tall() and absf(en.position.y - pl.position.y) > DECK_ROWS * TILE
+
+
+func _deck_post(r: Dictionary, pl: Node2D):
+	## A taller level: where the bot goes while drop-ins are still due: the
+	## nearest one's post while it's off the glass (on another deck, or on
+	## his but not yet in view: it drops in once he's there and it shows);
+	## null when it shows (the bot waits clear of it: _wait_spot) or in a strip.
+	if not level.tall():
+		return null
+	var best: Node2D = null
+	for d in r["drops"]:
+		var en = d["en"]
+		if d["on"] or en == null or not is_instance_valid(en):
+			continue
+		if best == null or (en as Node2D).position.distance_to(pl.position) < best.position.distance_to(pl.position):
+			best = en
+	if best == null or world.in_plain_view(best.rect()):
+		return null
+	return best.position
 
 
 func _put_out_lost(r: Dictionary) -> void:
@@ -711,8 +749,10 @@ func bot_target(pl: Node2D):
 	## The --autoplay bot's foe in a shut room (autoplay_bot.gd's room pad):
 	## the nearest that holds the doors; a restless level's remains still to
 	## stand (it swings over them); while they drop in, a spot clear of every
-	## post still to drop (_wait_spot: a drop waits while he's near it);
-	## null while no room is shut.
+	## post still to drop (_wait_spot: a drop waits while he's near it; in a
+	## taller level on that post's deck), or, in a taller level with the
+	## nearest one off the glass, its post (_deck_post: autoplay_bot.gd plans
+	## its way there); null while no room is shut.
 	for r in rooms:
 		if r["phase"] != "fight":
 			continue
@@ -724,8 +764,26 @@ func bot_target(pl: Node2D):
 			return best
 		for rm in remains_in(r):
 			return Vector2((rm["pos"] as Vector2).x, pl.position.y)
-		return Vector2(_wait_spot(r, pl), pl.position.y)
+		var deck = _deck_post(r, pl)
+		if deck != null:
+			return deck
+		return Vector2(_wait_spot(r, pl), _wait_y(r, pl))
 	return null
+
+
+func _wait_y(r: Dictionary, pl: Node2D) -> float:
+	## The floor to wait on: his (a strip's, as ever); a taller level's the
+	## nearest post still to drop's (its deck: not the floor under him).
+	if not level.tall():
+		return pl.position.y
+	var y := pl.position.y
+	var bd := INF
+	for d in r["drops"]:
+		var en = d["en"]
+		if not d["on"] and en != null and is_instance_valid(en) and (en as Node2D).position.distance_to(pl.position) < bd:
+			bd = (en as Node2D).position.distance_to(pl.position)
+			y = (en as Node2D).position.y
+	return y
 
 
 func _wait_spot(r: Dictionary, pl: Node2D) -> float:

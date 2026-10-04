@@ -956,11 +956,11 @@ func _test_layout(lv: RefCounted) -> void:
 	_check(lv.count("sconce") == 0, "%s: no wall sconces (in W6 `c` gives no light)" % id)
 	_check(lv.count("sign") == hints.size(), "%s: a sign for every hint" % id)
 	# Every Hollin how-to the level fires exists (the barks are story.gd's).
-	# The caps per 27-tile window (a taller level's 12 rows tall:
-	# Rules.screen_rows).
+	# The caps per 27-tile window (a taller level's the views over the rows
+	# he stands on in it: Rules.screen_rows).
 	var windows := []
 	for x0 in range(0, maxi(lv.width - 26, 1)):
-		for ys in Rules.screen_rows(lv):
+		for ys in Rules.screen_rows(lv, x0, 27):
 			windows.append(Vector3i(x0, ys.x, ys.y))
 	for win in windows:
 		var x0: int = win.x
