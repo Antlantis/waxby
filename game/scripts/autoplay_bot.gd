@@ -363,7 +363,9 @@ func _enemy_ahead(pl: Node2D) -> bool:
 	for e in world.enemies:
 		if e.alive and e.active and e.rect().intersects(r):
 			return true
-	return false
+	# A restless level's remains (twists.gd): strike them as it passes, so they stay down.
+	var tw = world.get("twists")
+	return tw != null and tw.has_method("remains_in") and tw.remains_in(r)
 
 
 # ---------------------------------------------------------------- the boss

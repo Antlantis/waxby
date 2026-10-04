@@ -56,6 +56,9 @@ extends RefCounted
 ## story_end, par, tick, secret, secret_prize, gusts, hush, chase, cog_phase,
 ## weight_phase, rush. Every header, known or not, is also kept raw in
 ## `headers` (the modes' private keys: kind, tier, tags, deep, ...).
+## Build 2's optional keys are read from there: twist (an id in
+## twists.gd TWISTS) and lesson (Title|Line) by twists.gd, belt_flip
+## (x0-x1=N, ...) by features/clockwork.gd; a level without them plays as before.
 
 const TILE := 32
 

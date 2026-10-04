@@ -28,6 +28,10 @@ extends Node2D
 ##   on_snuffed allows stats_filter tells_mult elite_rules loot lights
 ##   result_extra; the boss's is_open configure checkpoint reset_fight(keep)
 ##   vars: mode world_n lights (world_lights.gd when it's there) movers
+##
+## Build 2 (twists.gd, from an optional `twist:` header; none, none of this):
+##   twist_id() twist(rule) twist_heal() title_sub() twist_cards()
+##   vars: twists (its runtime, or null)
 
 signal finished(result: Dictionary)
 signal quit
@@ -124,6 +128,7 @@ const EDGE_LINES := "res://scripts/edge_lines.gd"        # W0-render's readabili
 const STORY := "res://scripts/story.gd"
 const ChoiceCard := preload("res://scripts/choice_card.gd")
 const Rites := preload("res://scripts/rites.gd")
+const Twists := preload("res://scripts/twists.gd")
 const RITES_CLEAR := 200.0       # an altar's Rites open with no monster awake this near (px)...
 const RITES_LEASH := 480.0       # ...waiting for it only while he's this near the altar
 const BOON_WAIT := 1.0           # s of play after a boss's fall before his boon opens (his drops land first)
@@ -299,6 +304,10 @@ var _relic_wait: Array = []     # relics found this visit with the belt full: th
 # The Boss Boons: a boss's first kill offers his prize on the same card
 # (open_boon), once his fall has settled (_tick_boon).
 var _boon := {}                 # {at, who, t, wait}: a boss's boon waiting to open ({}: none)
+# Build 2: the level's twist (twists.gd), from its optional `twist:` header;
+# null with none (or in a mode), and then nothing below changes a thing.
+var twists: RefCounted = null
+var _twist_id = null            # the header's id, read once (twist_id)
 
 
 func setup(p_level: RefCounted, p_headless := false) -> void:
@@ -568,6 +577,8 @@ func _build() -> void:
 		dark_layer.add_child(dr)
 		_darkness = dr
 	_apply_theme_dark()
+	# The twist's runtime (its painters go beside the monsters and the glow).
+	twists = Twists.make(self)
 
 	kit.on_level_start()
 	if autoplay:
@@ -587,9 +598,12 @@ func _build() -> void:
 		sync_music()
 		var beat: String = level.story.get("start", "")
 		if beat != "" and not Game.seen(beat):
-			play_beat(beat, func(): hud.title_card(level.subtitle, level.title))
+			play_beat(beat, func():
+				hud.title_card(title_sub(), level.title)
+				_twist_cards())
 		else:
-			hud.title_card(level.subtitle, level.title)
+			hud.title_card(title_sub(), level.title)
+			_twist_cards()
 	if not is_lab():
 		Game.next_run()   # (a lab's runs aren't counted: it writes nothing)
 	_refresh_look()      # the hero's flame, before a mode's on_build overrides it
@@ -738,13 +752,13 @@ func flask_max() -> int:
 func flask_heal() -> float:
 	## A drink's share of life: a mode's own when it says, else
 	## Game.flask_heal(diff) (the Rich Draught, flask_pct) when it's there,
-	## else the difficulty's.
+	## else the difficulty's; x the dry twist's cut (twist_heal).
 	if mode != null and mode.has_method("flask_heal"):
 		return float(mode.flask_heal())
 	var g := _game()
 	if mode == null and g != null and g.has_method("flask_heal"):
-		return float(g.flask_heal(diff))
-	return float(Combat.diff(diff)["flask"])
+		return float(g.flask_heal(diff)) * twist_heal()
+	return float(Combat.diff(diff)["flask"]) * twist_heal()
 
 
 static func _arity(sc: Script, fn: String) -> int:
@@ -829,7 +843,67 @@ func elite_rules() -> Dictionary:
 				"omens": int(d.get("omens", 1)), "second_omen": float(d.get("second_omen", 0.0))}
 	if mode != null:
 		out.merge(mode.elite_rules(), true)
+	else:
+		Twists.elite_rules(twist_id(), out)   # (omens: twice the chance, the max kept)
 	return out
+
+
+# ---------------------------------------------------------------- the twist (Build 2)
+
+func twist_id() -> String:
+	## The level's twist id (twists.gd TWISTS) from its `twist:` header: ""
+	## with none, and always in a mode (a twist is the story's).
+	if mode != null:
+		return ""
+	if _twist_id == null:
+		_twist_id = Twists.id_in(level)
+	return str(_twist_id)
+
+
+func twist(rule: String) -> bool:
+	## Is this twist rule on here (restless, dark, omens, dry, packs, toll, lamplit)?
+	return rule != "" and Twists.rule_of(twist_id()) == rule
+
+
+func twist_heal() -> float:
+	## What an altar or a draught heals here, of its own (dry: 0.75; else 1).
+	return Twists.heal_mult(twist_id())
+
+
+func title_sub() -> String:
+	## The title card's line: "4-2 · On the Hour" with a twist, else the subtitle.
+	var c := Twists.card_of(twist_id(), world_n)
+	return level.subtitle if c.is_empty() else "%s · %s" % [level.subtitle, c[0]]
+
+
+func twist_cards() -> Array:
+	## The top band's cards after the title: [id, title, line] for the twist's
+	## line, then a lesson's (an X-1's `lesson: Title|Line`); [] for neither.
+	var out := []
+	var key := "twist:%s:%s" % [level_id, diff]
+	var c := Twists.card_of(twist_id(), world_n)
+	if not c.is_empty():
+		out.append([key, str(c[0]), str(c[1])])
+	var l := Twists.lesson_in(level) if mode == null else []
+	if not l.is_empty():
+		out.append([key + ":lesson", str(l[0]), str(l[1])])
+	return out
+
+
+func _twist_cards() -> void:
+	## Queued under the title card (they wait their turn in the band, and for a
+	## start beat's lines), once per level and difficulty (Game.seen). Never
+	## marked seen by the bot, a test's pad or a golden route, nor in a feel
+	## lab (it writes nothing: its cards show every time).
+	if hud == null:
+		return
+	var marks := not (autoplay or test_pad != null or on_pad.is_valid() or is_lab())
+	for c in twist_cards():
+		if marks and Game.seen(str(c[0])):
+			continue
+		card(str(c[0]), str(c[1]), str(c[2]))
+		if marks:
+			Game.mark_seen(str(c[0]))
 
 
 func freeze(sec: float, force := false) -> void:
@@ -1775,6 +1849,8 @@ func tick(dt: float) -> void:
 	_update_pool(dt)
 	if not stopped:
 		features.step(dt)
+		if twists != null:
+			twists.step(dt)
 	if mode != null:
 		mode.on_tick(self, dt)
 	elif _flame_id != "" and _flame_id != "tallow" and not special_override.has("hold_ring"):
@@ -2229,12 +2305,14 @@ func stood_on(who: Node2D, x: int, y: int) -> void:
 		return
 	var cell := Vector2i(x, y)
 	if crumbles.has(cell) and crumbles[cell]["state"] == "idle":
-		# The whole run of slabs goes together.
+		if twists != null and twists.holds_crumble(cell):
+			return   # (lamplit: soft wax holds firm in lantern light)
+		# The whole run of slabs goes together (but a lamplit slab in it).
 		var cx := x
 		while crumbles.has(Vector2i(cx - 1, y)):
 			cx -= 1
 		while crumbles.has(Vector2i(cx, y)):
-			if crumbles[Vector2i(cx, y)]["state"] == "idle":
+			if crumbles[Vector2i(cx, y)]["state"] == "idle" and not (twists != null and twists.holds_crumble(Vector2i(cx, y))):
 				crumbles[Vector2i(cx, y)] = {"state": "shake", "timer": 0.55}
 			cx += 1
 
@@ -2770,7 +2848,7 @@ func _light_altar(a: Dictionary) -> void:
 	a["lit"] = true
 	a["glow"] = 1.0
 	checkpoint = a["pos"]
-	var pct: float = Combat.altar_heal(diff, _teeth_world())   # (Dusk heals less from World 3)
+	var pct: float = Combat.altar_heal(diff, _teeth_world()) * twist_heal()   # (Dusk heals less from World 3; dry less again)
 	_last_altar_hp.append(roundf(player.life_frac() * 100.0))
 	var healed = player.heal_pct(pct)
 	flask_charges = flask_max()
@@ -3418,7 +3496,10 @@ func _log(cleared: bool) -> void:
 	var causes := snuff_causes.duplicate()
 	for k in ["_last", "_move", "_feature"]:
 		causes.erase(k)   # the running "what hurt last", not a snuff
-	Playlog.write(Playlog.entry(self, cleared, causes))
+	var line := Playlog.entry(self, cleared, causes)
+	if twists != null:
+		line.merge(twists.log_extra(), true)   # (the twist, and what it did: for tuning)
+	Playlog.write(line)
 	var g := _game()
 	if g != null and g.get("embers_spent") != null:
 		g.set("embers_spent", 0)   # (a line's embers_spent: what was paid since the one before)
@@ -3534,6 +3615,10 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 	var sp = e.get("spawn")
 	if sp is Dictionary and int(sp.get("ent", -1)) >= 0 and not _killed.has(int(sp["ent"])):
 		_killed.append(int(sp["ent"]))   # (the altar snapshot's)
+	# Restless (twists.gd): a stomped one's remains may get up; one that did pays nothing.
+	var risen := Twists.is_risen(e)
+	if twists != null:
+		twists.on_enemy_died(e, how)
 	kit.on_kill(e)
 	if player.stats.get("legends", {}).has("ossuary_coat"):
 		bone_wards = mini(bone_wards + 1, int(_flag("ossuary_max", 3.0)))
@@ -3548,7 +3633,8 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 					glow.burst(o.center(), 12, Color("e8e0d0"), 120.0, 0.4, 0.0, 2.0)
 				deal(o, _flag("bone_flute_coef", 1.5), {"how": "moth", "no_hitstop": true})
 	var xk: String = e.xp_kind if e.xp_kind != "" else e.kind
-	gain_xp(Progression.kill_xp(xk, e.area, int(Game.hero()["level"]), diff, e.tier, e.respawned), e.center())
+	if not risen:
+		gain_xp(Progression.kill_xp(xk, e.area, int(Game.hero()["level"]), diff, e.tier, e.respawned), e.center())
 	if player.alive:
 		var heal := float(player.stats.get("on_kill_heal", 0.0))
 		if heal > 0.0:
@@ -3563,6 +3649,8 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 		if e.get("door") != null:
 			Arena.unseal(self, level, e.door)
 		return
+	if risen:
+		return   # (no embers, no loot: a stomp-and-rise is no farm)
 	var at: Vector2 = e.center()
 	var lost: bool = how == "pit"
 	if lost:
@@ -4186,6 +4274,8 @@ func _update_dead(dt: float) -> void:
 			_respawn_monsters()
 		kit.on_respawn()
 		features.on_respawn()
+		if twists != null:
+			twists.on_respawn()   # (the remains still lying are at rest)
 		if _has_sfx():
 			_reset_audio(get_node_or_null("/root/Sfx"), false)
 		sync_music()
