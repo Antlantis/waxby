@@ -472,19 +472,9 @@ func _past_door(pl: Node2D) -> bool:
 func _seal() -> void:
 	if sealed:
 		return
-	var cells: Array = []
 	var bodies: Array = [player()]
 	bodies.append_array(world.enemies)
-	for c in room["door"]:
-		var cr := Rect2(c.x * TILE, c.y * TILE, TILE, TILE)
-		var blocked := false
-		for a in bodies:
-			if a != null and is_instance_valid(a) and a.alive and (a.rect() as Rect2).intersects(cr):
-				blocked = true
-		if not blocked and level.tile(c.x, c.y) == LevelData.AIR:
-			cells.append(c)
-	room["sealed_cells"] = cells
-	Arena.seal(world, level, cells)
+	room["sealed_cells"] = Arena.seal_free(world, level, room["door"], bodies)
 	sealed = true
 	phase = "fight"
 	_wake()
@@ -664,6 +654,14 @@ func _reset_warden() -> void:
 		_won_t = 0.0
 		return
 	_sleep(en)
+
+
+func bot_target(_pl: Node2D):
+	## The --autoplay bot's foe in a shut room (autoplay_bot.gd's room pad
+	## asks every module): the Warden awake in its sealed room, else null.
+	if not secret_level or phase != "fight" or dormant or warden == null or not is_instance_valid(warden) or not warden.alive:
+		return null
+	return warden
 
 
 # ---------------------------------------------------------------- the step

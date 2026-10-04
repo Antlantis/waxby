@@ -39,7 +39,9 @@ or, for the v2 levels (kept byte for byte), an explicit ordered 'header'
 list of (key, value) pairs. Header values holding x (cog_phase,
 weight_phase, chase) may name places as (section, dx) or (section, dx, n)
 (the n-th use of that section in the level) and are written with absolute x,
-as _order_hints writes the hints in reading order.
+as _order_hints writes the hints in reading order. A 'room' list (the sealed
+fight rooms, features/sealed.gd) is written by rooms_header and checked by
+check_rooms.
 
 Build 2's toolkit (the toolkit part below): swap() edits a copy of a
 section, stamp() drops an encounter stamp (STAMPS) into one, span() names a
@@ -221,6 +223,74 @@ def _num(v):
     return s if s else '0'
 
 
+# ---------------------------------------------------------------- sealed rooms
+
+# features/sealed.gd's rooms (Build 2): the header's kinds, and the altar a
+# snuff inside relights at, this many tiles before each room's door at most
+# (sealed.gd ALTAR_REACH).
+ROOM_KINDS = ('duel', 'ambush', 'hold')
+ROOM_ALTAR_REACH = 8
+MONSTER_GLYPHS = set('sbtahgkfMD' + 'rpmijqeuxzyln567')
+SOLID_GLYPHS = set('#B?WRUFIZ<>G')
+
+
+def rooms_header(rows, rooms):
+    """'duel 98-109 rows 3-7; hold 300-327 @20' from an entry's 'room' list
+    (features/sealed.gd reads it). Each room is (kind, where[, opts]): where
+    is a section (its columns, end walls included) or a pair of places
+    ((section, dx[, n]) or an absolute x); opts may hold rows=(y0, y1) (its
+    rows, ceiling and floor included: a room up off the path, which seals
+    only once he climbs in), secs=N (the doors open after N s: a hold) and
+    foe=(place, y) (a duel's named foe)."""
+    out = []
+    for room in rooms:
+        assert len(room) in (2, 3), 'a room is (kind, where[, opts]): %r' % (room,)
+        kind, where = room[0], room[1]
+        opts = room[2] if len(room) > 2 else {}
+        assert kind in ROOM_KINDS, 'room kind %r (one of %s)' % (kind, ', '.join(ROOM_KINDS))
+        if isinstance(where, Section):
+            x0 = x_of(rows, where)
+            x1 = x0 + len(where[0]) - 1
+        else:
+            assert len(where) == 2, "a room's where is a section or a pair of places: %r" % (where,)
+            x0, x1 = _place(rows, where[0]), _place(rows, where[1])
+        s = '%s %d-%d' % (kind, x0, x1)
+        if 'rows' in opts:
+            s += ' rows %d-%d' % tuple(opts['rows'])
+        if 'secs' in opts:
+            s += ' @%s' % _num(opts['secs'])
+        if 'foe' in opts:
+            s += ' foe %d,%d' % (_place(rows, opts['foe'][0]), opts['foe'][1])
+        out.append(s)
+    return '; '.join(out)
+
+
+def check_rooms(name, rows, value):
+    """Every sealed room (a written 'room' header) holds a monster, has a way
+    in at an end, and has an altar within ROOM_ALTAR_REACH tiles before its
+    door: a snuff inside relights by it, as at a boss's door."""
+    if not value:
+        return
+    altars = [x for r in rows for x, ch in enumerate(r) if ch == 'K']
+    for part in value.split(';'):
+        bits = part.split()
+        x0, x1 = (int(v) for v in bits[1].split('-'))
+        y0, y1 = 0, len(rows) - 1
+        if 'rows' in bits:
+            y0, y1 = (int(v) for v in bits[bits.index('rows') + 1].split('-'))
+        door_rows = range(0, len(rows) - 1) if 'rows' not in bits else range(y0 + 1, y1)
+
+        def at(x, y):
+            return rows[y][x] if 0 <= y < len(rows) and 0 <= x < len(rows[y]) else '.'
+        assert any(at(x, y) in MONSTER_GLYPHS for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)), \
+            '%s: room "%s" holds no monster' % (name, part.strip())
+        assert any(at(x, y) not in SOLID_GLYPHS for x in (x0, x1) for y in door_rows), \
+            '%s: room "%s" has no doorway at either end' % (name, part.strip())
+        assert any(x0 - ROOM_ALTAR_REACH <= x < x0 for x in altars), \
+            '%s: room "%s" has no altar within %d tiles before its door (altars at %s)' % (
+                name, part.strip(), ROOM_ALTAR_REACH, altars)
+
+
 def mirror_rows(rows):
     """The Descent's mirror of rows (and its overlay): reversed, with exactly
     the MIRROR swaps."""
@@ -287,6 +357,7 @@ def write(name, header, rows, out_dir=None):
         at = keys.index('hints') if 'hints' in keys else len(header)
         header = header[:at] + extra + header[at:]
     header = [_order_hints(kv, rows) for kv in header]
+    check_rooms(name, rows, dict(header).get('room', ''))
     text = ''.join('%s: %s\n' % kv for kv in header) + '---\n' + '\n'.join(r.rstrip('.') for r in rows) + '\n'
     d = out_dir or OUT
     os.makedirs(d, exist_ok=True)
@@ -318,6 +389,8 @@ def header_of(entry, rows):
             v = phases_header({_place(rows, p): t for p, t in v.items()})
         elif k == 'chase' and not isinstance(v, str):
             v = ranges_header([(_place(rows, a), _place(rows, b)) for a, b in v])
+        elif k == 'room' and not isinstance(v, str):
+            v = rooms_header(rows, v)
         elif k == 'roster' and isinstance(v, dict):
             v = roster_header(v)
         elif k == 'threat' and not isinstance(v, str):

@@ -63,6 +63,25 @@ static func seal(world: Node, level: RefCounted, door: Array) -> void:
 		world._sfx("block_break", 0.7)
 
 
+static func seal_free(world: Node, level: RefCounted, door: Array, bodies: Array) -> Array:
+	## Seals the door's open cells that no living body stands in (a body in a
+	## doorway keeps its cell open: never stone round a hero or a monster) and
+	## returns the cells it sealed, to unseal later. secrets.gd's Warden rooms
+	## and features/sealed.gd's fight rooms.
+	var cells: Array = []
+	for c in door:
+		var cr := Rect2(c.x * TILE, c.y * TILE, TILE, TILE)
+		var blocked := false
+		for a in bodies:
+			if a != null and is_instance_valid(a) and a.alive and (a.rect() as Rect2).intersects(cr):
+				blocked = true
+				break
+		if not blocked and level.tile(c.x, c.y) == LevelData.AIR:
+			cells.append(c)
+	seal(world, level, cells)
+	return cells
+
+
 static func unseal(world: Node, level: RefCounted, door: Array) -> void:
 	for c in door:
 		level.set_tile(c.x, c.y, LevelData.AIR)

@@ -6,7 +6,7 @@ extends RefCounted
 ##
 ## v3: this is the dispatcher (contract.md §4). v2's features stay here; the
 ## new ones are the modules in scripts/features/ (orchard, clockwork, glass,
-## deep, secrets: each extends features/feature.gd), built after v2's and
+## deep, secrets, sealed: each extends features/feature.gd), built after v2's and
 ## called after v2's for every hook. The queries at the end (vine_at ...
 ## tide_x) forward to the module that owns them, with a fallback from the
 ## tiles when that module isn't there.
@@ -102,8 +102,9 @@ const MODULES := {
 	"glass": "res://scripts/features/glass.gd",
 	"deep": "res://scripts/features/deep.gd",
 	"secrets": "res://scripts/features/secrets.gd",
+	"sealed": "res://scripts/features/sealed.gd",   # Build 2's sealed fight rooms (header room:)
 }
-const MODULE_ORDER := ["orchard", "clockwork", "glass", "deep", "secrets"]
+const MODULE_ORDER := ["orchard", "clockwork", "glass", "deep", "secrets", "sealed"]
 var modules: Array = []          # built modules, in MODULE_ORDER
 var by_name := {}                # name -> module
 

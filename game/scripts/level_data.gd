@@ -69,6 +69,8 @@ extends RefCounted
 ## Build 2's twist keys, read from there, all optional: twist (an id in
 ## twists.gd TWISTS) and lesson (Title|Line) by twists.gd, belt_flip
 ## (x0-x1=N, ...) by features/clockwork.gd; a level without them plays as before.
+## Build 2's `room: duel 98-109 rows 3-7; ambush 200-229; hold 300-327 @20`
+## (sealed fight rooms) is read raw by features/sealed.gd.
 
 const TILE := 32
 
