@@ -1499,12 +1499,13 @@ func _test_flits_shown() -> void:
 	hi.queue_free()
 	w.queue_free()
 	await _frames(2)
-	# A Gutterwing nest over 2-3's floor: leaned to, and one off the glass waits.
+	# A Gutterwing nest over 2-3's floor: leaned to, and one off the glass waits
+	# (Build 2's switchback: the nest in the drop, over the stair's foot).
 	_fresh_hero(11)
-	var w3 = await _floor_world("2-3", 34)
+	var w3 = await _floor_world("2-3", 102)
 	var nest: Dictionary = {}
 	for n in w3.features.nests:
-		if n["cell"] == Vector2i(34, 6):
+		if n["cell"] == Vector2i(102, 15):
 			nest = n
 	var nlean: float = w3.look_up()
 	var nr: Rect2 = w3.features.nest_rect(nest) if not nest.is_empty() else Rect2()

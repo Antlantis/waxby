@@ -374,7 +374,7 @@ func _test_retrofits() -> void:
 		if not bell_ok:
 			print("  (1-3's B_BELL hash now: %s)" % _sha_cols(r13, 204, 236))
 		_check(bell_ok, "1-3: B_BELL is v2's, 30 columns on")
-	_check(l13.tile(69, 5) == LevelData.STONE, "1-3's star route post (69, 5) stands")
+	_check(l13.tile(69, 14) == LevelData.STONE, "1-3's star route post (69, 14: B_RISE on the choir floor) stands")
 	_check(_ents(l13, "silver_bell").size() == 1 and l13.tile(_ents(l13, "silver_bell")[0]["cell"].x, _ents(l13, "silver_bell")[0]["cell"].y + 1) == LevelData.FALSE_STONE,
 			"1-3: the silver bell hangs right over its false stone")
 	var r22 := _rows(_path("2-2"))
@@ -393,9 +393,10 @@ func _test_retrofits() -> void:
 		_check("\n".join(masked).sha256_text() == V2_22_MASKED, "2-2: all but C2_LANTERNS' columns 26-37 and its new sign are v2's")
 	_check(_ents(l22, "silver_bell").size() == 1 and l22.tile(_ents(l22, "silver_bell")[0]["cell"].x, _ents(l22, "silver_bell")[0]["cell"].y + 1) == LevelData.FALSE_STONE,
 			"2-2: the silver bell hangs right over its false stone")
-	# 2-2's bell hangs over the third lantern post of the dark passage.
+	# 2-2's bell hangs over the third lantern post of the dark passage
+	# (C2_LANTERNS, x 204-245 since Build 2's re-cut).
 	var bell: Vector2i = _ents(l22, "silver_bell")[0]["cell"] if not _ents(l22, "silver_bell").is_empty() else Vector2i(-1, -1)
-	var posts := _ents(l22, "lantern").map(func(e): return e["cell"].x).filter(func(x): return x >= 180 and x < 222)
+	var posts := _ents(l22, "lantern").map(func(e): return e["cell"].x).filter(func(x): return x >= 204 and x < 246)
 	posts.sort()
 	_check(posts.size() >= 3 and posts[2] == bell.x, "2-2: the silver bell hangs over C2_LANTERNS' third post (%s, bell %d)" % [posts, bell.x])
 

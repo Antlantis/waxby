@@ -1857,8 +1857,14 @@ ROLE_MARKS = (('P', 'S'), ('M', 'V'), ('D', 'D'), ('K', 'A'), ('E', 'B'), ('X', 
 # MIXED_KINDS kinds or more; no screen with more than AWAKE_MAX bodies in
 # play (in_play: packs at their size; what the phone reads at once). Any
 # X-1 keeps its stamps to its second half (it teaches alone first).
+# Worlds 1-2 stay gentle on Dusk (GENTLE_WORLDS, the author's ruling): their
+# X-1 and X-2 keep the on-ramp's fodder (1-2's Restless and 2-2's dark make
+# their fodder the lesson), so there only the X-3 is held: its fodder_max
+# under its X-1's and at most GENTLE_X3 (2-3's nests count as moths).
 ALTAR_NEAR = 8
 FODDER_CAPS = (0.85, 0.75, 0.65)
+GENTLE_WORLDS = (1, 2)
+GENTLE_X3 = 0.85
 SCREEN = 26
 SCREEN_ROWS = 12      # a taller level's screen (the view's rows; a strip's is its height)
 MIXED_KINDS = 3
@@ -2813,7 +2819,8 @@ def world_problems(entries, max_gap, ramp=None, altar_band=ALTARS):
     declares its roles:, which must be what its sections hold), every one
     declares them, and the variety rules (ALTAR_NEAR and on): no two share
     their landmarks (landmarks_of) or line their altars up, the fodder
-    ceilings fall within FODDER_CAPS, the X-3 mixes MIXED_SCREENS screens and
+    ceilings fall within FODDER_CAPS (in GENTLE_WORLDS only the X-3's, under
+    the X-1's and GENTLE_X3), the X-3 mixes MIXED_SCREENS screens and
     no screen of an X-1..X-3 holds more than AWAKE_MAX in play (a fixture,
     unnumbered, is no X-n)."""
     regular = sorted((e for e in entries if 'roster' in e), key=lambda e: e['id'])
@@ -2859,13 +2866,22 @@ def world_problems(entries, max_gap, ramp=None, altar_band=ALTARS):
                 out.append('%s and %s have their altars within %d tiles of each other\'s (%s, %s)'
                            % (a['id'], b['id'], ALTAR_NEAR, ia['altars'], ib['altars']))
     last = None
+    before = []
     for e in regular:
         n = level_no(e['id'])
         fm = float(info[e['id']]['roster']['fodder_max'])
-        if 1 <= n <= len(FODDER_CAPS) and fm > FODDER_CAPS[n - 1] + 1e-9:
-            out.append('%s: fodder_max %s (an X-%d at most %s)' % (e['id'], _num(fm), n, _num(FODDER_CAPS[n - 1])))
-        if last is not None and fm >= last[1] - 1e-9:
-            out.append('%s: fodder_max %s, not under %s\'s %s (it falls X-1 to X-3)' % (e['id'], _num(fm), last[0], _num(last[1])))
+        if entry_world(e) in GENTLE_WORLDS:
+            if n == 3:
+                if fm > GENTLE_X3 + 1e-9:
+                    out.append('%s: fodder_max %s (a gentle world\'s X-3 at most %s)' % (e['id'], _num(fm), _num(GENTLE_X3)))
+                out += ['%s: fodder_max %s, not under %s\'s %s (a gentle world\'s X-3 under its X-1)'
+                        % (e['id'], _num(fm), b[0], _num(b[1])) for b in before if level_no(b[0]) == 1 and fm >= b[1] - 1e-9]
+            before.append((e['id'], fm))
+        else:
+            if 1 <= n <= len(FODDER_CAPS) and fm > FODDER_CAPS[n - 1] + 1e-9:
+                out.append('%s: fodder_max %s (an X-%d at most %s)' % (e['id'], _num(fm), n, _num(FODDER_CAPS[n - 1])))
+            if last is not None and fm >= last[1] - 1e-9:
+                out.append('%s: fodder_max %s, not under %s\'s %s (it falls X-1 to X-3)' % (e['id'], _num(fm), last[0], _num(last[1])))
         last = (e['id'], fm)
         it = info[e['id']]
         anoint = [(x, y) for x, y, _o, _n in anoint_cells(it['hd'].get('anoint', ''))]

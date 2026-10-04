@@ -607,12 +607,12 @@ func _test_interactions() -> void:
 	await process_frame
 	w.test_pad = {}
 	var pl: Node2D = w.player
-	# Stomp: drop Wick onto the first skeleton.
+	# Stomp: drop Wick onto the first skeleton (the first he meets: the
+	# leftmost, on the nave's floor; the Choir Stalls' are up on ledges).
 	var skel: Node2D = null
 	for e in w.enemies:
-		if e.kind == "skeleton":
+		if e.kind == "skeleton" and (skel == null or e.position.x < skel.position.x):
 			skel = e
-			break
 	_check(skel != null, "1-1 has a skeleton")
 	if skel:
 		skel.active = true
@@ -628,9 +628,8 @@ func _test_interactions() -> void:
 	# Walking into a monster hurts.
 	var skel2: Node2D = null
 	for e in w.enemies:
-		if e.kind == "skeleton" and e.alive:
+		if e.kind == "skeleton" and e.alive and (skel2 == null or e.position.x < skel2.position.x):
 			skel2 = e
-			break
 	if skel2:
 		skel2.active = true
 		pl.invuln = 0.0

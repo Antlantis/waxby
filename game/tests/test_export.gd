@@ -17,15 +17,14 @@ extends SceneTree
 ##     godot --headless --path game --script res://tests/test_export.gd
 
 const PRESETS := "res://export_presets.cfg"
-# sha256 of the v2 level files that stay as v2 wrote them (1-3 and 2-2 get
-# the secret exits' retrofits, WLS's), less the signs the sign cut took
-# (their '@' to '.', their hints gone or reworded; 1-4's one sign stays).
+# sha256 of the v2 level files that stay as v2 wrote them, less the signs
+# the sign cut took (their '@' to '.', their hints gone or reworded; 1-4's
+# one sign stays): the two bosses. Build 2 re-cut the six regular levels of
+# Worlds 1-2 (tools/levels/w1.py, w2.py: their shapes, rosters and twists),
+# so they left this table; test_core, test_content and tests/level_rules.gd
+# hold them to their own roster:, threat:, roles: and shape now.
 const V2_SHA := {
-	"1-1": "7a804439e3938f49b111c37d4fe3592634169987ff4cbbd80499f4fdc17b5802",
-	"1-2": "26d5dd350ba41b118f5116a9d75a966e275db68f0ce2ea7a14aef2944f00f7b4",
 	"1-4": "a720f34fa5c98dfa8d5eea6d8de9f3f50449627df4293a02e0b2c83e86e29162",
-	"2-1": "4d47de6f10acd91ca8b94644d109422543e25cecbce3e6cb341fb88c530f5239",
-	"2-3": "a30199c6c3e349b5acec870cf3e0404623f499e6221b3063f260e12aa6e9c7c4",
 	"2-4": "c419ee42c070ef3f531b6e91e2ad0817b7903e763cde08a21657e746fb1e5d02",
 }
 const NO_POLY_DIRS := ["res://scripts/features", "res://scripts/tiles", "res://scripts/backdrops"]

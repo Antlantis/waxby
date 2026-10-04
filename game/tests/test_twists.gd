@@ -9,11 +9,12 @@ extends SceneTree
 ##                  World 4's "Cold Altars"); omens doubles the chance, keeps
 ##                  the max and gives the second Omen two rolls; restless
 ##                  raises Rattles in Worlds 1-2, the floor kinds from 3
-##   unchanged      no level on the path or secret carries a twist, lesson or
-##                  belt_flip header, and a World built for every one of them
-##                  has no twist runtime, no painters, its own title line, no
-##                  cards, the elite rules, heals and belts it always had; a
-##                  mode never has a twist
+##   unchanged      only a re-cut level (Build 2's redesign: it declares its
+##                  roles:) carries a twist, lesson or belt_flip header, and
+##                  a World built for every level without one has no twist
+##                  runtime, no painters, its own title line, no cards, the
+##                  elite rules, heals and belts it always had; a mode never
+##                  has a twist
 ##   the cards      "3-9 · Restless" over the name, then the twist's line and a
 ##                  lesson's in the top band, once per level and difficulty
 ##                  (Game.seen), never marked by the bot or in a lab; every
@@ -34,7 +35,10 @@ extends SceneTree
 ##                  restless keeps to Rattles in World 1 and raises a Rootling
 ##                  in World 3, restless_all raises the floor kinds but a
 ##                  Hushling; a monster back once (a respawn) stays down; no
-##                  twist, no rise
+##                  twist, no rise. 1-2's crypt stair (Build 2): the Ossuary's
+##                  Rattle, stomped and left behind on its flight, waits while
+##                  the stair has scrolled it off the glass, and stands on the
+##                  step above him once he's back in view
 ##   the clock      a sealed hold's bar (info.clock) draws gold with no damage
 ##                  trail, and a level-up waits out its doors
 ##   toll           a warning beat 15, then on beat 16 every monster in plain
@@ -94,6 +98,7 @@ func _initialize() -> void:
 	await _test_dry()
 	await _test_packs()
 	await _test_restless()
+	await _test_restless_stair()
 	await _test_toll()
 	await _test_belt_flip()
 	await _test_lamplit()
@@ -244,15 +249,21 @@ func _test_unchanged() -> void:
 			ids.append(f.get_basename())
 	ids.sort()
 	var bare := true
+	var plain := []
 	for id in ids:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		var twisted := false
 		for k in ["twist", "lesson", "belt_flip"]:
 			if lv.headers.has(k):
-				bare = false
-				print("  %s has a %s header" % [id, k])
-	_check(bare and ids.size() >= 30, "no level on the path or secret carries a twist, lesson or belt_flip header yet (%d levels)" % ids.size())
+				twisted = true
+				if str(lv.headers.get("roles", "")).strip_edges() == "":
+					bare = false
+					print("  %s has a %s header but isn't re-cut (no roles:)" % [id, k])
+		if not twisted:
+			plain.append(id)
+	_check(bare and ids.size() >= 30, "only a re-cut level on the path carries a twist, lesson or belt_flip header (%d levels, %d without)" % [ids.size(), plain.size()])
 	var same := 0
-	for id in ids:
+	for id in plain:
 		var w := _world(LevelData.load_file("res://levels/%s.txt" % id))
 		await process_frame
 		var ok: bool = w.twists == null and w.twist_id() == "" and w.title_sub() == w.level.subtitle and w.twist_cards().is_empty()
@@ -267,7 +278,7 @@ func _test_unchanged() -> void:
 		else:
 			print("  %s: a twist leaked in" % id)
 		await _done(w)
-	_check(same == ids.size(), "a World for every level without the header has no twist: no runtime, painters, card, rule or change (%d of %d)" % [same, ids.size()])
+	_check(same == plain.size(), "a World for every level without the header has no twist: no runtime, painters, card, rule or change (%d of %d)" % [same, plain.size()])
 	# A mode never has one, whatever the header says.
 	var w := _world(_level(".P...s", "twist: dark\n"))
 	await process_frame
@@ -748,6 +759,39 @@ func _test_restless() -> void:
 
 
 # ---------------------------------------------------------------- the toll
+
+func _test_restless_stair() -> void:
+	## 1-2 (Restless, a stair down): the Ossuary's Rattle on its landing.
+	var lv = LevelData.load_file("res://levels/1-2.txt")
+	if Twists.id_in(lv) != "restless":
+		return
+	var w := _world(lv)
+	await process_frame
+	var tw: RefCounted = w.twists
+	var rattles := _of(w, "skeleton").filter(func(e): return e.spawn["cell"].x < 24)
+	_check(tw != null and rattles.size() == 1, "1-2: restless, a Rattle on the Ossuary's landing (%d)" % rattles.size())
+	if tw == null or rattles.is_empty():
+		await _done(w)
+		return
+	var r0: Node2D = rattles[0]
+	var land := int(r0.spawn["cell"].y) + 1
+	_stand(w, r0.position.x - 160.0, land)
+	_ticks(w, 30)
+	_stomp(w, r0)
+	_check(tw.remains.size() == 1, "1-2: the stomped Rattle's bones lie on the landing")
+	# Down the stair, out of sight: the bones wait, however long.
+	_stand(w, 112.5 * TILE, land + 4)
+	_secs(w, Twists.RISE_WAIT + Twists.RISE_TELL + 2.0)
+	var seen: bool = not tw.remains.is_empty() and w.in_plain_view(tw.remains_rect(tw.remains[0]))
+	_check(tw.remains.size() == 1 and tw.risen == 0 and not seen, "1-2: down the stair, off the glass, they wait (rose %d)" % tw.risen)
+	# Back up the flight in view of them: they twitch and it stands on its step.
+	_stand(w, r0.position.x - 160.0, land)
+	_secs(w, Twists.RISE_WAIT + Twists.RISE_TELL + 0.5)
+	var up := _of(w, "skeleton").filter(func(e): return Twists.is_risen(e))
+	_check(up.size() == 1 and tw.risen == 1 and int(floorf(up[0].position.y / TILE)) == land,
+			"1-2: back in view, it stands again on its landing (%s)" % [up.map(func(e): return e.position)])
+	await _done(w)
+
 
 func _test_toll() -> void:
 	var row := ".P" + ".".repeat(8) + "s" + ".".repeat(6) + "s" + ".".repeat(60) + "s" + ".".repeat(10)

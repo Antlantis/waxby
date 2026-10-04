@@ -31,6 +31,7 @@ extends SceneTree
 const LevelData := preload("res://scripts/level_data.gd")
 const PlayerScript := preload("res://scripts/player.gd")
 const Combat := preload("res://scripts/combat.gd")
+const Rules := preload("res://tests/level_rules.gd")
 var WorldScript: GDScript   # loaded at run time: it needs the autoloads
 var Elites: GDScript
 const TILE := 32
@@ -1290,7 +1291,14 @@ func _test_elite_picks() -> void:
 	for id in dreads:
 		var w := await _level_world(id)
 		var found := false
-		for e in w.enemies:
+		# (A sealed room's foe sleeps out of the World's list till its doors
+		# shut: 1-3's Barbs in his loft.)
+		var sm = w.features.module("sealed") if w.features != null else null
+		var all: Array = w.enemies.duplicate()
+		if sm != null:
+			for room in sm.rooms:
+				all += room["away"]
+		for e in all:
 			if e.tier == "dread":
 				found = e.elite_name == dreads[id][0] and e.kind == dreads[id][1] and e.omens == dreads[id][2] and not e.ordinary
 		_check(found, "%s has its Dread, %s" % [id, dreads[id][0]])
@@ -1778,15 +1786,14 @@ func _test_level_rules() -> void:
 		if lv.id in ["1-2", "1-3"]:
 			_check(altars.size() >= 2, "%s has a second altar" % lv.id)
 		if lv.id.begins_with("2-") and lv.boss == "":
-			var marks := [lv.start.x] + altars
-			for e in lv.entities:
-				if e["kind"] == "bell":
-					marks.append(e["cell"].x)
+			# Along the route (a taller level's on foot: level_rules.gd
+			# checkpoint_gaps; with roads, each road's).
+			var gaps: Dictionary = Rules.checkpoint_gaps(lv)
 			var ok := true
-			for i in range(1, marks.size()):
-				if marks[i] - marks[i - 1] > 90:
+			for gap in gaps["gaps"]:
+				if int(gap) > 90:
 					ok = false
-			_check(ok, "%s: an altar every 90 tiles or less (%s)" % [lv.id, marks])
+			_check(ok, "%s: an altar every 90 tiles or less (%s)" % [lv.id, gaps])
 		if lv.boss != "":
 			# From the boss's own cell, as world.gd finds the arena (the Hush
 			# stands on row 10, the Saint mid-nave): the door is its two
@@ -2158,9 +2165,9 @@ func _test_hang_heights() -> void:
 const STAR_ROUTES := {
 	"1-1": {"sigil": 3, "route": [Vector2i(264, 7), Vector2i(268, 5)], "from": Vector2i(241, 12),
 			"what": "two lone stones past the bell stair"},
-	"1-2": {"sigil": 2, "route": [Vector2i(110, 7), Vector2i(111, 7), Vector2i(116, 7), Vector2i(117, 7), Vector2i(121, 7), Vector2i(122, 7)],
-			"from": Vector2i(101, 12), "what": "crumbling slabs under a spiked ceiling"},
-	"1-3": {"sigil": 1, "route": [Vector2i(69, 5)], "from": Vector2i(55, 12), "what": "a lone post high over the lava"},
+	"1-2": {"sigil": 2, "route": [Vector2i(110, 11), Vector2i(111, 11), Vector2i(116, 11), Vector2i(117, 11), Vector2i(121, 11), Vector2i(122, 11)],
+			"from": Vector2i(101, 15), "what": "crumbling slabs under a spiked ceiling"},
+	"1-3": {"sigil": 1, "route": [Vector2i(69, 14)], "from": Vector2i(55, 21), "what": "a lone post high over the lava"},
 	"1-4": {"sigil": 1, "route": [Vector2i(18, 7), Vector2i(22, 5)], "from": Vector2i(3, 12),
 			"what": "two lone stones up the tower, a bat between"},
 }

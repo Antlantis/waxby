@@ -375,7 +375,7 @@ func _test_road_xp() -> void:
 	_check(sig.call(0) == 2 and sig.call(1) == 2, "each road's walk takes 2 of its 3 sigils on its way (%d, %d)" % [sig.call(0), sig.call(1)])
 	var by: Array = road_xp(lv, 0)
 	_check(by.size() == 2 and by.min() < _play(lv, 0), "the budget is the poorer road's (%s; both counted: %d)" % [by, _play(lv, 0)])
-	var strip: RefCounted = LevelData.load_file("res://levels/1-2.txt")
+	var strip: RefCounted = LevelData.load_file("res://levels/1-1.txt")   # (1-2 is a stair since Build 2; 1-1 stays a strip)
 	_check(road_xp(strip, 0) == [_play(strip, 0)], "a strip's walk is as it was")
 
 

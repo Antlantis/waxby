@@ -85,6 +85,10 @@ const HEADLINE_RETURN := {6: ["brinejaw"]}
 const ROSTER_KEYS := ["headline", "support", "guest", "rattle_max", "fodder_max", "count", "banned", "pack_leaders", "stamps"]
 const ALTAR_NEAR := 8
 const FODDER_CAPS := [0.85, 0.75, 0.65]
+# Worlds 1-2 stay gentle on Dusk (common.GENTLE_WORLDS): only their X-3's
+# fodder is held, under its X-1's and at most GENTLE_X3.
+const GENTLE_WORLDS := [1, 2]
+const GENTLE_X3 := 0.85
 const SCREEN := 26
 const MIXED_KINDS := 3
 const MIXED_SCREENS := 2
@@ -813,7 +817,8 @@ static func crowded_screens(lv: RefCounted) -> Array:
 static func recut_problems(levels: Array) -> Array:
 	## A re-cut world's variety rules (common.world_problems), [] for a world
 	## that isn't: the fodder ceilings falling X-1 > X-2 > X-3 and at most
-	## FODDER_CAPS; its X-3 with MIXED_SCREENS screens of MIXED_KINDS kinds;
+	## FODDER_CAPS (in GENTLE_WORLDS only the X-3's: under the X-1's and
+	## GENTLE_X3); its X-3 with MIXED_SCREENS screens of MIXED_KINDS kinds;
 	## no screen of an X-1..X-3 with more than AWAKE_MAX in play.
 	var out := []
 	if not recut(levels):
@@ -821,15 +826,25 @@ static func recut_problems(levels: Array) -> Array:
 	var sorted := levels.duplicate()
 	sorted.sort_custom(func(a, b): return str(a.id) < str(b.id))
 	var last := []
+	var before := []
 	for lv in sorted:
 		var n := level_no(str(lv.id))
 		var r := roster_of(lv)
 		if r.has("fodder_max"):
 			var fm := float(r["fodder_max"])
-			if n >= 1 and n <= FODDER_CAPS.size() and fm > float(FODDER_CAPS[n - 1]) + 0.000001:
-				out.append("%s: fodder_max %s (an X-%d at most %s)" % [lv.id, fm, n, FODDER_CAPS[n - 1]])
-			if not last.is_empty() and fm >= float(last[1]) - 0.000001:
-				out.append("%s: fodder_max %s, not under %s's %s (it falls X-1 to X-3)" % [lv.id, fm, last[0], last[1]])
+			if GENTLE_WORLDS.has(int(lv.world)):
+				if n == 3:
+					if fm > GENTLE_X3 + 0.000001:
+						out.append("%s: fodder_max %s (a gentle world's X-3 at most %s)" % [lv.id, fm, GENTLE_X3])
+					for b in before:
+						if level_no(str(b[0])) == 1 and fm >= float(b[1]) - 0.000001:
+							out.append("%s: fodder_max %s, not under %s's %s (a gentle world's X-3 under its X-1)" % [lv.id, fm, b[0], b[1]])
+				before.append([lv.id, fm])
+			else:
+				if n >= 1 and n <= FODDER_CAPS.size() and fm > float(FODDER_CAPS[n - 1]) + 0.000001:
+					out.append("%s: fodder_max %s (an X-%d at most %s)" % [lv.id, fm, n, FODDER_CAPS[n - 1]])
+				if not last.is_empty() and fm >= float(last[1]) - 0.000001:
+					out.append("%s: fodder_max %s, not under %s's %s (it falls X-1 to X-3)" % [lv.id, fm, last[0], last[1]])
 			last = [lv.id, fm]
 		if n == 3 and mixed_screens(lv) < MIXED_SCREENS:
 			out.append("%s: %d screens with %d kinds or more (an X-3 mixes: at least %d)" % [lv.id, mixed_screens(lv), MIXED_KINDS, MIXED_SCREENS])

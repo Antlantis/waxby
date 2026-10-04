@@ -135,6 +135,7 @@ func _initialize() -> void:
 	await _test_pit()
 	await _test_twinned()
 	await _test_loft()
+	await _test_loft_13()
 	await _test_no_monsters()
 	await _test_resume()
 	await _test_bot()
@@ -266,10 +267,11 @@ func _test_rules() -> void:
 	## room_problems, common.py check_rooms as it writes): a monster in each,
 	## a way in at an end, doorways of air or stone that never opens, no
 	## monster within DOOR_CLEAR columns of a door, an altar within
-	## ALTAR_REACH tiles before its door. Only labs have any yet (this one;
+	## ALTAR_REACH tiles before its door. Labs have them (this one;
 	## lab-shapes and lab-mirror's, each met by its right door, and
 	## lab-shape-mirror's and lab-shape-decks', test_shaped.gd's: Build 2's
-	## shapes).
+	## shapes), and the levels re-cut by Build 2's redesign (they declare
+	## their roles:): 1-3's Barbs' Loft, the X-3s' fight rooms.
 	var with_rooms := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if not f.ends_with(".txt"):
@@ -277,11 +279,11 @@ func _test_rules() -> void:
 		var lv = LevelData.load_file("res://levels/" + f)
 		if str(lv.headers.get("room", "")) == "":
 			continue
-		with_rooms.append(str(lv.id))
+		with_rooms.append(str(lv.id) if str(lv.headers.get("roles", "")).strip_edges() == "" else "")
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-")),
-			"only labs have rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id) == "" or str(id).begins_with("lab-")),
+			"only labs and re-cut levels have rooms (the levels' come with their redesigns): %s" % [with_rooms])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.
@@ -301,8 +303,11 @@ func _test_rules() -> void:
 
 func _test_absent() -> void:
 	## No header, nothing changes: a level's monsters stay in the World's
-	## list, seen, and in its spawns.
+	## list, seen, and in its spawns (a re-cut level with its room: header,
+	## 1-3's loft, is the rooms' own: _test_loft_13).
 	for id in ["1-3", "3-3", "4-3", "5-3", "6-3"]:
+		if str(LevelData.load_file("res://levels/%s.txt" % id).headers.get("room", "")) != "":
+			continue
 		var w := _world(id)
 		await process_frame
 		var n0: int = w.enemies.size()
@@ -731,6 +736,44 @@ func _test_loft() -> void:
 	_kill(foe)
 	_until(w, func(): return r["phase"] == "won", 1.0)
 	_check(r["phase"] == "won" and _all(w, r["door"], LevelData.AIR), "down: the gap opens")
+	await _done(w)
+
+
+func _test_loft_13() -> void:
+	## 1-3's Barbs' Loft (Build 2): a storey over the crossfire, sealed only
+	## if he climbs in by its gap; Brother Barbs (the Dread) its named foe,
+	## asleep up there; walk the floor under it and nothing happens.
+	var lv = LevelData.load_file("res://levels/1-3.txt")
+	if str(lv.headers.get("room", "")) == "":
+		return
+	var w := _world("1-3")
+	await process_frame
+	var m = _mod(w)
+	_check(m != null and m.rooms.size() == 1, "1-3 has one room, the loft")
+	if m == null or m.rooms.is_empty():
+		await _done(w)
+		return
+	var r: Dictionary = m.rooms[0]
+	var foe: Node2D = r["named"]
+	_check(r["kind"] == "duel" and not r["full"] and not (r["door"] as Array).is_empty() and (r["door"] as Array).all(func(c): return c.x == int(r["x0"])),
+			"1-3's loft: a duel up off the path, its only doorway the gap on the left (%s)" % [r["door"]])
+	_check(foe != null and foe.tier == "dread" and foe.elite_name == "Brother Barbs" and not w.enemies.has(foe),
+			"Brother Barbs asleep up there, the loft's foe")
+	var pl: Node2D = w.player
+	pl.invuln = 1000.0
+	pl.reset_at(_altar_at(w, 93)["pos"])
+	_ticks(w, 0.3)
+	var floor_row := int(r["y1"]) + 6
+	for x in [99.5, 104.5, 108.5]:
+		pl.reset_at(_floor(x, floor_row))
+		_ticks(w, 0.5)
+	_check(r["phase"] == "wait" and _all(w, r["door"], LevelData.AIR), "walk the crossfire under it: it never seals")
+	_seal(w, r, _floor(104.5, int(r["y1"])))
+	_check(r["phase"] == "fight" and _all(w, r["sealed"], LevelData.STONE) and w.enemies.has(foe) and foe.active,
+			"climb in: the gap shuts and Barbs wakes (%s)" % r["phase"])
+	_kill(foe)
+	_until(w, func(): return r["phase"] == "won", 1.0)
+	_check(r["phase"] == "won" and _all(w, r["door"], LevelData.AIR), "Barbs down: the gap opens")
 	await _done(w)
 
 
