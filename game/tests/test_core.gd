@@ -103,6 +103,8 @@ func _initialize() -> void:
 	await _test_p0_review()
 	await _test_wave1_wiring()
 	await _test_loot_build1()
+	await _test_trophies()
+	await _test_trophy_picker()
 	await _test_boss_boons()
 	await _test_relic_altar()
 	_test_relics_and_save()
@@ -826,7 +828,7 @@ func _test_boss() -> void:
 	for p in w.pickups:
 		if p["kind"] == "item" or p["kind"] == "relic":
 			loot += 1
-	_check(loot >= 3, "he drops his hoard (%d pieces)" % loot)
+	_check(loot >= 2, "he drops his prize and a relic (%d pieces; on Dusk no boss-table items: world.trophies())" % loot)
 	_check(w.bells.size() == 1, "and the bell comes down to ring")
 	w.queue_free()
 	await process_frame
@@ -3105,14 +3107,21 @@ func cards() -> int:
 
 func _test_loot_build1() -> void:
 	## Build 1's loot slice in the World: a boss pays his embers (with his
-	## drops only); Tollgrave's and the Snuffer's first kills give their
-	## signature piece; the vault's Lidlurk pays a relic (a gold-table item
+	## drops only; on Dusk's story levels in BOSS_PIECES pieces worth them
+	## all, world.trophies()); Tollgrave's and the Snuffer's first kills give their
+	## signature piece; the vault's Lidlurk pays a relic (a Trophy on Dusk
 	## once the codex is full; a mode's Lidlurk its item, a lab's nothing); a
 	## Legendary is worn over a piece that isn't one with auto-equip on (not
 	## when that would melt the worn piece), its moment only for a player
 	## (never headless, under --autoplay, or on a golden route); the playlog
 	## line's loot and ember fields, embers_spent cleared once it's written.
 	var count_embers := func(w: Node2D) -> int: return w.pickups.filter(func(p): return p["kind"] == "ember" and not p["taken"]).size()
+	var worth_of := func(w: Node2D) -> int:
+		var n := 0
+		for p in w.pickups:
+			if p["kind"] == "ember" and not p["taken"]:
+				n += int(p.get("worth", w.ember_worth()))
+		return n
 	for row in [["1-4", "tollbreaker", 30], ["2-4", "twin_wick", 50]]:
 		var bw := _world_as(str(row[0]), "knight")
 		await process_frame
@@ -3121,10 +3130,13 @@ func _test_loot_build1() -> void:
 		_check(b != null and int(b.embers) == int(row[2]), "%s: the boss carries %d embers" % [row[0], row[2]])
 		if b != null:
 			var n0: int = count_embers.call(bw)
+			var v0: int = worth_of.call(bw)
 			bw.boss_defeated(b, b.center())
-			var paid: int = count_embers.call(bw) - n0
+			var pieces: int = count_embers.call(bw) - n0
+			var paid: int = worth_of.call(bw) - v0
 			var loose: int = bw.pickups.filter(func(p): return p["kind"] == "ember" and p["loose"]).size()
-			_check(paid == int(b.embers) and loose >= paid, "%s: he pays them, %d loose embers where he fell (never paid before build 1)" % [row[0], paid])
+			_check(paid == int(b.embers) * bw.ember_worth() and pieces == bw.BOSS_PIECES and loose >= pieces,
+					"%s: he pays them, %d embers in %d loose pieces where he fell (never paid before build 1)" % [row[0], paid, pieces])
 			var prize := ""
 			for p in bw.pickups:
 				if p["kind"] == "item" and bool(p.get("boss_first", false)):
@@ -3149,8 +3161,8 @@ func _test_loot_build1() -> void:
 		if ended[0]:
 			break
 	var left: int = his.filter(func(p): return not p["taken"]).size()
-	_check(gw.state == "clear" and ended[0] and his.size() == int(gb.embers) and left == 0,
-			"the bell rung with his %d embers loose: every one gathered to him (%d left)" % [his.size(), left])
+	_check(gw.state == "clear" and ended[0] and his.size() == gw.BOSS_PIECES and left == 0,
+			"the bell rung with his %d ember pieces loose: every one gathered to him (%d left)" % [his.size(), left])
 	_check(game.embers() - purse0 >= int(gb.embers) * gw.ember_worth() and gw.embers_carried == 0,
 			"and banked as the level ends (+%d, %d at least)" % [game.embers() - purse0, int(gb.embers) * gw.ember_worth()])
 	gw.queue_free()
@@ -3176,7 +3188,7 @@ func _test_loot_build1() -> void:
 		w._on_enemy_died(lid, "slash")
 		got = loot_of.call(w).slice(k0)
 		_check(got.size() == 1 and got[0]["kind"] == "item" and str(got[0]["rarity"]) in ["rare", "legendary"],
-				"with every relic found, a gold-table item instead (%s)" % [got.map(func(p): return [p["kind"], p["rarity"]])])
+				"with every relic found, a Trophy instead (%s)" % [got.map(func(p): return [p["kind"], p["rarity"]])])
 		game.data["relics"] = []
 	w.queue_free()
 	await process_frame
@@ -3289,6 +3301,169 @@ func _test_loot_build1() -> void:
 	w.headless = true
 	w.hud = null
 	hud.free()
+	w.queue_free()
+	await process_frame
+
+
+# ---------------------------------------------------------------- the Trophies
+
+func _test_trophies() -> void:
+	## Dusk's story levels (world.trophies()) drop gear only from the big
+	## fights. A kill pays embers, never an item: one piece carrying its whole
+	## worth (as many embers as the old spray), three for an elite; an
+	## Anointed x5 and no item, a Dread one Trophy (World 3's: boots, the
+	## gift). A boss's first kill gives his prize alone (with the relic) and
+	## twelve ember pieces worth his old spray; a later kill one Trophy.
+	## Nightfall keeps its tables and its spray. A loose piece lies 20 s.
+	var w := _world_as("3-1", "knight")
+	await process_frame
+	w.set_physics_process(false)
+	var worth: int = w.ember_worth()
+	_check(w.trophies() and w.diff == "dusk" and worth == 3, "3-1 on Dusk drops Trophies (an ember worth %d)" % worth)
+	var pay := func(x: Node2D, e: Node2D) -> Dictionary:
+		var k0: int = x.pickups.size()
+		x._on_enemy_died(e, "slash")
+		var got := {"items": [], "pieces": 0, "worth": 0, "sizes": []}
+		for p in x.pickups.slice(k0):
+			if p["kind"] == "item":
+				got["items"].append(p["item"])
+			elif p["kind"] == "ember":
+				got["pieces"] += 1
+				got["worth"] += int(p.get("worth", x.ember_worth()))
+				got["sizes"].append(int(p.get("size", 1)))
+		return got
+	for row in [["", 1, 1], ["anointed", 3, 5], ["dread", 3, 6]]:
+		var e: Node2D = w.spawn_enemy("skeleton", w.player.position + Vector2(96, 0), {"tier": row[0]})
+		e.item_chance = 1.0
+		e.relic_chance = 0.0
+		var got: Dictionary = pay.call(w, e)
+		var what: String = {"": "an ordinary kill", "anointed": "an Anointed", "dread": "a Dread"}[row[0]]
+		_check(int(got["pieces"]) == int(row[1]) and int(got["worth"]) == int(e.embers) * int(row[2]) * worth,
+				"%s: %d piece(s) worth %d (%d embers x%d x %d)" % [what, got["pieces"], got["worth"], e.embers, row[2], worth])
+		_check((got["sizes"] as Array).all(func(s): return int(s) >= 2), "%s: its pieces drawn big (%s)" % [what, got["sizes"]])
+		if row[0] == "dread":
+			_check((got["items"] as Array).size() == 1 and str(got["items"][0]["rarity"]) in ["rare", "legendary"] and str(got["items"][0]["slot"]) == "boots",
+					"a Dread: one Trophy, Rare or better, World 3's gift of boots (%s)" % [(got["items"] as Array).map(func(it): return [it["rarity"], it["slot"]])])
+		else:
+			_check((got["items"] as Array).is_empty(), "%s: no item, even at item chance 1 (%d)" % [what, (got["items"] as Array).size()])
+	# A loose piece lies 20 s (a placed ember 9 s, as before).
+	var e2: Node2D = w.spawn_enemy("skeleton", w.player.position + Vector2(400, -200), {})
+	var k2: int = w.pickups.size()
+	w._on_enemy_died(e2, "slash")
+	var piece: Dictionary = w.pickups[k2]
+	_check(piece["kind"] == "ember" and piece["loose"] and piece.has("worth"), "(a kill's piece, loose)")
+	piece["age"] = 15.0
+	w._update_pickups(DT)
+	_check(not piece["taken"], "a kill's piece is still there after 15 s")
+	piece["age"] = 20.5
+	w._update_pickups(DT)
+	_check(piece["taken"], "and gone after 20")
+	# _collect pays a piece's worth and ticks it by the counter.
+	var got0: int = w.embers_got
+	w._collect({"kind": "ember", "pos": w.player.center(), "worth": 37, "taken": false, "loose": false, "age": 1.0})
+	_check(w.embers_got == got0 + 37, "a piece pays what it carries (+%d)" % (w.embers_got - got0))
+	w.queue_free()
+	await process_frame
+	# The same kills on Nightfall: the tables' items and the old spray.
+	game.reset()
+	game.new_hero("knight")
+	game.data["difficulty"] = "nightfall"
+	var nw: Node2D = WorldScript.new()
+	nw.setup(LevelData.load_file("res://levels/3-1.txt"), true)
+	root.add_child(nw)
+	await process_frame
+	nw.set_physics_process(false)
+	_check(not nw.trophies(), "3-1 on Nightfall drops no Trophies")
+	for row in [["", 1], ["anointed", 3], ["dread", 6]]:
+		var e: Node2D = nw.spawn_enemy("skeleton", nw.player.position + Vector2(96, 0), {"tier": row[0]})
+		e.item_chance = 0.0
+		e.relic_chance = 0.0
+		var got: Dictionary = pay.call(nw, e)
+		var items: int = {"": 0, "anointed": 1, "dread": 2}[row[0]]
+		_check(int(got["pieces"]) == int(e.embers) * int(row[1]) and (got["items"] as Array).size() == items,
+				"Nightfall, %s: %d ember pieces and %d item(s), as before" % [row[0] if row[0] != "" else "a kill", got["pieces"], items])
+	nw.queue_free()
+	await process_frame
+	game.data["difficulty"] = "dusk"
+	# A boss: his first kill, then a later one.
+	var bw := _world_as("1-4", "knight")
+	await process_frame
+	bw.set_physics_process(false)
+	var b: Node2D = bw.boss
+	for first in [true, false]:
+		var k0: int = bw.pickups.size()
+		bw.boss_defeated(b, b.center())
+		var items: Array = []
+		var pieces := 0
+		var paid := 0
+		for p in bw.pickups.slice(k0):
+			if p["kind"] == "item":
+				items.append(p)
+			elif p["kind"] == "ember":
+				pieces += 1
+				paid += int(p.get("worth", bw.ember_worth()))
+		_check(pieces == bw.BOSS_PIECES and paid == int(b.embers) * bw.ember_worth(),
+				"1-4's boss (%s kill): %d ember pieces worth his %d embers (%d)" % ["first" if first else "a later", pieces, int(b.embers), paid])
+		if first:
+			_check(items.size() == 1 and bool(items[0].get("boss_first", false)), "his first kill: his prize alone, no boss-table items (%d)" % items.size())
+			game.level_record("1-4")["boss_first"] = true
+		else:
+			_check(items.size() == 1 and str(items[0]["rarity"]) in ["rare", "legendary"] and not items[0].get("boss_first", false),
+					"a later kill: one Trophy (%s)" % [items.map(func(p): return p["rarity"])])
+	bw.queue_free()
+	await process_frame
+
+
+func _test_trophy_picker() -> void:
+	## world.trophy_item: Rare 80 / Legendary 20, at area + 2; made for
+	## TROPHY_TRIES of the live slots and the best by its chips kept; never
+	## for a slot wearing a Legendary while one doesn't (a plain piece can't
+	## replace it, and a Legendary goes where there's none).
+	var w := _world_as("1-1", "knight")
+	await process_frame
+	w.set_physics_process(false)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 404
+	var live: Array = Items.live_slots(w.area)
+	_check(live.size() == 5 and w.TROPHY_TRIES == 3, "(1-1's live slots: %s; %d tried a Trophy)" % [live, w.TROPHY_TRIES])
+	# Strong pieces worn everywhere but a poor coat: the coat wins whenever
+	# it's tried (3 times in 5), never by chance alone (1 in 5).
+	for slot in ["weapon", "candle", "boots", "charm"]:
+		game.equip(Items.make(slot, "knight", 40, "rare", rng))
+	game.equip(Items.make("coat", "knight", 1, "common", rng))
+	var slots := {}
+	var rarities := {}
+	var ilvl_ok := true
+	for i in 300:
+		var it: Dictionary = w.trophy_item()
+		slots[it["slot"]] = int(slots.get(it["slot"], 0)) + 1
+		rarities[it["rarity"]] = int(rarities.get(it["rarity"], 0)) + 1
+		ilvl_ok = ilvl_ok and int(it["ilvl"]) == w.area + 2
+	_check(int(slots.get("coat", 0)) >= 140, "the best by its chips: the poor coat's whenever it's tried (%s of 300)" % [slots])
+	_check(rarities.keys().all(func(r): return r in ["rare", "legendary"]) and int(rarities.get("legendary", 0)) >= 30 and int(rarities.get("legendary", 0)) <= 95,
+			"Rare or better, about 1 in 5 Legendary (%s of 300)" % [rarities])
+	_check(ilvl_ok, "at item level area + 2 (%d)" % (w.area + 2))
+	# Legendaries worn in four slots: every Trophy is for the fifth.
+	for row in [["weapon", "dawnsliver"], ["candle", "gutterlight"], ["boots", "thornsole"], ["charm", "first_dawn"]]:
+		game.equip(Items.make(str(row[0]), "knight", 1, "legendary", rng, str(row[1])))
+	slots = {}
+	for i in 100:
+		var it: Dictionary = w.trophy_item()
+		slots[it["slot"]] = int(slots.get(it["slot"], 0)) + 1
+	_check(slots.keys() == ["coat"], "four slots wearing a Legendary: every Trophy is for the coat (%s)" % [slots])
+	# Every slot wearing one: still a Trophy, for any of them.
+	game.equip(Items.make("coat", "knight", 1, "legendary", rng, "ossuary_coat"))
+	var any: Dictionary = w.trophy_item()
+	_check(not any.is_empty() and str(any["rarity"]) in ["rare", "legendary"], "every slot wearing a Legendary: a Trophy all the same (%s %s)" % [any.get("rarity"), any.get("slot")])
+	# A gift slot (a Dread's): that slot alone.
+	var gift: Dictionary = w.trophy_item("boots")
+	_check(str(gift["slot"]) == "boots", "a gift slot makes it for that slot (%s)" % gift["slot"])
+	# drop_item("trophy") places it; a mode's World never gets one from the
+	# Dread, a room or a boss (trophies() false: test_modes).
+	var n0: int = w.pickups.size()
+	w.drop_item(w.player.position, "trophy")
+	_check(w.pickups.size() == n0 + 1 and w.pickups[n0]["kind"] == "item" and str(w.pickups[n0]["rarity"]) in ["rare", "legendary"],
+			"drop_item(at, \"trophy\") drops one")
 	w.queue_free()
 	await process_frame
 
@@ -3426,7 +3601,8 @@ func _test_boss_boons() -> void:
 	## no Later. It opens once his fall has settled (BOON_WAIT, the level-up
 	## card's time), and a pick goes through the pickup's own path (worn,
 	## its New power moment) and only then counts as given. A second kill
-	## drops as before; so does a first kill under the --autoplay bot (or on
+	## drops a Trophy (Dusk's story levels); a first kill under the
+	## --autoplay bot drops his prize as before (or on
 	## a route, a scripted pad, headless, in a mode). A bell rung first holds
 	## the level's end until the boon is chosen. Every Legendary's power fits
 	## its card.
@@ -3440,10 +3616,16 @@ func _test_boss_boons() -> void:
 	var b := _wake_boss(w)
 	var hud := _as_player(w)
 	_check(w.boon_block() == "", "a player's first kill may offer the boon (%s)" % w.boon_block())
-	var embers0: int = w.pickups.filter(func(p): return p["kind"] == "ember").size()
+	var ember_worth := func() -> int:
+		var n := 0
+		for p in w.pickups:
+			if p["kind"] == "ember":
+				n += int(p.get("worth", w.ember_worth()))
+		return n
+	var embers0: int = ember_worth.call()
 	_kill_boss(w, b)
 	_check(not b.alive and not w._boon.is_empty() and boss_firsts.call(w).is_empty(), "he falls: his boon waits, and no prize drops")
-	_check(w.pickups.filter(func(p): return p["kind"] == "ember").size() - embers0 >= int(b.embers), "his embers are paid all the same (%d)" % int(b.embers))
+	_check(ember_worth.call() - embers0 >= int(b.embers) * w.ember_worth(), "his embers are paid all the same (%d)" % int(b.embers))
 	hud.busy = true
 	for i in int(1.5 / DT):
 		w.tick(DT)
@@ -3469,14 +3651,14 @@ func _test_boss_boons() -> void:
 	_check(str(h["equip"]["weapon"].get("uid", "")) == str(prize["uid"]) and w.items_found.has(prize), "the pick is worn at once, over a piece that isn't a Legendary")
 	_check(hud.said.has(["power_card", str(prize["uid"])]) and is_equal_approx(w.hitstop, w.LEGEND_FREEZE), "with its New power moment (the freeze, the held card)")
 	_check(game.level_record("1-4").get("boss_first", false), "and now the first kill counts as given")
-	# A second kill drops as before.
+	# A second kill drops a Trophy (Dusk's story levels: world.trophies()).
 	var n0: int = w.pickups.filter(func(p): return p["kind"] == "item").size()
 	w.boss_defeated(b, b.center())
 	var dropped: int = w.pickups.filter(func(p): return p["kind"] == "item").size() - n0
 	for i in int(1.5 / DT):
 		w.tick(DT)
-	_check(w._boon.is_empty() and not w.choice.is_open() and dropped == 3 and boss_firsts.call(w).is_empty(),
-			"a second kill: no boon, his three drops as before (%d)" % dropped)
+	_check(w._boon.is_empty() and not w.choice.is_open() and dropped == 1 and boss_firsts.call(w).is_empty(),
+			"a second kill: no boon, one Trophy (%d)" % dropped)
 	# Why not: only a player's story level.
 	var whys := {}
 	for flag in ["autoplay", "route", "scripted", "headless"]:

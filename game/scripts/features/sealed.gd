@@ -62,7 +62,7 @@ extends "res://scripts/features/feature.gd"
 ## foe knocked into a pit never leaves the doors shut for good.
 ## Won (none left, or the clock out): the doors open with dust, a chime and a
 ## gold burst at each, a toast, and for an ambush or a hold a REWARD item
-## where loot is kept. A snuff while it's shut opens it and starts it over,
+## where loot is kept (a Trophy on Dusk's story levels: world.trophies()). A snuff while it's shut opens it and starts it over,
 ## as a boss room: everything alive in it gone, its monsters back at their
 ## posts (one already put out comes back as a respawn: less XP, no embers,
 ## a Dread's or an Anointed's tier drops paid once, world.gd _on_enemy_died,
@@ -96,6 +96,8 @@ const WON_FX := 1.0              # s the open doors glow after a win
 const ALTAR_REACH := 8           # tiles: an altar this near before each door (common.py check_rooms)
 const SLACK_UP := 4              # rows over a full-height room's top a flier still counts as in it
 # The win's item (world.drop_item's source; "" none: a duel's Dread pays its own).
+# Where the World drops Trophies (world.trophies(): Dusk's story levels) a win
+# pays one instead.
 const REWARD := {"duel": "", "ambush": "kill", "hold": "kill"}
 const DORMANT := Color(0.46, 0.46, 0.58)   # a duel's monsters asleep at their posts, dim
 const SLAB := Color("3a3346")
@@ -602,6 +604,8 @@ func _win(r: Dictionary, how: String) -> void:
 		line[0] = "Ambush beaten"
 	world.hud_call("toast", line)
 	var src := str(REWARD.get(r["kind"], ""))
+	if src != "" and world.has_method("trophies") and world.trophies():
+		src = "trophy"
 	var pl := player()
 	if src != "" and pl != null and world.allows("loot"):
 		world.drop_item(pl.center() + Vector2(pl.facing * 24.0, -30.0), src)

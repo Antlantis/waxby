@@ -995,7 +995,7 @@ func _test_saint_defeat() -> void:
 	for p in w.pickups:
 		if p["kind"] == "item" or p["kind"] == "relic":
 			loot += 1
-	_check(loot >= 3 and w.bells.size() == 1, "her drops fall (%d) and the bell comes down" % loot)
+	_check(loot >= 2 and w.bells.size() == 1, "her prize and a relic fall (%d; on Dusk no boss-table items: world.trophies()) and the bell comes down" % loot)
 	await _done(w)
 
 

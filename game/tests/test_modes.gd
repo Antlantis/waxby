@@ -754,8 +754,10 @@ func _test_descent_rules() -> void:
 
 func _test_mode_dusk() -> void:
 	## Build 1's Dusk (about twice the Anointed from World 3 with a second
-	## Omen, half the kill drops and no Commons, Hushlings in packs) is the
-	## story's: a mode keeps the numbers from before it. The Descent reads
+	## Omen, half the kill drops and no Commons, Hushlings in packs) and the
+	## Trophies (no kill drops; an Anointed's embers x5 and no item, a Dread's
+	## one Trophy, a kill's embers in one piece: world.trophies()) are the
+	## story's: a mode keeps the numbers from before them. The Descent reads
 	## the elite rows by its room's world, so a W3-W6 room plays v3's.
 	## (The Hushling packs: test_monsters4.)
 	var v3 := {1: [0.06, 2, 1, 0.0], 2: [0.06, 2, 1, 0.0], 3: [0.07, 2, 1, 0.0],
@@ -786,7 +788,7 @@ func _test_mode_dusk() -> void:
 	m.built["world"] = wn0
 	w.world_n = wn0
 	# Kill drops: v3's rate and rarities in a mode; Build 1's in a story level.
-	_check(Combat.kill_drop("dusk", false) == 1.0 and Combat.kill_drop("dusk") == 0.5, "a Dusk kill's item chance x1.0 in a mode (x0.5 in a story level)")
+	_check(Combat.kill_drop("dusk", false) == 1.0 and Combat.kill_drop("dusk") == 0.0, "a Dusk kill's item chance x1.0 in a mode (none in a story level)")
 	_check(Combat.kill_drop("nightfall", false) == Combat.kill_drop("nightfall") and Combat.kill_drop("witching", false) == Combat.kill_drop("witching"),
 			"Nightfall's and Witching's are the same in a mode")
 	var old12 := {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5}
@@ -814,7 +816,7 @@ func _test_mode_dusk() -> void:
 		_check(absf(w.kill_item_chance(en) - float(en.item_chance) * deeper) < 1e-6,
 				"a Descent kill on Dusk: its item chance x1.0 x the depth's %.2f (%.4f)" % [deeper, w.kill_item_chance(en)])
 		w.mode = null
-		_check(absf(w.kill_item_chance(en) - float(en.item_chance) * 0.5) < 1e-6, "(the same World as a story level: x0.5)")
+		_check(w.kill_item_chance(en) == 0.0, "(the same World as a story level: none)")
 		w.mode = m
 	var rolled := {}
 	var n0: int = w.pickups.size()
@@ -834,6 +836,40 @@ func _test_mode_dusk() -> void:
 			rolled[pk["rarity"]] = int(rolled.get(pk["rarity"], 0)) + 1
 	_check(not rolled.has("common") and not rolled.is_empty(), "(as a story level: never a Common: %s)" % [rolled])
 	w.mode = m
+	# The Trophies stay out of a mode: its kills, Anointed and Dreads pay as
+	# before (the tables' items, the spray of embers worth one each).
+	_check(not w.trophies(), "a mode's World drops no Trophies")
+	w.mode = null
+	_check(w.trophies(), "(the same World as a story level does)")
+	w.mode = m
+	# [tier, the old ember multiple, a mode's items, a story level's items]
+	for row in [["", 1, 0, 0], ["anointed", 3, 1, 0], ["dread", 6, 2, 1]]:
+		var paid := {"items": 0, "pieces": 0, "worth": 0}
+		var story := {"items": 0, "pieces": 0, "worth": 0}
+		for k in 2:
+			var side: Dictionary = paid if k == 0 else story
+			w.mode = m if k == 0 else null
+			side["one"] = w.ember_worth()
+			var e: Node2D = w.spawn_enemy("skeleton", w.player.position + Vector2(96, 0), {"tier": row[0]})
+			e.item_chance = 1000.0 if row[0] == "" else 0.0
+			e.relic_chance = 0.0
+			var k0: int = w.pickups.size()
+			w._on_enemy_died(e, "slash")
+			for pk in w.pickups.slice(k0):
+				if pk["kind"] == "item":
+					side["items"] += 1
+				elif pk["kind"] == "ember":
+					side["pieces"] += 1
+					side["worth"] += int(pk.get("worth", w.ember_worth()))
+			side["embers"] = int(e.embers)
+		w.mode = m
+		var what: String = {"": "an ordinary kill", "anointed": "an Anointed", "dread": "a Dread"}[row[0]]
+		var items_mode: int = 1 if row[0] == "" else int(row[2])
+		_check(int(paid["items"]) == items_mode and int(paid["pieces"]) == int(paid["embers"]) * int(row[1]) and int(paid["worth"]) == int(paid["pieces"]) * int(paid["one"]),
+				"a mode's %s: %d item(s), %d ember pieces worth one each, as before (%s)" % [what, items_mode, int(paid["embers"]) * int(row[1]), paid])
+		var mult: int = 5 if row[0] == "anointed" else int(row[1])
+		_check(int(story["items"]) == int(row[3]) and int(story["worth"]) == int(story["embers"]) * mult * int(story["one"]) and int(story["pieces"]) == (1 if row[0] == "" else 3),
+				"(as a story level: %d item(s), %d piece(s) worth %d x%d)" % [row[3], story["pieces"], story["embers"], mult])
 	w.queue_free()
 	await process_frame
 

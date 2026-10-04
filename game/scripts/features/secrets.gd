@@ -559,7 +559,8 @@ func _candle_foot() -> Vector2:
 func _place_prize() -> void:
 	## The prize on the shrine: the secret's Legendary until it's taken on
 	## this difficulty (Game.secret_prize: {} once paid), else one
-	## boss-weighted item. None where the World keeps no loot.
+	## boss-weighted item (a Trophy on Dusk: world.trophies()). None where
+	## the World keeps no loot.
 	_prize_done = true
 	if shrine.is_empty() or not world.allows("loot"):
 		return
@@ -575,7 +576,7 @@ func _place_prize() -> void:
 		p["loose"] = false
 		prize_pickup = p
 	else:
-		world.drop_item(at, "boss")
+		world.drop_item(at, "trophy" if world.has_method("trophies") and world.trophies() else "boss")
 	if world.glow:
 		world.glow.burst(at, 16, GILT, 110.0, 0.6, -30.0, 2.0)
 

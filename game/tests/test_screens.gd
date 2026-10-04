@@ -1133,25 +1133,46 @@ func _test_hud_on_world() -> void:
 		hud._process(1.0 / 60.0)
 	_check(hud._card.is_empty(), "the card goes after its window")
 	_check(not hud.tap_card(), "no card, no tap")
-	# An item that isn't an upgrade goes to the satchel; a tap wears it.
+	# A find no better than what's worn is sold on touch ("Sell weaker
+	# finds", on by default); a tap keeps it, the embers going back.
 	var worse = Items.make("coat", "knight", 1, "magic", rng)
 	worse["affixes"] = []
 	worse["implicit"]["v"] = 0.0
-	w._take_item(worse)
+	var purse := int(game.embers())
+	_check(w._take_item(worse) == "sold" and int(game.embers()) == purse + Items.sell_value(worse), "a weaker find is sold on touch (+%d)" % Items.sell_value(worse))
 	hud._process(0.05)
 	var where: String = str(hud._card.get("where", ""))
-	_check(where == "satchel", "an item that isn't an upgrade goes to the satchel (%s)" % where)
-	hud.tap_card()
-	_check(str(game.hero()["equip"]["coat"]["uid"]) == str(worse["uid"]), "tapping a satchel card wears it")
-	# A Common with auto-salvage becomes a note, not a card.
+	_check(where == "sold" and hud.card_hit(hud.card_rect().get_center()), "its card says so and takes a tap (%s)" % where)
+	await _frames(1)
+	_check(hud.card_line == "SOLD  +%d · TAP TO KEEP" % Items.sell_value(worse), "\"%s\"" % hud.card_line)
+	_check(hud.tap_card() and str(hud._card["where"]) == "kept" and int(game.embers()) == purse
+			and (game.hero()["satchel"] as Array).any(func(x): return str(x["uid"]) == str(worse["uid"])), "a tap keeps it: into the satchel, the embers back")
+	_check(not hud.tap_card(), "kept: no more taps")
+	# With the setting off it goes to the satchel; a tap wears it.
 	hud._card = {}
+	game.set_setting("auto_sell", false)
+	var worse2 = worse.duplicate(true)
+	worse2["uid"] = "worse-2"
+	w._take_item(worse2)
+	game.set_setting("auto_sell", true)
+	hud._process(0.05)
+	where = str(hud._card.get("where", ""))
+	_check(where == "satchel", "Sell weaker finds off: an item that isn't an upgrade goes to the satchel (%s)" % where)
+	hud.tap_card()
+	_check(str(game.hero()["equip"]["coat"]["uid"]) == str(worse2["uid"]), "tapping a satchel card wears it")
+	# A Common find sells too (what auto-salvage melted): a card, as any sale with room.
+	hud._card = {}
+	hud._cards.clear()
 	hud._msgs.clear()
 	var common = Items.make("candle", "knight", 1, "common", rng)
 	var before := int(game.embers())
-	var res: String = game.add_item(common)
+	var res: String = game.add_item(common, true)
 	hud.show_pickup(common, {"dmg": 0.0, "life": 0.0}, res)
-	_check(res == "salvaged" and int(game.embers()) > before, "a Common is salvaged for embers")
-	_check(hud._cards.is_empty() and hud._msgs.any(func(q): return q["kind"] == "pickup"), "salvage shows as a note in the slot")
+	_check(res == "sold" and int(game.embers()) > before, "a Common find is sold for embers")
+	_check(hud._cards.size() == 1 and str(hud._cards[0]["where"]) == "sold" and not hud._msgs.any(func(q): return q["kind"] == "pickup"),
+			"with room in the satchel a sale is a card (it can be kept), not a note")
+	_check(hud._tick_t > 0.0 and hud._tick == Items.sell_value(common) and hud._tick_word == "sold", "and \"+%d sold\" ticks by the embers" % hud._tick)
+	hud._cards.clear()
 	# Level up through the World, and banking.
 	hud._lvl = {}
 	w.gain_xp(Progression.xp_to_next(3) + 5, w.player.position)
@@ -2827,12 +2848,12 @@ func _test_results() -> void:
 # ---------------------------------------------------------------- integration (the seams)
 
 func _test_pickup_states() -> void:
-	## The pickup card for everything Game.add_item can say: salvaged (a
-	## Common by auto-salvage, a Blessed or Rare because the satchel was full)
-	## and "full". A full item the World already took up (world.gd today)
-	## takes a tap and is worn, and the old one melts so the satchel stays at
-	## its cap; one the World left on the floor takes a tap only if the World
-	## can lift it (claim_item), else the card says it's still there, once per
+	## The pickup card for everything Game.add_item can say: sold (a find
+	## sold on touch: a card that keeps it; or, the satchel full, a note) and
+	## "full". A full item the World already took up (world.gd today) takes a
+	## tap and is worn, and the old one is sold so the satchel stays at its
+	## cap; one the World left on the floor takes a tap only if the World can
+	## lift it (claim_item), else the card says it's still there, once per
 	## item.
 	_where = "pickup states"
 	_fresh_hero(3)
@@ -2846,21 +2867,22 @@ func _test_pickup_states() -> void:
 	w.add_child(hud)
 	await _frames(2)
 	var com = Items.make("coat", "knight", 3, "common", rng)
-	hud.show_pickup(com, {"dmg": 0.0, "life": -2.0}, "salvaged")
+	hud.show_pickup(com, {"dmg": 0.0, "life": -2.0}, "sold")
 	hud._process(0.05)
-	_check(str(hud._msg.get("sub", "")) == "Salvaged  +%d embers" % Items.salvage_value(com), "a Common auto-salvaged: \"%s\"" % hud._msg.get("sub", ""))
-	hud._msg = {}
-	for rar in ["magic", "rare"]:
-		var it = Items.make("weapon", "knight", 3, rar, rng)
-		hud.show_pickup(it, {"dmg": -5.0, "life": 0.0}, "salvaged")
-		hud._process(0.05)
-		var sub := str(hud._msg.get("sub", ""))
-		_check(sub.begins_with("Satchel full") and sub.contains(str(Items.salvage_value(it))), "a %s salvaged by a full satchel says why: \"%s\"" % [rar, sub])
-		_check(hud._msg.get("col") == UI.rarity_color(rar), "in its rarity's colour")
-		hud._msg = {}
-	_check(hud._card.is_empty() and hud._cards.is_empty(), "a salvaged item gets a note, not a card")
+	_check(str(hud._card.get("where", "")) == "sold" and int(hud._card.get("embers", 0)) == Items.sell_value(com) and hud._msg.is_empty(),
+			"a find sold with room in the satchel: a card (+%d)" % int(hud._card.get("embers", 0)))
+	hud._card = {}
 	var h: Dictionary = game.hero()
 	_fill_satchel(rng)
+	for rar in ["magic", "rare"]:
+		var it = Items.make("weapon", "knight", 3, rar, rng)
+		hud.show_pickup(it, {"dmg": -5.0, "life": 0.0}, "sold")
+		hud._process(0.05)
+		var sub := str(hud._msg.get("sub", ""))
+		_check(sub == "Satchel full · sold  +%d embers" % Items.sell_value(it), "a %s sold by a full satchel says why: \"%s\"" % [rar, sub])
+		_check(hud._msg.get("col") == UI.rarity_color(rar), "in its rarity's colour")
+		hud._msg = {}
+	_check(hud._card.is_empty() and hud._cards.is_empty(), "sold with the satchel full: a note, not a card (nowhere to keep it)")
 	# Full, and already off the floor: the tap is its one chance, as before.
 	var worn: Dictionary = h["equip"]["candle"]
 	var left = Items.make("candle", "knight", 9, "rare", rng)
@@ -2877,7 +2899,7 @@ func _test_pickup_states() -> void:
 	_check(bool(hud._card.get("armed", false)) and is_equal_approx(float(hud._card["tap_left"]), HudScript.CARD_TAP),
 			"the card waits for a second tap, with a fresh window")
 	await _frames(1)
-	_check(hud.card_line.begins_with("TAP AGAIN") and hud.card_line.contains("MELTS"), "and says so: \"%s\"" % hud.card_line)
+	_check(hud.card_line.begins_with("TAP AGAIN") and hud.card_line.contains("SELLS"), "and says so: \"%s\"" % hud.card_line)
 	hud._cards.append({"kind": "relic", "id": "rook_feather", "on": false, "t": 0.0, "tap_left": 0.0})
 	for i in 20:
 		hud._process(0.1)
@@ -2887,15 +2909,15 @@ func _test_pickup_states() -> void:
 	_check(hud.tap_card(true), "a second tap")
 	_check(str(h["equip"]["candle"]["uid"]) == str(left["uid"]), "wears it")
 	_check((h["satchel"] as Array).size() == game.SATCHEL_MAX, "the satchel stays at %d (%d)" % [game.SATCHEL_MAX, (h["satchel"] as Array).size()])
-	_check(game.embers() == e0 + Items.salvage_value(worn), "the old one melted for its embers")
+	_check(game.embers() == e0 + Items.sell_value(worn), "the old one sold for its embers")
 	_check(not _holds(h, worn), "and is gone")
-	_check(str(hud._card["where"]) == "equipped" and hud._card.has("melt"), "the card says Equipped, and what melted")
+	_check(str(hud._card["where"]) == "equipped" and hud._card.has("melt"), "the card says Equipped, and what was sold")
 	_check(not hud.card_hit(hud.card_rect().get_center()) and not hud.tap_card(), "with nothing to flip back to")
 	# The longest status lines still fit the card on the narrowest screen.
 	await _set_view(Vector2i(780, 390), true)
 	_where = "pickup states"
 	await _frames(1)
-	_check(hud.card_fits, "780 wide: \"Equipped · old one salvaged\" fits the card")
+	_check(hud.card_fits, "780 wide: \"Equipped · old one sold\" fits the card")
 	hud._card["melt"]["old"] = false
 	hud._card["melt"]["name"] = "Bright Padded Greatcoat of the Bell"
 	await _frames(1)
@@ -2905,10 +2927,11 @@ func _test_pickup_states() -> void:
 	var kept: Dictionary = hud._card
 	hud._card = peek
 	await _frames(1)
-	_check(hud.card_fits, "780 wide: \"Satchel full · tap to wear, old one melts\" fits the card")
+	_check(hud.card_fits, "780 wide: \"Satchel full · tap to wear, old one sells\" fits the card")
 	# And every other state the card can be in.
 	for v in [["equipped", 2.0, {}], ["equipped", 0.0, {}], ["undone", 2.0, {}], ["undone", 0.0, {}], ["satchel", 2.0, {}],
-			["satchel", 0.0, {}], ["full", 2.0, {"melts": false}], ["full", 0.0, {"floor": true}], ["full", 0.0, {"floor": false}]]:
+			["satchel", 0.0, {}], ["full", 2.0, {"melts": false}], ["full", 0.0, {"floor": true}], ["full", 0.0, {"floor": false}],
+			["sold", 2.0, {"embers": 9999}], ["sold", 0.0, {"embers": 9999}], ["kept", 0.0, {}]]:
 		var pk: Dictionary = peek.duplicate()
 		pk["where"] = v[0]
 		pk["tap_left"] = v[1]

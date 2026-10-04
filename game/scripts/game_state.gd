@@ -138,7 +138,7 @@ const NOTICE_POINTS := "new_points"      # the map's "New skills: N points to sp
 const LOOK_KEYS := ["flame", "trim", "trim_color", "glow"]
 const COSMETIC_FREE := ["flame:tallow", "color:calling"]   # owned by everyone
 const MODES_SAVE := "res://scripts/modes/modes_save.gd"    # ModesSave (the modes stream), when it's there
-const SETTINGS_DEFAULT := {"haptics": true, "numbers": "on", "shake": 1.0, "auto_salvage": true, "auto_equip": true,
+const SETTINGS_DEFAULT := {"haptics": true, "numbers": "on", "shake": 1.0, "auto_sell": true, "auto_equip": true,
 		"auto_advance": false, "button_scale": 1.0, "candle_strength": "normal", "brightness": 0.0}
 const SIGIL_REWARD_EVERY := 6
 # v3's sigil milestones past #4 alternate (odd: a Legendary; even: a relic from
@@ -1698,27 +1698,30 @@ func _pay(n: int) -> void:
 
 # ---------------------------------------------------------------- gear
 
-func add_item(it: Dictionary) -> String:
-	## A picked-up item that isn't being worn: "satchel", "salvaged" or
-	## "full". A Common melts into embers at once when auto-salvage is on.
-	## With the satchel full (spec 4.4), anything no better than what's worn
-	## in its slot (both chips at or below zero) melts too; an item that would
-	## be better, a Legendary, or one for an empty slot is left: "full" (it
-	## stays on the ground with its beam). A borrowed hero takes nothing
-	## ("full"). A Legendary joins legends_found.
+func add_item(it: Dictionary, find := false) -> String:
+	## A picked-up item that isn't being worn: "satchel", "sold" or "full".
+	## A find (world.gd _take_item: one Waxby touched) sells at once for its
+	## price (Items.sell_value) when "Sell weaker finds" is on (auto_sell)
+	## and it adds nothing: no Legendary, both chips at or below zero against
+	## what's worn in its slot, or a Common (what the old auto-salvage
+	## melted); its card's tap keeps it (keep_sold). With the satchel full
+	## (spec 4.4), anything no better than what's worn sells too, whatever
+	## the setting; an item that would be better, a Legendary, or one for an
+	## empty slot is left: "full" (it stays on the ground with its beam). A
+	## borrowed hero takes nothing ("full"). A Legendary joins legends_found.
 	var h := hero()
 	if not _borrowed.is_empty():
 		return "full"
 	note_legend(str(it.get("legend", "")))
-	if it["rarity"] == "common" and bool(setting("auto_salvage")):
-		add_embers(Items.salvage_value(it))
-		return "salvaged"   # the next save keeps the embers
-	if (h["satchel"] as Array).size() >= SATCHEL_MAX:
-		if it["rarity"] != "legendary" and h["equip"].get(it["slot"]) is Dictionary:
-			var chips := Hero.compare(h, it["slot"], it, h.get("belt", []), diff())
-			if float(chips["dmg"]) <= 0.0 and float(chips["life"]) <= 0.0:
-				add_embers(Items.salvage_value(it))
-				return "salvaged"
+	var full := (h["satchel"] as Array).size() >= SATCHEL_MAX
+	var sell := full and weaker_find(it)
+	if not sell and find and bool(setting("auto_sell")):
+		sell = weaker_find(it) or str(it.get("rarity", "")) == "common"
+	if sell:
+		add_embers(Items.sell_value(it))
+		_prize_taken(it)
+		return "sold"   # the next save keeps the embers
+	if full:
 		return "full"
 	(h["satchel"] as Array).append(it)
 	_prize_taken(it)
@@ -1726,12 +1729,36 @@ func add_item(it: Dictionary) -> String:
 	return "satchel"
 
 
+func weaker_find(it: Dictionary) -> bool:
+	## A piece that adds nothing to what's worn: not a Legendary, for a slot
+	## with something in it, and both its chips at or below zero. What sells
+	## on touch (add_item), and what a full satchel turns into embers.
+	var h := hero()
+	if str(it.get("rarity", "")) == "legendary" or not (h["equip"].get(str(it.get("slot", ""))) is Dictionary):
+		return false
+	var chips := Hero.compare(h, it["slot"], it, h.get("belt", []), diff())
+	return float(chips["dmg"]) <= 0.0 and float(chips["life"]) <= 0.0
+
+
+func keep_sold(it: Dictionary) -> bool:
+	## The "Sold · tap to keep" card was tapped: the piece add_item sold goes
+	## into the satchel after all, and its embers come back out of the purse.
+	## Refused (false) with the satchel full, or for a borrowed hero.
+	var h := hero()
+	if not _borrowed.is_empty() or (h["satchel"] as Array).size() >= SATCHEL_MAX or _in_satchel(h, it):
+		return false
+	add_embers(-Items.sell_value(it))
+	(h["satchel"] as Array).append(it)
+	save()
+	return true
+
+
 func equip(it: Dictionary):
 	## Wears an item (from the satchel or new); what it replaces goes to the
 	## satchel. A new item worn with the satchel full leaves no room for it,
-	## so something melts into embers instead (see melt_on_equip; last_melt
-	## says what). Returns the replaced item or null. Refused (null, nothing
-	## changes) for a borrowed hero.
+	## so something is sold for its price instead (Items.sell_value; see
+	## melt_on_equip; last_melt says what). Returns the replaced item or null.
+	## Refused (null, nothing changes) for a borrowed hero.
 	var h := hero()
 	if not _borrowed.is_empty():
 		return null
@@ -1745,7 +1772,7 @@ func equip(it: Dictionary):
 	if old != null:
 		(h["satchel"] as Array).append(old)
 	if not victim.is_empty():
-		var v := Items.salvage_value(victim)
+		var v := Items.sell_value(victim)
 		_take_from_satchel(h, victim)
 		add_embers(v)
 		last_melt = {"for": str(it.get("uid", "")), "item": victim, "embers": v,

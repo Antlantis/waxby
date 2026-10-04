@@ -131,6 +131,7 @@ func _initialize() -> void:
 	_test_altar_rites()
 	_test_new_calling()
 	_test_satchel_full()
+	_test_sell_on_touch()
 	_test_salvage_weaker()
 	_test_equip_full()
 	_test_settings_cache()
@@ -1020,7 +1021,8 @@ func _test_items_misc() -> void:
 	var mods := Items.mods(Items.make("candle", "knight", 10, "common", rng))
 	_check(absf(float(mods["max_hp_pct"]) - 0.11) < 0.001 and absf(float(mods["light_pct"]) - 0.07) < 0.001, "a candle gives life and light (T2 ilvl 10: +11%, +7%)")
 	_check(Items.price(Items.make("coat", "knight", 5, "magic", rng)) == 70 and Items.price(Items.make("coat", "knight", 5, "rare", rng)) == 190, "Chandler prices: Blessed 30 + 8*ilvl, Rare 90 + 20*ilvl")
-	_check(Items.salvage_value(Items.make("coat", "knight", 10, "rare", rng)) == 30, "salvage: Rare 15 x (1 + ilvl/10)")
+	var r10 := Items.make("coat", "knight", 10, "rare", rng)
+	_check(Items.sell_value(r10) == 73 and Items.salvage_value(r10) == Items.sell_value(r10), "sell: a quarter of Waxley's price (290 / 4: %d)" % Items.sell_value(r10))
 	var p0 := Items.power(Items.make("coat", "knight", 5, "common", rng))
 	var p1 := Items.power(Items.make("coat", "knight", 25, "common", rng))
 	_check(p1 > p0 and Items.power(leg) > Items.power(Items.make("weapon", "knight", 8, "common", rng)), "Power grows with ilvl and with a legend")
@@ -1852,7 +1854,7 @@ func _test_rekindle() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 5150
 	_set_depth(26, 25)
-	game.set_setting("auto_salvage", false)
+	game.set_setting("auto_sell", false)
 	var old := Items.make("candle", "knight", 14, "legendary", rng, "marrow_lantern")
 	game.hero()["satchel"].append(old)
 	_check(not game.rekindle_open() and game.rekindle_verdict(old) == "locked" and not game.rekindle(old), "before World 5: locked")
@@ -1878,7 +1880,7 @@ func _test_rekindle() -> void:
 	var rows: Array = game.rekindle_list()
 	_check(rows.size() == 2 and rows[0]["worn"] == true, "rekindle_list: worn first, then the satchel's")
 	game.LEVELS = kept_levels
-	game.set_setting("auto_salvage", true)
+	game.set_setting("auto_sell", true)
 
 
 func _test_gifts_and_cards() -> void:
@@ -2182,15 +2184,17 @@ func _descent_rate(area: int, depth: int, hero_level: int, fx: Dictionary) -> fl
 
 func _test_loot_build1() -> void:
 	## Build 1's loot slice: Dusk kills roll no Commons and half as often, so a
-	## kill gives a Legendary as often as before and the Blessed / Rare mix
-	## stays as it was (nothing up-tiered); the Chandler's shelf holds one
+	## kill gave a Legendary as often as before and the Blessed / Rare mix
+	## stays as it was (nothing up-tiered; with the Trophies a story level's
+	## kills drop nothing, DIFF.dusk.drop 0, but a "kill" drop there still
+	## rolls this row); the Chandler's shelf holds one
 	## relic of each rarity; what's paid there is counted for the playlog
 	## (Game.embers_spent, never saved); the playlog's legendaries_worn.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1001
-	var drop := float(Combat.diff("dusk")["drop"])
-	_check(drop == 0.5 and float(Combat.diff("nightfall")["drop"]) == 1.2 and float(Combat.diff("witching")["drop"]) == 1.4,
-			"Dusk kills drop half as often (0.5); Nightfall and Witching as before")
+	_check(float(Combat.diff("dusk")["drop"]) == 0.0 and float(Combat.diff("nightfall")["drop"]) == 1.2 and float(Combat.diff("witching")["drop"]) == 1.4,
+			"Dusk's story kills drop no item (0: the Trophies); Nightfall and Witching as before")
+	var drop := 0.5   # (Build 1's rate, which its row was cut for)
 	var v2 := {1: {"common": 60.0, "magic": 32.0, "rare": 7.5, "legendary": 0.5}, 13: {"common": 55.0, "magic": 34.0, "rare": 10.0, "legendary": 1.0},
 			23: {"common": 50.0, "magic": 35.0, "rare": 13.5, "legendary": 1.5}}
 	for a in v2:
@@ -2203,7 +2207,7 @@ func _test_loot_build1() -> void:
 			old_tot += float(old[r])
 		var leg_now := drop * float(now["legendary"]) / tot
 		var leg_old := float(old["legendary"]) / old_tot
-		_check(absf(leg_now - leg_old) < 1e-6, "area %d: a Dusk kill drops a Legendary as often as before (%.4f vs %.4f)" % [a, leg_now, leg_old])
+		_check(absf(leg_now - leg_old) < 1e-6, "area %d: Build 1's Dusk kill (x0.5) dropped a Legendary as often as v2's (%.4f vs %.4f)" % [a, leg_now, leg_old])
 		var mix_now := float(now["rare"]) / (float(now["magic"]) + float(now["rare"]))
 		var mix_old := float(old["rare"]) / (float(old["magic"]) + float(old["rare"]))
 		_check(absf(mix_now - mix_old) < 0.01, "area %d: the Blessed / Rare mix is v2's (%.3f Rare vs %.3f): nothing up-tiered" % [a, mix_now, mix_old])
@@ -2489,10 +2493,10 @@ func _rich_state() -> void:
 	game.grant_relic("bellows")
 	game.add_embers(321)
 	game.equip(Items.make("weapon", "knight", 9, "legendary", rng, "dawnsliver"))
-	game.set_setting("auto_salvage", false)
+	game.set_setting("auto_sell", false)
 	game.add_item(Items.make("candle", "knight", 8, "rare", rng))
 	game.add_item(Items.make("coat", "knight", 12, "magic", rng))
-	game.set_setting("auto_salvage", true)
+	game.set_setting("auto_sell", true)
 	game.record_result({"level": "1-1", "cleared": true, "embers": 40, "sigils": [true, false, true], "time": 71.23456789, "relics": [], "dread": true})
 	game.wares()
 	game.mark_seen("intro")
@@ -2797,10 +2801,10 @@ func _test_game_api_v3() -> void:
 	# Legendaries, depth.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 8
-	game.set_setting("auto_salvage", false)
+	game.set_setting("auto_sell", false)
 	game.add_item(Items.make("coat", "knight", 5, "legendary", rng, "ossuary_coat"))
 	game.equip(Items.make("boots", "knight", 5, "legendary", rng, "thornsole"))
-	game.set_setting("auto_salvage", true)
+	game.set_setting("auto_sell", true)
 	_check(game.legends_found().has("ossuary_coat") and game.legends_found().has("thornsole"), "picking up or wearing a Legendary notes it")
 	game.note_area(9)
 	game.note_area(4)
@@ -3100,8 +3104,9 @@ func _test_salvage_weaker() -> void:
 
 
 func _test_satchel_full() -> void:
-	## Spec 4.4: with the satchel full, anything weaker than what's worn melts
-	## into embers; anything else stays on the ground ("full").
+	## Spec 4.4: with the satchel full, anything weaker than what's worn is
+	## sold for its price (Items.sell_value); anything else stays on the
+	## ground ("full").
 	_fresh()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 42
@@ -3117,22 +3122,95 @@ func _test_satchel_full() -> void:
 	for i in game.SATCHEL_MAX:
 		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
 	var e0: int = game.embers()
-	_check(game.add_item(weak) == "salvaged" and game.embers() == e0 + Items.salvage_value(weak), "full: a weaker Blessed coat melts into embers (+%d)" % Items.salvage_value(weak))
+	_check(game.add_item(weak) == "sold" and game.embers() == e0 + Items.sell_value(weak), "full: a weaker Blessed coat is sold (+%d)" % Items.sell_value(weak))
+	_check(not game.keep_sold(weak) and game.embers() == e0 + Items.sell_value(weak), "full: nowhere to keep it")
 	var strong := Items.make("weapon", "knight", 20, "rare", rng)
-	_check(game.add_item(strong) == "full" and game.embers() == e0 + Items.salvage_value(weak), "full: a better Rare stays on the ground")
+	_check(game.add_item(strong) == "full" and game.embers() == e0 + Items.sell_value(weak), "full: a better Rare stays on the ground")
 	var leg := Items.make("coat", "knight", 1, "legendary", rng, "ossuary_coat")
 	leg["implicit"]["v"] = 0.0
 	leg["affixes"] = []
-	_check(float(Hero.compare(h, "coat", leg)["life"]) < 0.0 and game.add_item(leg) == "full", "full: a Legendary is never melted, even a weaker one")
+	_check(float(Hero.compare(h, "coat", leg)["life"]) < 0.0 and game.add_item(leg) == "full", "full: a Legendary is never sold, even a weaker one")
 	h["equip"]["candle"] = null
 	_check(game.add_item(Items.make("candle", "knight", 1, "magic", rng)) == "full", "full: an item for an empty slot stays on the ground")
 	_check((h["satchel"] as Array).size() == game.SATCHEL_MAX, "and the satchel never goes past %d" % game.SATCHEL_MAX)
-	game.set_setting("auto_salvage", false)
+	game.set_setting("auto_sell", false)
 	var plain: Dictionary = worn.duplicate(true)
 	plain["uid"] = "plain-coat"
 	plain["implicit"]["v"] = 1.0
-	_check(game.add_item(plain) == "salvaged", "full: a weaker Common melts even with auto-salvage off")
-	game.set_setting("auto_salvage", true)
+	_check(game.add_item(plain) == "sold", "full: a weaker Common is sold even with Sell weaker finds off")
+	game.set_setting("auto_sell", true)
+
+
+func _test_sell_on_touch() -> void:
+	## "Sell weaker finds" (auto_sell, on by default): a find (add_item(it,
+	## true), world.gd _take_item) that adds nothing (no Legendary, both chips
+	## at or below zero against what's worn in its slot) or is a Common sells
+	## at once for its price, a quarter of Waxley's; keep_sold puts it in the
+	## satchel after all and takes the embers back. Anything better, a
+	## sidegrade, a Legendary or a piece for an empty slot goes to the
+	## satchel; so does everything with the setting off, and whatever isn't a
+	## find (a mode's reward: add_item(it)).
+	_fresh()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var h: Dictionary = game.hero()
+	_check(bool(game.setting("auto_sell")) and not (game.SETTINGS_DEFAULT as Dictionary).has("auto_salvage"), "Sell weaker finds is on by default (auto_salvage is gone)")
+	var worn: Dictionary = h["equip"]["coat"]
+	var weak: Dictionary = worn.duplicate(true)
+	weak["uid"] = "weak-coat"
+	weak["rarity"] = "rare"
+	weak["implicit"]["v"] = 0.0
+	weak["affixes"] = []
+	var chips := Hero.compare(h, "coat", weak)
+	_check(float(chips["dmg"]) <= 0.0 and float(chips["life"]) <= 0.0 and game.weaker_find(weak), "(a Rare coat with nothing on it is no better than the worn one)")
+	_check(Items.sell_value(weak) == roundi(float(Items.price(weak)) / 4.0) and Items.sell_value(weak) > 0, "its price: a quarter of Waxley's (%d of %d)" % [Items.sell_value(weak), Items.price(weak)])
+	var e0: int = game.embers()
+	_check(game.add_item(weak, true) == "sold" and game.embers() == e0 + Items.sell_value(weak) and not _in(h["satchel"], weak),
+			"found: sold on touch (+%d), not in the satchel" % Items.sell_value(weak))
+	_check(game.keep_sold(weak) and game.embers() == e0 and _in(h["satchel"], weak), "kept: into the satchel, the embers taken back")
+	_check(not game.keep_sold(weak) and game.embers() == e0, "kept once only")
+	h["satchel"] = []
+	_check(game.add_item(weak.duplicate(true)) == "satchel", "not a find (a reward): the satchel")
+	h["satchel"] = []
+	# A Common sells as a find whatever its chips (the old auto-salvage).
+	var com := Items.make("boots", "knight", 1, "common", rng)
+	h["equip"]["boots"] = Items.make("boots", "knight", 1, "common", rng)
+	_check(game.add_item(com, true) == "sold", "a Common find sells")
+	# What doesn't sell.
+	var leg := Items.make("coat", "knight", 1, "legendary", rng, "ossuary_coat")
+	leg["implicit"]["v"] = 0.0
+	leg["affixes"] = []
+	_check(float(Hero.compare(h, "coat", leg)["life"]) <= 0.0 and game.add_item(leg, true) == "satchel", "a Legendary, even a weaker one: the satchel")
+	var side: Dictionary = worn.duplicate(true)
+	side["uid"] = "side-coat"
+	side["rarity"] = "rare"
+	side["implicit"]["v"] = 0.0
+	side["affixes"] = [{"id": "keen", "t": 1, "v": 8.0}]
+	var sc := Hero.compare(h, "coat", side)
+	_check(float(sc["dmg"]) > 0.0 and float(sc["life"]) < 0.0 and game.add_item(side, true) == "satchel", "a sidegrade (DMG up, LIFE down): the satchel")
+	h["equip"]["charm"] = null
+	_check(game.add_item(Items.make("charm", "knight", 1, "magic", rng), true) == "satchel", "a piece for an empty slot: the satchel")
+	game.set_setting("auto_sell", false)
+	var weak2: Dictionary = weak.duplicate(true)
+	weak2["uid"] = "weak-coat-2"
+	_check(game.add_item(weak2, true) == "satchel" and _in(h["satchel"], weak2), "the setting off: a weaker find goes to the satchel")
+	game.set_setting("auto_sell", true)
+	# The satchel full: sold whatever the setting, and nowhere to keep it.
+	h["satchel"] = []
+	for i in game.SATCHEL_MAX:
+		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
+	var weak3: Dictionary = weak.duplicate(true)
+	weak3["uid"] = "weak-coat-3"
+	var e1: int = game.embers()
+	_check(game.add_item(weak3, true) == "sold" and not game.keep_sold(weak3) and game.embers() == e1 + Items.sell_value(weak3), "the satchel full: sold, and no keeping it")
+	h["satchel"] = []
+
+
+func _in(list: Array, it: Dictionary) -> bool:
+	for o in list:
+		if o is Dictionary and str(o.get("uid", "")) == str(it.get("uid", "-")):
+			return true
+	return false
 
 
 func _test_equip_full() -> void:

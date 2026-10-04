@@ -324,6 +324,7 @@ class Bot:
 func _test_play_all() -> void:
 	var totals := {}
 	var natural_drops := 0
+	var plain_drops := 0
 	for cls in CALLINGS:
 		game.reset()
 		totals[cls] = {"dealt": 0.0, "presses": 0, "spent": 0, "xp": 0, "embers": 0, "drops": 0, "taken": 0, "levels": 0}
@@ -336,6 +337,7 @@ func _test_play_all() -> void:
 			for k in ["dealt", "presses", "spent", "xp", "embers", "drops", "taken", "levels"]:
 				totals[cls][k] += r[k]
 			natural_drops += int(r["natural"])
+			plain_drops += int(r["plain"])
 			print("  %s%-7s %s: dealt %5.0f, specials %d/%d spent, xp %4d, embers %2d, items %d/%d taken, +%d lv, x %4.0f, snuffs %d%s" % [
 					"v3 " if V3_LEVELS.has(id) else "", cls, id, r["dealt"], r["spent"], r["presses"], r["xp"], r["embers"], r["taken"], r["drops"], r["levels"],
 					r["far"], r["snuffs"], ("  boss -%.0f" % r["boss"]) if r.has("boss") else ""])
@@ -354,7 +356,10 @@ func _test_play_all() -> void:
 		_check(tt["xp"] > 0, "the %s earns XP (%d)" % [name, tt["xp"]])
 		_check(tt["embers"] > 0, "the %s picks up embers (%d)" % [name, tt["embers"]])
 		_check(tt["levels"] >= 1, "the %s levels up somewhere (%d)" % [name, tt["levels"]])
-	_check(natural_drops > 0, "monsters drop items on their own (%d)" % natural_drops)
+	# Dusk's story kills drop no item of their own (world.trophies()): what
+	# drops on the way is a Trophy, Rare or better (a Dread's, a room's); a
+	# mode's kills still drop (test_modes' mode_dusk).
+	_check(plain_drops == 0, "Dusk's story kills drop no items: every natural drop is a Trophy (%d natural, %d not Rare or better)" % [natural_drops, plain_drops])
 
 
 func _play(cls: String, id: String) -> Dictionary:
@@ -368,7 +373,7 @@ func _play(cls: String, id: String) -> Dictionary:
 	bot.ranged = cls in RANGED
 	bot.rng.seed = hash(cls + id)
 	var hp_seen := {}
-	var r := {"dealt": 0.0, "presses": 0, "spent": 0, "drops": 0, "taken": 0, "natural": 0, "far": 0.0}
+	var r := {"dealt": 0.0, "presses": 0, "spent": 0, "drops": 0, "taken": 0, "natural": 0, "plain": 0, "forced": "", "far": 0.0}
 	var uids := {}
 	var watch: Array = []            # Special presses being watched: {res, min, left}
 	var was_down := false
@@ -391,6 +396,7 @@ func _play(cls: String, id: String) -> Dictionary:
 			forced = true
 			w.drop_item(pl.position + Vector2(0, -30.0), "kill")
 			w.pickups[w.pickups.size() - 1]["vel"] = Vector2.ZERO
+			r["forced"] = str(w.pickups[w.pickups.size() - 1]["item"].get("uid", ""))
 			bot.wait = 60
 			if OS.get_environment("WAXBY_DEBUG") != "":
 				print("    forced drop at %s (tick %d)" % [pl.position, i])
@@ -473,7 +479,7 @@ func _floor_ahead(w: Node2D, feet: Vector2, from: int, to: int, dir := 1) -> Vec
 
 func _observe(w: Node2D, hp_seen: Dictionary, r: Dictionary, uids: Dictionary) -> void:
 	## Damage dealt (life lost by every monster, a boss reset aside) and
-	## item pickups seen.
+	## item pickups seen ("plain": one not forced, under Rare).
 	for e in w.enemies:
 		var k: int = e.get_instance_id()
 		var hp: float = e.hp
@@ -486,6 +492,8 @@ func _observe(w: Node2D, hp_seen: Dictionary, r: Dictionary, uids: Dictionary) -
 			if not uids.has(u):
 				uids[u] = true
 				r["drops"] += 1
+				if u != str(r.get("forced", "")) and not (str(p["rarity"]) in ["rare", "legendary"]):
+					r["plain"] += 1
 
 
 func _fight(w: Node2D, cls: String, bot: Bot, hp_seen: Dictionary, r: Dictionary, uids: Dictionary) -> float:
@@ -589,7 +597,7 @@ func _test_full_satchel() -> void:
 	## Satchel full, auto-equip off: a better item stays on the ground with
 	## its beam and a "Satchel full" card, asks again only after he steps
 	## off and back, and a tap on the card wears it and lifts it off the
-	## ground. A Rare no better than what's worn melts into embers.
+	## ground. A Rare no better than what's worn is sold for its embers.
 	game.reset()
 	game.new_hero("knight")
 	game.set_setting("auto_equip", false)
@@ -648,12 +656,12 @@ func _test_full_satchel() -> void:
 	for i in 60:
 		_step(w, {})
 	_check(q["taken"], "a weaker Rare with no room is taken...")
-	_check(game.embers() == purse + Items.salvage_value(weak), "...and salvaged for its embers (%d)" % (game.embers() - purse))
+	_check(game.embers() == purse + Items.sell_value(weak), "...and sold for its embers (%d)" % (game.embers() - purse))
 	var said := false
 	for m in hud._msgs + [hud._msg]:
-		if str(m.get("key", "")) == "salv:" + str(weak["uid"]):
+		if str(m.get("key", "")) == "sold:" + str(weak["uid"]):
 			said = true
-	_check(said, "and the HUD says it was salvaged")
+	_check(said, "and the HUD says it was sold")
 	w.queue_free()
 	await process_frame
 	game.set_setting("auto_equip", true)
