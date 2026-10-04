@@ -37,6 +37,11 @@ extends SceneTree
 ## numbers (a float's 1.3 s). With the bot: every sigil 1 needs its
 ## dawnglass, every sigil 3 its floats; 6-1's spur is the crown's alone;
 ## 6-2's secret room has a way out. 6-4's approach route reaches its door.
+## Build 2's re-cut as the spec drew it (_test_recut): 6-1's shore ramp
+## (three altars, a lesson card and no rule), 6-2's valley (the Drowned
+## Dark, every drop onto a lit landing, Old Lullaby and The Sexton), 6-3's
+## strip (Hunted, the nave's ambush, Old Mournful and Sir Pale, and no
+## Hushling on a chase).
 ##
 ## The chases (6-3): every recorded route of 6-3 (one per difficulty) is
 ## replayed with the tide on and never touched; its run, turned into the
@@ -153,6 +158,7 @@ func _initialize() -> void:
 			continue
 		var lv: RefCounted = LevelData.load_file(path)
 		_test_layout(lv)
+		_test_recut(lv)
 		if lv.boss == "":
 			regular.append(lv)
 	if regular.size() == 3:
@@ -1079,6 +1085,57 @@ func _test_layout(lv: RefCounted) -> void:
 			if e["kind"] == "grasp" and (e["cell"] as Vector2i).x < first_g.x:
 				first_g = e["cell"]
 		_check(first_g.x < 9999 and _threat_free(lv, first_g.x, 8), "6-2: the first grasp is taught alone")
+
+
+func _test_recut(lv: RefCounted) -> void:
+	## Build 2's re-cut (the spec's personalities and shapes, held where a
+	## rule doesn't already): 6-1 teaches on the shore ramp with three altars
+	## (Hollin's "Altars are few down there" made true) and a lesson card, no
+	## rule, its drops landing in view; 6-2 is the Drowned Dark in the valley,
+	## every drop onto a lit landing, Old Lullaby (a Hushling) and The Sexton
+	## (a Stillmaw) its named Anointed; 6-3 is Hunted, a strip still, its nave
+	## LOCKED (an ambush of a Rattlehound, a Frostbuckle and Old Mournful, a
+	## Hollow Helm), Sir Pale (a Paneguard) on the shallows, and the tide the
+	## only hunter on its chases (no Hushling inside a chase range).
+	var id: String = lv.id
+	var kinds := {}
+	for e in lv.entities:
+		kinds[e["cell"]] = str(e["kind"])
+	var named := {}
+	for a in Rules.anoint_of(lv):
+		named[str(a["name"])] = str(kinds.get(a["cell"], ""))
+	var Twists = load("res://scripts/twists.gd")
+	var EK = load("res://scripts/enemy_kinds.gd")
+	match id:
+		"6-1":
+			_check(lv.count("altar") == 3 and lv.height == 24, "6-1: the shore ramp, 24 rows, three altars (%d rows, %d)" % [lv.height, lv.count("altar")])
+			_check(Twists.id_in(lv) == "" and Twists.lesson_in(lv).size() == 2 and str(lv.headers.get("max_drop", "")) == "4",
+					"6-1: a lesson card and no rule; its drops 4 rows at most (%s)" % [Twists.lesson_in(lv)])
+		"6-2":
+			_check(lv.height == 24 and Twists.id_in(lv) == "dark" and str(lv.headers.get("lit_drops", "")) == "3",
+					"6-2: the valley, 24 rows, the Drowned Dark, every drop onto a lit landing")
+			_check(named == {"Old Lullaby": "hushling", "The Sexton": "stillmaw"}, "6-2: Old Lullaby and The Sexton, Anointed (%s)" % [named])
+		"6-3":
+			_check(lv.height == LevelData.STRIP_ROWS and Twists.id_in(lv) == "packs", "6-3: a strip, Hunted (the packs twist)")
+			_check(named == {"Old Mournful": "hollow_helm", "Sir Pale": "paneguard"}, "6-3: Old Mournful and Sir Pale, Anointed (%s)" % [named])
+			var Sealed = load("res://scripts/features/sealed.gd")
+			var rooms: Array = Sealed.parse(str(lv.headers.get("room", "")))
+			var cast := []
+			if rooms.size() == 1:
+				for e in lv.entities:
+					var c: Vector2i = e["cell"]
+					if c.x > int(rooms[0]["x0"]) and c.x < int(rooms[0]["x1"]) and EK.known(str(e["kind"])):
+						cast.append(str(e["kind"]))
+			cast.sort()
+			_check(rooms.size() == 1 and str(rooms[0]["kind"]) == "ambush" and cast == ["frostbuckle", "hollow_helm", "rattlehound"],
+					"6-3: the drowned nave locks: one ambush of a Rattlehound, a Frostbuckle and a Hollow Helm (%s, %s)" % [rooms, cast])
+			var hunted := []
+			for r in lv.chase:
+				for e in lv.entities:
+					var c: Vector2i = e["cell"]
+					if str(e["kind"]) == "hushling" and c.x >= int(r["x0"]) and c.x <= int(r["x1"]):
+						hunted.append(c)
+			_check(hunted.is_empty(), "6-3: no Hushling on a chase (the tide is the only hunter there) %s" % [hunted])
 
 
 func _threat_free(lv: RefCounted, x: int, within: int) -> bool:
