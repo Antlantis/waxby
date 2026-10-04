@@ -131,7 +131,10 @@ func _initialize() -> void:
 	_test_altar_rites()
 	_test_new_calling()
 	_test_satchel_full()
-	_test_salvage_weaker()
+	_test_sell_weaker()
+	_test_sell_and_buy_back()
+	_test_fresh_stock()
+	_test_shop_badge()
 	_test_equip_full()
 	_test_settings_cache()
 	_test_chandler_logic()
@@ -1020,7 +1023,15 @@ func _test_items_misc() -> void:
 	var mods := Items.mods(Items.make("candle", "knight", 10, "common", rng))
 	_check(absf(float(mods["max_hp_pct"]) - 0.11) < 0.001 and absf(float(mods["light_pct"]) - 0.07) < 0.001, "a candle gives life and light (T2 ilvl 10: +11%, +7%)")
 	_check(Items.price(Items.make("coat", "knight", 5, "magic", rng)) == 70 and Items.price(Items.make("coat", "knight", 5, "rare", rng)) == 190, "Chandler prices: Blessed 30 + 8*ilvl, Rare 90 + 20*ilvl")
-	_check(Items.salvage_value(Items.make("coat", "knight", 10, "rare", rng)) == 30, "salvage: Rare 15 x (1 + ilvl/10)")
+	var sold_rare := Items.make("coat", "knight", 10, "rare", rng)
+	_check(Items.sell_value(sold_rare) == roundi((90.0 + 20.0 * 10.0) / 4.0) and Items.sell_value(sold_rare) == 73 and Items.salvage_value(sold_rare) == 73,
+			"Waxley buys at a quarter of his price: a Rare at ilvl 10 (290) sells for 73, and a melt pays the same")
+	for rr in [["magic", 20, 48], ["rare", 20, 123], ["legendary", 20, 275]]:
+		var lg: String = Items.pick_legend("candle", "knight", rng) if rr[0] == "legendary" else ""
+		var sit := Items.make("candle", "knight", int(rr[1]), str(rr[0]), rng, lg)
+		_check(Items.sell_value(sit) == int(rr[2]) and Items.sell_value(sit) == roundi(float(Items.price(sit)) / 4.0),
+				"a %s at ilvl %d sells for %d (a quarter of %d)" % [rr[0], rr[1], Items.sell_value(sit), Items.price(sit)])
+	_check(Items.sell_value({}) == 0 and Items.sell_value(null) == 0, "nothing sells for nothing")
 	var p0 := Items.power(Items.make("coat", "knight", 5, "common", rng))
 	var p1 := Items.power(Items.make("coat", "knight", 25, "common", rng))
 	_check(p1 > p0 and Items.power(leg) > Items.power(Items.make("weapon", "knight", 8, "common", rng)), "Power grows with ilvl and with a legend")
@@ -1729,25 +1740,31 @@ func _test_chandler_depth() -> void:
 	_fresh()
 	var h := _set_depth(6, 5)
 	var v2 := JSON.stringify(_v2_stock(h))
-	_check(JSON.stringify(game.wares()) == v2 and game.ware_count() == 4, "below depth 13 the Chandler's stock is v2's, item for item")
+	_check(JSON.stringify(game.wares().slice(0, 4)) == v2 and game.ware_count() == 5,
+			"below depth 13 the Chandler's first four wares are v2's, item for item, and a second pick follows")
 	h = _set_depth(12, 12)
 	v2 = JSON.stringify(_v2_stock(h))
-	_check(JSON.stringify(game.wares()) == v2, "(at level 12 too)")
-	var cases := [[14, 13, ["magic", "magic", "rare", "rare", "magic"], 3], [19, 18, ["magic", "magic", "rare", "rare", "rare"], 3],
-			[20, 23, ["magic", "magic", "rare", "rare", "rare"], 4], [29, 28, ["magic", "rare", "rare", "rare", "rare", "rare"], 4],
+	_check(JSON.stringify(game.wares().slice(0, 4)) == v2, "(at level 12 too)")
+	var cases := [[14, 13, ["magic", "magic", "rare", "rare", "magic", "magic"], 3], [19, 18, ["magic", "magic", "rare", "rare", "rare", "rare"], 3],
+			[20, 23, ["magic", "magic", "rare", "rare", "rare", "rare"], 4], [29, 28, ["magic", "rare", "rare", "rare", "rare", "rare"], 4],
 			[35, 12, ["magic", "rare", "rare", "rare", "rare", "rare"], 4]]
 	for c in cases:
 		h = _set_depth(int(c[0]), int(c[1]))
 		var stock: Array = game.wares()
+		var n := stock.size()
 		var rar: Array = stock.map(func(it): return it["rarity"])
-		var slots: Array = stock.slice(0, stock.size() - 1).map(func(it): return it["slot"])
+		var slots: Array = stock.slice(0, n - game.WEAK_PICKS).map(func(it): return it["slot"])
 		var distinct := {}
 		for sl in slots:
 			distinct[sl] = true
 		var lvl_ok := stock.all(func(it): return int(it["ilvl"]) == int(c[0]))
-		_check(rar == c[2] and game.ware_count() == stock.size() and lvl_ok and distinct.size() == slots.size(),
+		_check(rar == c[2] and game.ware_count() == n and n == 6 and lvl_ok and distinct.size() == slots.size(),
 				"shop depth %d (L%d, deepest %d): %s, one slot each, at the hero's level" % [game.shop_depth(), c[0], c[1], rar])
-		_check(str(stock[stock.size() - 1]["slot"]) == game.weakest_slot(h), "the last is for the weakest slot (%s)" % stock[stock.size() - 1]["slot"])
+		var live: Array = Items.live_slots(game.shop_depth())
+		var first := str(stock[n - 2]["slot"])
+		_check(first == game.weakest_slot(h, live), "the fifth is for the weakest slot (%s)" % first)
+		_check(str(stock[n - 1]["slot"]) == game.weakest_slot(h, live.filter(func(s): return s != first)) and str(stock[n - 1]["slot"]) != first,
+				"the last for the next weakest (%s)" % stock[n - 1]["slot"])
 		_check(game.relic_offers().size() == int(c[3]), "the relic shelf: %d at depth %d" % [c[3], game.shop_depth()])
 	_check(game.shop_depth() == 34, "shop depth = max(deepest, level - 1)")
 	# Going deeper mid-bell (a new row): a new stock, never the old one again.
@@ -1755,18 +1772,18 @@ func _test_chandler_depth() -> void:
 	var before: Array = game.wares().map(func(it): return it["uid"])
 	h["deepest"] = 13
 	var after: Array = game.wares().map(func(it): return it["uid"])
-	_check(after.size() == 5 and not after.any(func(u): return before.has(u)), "reaching depth 13 mid-bell restocks five new wares (no ware twice)")
+	_check(after.size() == 6 and not after.any(func(u): return before.has(u)), "reaching depth 13 mid-bell restocks six new wares (no ware twice)")
 	h["deepest"] = 18
 	var deeper: Array = game.wares().map(func(it): return it["uid"])
-	_check(deeper.size() == 5 and not deeper.any(func(u): return after.has(u)) and game.wares()[4]["rarity"] == "rare",
-			"and depth 18 (the same count, the weakest slot's a Rare now) restocks too")
+	_check(deeper.size() == 6 and not deeper.any(func(u): return after.has(u)) and game.wares()[4]["rarity"] == "rare" and game.wares()[5]["rarity"] == "rare",
+			"and depth 18 (the same count, the picks Rares now) restocks too")
 	# A bought ware stays gone; the next bell restocks the new count.
 	h = _set_depth(20, 23)
 	game.add_embers(5000)
 	var w: String = game.buy_ware(0)
-	_check((w == "equipped" or w == "satchel") and game.wares()[0] == null and game.wares().size() == 5, "a sale at depth 23 leaves its place empty (%s)" % w)
+	_check((w == "equipped" or w == "satchel") and game.wares()[0] == null and game.wares().size() == 6, "a sale at depth 23 leaves its place empty (%s)" % w)
 	game.record_result({"level": "1-1", "cleared": true, "embers": 0, "sigils": [false, false, false], "time": 60.0, "relics": []})
-	_check(game.wares()[0] != null and game.wares().size() == 5, "and a bell restocks all five")
+	_check(game.wares()[0] != null and game.wares().size() == 6, "and a bell restocks all six")
 
 
 func _test_reserve() -> void:
@@ -2786,7 +2803,7 @@ func _test_game_api_v3() -> void:
 	game.set_suspend({"level": "1-2", "altar": 1})
 	_check(game.suspended()["level"] == "1-2", "set_suspend / suspended")
 	game.clear_suspend()
-	_check(game.suspended().is_empty() and game.ware_count() == 4 and game.reserve().is_empty() and not game.rekindle({}), "clear_suspend; four wares, no Reserve, no Rekindle yet")
+	_check(game.suspended().is_empty() and game.ware_count() == 5 and game.reserve().is_empty() and not game.rekindle({}), "clear_suspend; five wares, no Reserve, no Rekindle yet")
 	_check(game.modes() is Dictionary and game.has_cosmetic("flame:tallow") and not game.has_cosmetic("flame:marigold"), "modes(); the free cosmetics")
 	_check(game.grant_cosmetic("flame:marigold") and not game.grant_cosmetic("flame:marigold") and game.has_cosmetic("flame:marigold")
 			and (game.modes()["cosmetics"]["new"] as Array).has("flame:marigold"), "grant_cosmetic: true when new")
@@ -3064,11 +3081,11 @@ func _test_new_calling() -> void:
 
 # ---------------------------------------------------------------- the satchel
 
-func _test_salvage_weaker() -> void:
-	## Salvage weaker (the Sheet's Gear tab and the Chandler) melts what
-	## weaker_items() lists: no better than what's worn in its slot, never a
-	## Legendary (like a full satchel), never for an empty slot; and it pays
-	## exactly weaker_value().
+func _test_sell_weaker() -> void:
+	## Sell weaker (the Sheet's Gear tab) sells what weaker_items() lists: no
+	## better than what's worn in its slot, never a Legendary (like a full
+	## satchel), never for an empty slot; and it pays exactly weaker_value(),
+	## a quarter of Waxley's price for each.
 	_fresh()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 77
@@ -3088,15 +3105,168 @@ func _test_salvage_weaker() -> void:
 	_check(list.size() == 1 and str(list[0]["uid"]) == "weak-coat", "only the weaker Common counts (%d)" % list.size())
 	var e0: int = game.embers()
 	var want: int = game.weaker_value()
-	_check(want == Items.salvage_value(weak), "weaker_value is what it pays")
-	_check(game.salvage_weaker() == want and game.embers() == e0 + want, "salvage_weaker pays it")
+	_check(want == Items.sell_value(weak) and want == roundi(float(Items.price(weak)) / 4.0), "weaker_value is what it pays: a quarter of the price")
+	_check(game.sell_weaker() == want and game.embers() == e0 + want, "sell_weaker pays it")
 	var left: Array = (h["satchel"] as Array).map(func(x): return str(x["uid"]))
 	_check(left.size() == 3 and not left.has("weak-coat") and left.has(str(leg["uid"])), "the Legendary, the better coat and the charm stay")
-	_check(game.salvage_weaker() == 0 and (h["satchel"] as Array).size() == 3, "again: nothing more to melt")
+	_check(game.sell_weaker() == 0 and (h["satchel"] as Array).size() == 3, "again: nothing more to sell")
 	h["satchel"] = []
 	for i in game.SATCHEL_MAX:
 		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
 	_check(game.satchel_full(), "satchel_full at %d" % game.SATCHEL_MAX)
+
+
+func _test_sell_and_buy_back() -> void:
+	## Selling to Waxley (Game.sell_item, sell_marked) pays Items.sell_value
+	## for a satchel piece and nothing for anything else; a piece sold can be
+	## bought back for exactly what it fetched, once, while the shop
+	## remembers (forget_sold), by the calling that sold it, with room and
+	## the embers: no loop of sales and buy-backs makes or loses an ember.
+	## sell_look marks each piece as the Sell tab shows it.
+	_fresh()
+	game.add_xp(Progression.total_to(8))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 41
+	var h: Dictionary = game.hero()
+	game.forget_sold()
+	var worn: Dictionary = h["equip"]["coat"]
+	var weak: Dictionary = worn.duplicate(true)
+	weak["uid"] = "sell-weak"
+	for k in weak["implicit"]:
+		if k != "id":
+			weak["implicit"][k] = 0.0
+	weak["affixes"] = []
+	var trade: Dictionary = weak.duplicate(true)
+	trade["uid"] = "sell-trade"
+	trade["affixes"] = [{"id": "keen", "t": 3, "v": 25.0}]
+	var leg := Items.make("coat", "knight", 1, "legendary", rng, "ossuary_coat")
+	leg["implicit"]["v"] = 0.0
+	leg["affixes"] = []
+	var strong := Items.make("coat", "knight", 30, "rare", rng)
+	var charm := Items.make("charm", "knight", 1, "magic", rng)
+	h["satchel"] = [weak, trade, leg, strong, charm]
+	# The marks.
+	var lw: Dictionary = game.sell_look(weak)
+	var lt: Dictionary = game.sell_look(trade)
+	var ll: Dictionary = game.sell_look(leg)
+	var ls: Dictionary = game.sell_look(strong)
+	var lc: Dictionary = game.sell_look(charm)
+	_check(lw["mark"] == "worse" and bool(lw["marked"]) and int(lw["price"]) == Items.sell_value(weak), "a piece no better than worn: ▼, marked to sell, at its price")
+	var tsum := float(lt["chips"]["dmg"]) + float(lt["chips"]["life"])
+	_check(lt["mark"] == "trade" and bool(lt["marked"]) == (tsum <= 0.0), "a trade-off: ◆, marked only when DMG + LIFE come to nothing (%.0f)" % tsum)
+	_check(ll["mark"] == "legendary" and not bool(ll["marked"]), "a Legendary: ★, never marked by itself")
+	_check(ls["mark"] == "better" and not bool(ls["marked"]), "an upgrade: ▲, kept")
+	_check(lc["mark"] == "open" and not bool(lc["marked"]), "a piece for an empty slot: kept")
+	# One sale.
+	var e0: int = game.embers()
+	var v: int = game.sell_item(weak)
+	_check(v == Items.sell_value(weak) and game.embers() == e0 + v and not (h["satchel"] as Array).has(weak), "sell_item: it goes, for a quarter of its price (+%d)" % v)
+	_check(game.sell_item(weak) == 0 and game.embers() == e0 + v, "the same piece can't be sold twice")
+	_check(game.sell_item(worn) == 0 and h["equip"]["coat"] == worn, "worn gear isn't sold")
+	_check(game.sold_price(weak) == v and game.buy_back_verdict(weak) == "satchel", "it can be bought back, for what it fetched")
+	# Buy-back: exactly the price, once.
+	var e1: int = game.embers()
+	_check(game.buy_back(weak) == "satchel" and game.embers() == e1 - v and (h["satchel"] as Array).has(weak), "buy_back: back in the satchel for %d" % v)
+	_check(game.embers() == e0, "sold and bought back: not an ember made or lost")
+	_check(game.buy_back(weak) == "gone" and game.embers() == e0, "and only once")
+	_check(game.buy_back(strong) == "gone", "a piece never sold can't be bought back")
+	# Round and round: still nothing gained.
+	for i in 5:
+		game.sell_item(weak)
+		game.buy_back(weak)
+	_check(game.embers() == e0 and (h["satchel"] as Array).has(weak), "five sales and buy-backs later the purse is the same (%d)" % game.embers())
+	# Several at once.
+	var marked := [weak, trade, charm]
+	var want := 0
+	for it in marked:
+		want += Items.sell_value(it)
+	var e2: int = game.embers()
+	_check(game.sell_marked(marked + [worn, {}]) == want and game.embers() == e2 + want, "sell_marked sells what's in the satchel, all at once (+%d), nothing else" % want)
+	_check((h["satchel"] as Array).size() == 2, "two left (%d)" % (h["satchel"] as Array).size())
+	# Why not: the embers, the room, another calling, a shop that forgot.
+	game.data["embers"] = 0
+	_check(game.buy_back_verdict(trade) == "poor" and game.buy_back(trade) == "poor" and not (h["satchel"] as Array).has(trade), "not without the embers")
+	game.data["embers"] = 5000
+	while (h["satchel"] as Array).size() < game.SATCHEL_MAX:
+		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
+	_check(game.buy_back(trade) == "full" and game.embers() == 5000, "not into a full satchel")
+	h["satchel"].pop_back()
+	_check(game.buy_back(trade) == "satchel" and game.embers() == 5000 - Items.sell_value(trade), "with room again, it comes back")
+	game.new_hero("witch")
+	_check(game.buy_back(charm) == "gone", "another calling can't buy back the knight's sale")
+	game.set_hero("knight")
+	game.forget_sold()
+	_check(game.buy_back(charm) == "gone" and game.sold_price(charm) == 0, "once the shop forgets, what was sold stays sold")
+	game.borrow_hero(game.hero().duplicate(true))
+	_check(game.sell_item(game.hero()["satchel"][0]) == 0, "a borrowed hero sells nothing")
+	game.return_hero()
+
+
+func _test_fresh_stock() -> void:
+	## Fresh stock (Game.buy_fresh): new wares at once for half a Rare's price
+	## at the hero's level, doubling with each one until the next bell; the
+	## Reserve stays as it is.
+	_fresh()
+	var h := _set_depth(24, 23)
+	var lvl := int(h["level"])
+	var half := roundi((90.0 + 20.0 * lvl) * 0.5)
+	_check(game.fresh_uses() == 0 and game.fresh_price() == half, "half a Rare's price at L%d: %d" % [lvl, game.fresh_price()])
+	game.data["embers"] = half - 1
+	_check(game.fresh_verdict() == "poor" and game.buy_fresh() == "poor" and game.embers() == half - 1, "not without the embers")
+	game.data["embers"] = 100000
+	var before: Array = game.wares().map(func(it): return it["uid"])
+	var res_uid := str(game.reserve()["item"]["uid"])
+	_check(game.buy_fresh() == "fresh" and game.embers() == 100000 - half, "the first costs %d" % half)
+	var after: Array = game.wares().map(func(it): return it["uid"] if it != null else "")
+	_check(after.size() == game.ware_count() and not after.any(func(u): return before.has(u) or u == ""), "a whole new stock, no ware twice")
+	_check(str(game.reserve()["item"]["uid"]) == res_uid, "the Reserve stays as it was")
+	_check(game.fresh_uses() == 1 and game.fresh_price() == half * 2, "the next costs twice as much (%d)" % game.fresh_price())
+	game.buy_ware(0)
+	var e1: int = game.embers()
+	_check(game.buy_fresh() == "fresh" and game.embers() == e1 - half * 2 and game.wares()[0] != null, "a bought one comes back with it")
+	_check(game.fresh_price() == half * 4, "then four times (%d)" % game.fresh_price())
+	var third: Array = game.wares().map(func(it): return it["uid"])
+	_check(not third.any(func(u): return after.has(u)), "each one new")
+	var kept: Array = game.wares().map(func(it): return it["uid"])
+	game.save()
+	game.load_save()
+	_check(game.wares().map(func(it): return it["uid"]) == kept and game.fresh_price() == half * 4, "a Fresh stock and its price keep through a save")
+	game.record_result({"level": "1-1", "cleared": true, "embers": 0, "sigils": [false, false, false], "time": 60.0, "relics": []})
+	_check(game.fresh_uses() == 0 and game.fresh_price() == half, "a bell rung: back to %d" % half)
+	var bell: Array = game.wares().map(func(it): return it["uid"])
+	_check(not bell.any(func(u): return kept.has(u)), "and the bell restocks as ever")
+	game.borrow_hero(game.hero().duplicate(true))
+	_check(game.fresh_verdict() == "nohero" and game.buy_fresh() == "nohero", "a borrowed hero can't")
+	game.return_hero()
+
+
+func _test_shop_badge() -> void:
+	## The Shop button's mark (Game.shop_badge): a full satchel first ("16/16"),
+	## else an upgrade he can afford, else a Reserve not yet shown, else none.
+	_fresh()
+	var h := _set_depth(24, 23)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	game.data["embers"] = 0
+	var before := JSON.stringify(game.data)
+	_check(str(game.shop_badge().get("kind", "")) == "new", "a fresh Reserve, nothing affordable: the gold dot (%s)" % game.shop_badge())
+	_check(JSON.stringify(game.data) == before, "the mark only looks: no stock made, nothing to save")
+	game.wares()
+	game.reserve()   # (the shop opens: both made)
+	_check(str(game.shop_badge().get("kind", "")) == "new", "made, not yet shown: still the dot")
+	game.reserve_seen()
+	_check(game.shop_badge().is_empty(), "shown: no mark (%s)" % game.shop_badge())
+	h["equip"]["boots"] = null
+	h["wares"][0] = Items.make("boots", "knight", 24, "magic", rng)
+	game.data["embers"] = Items.price(h["wares"][0]) - 1
+	_check(game.shop_badge().is_empty(), "an upgrade he can't afford: no mark")
+	game.data["embers"] = Items.price(h["wares"][0])
+	_check(str(game.shop_badge().get("kind", "")) == "up", "one he can afford: the green arrow")
+	while (h["satchel"] as Array).size() < game.SATCHEL_MAX:
+		h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
+	_check(game.shop_badge() == {"kind": "full", "text": "16/16"}, "the satchel full comes first: \"16/16\" (%s)" % game.shop_badge())
+	h["satchel"].append(Items.make("candle", "knight", 1, "magic", rng))
+	_check(str(game.shop_badge().get("text", "")) == "17/16", "over-full says so")
 
 
 func _test_satchel_full() -> void:
@@ -3231,7 +3401,7 @@ func _test_chandler_logic() -> void:
 	_fresh()
 	game.add_xp(Progression.total_to(6))
 	var stock: Array = game.wares()
-	_check(stock.size() == 4, "Waxley stocks 4 wares")
+	_check(stock.size() == 5, "Waxley stocks 5 wares")
 	var rar := []
 	var ok := true
 	for it in stock:
@@ -3239,9 +3409,12 @@ func _test_chandler_logic() -> void:
 		ok = ok and int(it["ilvl"]) == 6 and Items.LIVE_SLOTS.has(it["slot"])
 		if it["slot"] == "weapon":
 			ok = ok and it["cls"] == "knight"
-	_check(rar == ["magic", "magic", "rare", "magic"], "2 Blessed, a Rare and one more Blessed (%s)" % [rar])
+	_check(rar == ["magic", "magic", "rare", "magic", "magic"], "2 Blessed, a Rare and two more Blessed (%s)" % [rar])
 	_check(ok, "all at the hero's level, live slots, knight weapons")
 	_check(stock[3]["slot"] == game.weakest_slot(), "the fourth is for the weakest slot (%s)" % stock[3]["slot"])
+	var rest: Array = Items.live_slots(game.shop_depth()).filter(func(s): return s != stock[3]["slot"])
+	_check(stock[4]["slot"] == game.weakest_slot(game.hero(), rest) and stock[4]["slot"] != stock[3]["slot"],
+			"the fifth is for the next weakest (%s)" % stock[4]["slot"])
 	_check(stock[0]["slot"] != stock[1]["slot"] and stock[1]["slot"] != stock[2]["slot"] and stock[0]["slot"] != stock[2]["slot"], "the first three are three different slots")
 	_check(game.ware_price(stock[0]) == 30 + 8 * 6 and game.ware_price(stock[2]) == 90 + 20 * 6, "priced 30 + 8*ilvl and 90 + 20*ilvl")
 	var uids: Array = stock.map(func(it): return it["uid"])
@@ -3327,7 +3500,7 @@ func _test_chandler_screen() -> void:
 		if promax:
 			scr.set("safe_override", Rect2(55, 10, vs.x - 110, vs.y - 28))
 			safe = scr.call("_safe")
-		for tab in ["relics", "wares", "unmake"]:
+		for tab in ["relics", "buy", "sell"]:
 			scr.call("show_tab", tab)
 			await process_frame
 			var shown := _buttons(scr).filter(func(b): return b.visible)
@@ -3336,15 +3509,17 @@ func _test_chandler_screen() -> void:
 				var r := Rect2(b.global_position, b.size)
 				inside = inside and safe.grow(1.0).encloses(r) and r.size.y >= 44.0 and r.size.x >= 44.0
 			_check(inside, "the %s tab lays out inside the %s safe area" % [tab, "Pro Max" if promax else "screen's"])
-		scr.call("show_tab", "wares")
+		scr.call("show_tab", "buy")
 		await process_frame
 		var cards: Array = scr.call("_cards")
 		var apart := true
-		for i in cards.size() - 1:
-			apart = apart and cards[i].end.x < cards[i + 1].position.x
-		_check(apart and safe.grow(1.0).encloses(cards[0]) and safe.grow(1.0).encloses(cards[cards.size() - 1]), "the cards sit side by side inside it")
+		for i in cards.size():
+			apart = apart and safe.grow(1.0).encloses(cards[i])
+			for j in range(i + 1, cards.size()):
+				apart = apart and not (cards[i] as Rect2).intersects(cards[j])
+		_check(apart and cards.size() == game.ware_count(), "the cards sit apart inside it (%d)" % cards.size())
 	# Buy a ware through its button.
-	scr.call("show_tab", "wares")
+	scr.call("show_tab", "buy")
 	await process_frame
 	var e0: int = game.embers()
 	var price: int = game.ware_price(game.wares()[0])
@@ -3378,7 +3553,7 @@ func _test_chandler_screen() -> void:
 	var rb: Button = scr.get("_buy_btns")[0]
 	rb.pressed.emit()
 	_check(not game.has_relic(offer) and int(scr.get("_sale")) == 0, "a relic asks first too")
-	scr.call("show_tab", "wares")
+	scr.call("show_tab", "buy")
 	_check(int(scr.get("_sale")) == -1, "changing tab clears the question")
 	scr.call("show_tab", "relics")
 	await process_frame
@@ -3387,16 +3562,11 @@ func _test_chandler_screen() -> void:
 	rb.pressed.emit()
 	await process_frame
 	_check(game.has_relic(offer) and game.embers() == kept - Relics.price(offer), "and two taps buy it")
-	# Unmake through its button.
-	game.buy_skill("k_tempered")
-	scr.call("show_tab", "unmake")
-	await process_frame
-	var um: Button = scr.get("_unmake_btn")
-	um.pressed.emit()
-	await process_frame
-	um.pressed.emit()   # the second tap confirms
-	await process_frame
-	_check(game.points_spent() == 0, "Unmake (two taps) refunds the points")
+	# No Unmake here: the Sheet's Skills tab has the free Respec.
+	_check(sc.TABS == ["buy", "sell", "relics", "draughts"] and not (scr.get("_tab_btns") as Dictionary).has("unmake") and not (scr.get("_tab_btns") as Dictionary).has("wares"),
+			"the tabs: Buy, Sell, Relics, Draughts (no Unmake, no Wares)")
+	var skills_src := FileAccess.get_file_as_string("res://scripts/skills_panel.gd")
+	_check(skills_src.contains("Respec") and skills_src.contains("respec()"), "the Sheet's Skills tab keeps the free Respec")
 	var went := [false]
 	scr.connect("back", func(): went[0] = true)
 	scr.get("_back_btn").pressed.emit()
@@ -3495,7 +3665,7 @@ func _test_chandler_screen_v3() -> void:
 		_screen_fits(ds, tag)
 		var safe: Rect2 = ds.call("_safe")
 		var title_end: float = safe.position.x + 96.0 + ds.UI.text_width("The Chandler", 26, "title", 700)
-		var first_tab: Button = ds.get("_tab_btns")["relics"]
+		var first_tab: Button = ds.get("_tab_btns")[ds.call("tabs_shown")[0]]
 		_check(first_tab.global_position.x >= title_end, "%s: the tabs clear the title (%.0f >= %.0f)" % [tag, first_tab.global_position.x, title_end])
 		var acts: Array = ds.get("_acts")
 		var di := -1

@@ -1,34 +1,48 @@
 extends Control
-## The Chandler: Waxley's shop, reached from the map. Three tabs (four once
-## World 3 is reached):
+## The Chandler: Waxley's shop, the map's Shop button (and the results
+## screen's, over the results: back_text "Back"). Three tabs (four once
+## World 3 is reached); it opens on Sell while the satchel holds SELL_FROM
+## pieces or more, else on Buy:
+##   Buy     items at the hero's level, by shop depth (Game.wares): five or six
+##           in two rows of three compact cards (Blessed 30 + 8*ilvl, Rare
+##           90 + 20*ilvl; the last two "For your <slot>", picked for the two
+##           weakest slots), and from depth 23 Waxley's Reserve, a Legendary,
+##           in a tall card on the right (300 + 40*ilvl; it restocks when a
+##           boss at the hero's depth falls). A tap on a card (or the
+##           Reserve's) opens its detail sheet: every line, the chips, what it
+##           would sell back for, and its price button, moved there; a tap
+##           outside it or Close shuts it. A bought upgrade is worn at once;
+##           anything else goes to the satchel. The stock lives in the hero's
+##           save and restocks after every bell, or at once with Fresh stock
+##           (Game.buy_fresh: half a Rare's price, doubling until the next
+##           bell; two taps). A full satchel shows "Satchel full · Sell ›",
+##           a link to Sell, and a sale refused for it goes there.
+##   Sell    the satchel as a grid of 4 x 4 squares (empty ones hollow), each
+##           piece with what Waxley pays (Items.sell_value, a quarter of his
+##           price) and a corner mark (Game.sell_look): a red ▼ no better than
+##           what's worn, an amber ◆ a trade-off, a gold ★ a Legendary, a green
+##           ▲ an upgrade. Pieces adding up to nothing start marked (an ember
+##           tag), never a Legendary. A tap shows a piece on the right against
+##           what's worn, with Wear and "Sell +N"; a tap on the piece shown
+##           marks or keeps it. "Sell N marked +total" sells them all at once.
+##           No question asked: a piece sold leaves a ghost in its square,
+##           "Buy back N", until the shop closes (Game.buy_back, at what it
+##           fetched; Game.forget_sold as it opens and closes).
 ##   Relics  the cheapest relics not yet found (3, or 4 from shop depth 23;
 ##           only the worlds reached), at Relics.PRICE.
-##   Wares   items at the hero's level, by shop depth (Game.wares): four in a
-##           row below depth 13 (2 Blessed, 1 Rare and 1 for the weakest slot;
-##           Blessed 30 + 8*ilvl, Rare 90 + 20*ilvl), then 5 or 6 in two rows
-##           of three compact cards, and from depth 23 Waxley's Reserve, a
-##           Legendary, in a tall card on the right (300 + 40*ilvl; it
-##           restocks when a boss at the hero's depth falls). A tap on a
-##           compact card (or the Reserve's) opens its detail sheet: every
-##           line, the chips, and its price button, moved there; a tap outside
-##           it or Close shuts it. A bought upgrade is worn at once; anything
-##           else goes to the satchel. The stock lives in the hero's save and
-##           restocks after every bell.
 ##   Draughts  (from World 3) Mother Yarrow's Second Draught (a gift, shown
 ##           as had or to come), the Rich Draught (after the Tinker, 1,600
 ##           embers) and, from World 5, Rekindle: a Legendary re-made at the
 ##           hero's level (200 + 30*ilvl), up to three held ones listed. Before
 ##           World 5 the right side shows the flask as it is, with Rekindle's
 ##           padlock note under it.
-##   Unmake  every skill point back, free (a second tap confirms).
-## On Wares, "Salvage weaker" melts every satchel item no better than what's
-## worn (never a Legendary; Game.salvage_weaker), after a second tap: the way
-## out of a full satchel, which the note beside it shows in red.
-## Buying takes two taps too: the first turns the price button gold and asks
+## (Unmaking skills is the Sheet's free Respec, on its Skills tab.)
+## Buying takes two taps: the first turns the price button gold and asks
 ## "Buy?" for 3 s, the second buys. A sale that can't happen (too dear, the
-## satchel full) is refused on the first tap. All buying goes through Game
-## (ware_verdict/buy_ware, relic_verdict/buy_relic, respec). Emits back when
-## closed; the map frees it.
+## satchel full) is refused on the first tap. All buying and selling goes
+## through Game (ware_verdict/buy_ware, relic_verdict/buy_relic, sell_item,
+## sell_marked, buy_back, buy_fresh). Emits back when closed; the map (or
+## the results) frees it.
 ##
 ##     var c := preload("res://scripts/chandler_screen.gd").new()
 ##     c.back.connect(func(): c.queue_free())
@@ -45,9 +59,16 @@ const Combat := preload("res://scripts/combat.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
 const Story := preload("res://scripts/story.gd")
 
-const TABS := ["relics", "wares", "draughts", "unmake"]
-const TAB_NAME := {"relics": "Relics", "wares": "Wares", "draughts": "Draughts", "unmake": "Unmake"}
-const GRID_COLS := 3        # wares past four: two rows of three
+const TABS := ["buy", "sell", "relics", "draughts"]
+const TAB_NAME := {"buy": "Buy", "sell": "Sell", "relics": "Relics", "draughts": "Draughts"}
+const SELL_FROM := 12       # the shop opens on Sell while the satchel holds this many
+const SQUARES := 16         # the Sell tab's 4 x 4 (Game.SATCHEL_MAX; an over-full satchel adds a row)
+const SQ_COLS := 4
+const SQ := 60.0            # a square, at most
+const SQ_GAP := 6.0
+const AMBER := Color("f0a040")   # a trade-off's mark
+const LINK_H := 44.0        # the buttons in the row under the header (Fresh stock, the Sell link)
+const GRID_COLS := 3        # the wares: two rows of three
 const RESERVE_W := 184.0    # Waxley's Reserve, the tall card right of them
 const REKINDLE_ROWS := 3    # the Legendaries Rekindle lists
 const ROW_H := 52.0         # one of them
@@ -70,28 +91,33 @@ const LINES := {
 	"equipped": ["Looks better on you already.", "Wear it in good health!", "That'll hold a flame. Probably."],
 	"satchel": ["Into the satchel it goes.", "Sold! Mind the drips."],
 	"poor": ["Embers first, friend. No credit.", "Ah. Come back a little richer."],
-	"full": ["Your satchel's stuffed. Salvage something first."],
+	"full": ["Your satchel's stuffed! Sell me something first."],
 	"sold": ["That one's gone. More after the next bell."],
 	"belt": ["On your belt. Wear it well."],
 	"stowed": ["Your belt's full, so it's in your codex. Swap it on in the Sheet."],
 	"bare": ["You've bought me out! Not a relic left."],
-	"arm": ["Tap again and I'll melt it all back down."],
 	"ask_equipped": ["Tap again and you'll wear it out the door.", "Sure? One more tap and it's on you."],
-	"ask_equipped_melt": ["Tap again: you wear it, and the old one melts."],
-	"equipped_melt": ["Looks better on you! Old one melted:"],
+	"ask_equipped_melt": ["Tap again: you wear it, and I buy the old one."],
+	"equipped_melt": ["Worn! And I bought the old one:"],
 	"ask_satchel": ["Tap again and it's in your satchel. No refunds!", "One more tap seals it. Into the satchel."],
 	"ask_belt": ["Tap again and it's on your belt.", "One more tap and it's yours. Forever!"],
 	"ask_stowed": ["Tap again: your belt's full, so it goes in your codex."],
-	"unmade": ["Poof! Clean as new tallow."],
-	"ask_salvage": ["Tap again and I'll melt the lot. Nothing you'd miss."],
-	"salvaged": ["Melted down, all of it. That's"],
-	"no_junk": ["Nothing in there worth melting, friend."],
-	"nothing": ["Nothing to unmake. You're a fresh candle."],
+	"ask_fresh": ["Tap again and I'll fetch fresh stock. For a fee."],
+	"fresh": ["Fresh from the back room! Still warm.", "New stock! Don't ask from where."],
 	"nohero": ["Choose your calling first, friend."],
 	"tab_relics": ["Relics! Found once, kept forever.", "Saints' odds and ends. Genuine. Mostly."],
-	"tab_wares": ["Gear for your level, fresh after every bell.", "Try before you buy? No. Buy, then try."],
-	"tab_unmake": ["Changed your mind? No shame in it. It's free.", "Wax remembers nothing. Neither will you."],
+	"tab_buy": ["Gear for your level, fresh after every bell.", "Try before you buy? No. Buy, then try."],
+	"tab_sell": ["I'll take what you don't wear. Fair prices! Mostly.", "A quarter of my price, paid on the spot. Generous!"],
 	"tab_draughts": ["Draughts! For the flask, and for old favourites.", "Deeper down, a Wick needs a better flask."],
+	"sold_one": ["Sold! Change your mind before you go, it's yours again.", "Into the back room it goes."],
+	"sold_marked": ["A fine haul! That's"],
+	"no_marks": ["Nothing marked, friend. Tap a piece twice to mark it."],
+	"marked": ["Marked. It goes with the rest.", "That one? Gladly."],
+	"kept": ["Kept. I won't touch it.", "Fine, keep it. Sentimental, are we?"],
+	"bought_back": ["Back in your satchel. Same price, no hard feelings."],
+	"back_full": ["No room to put it back. Sell me something else first."],
+	"worn": ["Looks better on you already. The old one's in your satchel."],
+	"empty": ["An empty satchel! Bring me what you don't wear."],
 	"reserve_sold": ["The Reserve's gone. Another boss, another prize."],
 	"ask_buy": ["Tap again and it's in your flask. For good.", "One more tap and it's yours, every difficulty."],
 	"bought": ["Drink deep, friend. It's yours now."],
@@ -103,7 +129,8 @@ const LINES := {
 	"none": ["I can only rekindle a Legendary you carry."],
 }
 
-var tab := "wares"
+var tab := ""               # the tab on show ("" until it opens: default_tab())
+var back_text := "Map"      # the back button's word ("Back" over the results)
 var safe_override := Rect2()
 var _t := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -111,7 +138,6 @@ var _back_btn: Button
 var _tab_btns := {}
 var _buy_btns: Array[Button] = []
 var _acts: Array = []       # what each price button buys: {kind: ware | relic | reserve | draught | rekindle, i, id, row}
-var _unmake_btn: Button
 var _stock: Array = []      # the wares (items or null) or the relic offers on show
 var _chips: Array = []      # Hero.compare for each ware
 var _reserve := {}          # Game.reserve() on show (Wares), {} when there's none
@@ -126,18 +152,27 @@ var _flash := {}            # card index -> glow left after a sale
 var _deny := 0.0
 var _deny_card := -1
 var _purse_flash := 0.0
-var _armed := 0.0           # Unmake's confirm window
-var _salv_armed := 0.0      # Salvage weaker's confirm window
 var _deny_why := ""         # why the last sale was refused (the purse goes red only for "poor")
-var _salv_btn: Button
 var _sale := -1             # the price button waiting for its second tap
 var _sale_t := 0.0          # and how long it waits yet
 var _ember_tex: Texture2D
-var _portrait: Texture2D
 var _boxes := {}
 var _glow_tex: GradientTexture2D
 var _detail := -1           # the price button whose ware (or the Reserve) the detail sheet shows, else -1
 var _close_btn: Button
+var _fresh_btn: Button      # Buy: Fresh stock, in the row under the header
+var _fresh_armed := 0.0     # its confirm window
+var _full_btn: Button       # Buy: "Satchel full · Sell ›", while it is
+# The Sell tab.
+var _grid: Array = []       # its squares: {uid} a piece, {ghost: item, price, n} one sold this visit, {} empty
+var _marked := {}           # uid -> marked to sell (set when a piece first shows: Game.sell_look's marked)
+var _looks := {}            # uid -> Game.sell_look of each piece on show
+var _pick := ""             # the piece shown on the right ("" for none)
+var _ghosts := 0            # sales this visit (a ghost's n: the oldest gives its square up first)
+var _sq_flash := {}         # square -> glow left after a sale or a buy-back
+var _wear_btn: Button
+var _sell_btn: Button       # "Sell +N", the piece shown
+var _sell_all_btn: Button   # "Sell N marked  +total"
 
 
 func _ready() -> void:
@@ -145,7 +180,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_rng.randomize()
 	_ember_tex = UI.tex("res://art/ui/ember.svg")
-	_portrait = UI.tex("res://art/story/portraits/waxley_grin.svg")
+	Game.forget_sold()   # a fresh visit: nothing to buy back yet
 	# A soft round glow, for every candle's halo.
 	var g := Gradient.new()
 	g.set_color(0, Color(1.0, 0.72, 0.36, 0.55))
@@ -160,19 +195,30 @@ func _ready() -> void:
 	_glow_tex.height = 128
 	for r in Relics.ALL:
 		UI.relic_icon(r["id"])
-	_back_btn = _button("Map", false, func(): _close())
+	_back_btn = _button(back_text, false, func(): _close())
 	for id in TABS:
 		var b := _button(TAB_NAME[id], false, func(): show_tab(id))
 		_tab_btns[id] = b
 	_tab_btns["draughts"].visible = Game.draughts_open()
-	_unmake_btn = _button("Unmake", true, func(): _unmake())
-	_unmake_btn.add_theme_font_size_override("font_size", 20)
-	_salv_btn = _button("Salvage weaker", false, func(): _salvage_weaker())
-	UI.small_button(_salv_btn, 14)
+	_fresh_btn = _button("", false, func(): _fresh_pressed())
+	UI.small_button(_fresh_btn, 14)
+	_fresh_btn.draw.connect(_draw_fresh)
+	_full_btn = _button("Satchel full · Sell  ›", false, func(): show_tab("sell"))
+	UI.small_button(_full_btn, 14)
+	for st in ["font_color", "font_hover_color", "font_pressed_color"]:
+		_full_btn.add_theme_color_override(st, DOWN)
 	_close_btn = _button("Close", false, func(): close_detail())
 	UI.small_button(_close_btn, 15)
 	_close_btn.visible = false
-	_say("hello" if Game.hero_made() else "nohero")
+	_wear_btn = _button("Wear", false, func(): wear_picked())
+	UI.small_button(_wear_btn, 16)
+	_sell_btn = _button("Sell", true, func(): sell_picked())
+	UI.small_button(_sell_btn, 16)
+	_sell_all_btn = _button("Sell marked", true, func(): sell_marked())
+	_sell_all_btn.add_theme_font_size_override("font_size", 18)
+	if tab == "":
+		tab = default_tab()
+	_say(("tab_sell" if tab == "sell" else "hello") if Game.hero_made() else "nohero")
 	show_tab(tab)
 	resized.connect(_layout)
 	# The first visit: Waxley introduces himself (story beat meet_waxley).
@@ -226,27 +272,40 @@ func reserve_line() -> String:
 
 
 func tabs_shown() -> Array:
-	## The tabs on the bar: v2's three, and Draughts once World 3 is reached.
+	## The tabs on the bar: Buy, Sell and Relics, and Draughts once World 3 is
+	## reached.
 	return TABS.filter(func(t): return t != "draughts" or Game.draughts_open())
+
+
+static func default_tab() -> String:
+	## Where the shop opens: Sell while the satchel holds SELL_FROM pieces or
+	## more, else Buy.
+	if Game.hero_made() and (Game.hero()["satchel"] as Array).size() >= SELL_FROM:
+		return "sell"
+	return "buy"
 
 
 func show_tab(id: String) -> void:
 	if not tabs_shown().has(id):
 		return
 	if id != tab:
-		_armed = 0.0
 		_sale = -1
 		_notes = {}
 		_flash = {}
 		_deny_card = -1
-		_salv_armed = 0.0
+		_fresh_armed = 0.0
 		_say("tab_" + id if Game.hero_made() or id == "relics" else "nohero")
 	tab = id
 	_refresh()
 
 
 func _close() -> void:
+	Game.forget_sold()   # what was sold stays sold
 	back.emit()
+
+
+func _exit_tree() -> void:
+	Game.forget_sold()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -268,11 +327,20 @@ func _gui_input(event: InputEvent) -> void:
 func tap_at(p: Vector2) -> void:
 	## A tap on the screen itself: outside the detail sheet it shuts it; on a
 	## compact card or the Reserve's it opens that one's (a sold one says so).
+	## On Sell, a tap on a piece shows it (on the one shown, marks or keeps
+	## it), on a ghost buys it back.
 	if _detail >= 0:
 		if not detail_rect().has_point(p):
 			close_detail()
 		return
-	if tab != "wares" or not grid() or not Game.hero_made():
+	if tab == "sell" and Game.hero_made():
+		var sq := squares()
+		for k in sq.size():
+			if (sq[k] as Rect2).has_point(p):
+				tap_square(k)
+				return
+		return
+	if tab != "buy" or not grid() or not Game.hero_made():
 		return
 	var cards := _cards()
 	for k in cards.size():
@@ -370,8 +438,12 @@ func _refresh() -> void:
 	_kindle = []
 	var made := Game.hero_made()
 	_tab_btns["draughts"].visible = Game.draughts_open()
+	_looks = {}
 	match tab:
-		"wares":
+		"sell":
+			if made:
+				_sync_grid()
+		"buy":
 			if made:
 				_stock = Game.wares().duplicate()
 				var h: Dictionary = Game.hero()
@@ -400,7 +472,7 @@ func _refresh() -> void:
 					for row in _kindle:
 						UI.tex(Items.icon(row["item"]))
 	for i in _stock.size():
-		_acts.append({"kind": "ware" if tab == "wares" else "relic", "i": i})
+		_acts.append({"kind": "ware" if tab == "buy" else "relic", "i": i})
 	if not _reserve.is_empty():
 		_acts.append({"kind": "reserve"})
 	for d in _draughts:
@@ -413,9 +485,7 @@ func _refresh() -> void:
 		var b := _button("", true, func(): _buy(idx))
 		b.draw.connect(_draw_price.bind(b, idx))
 		_buy_btns.append(b)
-	_unmake_btn.visible = tab == "unmake" and made
 	_update_buttons()
-	_update_salvage()
 	_layout()
 	queue_redraw()
 
@@ -488,12 +558,79 @@ func _update_buttons() -> void:
 		b.queue_redraw()
 	if _close_btn != null:
 		_close_btn.visible = _detail >= 0
-	var spent := Game.points_spent() if Game.hero_made() else 0
-	if _armed > 0.0:
-		_unmake_btn.text = "Tap again: unmake"
-	else:
-		_unmake_btn.text = "Unmake  (free)" if spent > 0 else "Nothing to unmake"
-	_unmake_btn.disabled = spent <= 0 and _armed <= 0.0
+	var made := Game.hero_made()
+	# Buy: Fresh stock, and the way to Sell while the satchel's full.
+	_fresh_btn.visible = tab == "buy" and made
+	_fresh_btn.queue_redraw()
+	_full_btn.visible = tab == "buy" and made and Game.satchel_full()
+	# Sell: the piece shown (Wear, Sell +N) and everything marked.
+	var it = picked()
+	var selling := tab == "sell" and made
+	_wear_btn.visible = selling and it is Dictionary
+	_sell_btn.visible = selling and it is Dictionary
+	_sell_all_btn.visible = selling
+	if it is Dictionary:
+		_sell_btn.text = "Sell  +%d" % Items.sell_value(it)
+	var marked := marked_items()
+	var total := 0
+	for m in marked:
+		total += Items.sell_value(m)
+	_sell_all_btn.text = ("Sell %d marked  +%d" % [marked.size(), total]) if not marked.is_empty() else "Nothing marked"
+	_sell_all_btn.disabled = marked.is_empty()
+
+
+func _draw_fresh() -> void:
+	## Fresh stock's face: its name and an ember and the price (red when
+	## it's too dear); waiting for its second tap, "Tap again" and the price,
+	## with a bar running out.
+	var b := _fresh_btn
+	if not b.visible:
+		return
+	var p: int = Game.fresh_price()
+	var asking := _fresh_armed > 0.0
+	var word := "Tap again:" if asking else "Fresh stock"
+	var fs := 14
+	var ww := UI.text_width(word, fs, "body", 700)
+	var pw := UI.text_width(str(p), fs, "body", 800)
+	var x := (b.size.x - (ww + 6.0 + 18.0 + pw)) * 0.5
+	var y := b.size.y * 0.5 + fs * 0.36
+	if asking:
+		b.draw_rect(Rect2(8.0, b.size.y - 7.0, (b.size.x - 16.0) * clampf(_fresh_armed / CONFIRM_TIME, 0.0, 1.0), 3.0), Color(UI.GOLD, 0.6))
+	UI.text(b, Vector2(x, y), word, fs, UI.GOLD if asking else UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 700)
+	if _ember_tex:
+		b.draw_texture_rect(_ember_tex, Rect2(x + ww + 4.0, b.size.y * 0.5 - 9.0, 18, 18), false)
+	UI.text(b, Vector2(x + ww + 6.0 + 18.0, y), str(p), fs, UI.GOLD if Game.embers() >= p else Color("d88070"), HORIZONTAL_ALIGNMENT_LEFT, -1, "body", 800)
+
+
+func fresh_btn_w() -> float:
+	## Fresh stock's width: room for its longer face.
+	var p := str(Game.fresh_price())
+	return maxf(UI.text_width("Fresh stock", 14, "body", 700), UI.text_width("Tap again:", 14, "body", 700)) + UI.text_width(p, 14, "body", 800) + 6.0 + 18.0 + 24.0
+
+
+func _fresh_pressed() -> void:
+	## Two taps: the first asks (or refuses at once, too dear), the second
+	## restocks the wares (Game.buy_fresh).
+	var why: String = Game.fresh_verdict()
+	if why != "fresh":
+		_fresh_armed = 0.0
+		_refuse(-1, why)
+		_fresh_btn.queue_redraw()
+		return
+	if _fresh_armed <= 0.0:
+		_fresh_armed = CONFIRM_TIME
+		_sale = -1
+		_say("ask_fresh")
+		_update_buttons()
+		return
+	_fresh_armed = 0.0
+	if Game.buy_fresh() == "fresh":
+		_sfx("relic_rare")
+		_say("fresh")
+		_purse_flash = 1.0
+		_refresh()
+		for k in _stock.size():
+			_flash[k] = 1.0
 
 
 func _draw_price(b: Button, i: int) -> void:
@@ -505,7 +642,7 @@ func _draw_price(b: Button, i: int) -> void:
 	var p := _price(i)
 	var asking := i == _sale and _sale_t > 0.0
 	var col: Color = UI.GOLD if Game.embers() >= p else Color("d88070")
-	if tab == "wares" and col == UI.GOLD and Game.hero_made() and Game.satchel_full() and _verdict(i) == "full":
+	if tab == "buy" and col == UI.GOLD and Game.hero_made() and Game.satchel_full() and _verdict(i) == "full":
 		# Nowhere to put it (it wouldn't be worn): the price goes quiet.
 		col = UI.MUTED
 	var f := UI.font("body", 800)
@@ -583,7 +720,7 @@ func _buy(i: int) -> void:
 		match res:
 			"equipped", "satchel":
 				_sfx("relic_" + str(_stock[i]["rarity"]) if _stock[i]["rarity"] != "common" else "select")
-				# A full satchel had no room for the old one: it melted.
+				# A full satchel had no room for the old one: Waxley bought it.
 				var melt: Dictionary = Game.last_melt if res == "equipped" and str(Game.last_melt.get("for", "-")) == str(_stock[i].get("uid", "")) else {}
 				if melt.is_empty():
 					_say(res)
@@ -593,7 +730,7 @@ func _buy(i: int) -> void:
 				var keep := _notes.duplicate()
 				keep[i] = {"text": "Worn" if res == "equipped" else "In your satchel", "name": _stock[i]["name"], "rarity": _stock[i]["rarity"]}
 				if not melt.is_empty():
-					keep[i]["sub"] = ("Old one melted  +%d" if melt["old"] else (str(melt["item"].get("name", "")) + " melted  +%d")) % int(melt["embers"])
+					keep[i]["sub"] = ("Old one sold  +%d" if melt["old"] else (str(melt["item"].get("name", "")) + " sold  +%d")) % int(melt["embers"])
 				_refresh()
 				_notes = keep
 				_flash[i] = 1.0
@@ -606,7 +743,7 @@ func _ask(i: int, what: String) -> void:
 	var old := _sale
 	_sale = i
 	_sale_t = CONFIRM_TIME
-	if what == "equipped" and tab == "wares":
+	if what == "equipped" and tab == "buy":
 		var a := _act(i)
 		var it = _stock[int(a["i"])] if a.get("kind") == "ware" else _reserve.get("item")
 		if it is Dictionary and not Game.melt_on_equip(it).is_empty():
@@ -619,9 +756,15 @@ func _ask(i: int, what: String) -> void:
 
 func _refuse(i: int, why: String) -> void:
 	## No sale: the card shakes and Waxley says why (the purse flashes red
-	## only when it's the embers).
+	## only when it's the embers). A ware refused for a full satchel goes to
+	## Sell, to make the room.
 	_sfx("back")
 	_deny_why = why
+	if why == "full" and tab == "buy" and Game.hero_made():
+		show_tab("sell")
+		_deny_why = why
+		_say("full")
+		return
 	_say(why if LINES.has(why) else ("sold" if why == "owned" or why == "unknown" else "poor"))
 	_deny = 1.0
 	_deny_card = i
@@ -667,83 +810,305 @@ func _buy_more(i: int, kind: String) -> void:
 	_refuse(i, res)
 
 
-func _unmake() -> void:
-	if not Game.hero_made():
-		return
-	if Game.points_spent() <= 0:
-		_say("nothing")
-		return
-	if _armed <= 0.0:
-		_armed = 3.0
-		_say("arm")
-		_update_buttons()
-		return
-	_armed = 0.0
-	var back_pts: int = Game.respec()
-	_sfx("relight")
-	_say("unmade", " %d point%s back to spend." % [back_pts, "" if back_pts == 1 else "s"])
-	_refresh()
+# ---------------------------------------------------------------- the Sell tab
+
+func _sync_grid() -> void:
+	## The squares against the satchel now: a piece keeps its square; one gone
+	## without a sale here (worn) leaves it empty; one new takes the first
+	## empty square, else the oldest ghost's (that sale can't be bought back
+	## here any more). A piece seen for the first time is marked as
+	## Game.sell_look says.
+	var h: Dictionary = Game.hero()
+	var sat: Array = (h["satchel"] as Array).filter(func(it): return it is Dictionary)
+	var have := {}
+	for it in sat:
+		have[str(it.get("uid", ""))] = true
+	while _grid.size() < maxi(SQUARES, sat.size()):
+		_grid.append({})
+	var on := {}
+	for k in _grid.size():
+		var sq: Dictionary = _grid[k]
+		if sq.has("uid"):
+			if not have.has(str(sq["uid"])) or on.has(str(sq["uid"])):
+				_grid[k] = {}
+			else:
+				on[str(sq["uid"])] = true
+		elif sq.has("ghost") and Game.sold_price(sq["ghost"]) <= 0:
+			_grid[k] = {}   # (bought back, or forgotten)
+	for it in sat:
+		var uid := str(it.get("uid", ""))
+		if on.has(uid):
+			continue
+		var at := _free_square()
+		if at < 0:
+			_grid.append({})
+			at = _grid.size() - 1
+		_grid[at] = {"uid": uid}
+		on[uid] = true
+	while _grid.size() > SQUARES and (_grid.back() as Dictionary).is_empty():
+		_grid.pop_back()
+	for it in sat:
+		var uid := str(it.get("uid", ""))
+		_looks[uid] = Game.sell_look(it, h)
+		if not _marked.has(uid):
+			_marked[uid] = bool(_looks[uid]["marked"])
+		UI.tex(Items.icon(it))
+	if not have.has(_pick):
+		_pick = ""
 
 
-func _update_salvage() -> void:
-	## "Salvage weaker +N" on Wares, while the satchel holds anything it
-	## would take.
-	if _salv_btn == null:
+func _free_square() -> int:
+	## The first empty square, else the oldest ghost's, else -1.
+	var oldest := -1
+	for k in _grid.size():
+		var sq: Dictionary = _grid[k]
+		if sq.is_empty():
+			return k
+		if sq.has("ghost") and (oldest < 0 or int(sq["n"]) < int(_grid[oldest]["n"])):
+			oldest = k
+	return oldest
+
+
+func _square_of(uid: String) -> int:
+	for k in _grid.size():
+		if str((_grid[k] as Dictionary).get("uid", "-")) == uid:
+			return k
+	return -1
+
+
+func piece(uid: String):
+	## A satchel piece by its uid, or null.
+	if not Game.hero_made() or uid == "":
+		return null
+	for it in (Game.hero()["satchel"] as Array):
+		if it is Dictionary and str(it.get("uid", "")) == uid:
+			return it
+	return null
+
+
+func picked():
+	## The piece the Sell tab shows on the right, or null.
+	return piece(_pick) if tab == "sell" else null
+
+
+func grid_square(k: int) -> Dictionary:
+	## Square k as the Sell tab has it: {uid}, {ghost, price, n} or {} (tests).
+	return _grid[k] if k >= 0 and k < _grid.size() else {}
+
+
+func is_marked(it) -> bool:
+	return it is Dictionary and bool(_marked.get(str(it.get("uid", "")), false))
+
+
+func marked_items() -> Array:
+	## The pieces marked to sell, in the squares' order.
+	var out := []
+	if tab != "sell":
+		return out
+	for sq in _grid:
+		if (sq as Dictionary).has("uid") and bool(_marked.get(str(sq["uid"]), false)):
+			var it = piece(str(sq["uid"]))
+			if it is Dictionary:
+				out.append(it)
+	return out
+
+
+func tap_square(k: int) -> void:
+	## A square tapped: a piece shows on the right, and a tap on the piece
+	## shown marks it to sell or keeps it; a ghost is bought back.
+	if k < 0 or k >= _grid.size():
 		return
-	var n: int = Game.weaker_items().size() if Game.hero_made() else 0
-	_salv_btn.visible = tab == "wares" and n > 0
-	if _salv_btn.visible:
-		_salv_btn.text = ("Tap again: melt %d" % n) if _salv_armed > 0.0 else ("Salvage weaker  +%d" % Game.weaker_value())
+	var sq: Dictionary = _grid[k]
+	if sq.has("ghost"):
+		buy_back(k)
+		return
+	if not sq.has("uid"):
+		return
+	var uid := str(sq["uid"])
+	if uid == _pick:
+		_marked[uid] = not bool(_marked.get(uid, false))
+		_sfx("select", 1.3 if _marked[uid] else 0.8)
+		_say("marked" if _marked[uid] else "kept")
+	else:
+		_pick = uid
+		_sfx("select")
+	_update_buttons()
 	_layout()
+	queue_redraw()
 
 
-func _salvage_weaker() -> void:
-	## Two taps: the first asks, the second melts every weaker item.
-	if not Game.hero_made():
+func _ghost(k: int, it: Dictionary, price: int) -> void:
+	## A sold piece's square: its ghost, to buy it back from.
+	if k < 0 or k >= _grid.size():
 		return
-	if Game.weaker_items().is_empty():
-		_say("no_junk")
-		_update_salvage()
-		return
-	if _salv_armed <= 0.0:
-		_salv_armed = CONFIRM_TIME
-		_sale = -1
-		_say("ask_salvage")
-		_update_salvage()
-		return
-	_salv_armed = 0.0
-	var got: int = Game.salvage_weaker()
-	_sfx("salvage")
-	_say("salvaged", " +%d embers." % got)
+	_grid[k] = {"ghost": it, "price": price, "n": _ghosts}
+	_ghosts += 1
+	_sq_flash[k] = 1.0
+	_marked.erase(str(it.get("uid", "")))
+
+
+func sell_picked() -> int:
+	## "Sell +N": the piece shown, at once (its ghost buys it back).
+	var it = picked()
+	if not (it is Dictionary):
+		return 0
+	var k := _square_of(_pick)
+	var v: int = Game.sell_item(it)
+	if v <= 0:
+		return 0
+	_ghost(k, it, v)
+	_pick = ""
+	_sfx("bank")
+	_say("sold_one")
 	_purse_flash = 1.0
 	_refresh()
+	return v
+
+
+func sell_marked() -> int:
+	## "Sell N marked": every marked piece, at once, no question asked (each
+	## leaves its ghost).
+	var items := marked_items()
+	if items.is_empty():
+		_say("no_marks")
+		return 0
+	var at := {}
+	for it in items:
+		at[str(it["uid"])] = _square_of(str(it["uid"]))
+	var total: int = Game.sell_marked(items)
+	for it in items:
+		var v: int = Game.sold_price(it)
+		if v > 0:
+			_ghost(int(at[str(it["uid"])]), it, v)
+			if str(it["uid"]) == _pick:
+				_pick = ""
+	_sfx("bank")
+	_say("sold_marked", " +%d embers." % total)
+	_purse_flash = 1.0
+	_refresh()
+	return total
+
+
+func wear_picked() -> void:
+	## Wear: the piece shown goes on; the one it replaces takes its square,
+	## and shows (marked as Game.sell_look says, against the new one).
+	var it = picked()
+	if not (it is Dictionary):
+		return
+	var k := _square_of(_pick)
+	var old = Game.equip(it)
+	_sfx("equip")
+	_say("worn" if old is Dictionary else "equipped")
+	_pick = ""
+	if old is Dictionary and k >= 0:
+		_grid[k] = {"uid": str(old["uid"])}
+		_marked.erase(str(old["uid"]))
+		_pick = str(old["uid"])
+		_sq_flash[k] = 1.0
+	_refresh()
+
+
+func buy_back(k: int) -> String:
+	## A ghost tapped: the piece back in the satchel for what it fetched
+	## (Game.buy_back), in its own square. Returns Game's word.
+	var sq: Dictionary = grid_square(k)
+	if not sq.has("ghost"):
+		return "gone"
+	var it: Dictionary = sq["ghost"]
+	var why: String = Game.buy_back(it)
+	if why != "satchel":
+		if why == "gone":
+			_grid[k] = {}
+			_refresh()
+		_refuse(-1, "back_full" if why == "full" else why)
+		return why
+	var uid := str(it.get("uid", ""))
+	_grid[k] = {"uid": uid}
+	_marked[uid] = false   # bought back: he wants it
+	_pick = uid
+	_sq_flash[k] = 1.0
+	_sfx("select")
+	_say("bought_back")
+	_purse_flash = 1.0
+	_refresh()
+	return why
 
 
 func wares_note() -> Dictionary:
-	## The small print right of Waxley's line on Wares: {text, col}. A full
-	## satchel says so in red, since a sale into it will be refused.
+	## The small print right of Waxley's line on Buy: {text, col}. (A full
+	## satchel shows the red Sell link instead: a sale into it is refused.)
 	if Game.hero_made() and Game.satchel_full():
-		return {"text": UI.satchel_line((Game.hero()["satchel"] as Array).size(), Game.SATCHEL_MAX, " / "), "col": DOWN}
+		return {"text": "", "col": UI.MUTED}
 	for it in _stock:
 		if it is Dictionary:
 			return {"text": "ilvl %d  ·  new stock every bell" % int(it["ilvl"]), "col": UI.MUTED}
 	return {"text": "New stock every bell" if Game.hero_made() else "", "col": UI.MUTED}
 
 
+func sell_note() -> Dictionary:
+	## The small print on Sell: the satchel, in red once it's full.
+	if not Game.hero_made():
+		return {"text": "", "col": UI.MUTED}
+	var n := (Game.hero()["satchel"] as Array).size()
+	return {"text": UI.satchel_line(n, Game.SATCHEL_MAX, " / "), "col": DOWN if n >= Game.SATCHEL_MAX else UI.MUTED}
+
+
 # ---------------------------------------------------------------- layout
 
 func _line_row() -> Rect2:
-	## The row under the header: Waxley's line, and the note or the
-	## Salvage weaker button on the right.
+	## The row under the header: Waxley's line, and the note on the right (on
+	## Buy, left of the Sell link and Fresh stock).
 	var s := _safe()
-	return Rect2(s.position.x, s.position.y + HEADER_H + 4.0, s.size.x, UI.TAP_H)
+	return Rect2(s.position.x, s.position.y + HEADER_H + 4.0, s.size.x, LINK_H)
 
 
 func _cards_top() -> float:
+	## Under that row: past its buttons on Buy, closer on the other tabs.
 	var s := _safe()
-	if _salv_btn != null and _salv_btn.visible:
-		return _line_row().end.y + 6.0
+	if _fresh_btn != null and _fresh_btn.visible:
+		return _line_row().end.y + 4.0
 	return s.position.y + HEADER_H + 40.0
+
+
+func _line_btns_x() -> float:
+	## Where the row's buttons start (its right end without them).
+	var x := _line_row().end.x
+	for b in [_full_btn, _fresh_btn]:
+		if b != null and b.visible:
+			x = minf(x, b.position.x)
+	return x
+
+
+func _sq_side() -> float:
+	## A Sell square's side: SQ, or less for an over-full satchel's fifth row.
+	var s := _safe()
+	var rows := maxi(4, ceili(float(maxi(_grid.size(), SQUARES)) / SQ_COLS))
+	return minf(SQ, floorf((s.end.y - 2.0 - _cards_top() - SQ_GAP * (rows - 1)) / rows))
+
+
+func squares() -> Array:
+	## The Sell tab's squares, four across from the left (_grid's order).
+	var s := _safe()
+	var top := _cards_top()
+	var side := _sq_side()
+	var out := []
+	for k in maxi(_grid.size(), SQUARES):
+		out.append(Rect2(s.position.x + (k % SQ_COLS) * (side + SQ_GAP), top + (k / SQ_COLS) * (side + SQ_GAP), side, side))
+	return out
+
+
+func sell_panel_rect() -> Rect2:
+	## The piece shown (or how selling works), right of the squares, over
+	## Sell marked.
+	var s := _safe()
+	var top := _cards_top()
+	var x := s.position.x + SQ_COLS * _sq_side() + (SQ_COLS - 1) * SQ_GAP + 14.0
+	return Rect2(x, top, s.end.x - x, s.end.y - 2.0 - top - BTN_H - 8.0)
+
+
+func sell_all_rect() -> Rect2:
+	var p := sell_panel_rect()
+	return Rect2(p.position.x, p.end.y + 8.0, p.size.x, BTN_H)
 
 
 func _cards() -> Array:
@@ -757,7 +1122,7 @@ func _cards() -> Array:
 		return []
 	if grid():
 		return _grid_cards(n, top, bottom)
-	var w := minf((s.size.x - GAP * (n - 1)) / n, 200.0 if tab == "wares" else 214.0)
+	var w := minf((s.size.x - GAP * (n - 1)) / n, 200.0 if tab == "buy" else 214.0)
 	var total := w * n + GAP * (n - 1)
 	var x0 := s.get_center().x - total * 0.5
 	var out := []
@@ -767,9 +1132,10 @@ func _cards() -> Array:
 
 
 func grid() -> bool:
-	## Wares past four (shop depth 13+), or with the Reserve: two rows of three
-	## compact cards. Four or fewer stay v2's row of tall cards.
-	return tab == "wares" and (_stock.size() > 4 or not _reserve.is_empty())
+	## The wares (five or six since Game.WEAK_PICKS's second pick): two rows
+	## of three compact cards, beside the Reserve's tall card from depth 23.
+	## (The relics stand in a row of tall cards.)
+	return tab == "buy"
 
 
 func _grid_cards(n: int, top: float, bottom: float) -> Array:
@@ -898,25 +1264,31 @@ func _layout() -> void:
 		var r := _btn_rect(i, cards)
 		_buy_btns[i].position = r.position
 		_buy_btns[i].size = r.size
-	if _salv_btn != null:
-		var row := _line_row()
-		_salv_btn.reset_size()
-		_salv_btn.size = Vector2(maxf(_salv_btn.size.x, 150.0), UI.TAP_H)
-		_salv_btn.position = Vector2(row.end.x - _salv_btn.size.x, row.position.y)
+	# The row under the header (Buy): Fresh stock at its right end, the Sell
+	# link left of it.
+	var row := _line_row()
+	if _fresh_btn != null:
+		_fresh_btn.size = Vector2(fresh_btn_w(), LINK_H)
+		_fresh_btn.position = Vector2(row.end.x - _fresh_btn.size.x, row.position.y)
+		_full_btn.reset_size()
+		_full_btn.size = Vector2(_full_btn.size.x, LINK_H)
+		_full_btn.position = Vector2(_fresh_btn.position.x - 8.0 - _full_btn.size.x, row.position.y)
 	if _close_btn != null and _detail >= 0:
 		var d := detail_rect()
 		_close_btn.size = Vector2(88.0, 44.0)
 		_close_btn.position = Vector2(d.end.x - 8.0 - 88.0, d.position.y + 8.0)
-	var p := _unmake_panel()
-	_unmake_btn.size = Vector2(minf(260.0, p.size.x - 180.0), 52.0)
-	_unmake_btn.position = Vector2(p.end.x - _unmake_btn.size.x - 18.0, p.end.y - 52.0 - 16.0)
-
-
-func _unmake_panel() -> Rect2:
-	var s := _safe()
-	var top := s.position.y + HEADER_H + 40.0
-	var w := minf(s.size.x, 560.0)
-	return Rect2(s.get_center().x - w * 0.5, top, w, s.end.y - 2.0 - top)
+	# Sell: Wear and Sell +N at the foot of the panel, Sell marked under it.
+	if _sell_btn != null:
+		var sp := sell_panel_rect()
+		_sell_btn.reset_size()
+		_sell_btn.size = Vector2(maxf(_sell_btn.size.x, 124.0), BTN_H)
+		_sell_btn.position = Vector2(sp.end.x - 12.0 - _sell_btn.size.x, sp.end.y - 10.0 - BTN_H)
+		_wear_btn.reset_size()
+		_wear_btn.size = Vector2(maxf(_wear_btn.size.x, 92.0), BTN_H)
+		_wear_btn.position = Vector2(_sell_btn.position.x - 8.0 - _wear_btn.size.x, _sell_btn.position.y)
+		var sa := sell_all_rect()
+		_sell_all_btn.position = sa.position
+		_sell_all_btn.size = sa.size
 
 
 func _process(dt: float) -> void:
@@ -926,16 +1298,13 @@ func _process(dt: float) -> void:
 	_purse_flash = maxf(_purse_flash - dt * 1.5, 0.0)
 	for k in _flash.keys():
 		_flash[k] = maxf(float(_flash[k]) - dt * 1.2, 0.0)
-	if _armed > 0.0:
-		_armed -= dt
-		if _armed <= 0.0:
-			_armed = 0.0
-			_update_buttons()
-	if _salv_armed > 0.0:
-		_salv_armed -= dt
-		if _salv_armed <= 0.0:
-			_salv_armed = 0.0
-			_update_salvage()
+	for k in _sq_flash.keys():
+		_sq_flash[k] = maxf(float(_sq_flash[k]) - dt * 1.5, 0.0)
+	if _fresh_armed > 0.0:
+		_fresh_armed -= dt
+		if _fresh_armed <= 0.0:
+			_fresh_armed = 0.0
+		_fresh_btn.queue_redraw()   # its running-out bar
 	if _sale >= 0:
 		_sale_t -= dt
 		if _sale >= _buy_btns.size() or _sale_t <= 0.0:
@@ -971,19 +1340,19 @@ func _draw() -> void:
 	# The header: title and the purse.
 	UI.text(self, Vector2(s.position.x + 96.0, s.position.y + 31.0), "The Chandler", 26, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1, "title", 700, 5)
 	_draw_purse(Rect2(s.end.x - 102.0, s.position.y, 102.0, HEADER_H))
-	# Waxley's line, and a note (or Salvage weaker) on the right. The note
-	# gives way first, then the line shrinks to fit what's left.
+	# Waxley's line, and a note (and on Buy the row's buttons) on the right.
+	# The note gives way first, then the line shrinks to fit what's left.
 	var ly := _line_row().get_center().y + 5.0
 	var shake := sin(_t * 60.0) * 5.0 * _deny
 	var note := _note()
 	var ncol := UI.MUTED
-	if tab == "wares":
-		var wn := wares_note()
+	if tab == "buy" or tab == "sell":
+		var wn := wares_note() if tab == "buy" else sell_note()
 		note = str(wn["text"])
 		ncol = wn["col"]
 	var right := s.end.x - 4.0
-	if _salv_btn != null and _salv_btn.visible:
-		right = _salv_btn.position.x - 12.0
+	if _line_btns_x() < _line_row().end.x:
+		right = _line_btns_x() - 12.0
 	var nweight := 700 if ncol == DOWN else 600
 	var nw := UI.text_width(note, 13, "body", nweight) if note != "" else 0.0
 	var line_x := s.position.x + 4.0
@@ -1004,16 +1373,16 @@ func _draw() -> void:
 	if note != "":
 		UI.text(self, Vector2(s.position.x, ly), note, 13, ncol, HORIZONTAL_ALIGNMENT_RIGHT, right - s.position.x, "body", nweight, 3)
 	match tab:
-		"wares":
+		"buy":
 			_draw_wares()
 			if _detail >= 0:
 				_draw_detail()
+		"sell":
+			_draw_sell()
 		"relics":
 			_draw_relics()
 		"draughts":
 			_draw_draughts()
-		"unmake":
-			_draw_unmake()
 
 
 func _note() -> String:
@@ -1024,15 +1393,12 @@ func _note() -> String:
 				return ""
 			var n: int = Game.flask_charges()
 			return "Flask: %d draught%s, each heals %d%%" % [n, "" if n == 1 else "s", roundi(float(Game.flask_heal()) * 100.0)]
-		"wares":
-			for it in _stock:
-				if it is Dictionary:
-					return "ilvl %d  ·  new stock every bell" % int(it["ilvl"])
-			return "New stock every bell" if Game.hero_made() else ""
+		"buy":
+			return str(wares_note()["text"])
+		"sell":
+			return str(sell_note()["text"])
 		"relics":
 			return "Belt %d / %d" % [Game.belt().size(), Game.belt_slots()]
-		"unmake":
-			return "%d unspent" % int(Game.hero()["points"]) if Game.hero_made() else ""
 	return ""
 
 
@@ -1065,68 +1431,7 @@ func _draw_wares() -> void:
 	if not Game.hero_made():
 		UI.text(self, Vector2(s.position.x, s.get_center().y + 20.0), "Waxley sells to Wicks with a calling.", 17, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, s.size.x)
 		return
-	if grid():
-		_draw_wares_grid()
-		return
-	var cards := _cards()
-	for i in _stock.size():
-		var it = _stock[i]
-		if not (it is Dictionary):
-			_draw_sold(_card_frame(cards[i], UI.PANEL_EDGE, i, true), i)
-			continue
-		var col: Color = UI.RARITY.get(it["rarity"], UI.CREAM)
-		var c := _card_frame(cards[i], col, i)
-		var x := c.position.x
-		var w := c.size.x
-		# Across the top: the slot (or who it's for) and the rarity.
-		var slot_name: String = Items.SLOT_NAME.get(it["slot"], "")
-		if i == 3:
-			UI.text(self, Vector2(x + 10.0, c.position.y + 18.0), "For your %s" % slot_name.to_lower(), 12, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w - 20.0, "body", 700)
-		else:
-			UI.text(self, Vector2(x + 10.0, c.position.y + 18.0), slot_name, 12, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, w * 0.5, "body", 700)
-		if i != 3 or w > 190.0:
-			UI.text(self, Vector2(x, c.position.y + 18.0), Items.RARITY_NAME[it["rarity"]], 12, col, HORIZONTAL_ALIGNMENT_RIGHT, w - 10.0, "body", 800)
-		# The icon on a disc of its color.
-		var ic := Vector2(c.get_center().x, c.position.y + 50.0)
-		draw_circle(ic, 26.0, Color(col, 0.10))
-		draw_arc(ic, 26.0, 0.0, TAU, 40, Color(col, 0.4), 1.5)
-		var tex := UI.tex(Items.icon(it))
-		if tex:
-			draw_texture_rect(tex, Rect2(ic - Vector2(24, 24), Vector2(48, 48)), false)
-		else:
-			_icon(ic, 22.0, it, col)
-		# The name, then its lines (powers and affixes first, the base's own
-		# stat last), down to the chips.
-		var f := UI.font("title", 700)
-		var ny := c.position.y + 95.0
-		draw_multiline_string_outline(f, Vector2(x + 6.0, ny), it["name"], HORIZONTAL_ALIGNMENT_CENTER, w - 12.0, 16, 2, 4, UI.INK)
-		draw_multiline_string(f, Vector2(x + 6.0, ny), it["name"], HORIZONTAL_ALIGNMENT_CENTER, w - 12.0, 16, 2, col)
-		var two := f.get_multiline_string_size(it["name"], HORIZONTAL_ALIGNMENT_CENTER, w - 12.0, 16, 2).y > 24.0
-		var ly := ny + (26.0 if two else 8.0)
-		var cy := c.end.y - BTN_H - 8.0 - 30.0
-		var all: Array = Items.lines(it).filter(func(l): return l["kind"] != "implicit") + Items.lines(it).filter(func(l): return l["kind"] == "implicit")
-		_draw_lines(all, Rect2(x + 8.0, ly, w - 16.0, cy - 4.0 - ly))
-		# The chips: what wearing it would do.
-		var ch: Dictionary = _chips[i] if i < _chips.size() else {}
-		var cw := (w - 24.0) * 0.5
-		_chip(Rect2(x + 8.0, cy, cw, 22.0), "DMG", float(ch.get("dmg", 0.0)))
-		_chip(Rect2(x + 16.0 + cw, cy, cw, 22.0), "LIFE", float(ch.get("life", 0.0)))
-
-
-func _draw_sold(c: Rect2, i: int) -> void:
-	## An empty place on the shelf: what was bought there, or just "Sold".
-	var note: Dictionary = _notes.get(i, {})
-	var cy := c.get_center().y
-	if note.is_empty():
-		UI.text(self, Vector2(c.position.x, cy - 4.0), "Sold", 20, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, c.size.x, "title", 700, 4)
-	else:
-		var col: Color = UI.RARITY.get(note["rarity"], UI.CREAM)
-		draw_multiline_string(UI.font("title", 700), Vector2(c.position.x + 8.0, cy - 30.0), note["name"], HORIZONTAL_ALIGNMENT_CENTER, c.size.x - 16.0, 16, 2, Color(col, 0.7))
-		UI.text(self, Vector2(c.position.x, cy + 14.0), note["text"], 18, UI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, c.size.x, "title", 700, 4)
-		if note.has("sub"):
-			var sub := str(note["sub"])
-			UI.text(self, Vector2(c.position.x + 6.0, cy + 34.0), sub, UI.fit_size(sub, c.size.x - 12.0, 12, 9), UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, c.size.x - 12.0)
-	UI.text(self, Vector2(c.position.x, c.end.y - 24.0), "More after the next bell", 12, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, c.size.x)
+	_draw_wares_grid()
 
 
 func _draw_wares_grid() -> void:
@@ -1210,12 +1515,17 @@ static func compact_name(name: String, w: float) -> Dictionary:
 	return {"lines": [name], "size": 10}
 
 
+func is_pick(i: int) -> bool:
+	## Whether ware i is one of the "For your <slot>" picks (the last ones).
+	return tab == "buy" and i >= _stock.size() - Game.WEAK_PICKS and i < _stock.size()
+
+
 func _draw_ware_compact(c: Rect2, it: Dictionary, i: int) -> void:
 	var col: Color = UI.RARITY.get(it["rarity"], UI.CREAM)
 	var x := c.position.x
 	var w := c.size.x
 	var slot_name: String = Items.SLOT_NAME.get(it["slot"], "")
-	if i == _stock.size() - 1:
+	if is_pick(i):
 		UI.text(self, Vector2(x + 10.0, c.position.y + 16.0), "For your %s" % slot_name.to_lower(), 11, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w * 0.62, "body", 700)
 	else:
 		UI.text(self, Vector2(x + 10.0, c.position.y + 16.0), slot_name, 11, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, w * 0.5, "body", 700)
@@ -1333,7 +1643,7 @@ func detail_rows() -> Array:
 	var out := []
 	var a := _act(_detail)
 	var is_res := str(a.get("kind", "")) == "reserve"
-	var weak := not is_res and int(a.get("i", -1)) == _stock.size() - 1
+	var weak := not is_res and is_pick(int(a.get("i", -1)))
 	var col: Color = UI.RARITY.get(it["rarity"], UI.CREAM)
 	var slot_name: String = Items.SLOT_NAME.get(it["slot"], "")
 	var head := "Waxley's Reserve" if is_res else ("For your %s" % slot_name.to_lower() if weak else slot_name)
@@ -1351,7 +1661,8 @@ func detail_rows() -> Array:
 	var ny := y + (80.0 if names.size() == 1 else 72.0)
 	for k in names.size():
 		out.append({"text": names[k], "pos": Vector2(nx, ny + (nfs + 2) * k), "w": nw, "size": nfs, "col": col, "kind": "title", "weight": 700})
-	var sub := "Item level %d" % int(it["ilvl"])
+	# Its item level, and what Waxley would give for it back (Items.sell_value).
+	var sub := "Item level %d  ·  sells back for %d" % [int(it["ilvl"]), Items.sell_value(it)]
 	out.append({"text": sub, "pos": Vector2(nx, ny + (nfs + 2) * (names.size() - 1) + 20.0), "w": nw, "size": 12, "col": UI.MUTED, "kind": "body", "weight": 600})
 	# The lines: the power in full (wrapped), then the rest in two columns.
 	var ly := y + 128.0
@@ -1389,12 +1700,12 @@ func detail_where() -> String:
 		"equipped":
 			var it = detail_item()
 			if it is Dictionary and not Game.melt_on_equip(it).is_empty():
-				return "Better than what you wear: you'd put it on, and your full satchel melts one."
+				return "Better than what you wear: you'd put it on, and I'd buy one from your full satchel."
 			return "Better than what you wear: you'd put it on at once."
 		"satchel":
 			return "Not better than what you wear: it would go in your satchel."
 		"full":
-			return "Your satchel is full: salvage something first."
+			return "Your satchel is full: sell me something first."
 		"poor":
 			return "Not enough embers yet."
 	return ""
@@ -1579,25 +1890,6 @@ func _flask(tb: RefCounted, c: Vector2, id: String, dim: bool) -> void:
 	tb.circle(c + Vector2(-8.0, -9.0), 4.0, Color(1, 1, 1, 0.25 if dim else 0.5), 10)
 
 
-func _draw_lines(all: Array, box: Rect2) -> void:
-	## An item's lines, wrapped, top down; "+N more" when they run out of room.
-	var f := UI.font("body", 600)
-	var y := box.position.y
-	for k in all.size():
-		var ln: Dictionary = all[k]
-		var txt: String = ln["text"]
-		var lc: Color = UI.MUTED if ln["kind"] == "implicit" else (Color("ffc080") if ln["kind"] == "legend" else UI.CREAM)
-		var h := f.get_multiline_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 12).y
-		# Room for this line and, when more follow, a "+N more" under it.
-		var need := h + (15.0 if k < all.size() - 1 else 0.0)
-		if y + need > box.end.y + 1.0:
-			if y + 13.0 <= box.end.y + 1.0:
-				draw_string(f, Vector2(box.position.x, y + 11.0), "+%d more" % (all.size() - k), HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 12, UI.MUTED)
-			return
-		draw_multiline_string(f, Vector2(box.position.x, y + 11.0), txt, HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 12, -1, lc)
-		y += h + 1.0
-
-
 func _chip(r: Rect2, label: String, v: float) -> void:
 	## "DMG +12%": green up, red down, grey even.
 	var col: Color = UP if v > 0.0 else (DOWN if v < 0.0 else UI.MUTED)
@@ -1648,39 +1940,264 @@ func _draw_relics() -> void:
 		UI.text(self, Vector2(c.position.x, c.end.y - BTN_H - 18.0), where, 12, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, c.size.x, "body", 600)
 
 
-func _draw_unmake() -> void:
-	var p := _unmake_panel()
-	UI.panel(self, p, Color(UI.GOLD, 0.55), UI.PANEL, 14.0)
-	# Left: Waxley, or a candle melting back down.
-	var art := Rect2(p.position.x + 14.0, p.position.y + 14.0, 132.0, p.size.y - 28.0)
-	if _portrait:
-		var side := minf(art.size.x, art.size.y)
-		draw_texture_rect(_portrait, Rect2(art.get_center() - Vector2(side, side) * 0.5, Vector2(side, side)), false)
-	else:
-		_melting_candle(Vector2(art.get_center().x, art.end.y - 10.0), art.size.y - 20.0)
-	var x := art.end.x + 16.0
-	var w := p.end.x - x - 18.0
-	UI.text(self, Vector2(x, p.position.y + 40.0), "Unmaking", 26, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700, 5)
-	draw_multiline_string(UI.font("body", 600), Vector2(x, p.position.y + 66.0),
-			"Waxley melts your skills back into points: free, as often as you like. Your level and Vigil ranks stay.",
-			HORIZONTAL_ALIGNMENT_LEFT, w, 14, 3, UI.CREAM)
+func _draw_sell() -> void:
+	## The Sell tab: the squares on the left, the piece shown (or how selling
+	## works) on the right, Sell marked under it (a button).
+	var s := _safe()
 	if not Game.hero_made():
+		UI.text(self, Vector2(s.position.x, s.get_center().y + 20.0), "Waxley buys from Wicks with a calling.", 17, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, s.size.x)
 		return
-	var h: Dictionary = Game.hero()
-	var spent := Game.points_spent()
-	UI.text(self, Vector2(x, p.position.y + 136.0), "In your tree: %d point%s" % [spent, "" if spent == 1 else "s"], 16, UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, w, "body", 700, 4)
-	var names := []
-	for n in Classes.tree(h["cls"]):
-		var r := int((h["skills"] as Dictionary).get(n["id"], 0))
-		if r - (1 if n["branch"] == -1 else 0) > 0:
-			names.append("%s %d" % [n["name"], r])
-	var listed := " · ".join(PackedStringArray(names)) if not names.is_empty() else ("%d points to spend on the Sheet" % int(h["points"]))
-	draw_multiline_string(UI.font("body", 600), Vector2(x, p.position.y + 158.0), listed, HORIZONTAL_ALIGNMENT_LEFT, w, 13, 2, UI.MUTED)
-	if _armed > 0.0:
-		var pulse := 0.5 + 0.5 * sin(_t * 10.0)
-		var sb := _box("arm", Color.BLACK, Color.BLACK, 16)
-		sb.bg_color = Color(UI.GOLD, 0.16 + 0.12 * pulse)
-		sb.draw(get_canvas_item(), Rect2(_unmake_btn.position, _unmake_btn.size).grow(4.0 + 2.0 * pulse))
+	var sq := squares()
+	var marks := TriBatch.new()
+	for k in sq.size():
+		var r: Rect2 = sq[k]
+		var cell: Dictionary = grid_square(k)
+		var glow := float(_sq_flash.get(k, 0.0))
+		if glow > 0.0:
+			var gb := _box("sq_glow", Color(UI.GOLD, 0.3), Color(UI.GOLD, 0.0), 12)
+			gb.bg_color = Color(UI.GOLD, 0.35 * glow)
+			gb.draw(get_canvas_item(), r.grow(5.0 * glow))
+		if cell.has("uid"):
+			var it = piece(str(cell["uid"]))
+			if not (it is Dictionary):
+				continue
+			var col: Color = UI.RARITY.get(it["rarity"], UI.CREAM)
+			var on := is_marked(it)
+			var sb := _box("sq", UI.PANEL, col, 9)
+			sb.bg_color = Color("2e2014") if on else UI.PANEL
+			sb.border_color = Color(col, 0.75)
+			sb.draw(get_canvas_item(), r)
+			if on:
+				# Marked: its price on a gold tag along the bottom.
+				var tag := _box("sq_tag", UI.GOLD, UI.GOLD, 6)
+				tag.set_border_width_all(0)
+				tag.draw(get_canvas_item(), Rect2(r.position.x + 4.0, r.end.y - 19.0, r.size.x - 8.0, 15.0))
+			if str(cell["uid"]) == _pick:
+				var ring := _box("sq_pick", Color(0, 0, 0, 0), UI.CREAM, 11)
+				ring.set_border_width_all(3)
+				ring.draw(get_canvas_item(), r.grow(3.0))
+			var look: Dictionary = _looks.get(str(cell["uid"]), {})
+			mark_glyph(marks, Vector2(r.end.x - 9.0, r.position.y + 9.0), 5.5, str(look.get("mark", "")))
+		elif cell.has("ghost"):
+			var gb := _box("sq_ghost", Color("150f1e"), Color(UI.PANEL_EDGE, 0.45), 9)
+			gb.draw(get_canvas_item(), r)
+		else:
+			# An empty place in the satchel: hollow.
+			var eb := _box("sq_empty", Color(0.05, 0.04, 0.07, 0.55), Color(UI.PANEL_EDGE, 0.35), 9)
+			eb.draw(get_canvas_item(), r)
+	for k in sq.size():
+		var r: Rect2 = sq[k]
+		var cell: Dictionary = grid_square(k)
+		if cell.has("uid"):
+			var it = piece(str(cell["uid"]))
+			if not (it is Dictionary):
+				continue
+			var on := is_marked(it)
+			var tex := UI.tex(Items.icon(it))
+			var side := minf(34.0, r.size.y - 26.0)
+			if tex:
+				draw_texture_rect(tex, Rect2(r.get_center().x - side * 0.5, r.position.y + 5.0, side, side), false)
+			if on and _ember_tex:
+				draw_texture_rect(_ember_tex, Rect2(r.position.x + 2.0, r.position.y + 2.0, 16, 16), false)
+			var price := str(Items.sell_value(it))
+			UI.text(self, Vector2(r.position.x, r.end.y - 7.0), price, UI.fit_size(price, r.size.x - 12.0, 13, 10, "body", 800),
+					UI.INK if on else UI.CREAM, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, "body", 800, 0 if on else 3)
+		elif cell.has("ghost"):
+			var it: Dictionary = cell["ghost"]
+			var tex := UI.tex(Items.icon(it))
+			if tex:
+				draw_texture_rect(tex, Rect2(r.get_center().x - 13.0, r.position.y + 4.0, 26, 26), false, Color(1, 1, 1, 0.25))
+			UI.text(self, Vector2(r.position.x, r.end.y - 18.0), "Buy back", UI.fit_size("Buy back", r.size.x - 4.0, 11, 9, "body", 700), UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, "body", 700)
+			var p := str(int(cell["price"]))
+			UI.text(self, Vector2(r.position.x, r.end.y - 5.0), p, 12, Color(UI.GOLD, 0.85), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, "body", 800)
+	marks.flush(self)   # the corner marks over the icons
+	var it = picked()
+	if it is Dictionary:
+		_draw_sell_piece(sell_panel_rect(), it)
+	else:
+		_draw_sell_help(sell_panel_rect())
+
+
+func _draw_sell_piece(p: Rect2, it: Dictionary) -> void:
+	## The piece shown, against what's worn: what it is, its chips and mark,
+	## its lines; whether it's marked (Wear and Sell +N are buttons below).
+	var col: Color = UI.RARITY.get(it["rarity"], UI.CREAM)
+	UI.panel(self, p, Color(col, 0.8), UI.PANEL, 12.0)
+	var look: Dictionary = _looks.get(str(it["uid"]), Game.sell_look(it))
+	var x := p.position.x
+	var y := p.position.y
+	var ic := Vector2(x + 34.0, y + 38.0)
+	var tb := TriBatch.new()
+	tb.circle(ic, 24.0, Color(col, 0.12), 24)
+	tb.ring(ic, 24.0, 1.5, Color(col, 0.5), 28)
+	tb.flush(self)
+	var tex := UI.tex(Items.icon(it))
+	if tex:
+		draw_texture_rect(tex, Rect2(ic - Vector2(20, 20), Vector2(40, 40)), false)
+	var tx := x + 68.0
+	var tw := p.end.x - 12.0 - tx
+	var slot_name: String = Items.SLOT_NAME.get(it["slot"], "")
+	var head := "%s  ·  %s  ·  item level %d" % [slot_name, Items.RARITY_NAME[it["rarity"]], int(it["ilvl"])]
+	UI.text(self, Vector2(tx, y + 20.0), head, UI.fit_size(head, tw, 12, 10, "body", 800), col, HORIZONTAL_ALIGNMENT_LEFT, tw, "body", 800)
+	var name := str(it["name"])
+	UI.text(self, Vector2(tx, y + 42.0), name, UI.fit_size(name, tw, 18, 12, "title", 700), col, HORIZONTAL_ALIGNMENT_LEFT, tw, "title", 700, 4)
+	var worn = Game.hero()["equip"].get(str(it["slot"]))
+	var vs := ("Against your %s" % str(worn["name"])) if worn is Dictionary else "Nothing worn there: it would fill the slot"
+	UI.text(self, Vector2(tx, y + 59.0), vs, UI.fit_size(vs, tw, 12, 10), UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, tw)
+	# The chips, and the mark in words.
+	var ch: Dictionary = look.get("chips", {})
+	var cy := y + 70.0
+	_chip(Rect2(x + 12.0, cy, 100.0, 24.0), "DMG", float(ch.get("dmg", 0.0)))
+	_chip(Rect2(x + 120.0, cy, 100.0, 24.0), "LIFE", float(ch.get("life", 0.0)))
+	var mark := str(look.get("mark", ""))
+	# (short: the panel is narrow on the smaller phones; the key says more)
+	var words := {"worse": "No better than worn", "trade": "A trade-off", "legendary": "Legendary",
+			"better": "Better than worn", "open": "Fills an empty slot"}
+	var mw := str(words.get(mark, ""))
+	var gb := TriBatch.new()
+	mark_glyph(gb, Vector2(x + 238.0, cy + 12.0), 6.0, mark)
+	gb.flush(self)
+	var mx := x + 250.0
+	UI.text(self, Vector2(mx, cy + 17.0), mw, UI.fit_size(mw, p.end.x - 10.0 - mx, 12, 9, "body", 700), mark_color(mark), HORIZONTAL_ALIGNMENT_LEFT, p.end.x - 10.0 - mx, "body", 700)
+	# Its lines: a Legendary's power first, then the rest in two columns.
+	var ly := cy + 42.0
+	var bottom := _wear_btn.position.y - 6.0
+	var lw := p.size.x - 24.0
+	var power: String = Items.LEGENDS.get(str(it.get("legend", "")), {}).get("text", "") if str(it.get("legend", "")) != "" else ""
+	if power != "":
+		var pl: Array = UI.wrap(power, lw, 12)
+		for k in mini(pl.size(), 2):
+			UI.text(self, Vector2(x + 12.0, ly), pl[k], 12, Color("ffc080"), HORIZONTAL_ALIGNMENT_LEFT, lw, "body", 700)
+			ly += 15.0
+	var rest: Array = Items.lines(it).filter(func(l): return l["kind"] == "affix") + Items.lines(it).filter(func(l): return l["kind"] == "implicit")
+	var cw := (lw - 12.0) * 0.5
+	for k in rest.size():
+		var row_y := ly + 15.0 * (k / 2)
+		if row_y > bottom - 18.0:
+			break
+		var txt: String = rest[k]["text"]
+		UI.text(self, Vector2(x + 12.0 + (k % 2) * (cw + 12.0), row_y), txt, UI.fit_size(txt, cw, 12, 9), UI.MUTED if rest[k]["kind"] == "implicit" else UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, cw)
+	# Marked or kept, left of the buttons.
+	var on := is_marked(it)
+	var hx := x + 14.0
+	var hw := _wear_btn.position.x - 10.0 - hx
+	var by := _wear_btn.position.y
+	if on and _ember_tex:
+		draw_texture_rect(_ember_tex, Rect2(hx - 2.0, by + 4.0, 18, 18), false)
+	var top_line := "Marked to sell" if on else "Kept"
+	var tip := "Tap it again to keep it" if on else "Tap it again to mark it"
+	var off := 20.0 if on else 0.0
+	UI.text(self, Vector2(hx + off, by + 18.0), top_line, 14, UI.GOLD if on else UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, hw - off, "body", 800)
+	UI.text(self, Vector2(hx, by + 36.0), tip, UI.fit_size(tip, hw, 12, 9), UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, hw)
+
+
+func _draw_sell_help(p: Rect2) -> void:
+	## Nothing shown yet: how selling works, the marks' key.
+	UI.panel(self, p, Color(UI.PANEL_EDGE, 0.7), UI.PANEL, 12.0)
+	var x := p.position.x + 16.0
+	var w := p.size.x - 32.0
+	var y := p.position.y
+	var n := (Game.hero()["satchel"] as Array).size()
+	var title := "Sell to Waxley" if n > 0 else "Nothing to sell"
+	UI.text(self, Vector2(x, y + 28.0), title, 19, UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w, "title", 700, 4)
+	var sub := "A quarter of his price, paid at once." if n > 0 else "Bring him what you don't wear: a quarter of his price."
+	UI.text(self, Vector2(x, y + 48.0), sub, UI.fit_size(sub, w, 13, 10), UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, w)
+	var keys := [["worse", "No better than what you wear"], ["trade", "A trade-off: one up, one down"], ["legendary", "Legendary: kept unless you mark it"]]
+	var tb := TriBatch.new()
+	for k in keys.size():
+		mark_glyph(tb, Vector2(x + 6.0, y + 70.0 + 18.0 * k), 5.5, str(keys[k][0]))
+	tb.flush(self)
+	for k in keys.size():
+		var t := str(keys[k][1])
+		UI.text(self, Vector2(x + 20.0, y + 75.0 + 18.0 * k), t, UI.fit_size(t, w - 20.0, 12, 9), mark_color(str(keys[k][0])), HORIZONTAL_ALIGNMENT_LEFT, w - 20.0, "body", 700)
+	if _ember_tex:
+		draw_texture_rect(_ember_tex, Rect2(x - 2.0, y + 117.0, 16, 16), false)
+	var m := "Marked: sells with the button below"
+	UI.text(self, Vector2(x + 20.0, y + 129.0), m, UI.fit_size(m, w - 20.0, 12, 9), UI.GOLD, HORIZONTAL_ALIGNMENT_LEFT, w - 20.0, "body", 700)
+	var help := "Tap a piece to see it against what you wear; tap it again to mark or keep it. Sold one by mistake? Tap its ghost to buy it back before you go."
+	var lines: Array = UI.wrap(help, w, 12)
+	var fs := 12
+	if y + 152.0 + 15.0 * (lines.size() - 1) > p.end.y - 6.0:
+		fs = 11
+		lines = UI.wrap(help, w, fs)
+	for k in lines.size():
+		var ty := y + 152.0 + (fs + 3) * k
+		if ty > p.end.y - 6.0:
+			break
+		UI.text(self, Vector2(x, ty), lines[k], fs, UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, w)
+
+
+static func mark_color(mark: String) -> Color:
+	match mark:
+		"worse":
+			return DOWN
+		"trade":
+			return AMBER
+		"legendary":
+			return UI.RARITY["legendary"]
+		"better":
+			return UP
+	return UI.MUTED
+
+
+static func mark_glyph(tb: RefCounted, c: Vector2, r: float, mark: String) -> void:
+	## A Sell square's corner mark, drawn (no font has them all), ink-edged:
+	## ▼ no better than worn, ◆ a trade-off, ★ a Legendary, ▲ an upgrade.
+	var pts := PackedVector2Array()
+	match mark:
+		"worse":
+			pts = PackedVector2Array([c + Vector2(-r, -r * 0.7), c + Vector2(r, -r * 0.7), c + Vector2(0, r * 0.95)])
+		"better":
+			pts = PackedVector2Array([c + Vector2(0, -r * 0.95), c + Vector2(r, r * 0.7), c + Vector2(-r, r * 0.7)])
+		"trade":
+			pts = PackedVector2Array([c + Vector2(0, -r), c + Vector2(r * 0.8, 0), c + Vector2(0, r), c + Vector2(-r * 0.8, 0)])
+		"legendary":
+			for k in 10:
+				var a := -PI * 0.5 + PI * 0.2 * k
+				pts.append(c + Vector2(cos(a), sin(a)) * (r * 1.15 if k % 2 == 0 else r * 0.5))
+		_:
+			return
+	var edge := PackedVector2Array()
+	for p in pts:
+		edge.append(c + (p - c) * ((r + 2.0) / r))
+	if mark == "legendary":
+		tb.concave(edge, UI.INK)
+		tb.concave(pts, mark_color(mark))
+	else:
+		tb.convex(edge, UI.INK)
+		tb.convex(pts, mark_color(mark))
+
+
+static func draw_badge(b: Control, badge: Dictionary, t: float) -> void:
+	## The Shop button's corner mark (Game.shop_badge), on the map and the
+	## results: a red "16/16" pill (the satchel full), a green ▲ (an upgrade
+	## he can afford), a gold dot (a new Reserve).
+	match str(badge.get("kind", "")):
+		"full":
+			var txt := str(badge.get("text", ""))
+			var w := UI.text_width(txt, 11, "body", 800) + 12.0
+			var r := Rect2(b.size.x - w + 6.0, -7.0, w, 17.0)
+			var sb := UI.box()
+			sb.bg_color = DOWN
+			sb.border_color = UI.INK
+			sb.set_border_width_all(2)
+			sb.set_corner_radius_all(8)
+			sb.draw(b.get_canvas_item(), r)
+			UI.text(b, Vector2(r.position.x, r.position.y + 12.5), txt, 11, UI.INK, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, "body", 800)
+		"up":
+			var tb := UI.batch()
+			var c := Vector2(b.size.x - 6.0, 6.0)
+			tb.circle(c, 9.0, UI.INK, 18)
+			tb.circle(c, 7.5, UP, 18)
+			tb.convex(PackedVector2Array([c + Vector2(0, -4.5), c + Vector2(4.5, 3.0), c + Vector2(-4.5, 3.0)]), UI.INK)
+			tb.flush(b)
+		"new":
+			var tb := UI.batch()
+			var k := 1.0 + 0.12 * sin(t * 4.0)
+			var c := Vector2(b.size.x - 6.0, 6.0)
+			tb.circle(c, 7.5 * k, UI.INK, 16)
+			tb.circle(c, 6.0 * k, UI.GOLD, 16)
+			tb.flush(b)
 
 
 func _glow(c: Vector2, r: float, strength := 1.0) -> void:
@@ -1782,29 +2299,6 @@ func _weapon_icon(c: Vector2, r: float, cls: String, metal: Color, dark: Color, 
 func _gem(c: Vector2, r: float, col: Color) -> void:
 	_shape(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r * 0.8, -r * 0.2), c + Vector2(0, r), c + Vector2(-r * 0.8, -r * 0.2)]), col)
 	_shape(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r * 0.8, -r * 0.2), c + Vector2(0, -r * 0.05)]), col.lightened(0.35), false)
-
-
-func _melting_candle(foot: Vector2, h: float) -> void:
-	## Unmaking's picture: a tall candle, drips running, pooling into wax.
-	var w := 36.0
-	var body := Rect2(foot.x - w * 0.5, foot.y - h * 0.62, w, h * 0.62)
-	var tip := Vector2(foot.x, body.position.y - 6.0)
-	_glow(tip + Vector2(0, -14), 70.0)
-	draw_colored_polygon(PackedVector2Array([foot + Vector2(-60, 0), foot + Vector2(-40, -10), foot + Vector2(42, -10), foot + Vector2(64, 0), foot + Vector2(42, 8), foot + Vector2(-46, 8)]), UI.INK)
-	draw_colored_polygon(PackedVector2Array([foot + Vector2(-56, 0), foot + Vector2(-38, -8), foot + Vector2(40, -8), foot + Vector2(60, 0), foot + Vector2(40, 6), foot + Vector2(-42, 6)]), Color("e3d5b6"))
-	draw_colored_polygon(PackedVector2Array([foot + Vector2(-40, -4), foot + Vector2(-20, -7), foot + Vector2(10, -6), foot + Vector2(-8, -2)]), Color("fff4dc"))
-	_shape(_rect_pts(body), Color("efe3c8"))
-	draw_rect(Rect2(body.end.x - 10.0, body.position.y + 1.0, 8.0, body.size.y - 2.0), Color("cdbd98"))
-	draw_rect(Rect2(body.position.x + 5.0, body.position.y + 14.0, 3.0, body.size.y - 30.0), Color("fffaf0"))
-	# Drips hang over the rim.
-	for k in 3:
-		var dx := body.position.x + 6.0 + k * 12.0
-		var dl := 18.0 + 14.0 * ((k * 5) % 3)
-		_shape(PackedVector2Array([Vector2(dx - 4.0, body.position.y - 1.0), Vector2(dx + 5.0, body.position.y - 1.0),
-				Vector2(dx + 4.0, body.position.y + dl), Vector2(dx + 0.5, body.position.y + dl + 5.0), Vector2(dx - 3.0, body.position.y + dl)]), Color("fff6e0"))
-	draw_colored_polygon(PackedVector2Array([body.position + Vector2(-2, -2), body.end - Vector2(-2, body.size.y + 2), body.end - Vector2(-2, body.size.y - 5), body.position + Vector2(-2, 5)]), Color("fff6e0"))
-	draw_line(Vector2(foot.x, body.position.y), tip, UI.INK, 2.5)
-	_flame(tip, 26.0)
 
 
 func _rect_pts(r: Rect2) -> PackedVector2Array:

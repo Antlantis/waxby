@@ -15,8 +15,11 @@ ring them again.
   - Bellfounder: Peal ground slam, runs on Heat; stampede.
   - Sexton: Knell wisps and Toll the Dead, runs on Dirge; grave step.
 - **Levels and loot:** XP to level 30, skill points, gear with affixes and
-  Legendaries, a relic codex with a belt of 2 to 4 slots, and the Chandler's
-  shop. The belt changes between levels, on the map's Sheet; in a level its
+  Legendaries, a relic codex with a belt of 2 to 4 slots, and Waxley's Shop
+  (the Chandler), on the map and after every bell: Buy (two "For your
+  <slot>" picks, and Fresh stock for embers), Sell (a quarter of his price,
+  everything marked in one tap, bought back until you leave), Relics and
+  Draughts. The belt changes between levels, on the map's Sheet; in a level its
   tab is only to look at, and a found relic goes straight onto a free slot.
   A lit altar with a skill point waiting offers three skills (the Altar
   Rites; again while points are left), then a relic found with the belt full

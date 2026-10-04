@@ -2680,6 +2680,8 @@ func _take_item(it: Dictionary) -> String:
 	_legend_moment(it, where)
 	if where != "full":
 		bark("first_item")   # "...the rest waits in your satchel": not while it's full
+	if mode == null and Game.satchel_full():
+		bark("satchel_full")   # Waxley, once a save: he buys, after the bell
 	return where
 
 

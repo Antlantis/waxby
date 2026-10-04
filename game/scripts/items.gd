@@ -1,6 +1,6 @@
 extends RefCounted
 ## Gear: the five slots, rarities, the affix table, rolling a new item, its
-## name, its stat changes, what it costs and what it salvages for. Static.
+## name, its stat changes, what it costs and what Waxley pays for it. Static.
 ## Items are plain Dictionaries so they save as JSON:
 ##
 ##   {uid, slot, base, cls, ilvl, tier, rarity, name, implicit: {id, v, ...},
@@ -108,7 +108,6 @@ const RARE_FIRST := ["Grim", "Ashen", "Hollow", "Sable", "Guttering", "Pale", "T
 const RARE_FIRST_DEEP := ["Rooted", "Rimed", "Shattered", "Hushed"]
 const RARE_SECOND := {"weapon": ["Edge", "Fang", "Bite"], "candle": ["Taper", "Wick", "Vigil"], "coat": ["Shroud", "Hauberk"],
 		"boots": ["Treads", "Stompers"], "charm": ["Token", "Knot"]}
-const SALVAGE := {"common": 2, "magic": 6, "rare": 15, "legendary": 40}
 const TIER_MULT := [1.0, 1.12, 1.25, 1.36, 1.46]
 const COAT_DR_MAX := 12.0   # the coat's own damage reduction, per item
 
@@ -438,11 +437,18 @@ static func power(it) -> int:
 	return roundi(p)
 
 
-static func salvage_value(it) -> int:
-	## Common 2, Blessed 6, Rare 15, Legendary 40, each x (1 + ilvl/10) embers.
+static func sell_value(it) -> int:
+	## What Waxley pays for it: a quarter of his own price (price), so a Rare
+	## at ilvl 20 sells for 123 (Blessed 48, Legendary 275).
 	if not (it is Dictionary) or it.is_empty():
 		return 0
-	return roundi(float(SALVAGE.get(it["rarity"], 2)) * (1.0 + float(it["ilvl"]) / 10.0))
+	return roundi(float(price(it)) / 4.0)
+
+
+static func salvage_value(it) -> int:
+	## The old name for sell_value: an item melted for room (a full satchel,
+	## an upgrade worn into one) pays what a sale would.
+	return sell_value(it)
 
 
 static func price(it) -> int:

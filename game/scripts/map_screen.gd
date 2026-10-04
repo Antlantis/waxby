@@ -9,7 +9,10 @@ extends Control
 ## Witching Hour, the deeper two with their "Lv 30+" / "Lv 40+" chips) and
 ## who's playing (his own name, then his calling and level, a gold "+" while
 ## skill points wait).
-## Along the bottom: Callings · Sheet · Chandler (· Challenges) and Play.
+## Along the bottom: Callings · Sheet · Shop (· Challenges) and Play. The
+## Shop (Waxley's, the Chandler) wears a corner mark (Game.shop_badge): a red
+## "16/16" while the satchel is full, else a green ▲ while a ware he can
+## afford would be an upgrade, else a gold dot for a Reserve not yet seen.
 ## World tabs appear once World 2 is open: one per world in the build (six
 ## in v3), each in its world's accent with its emblem (art/ui/world_<n>.svg),
 ## a world not reached yet dark behind a lock.
@@ -55,6 +58,7 @@ const UI := preload("res://scripts/ui.gd")
 const Classes := preload("res://scripts/classes.gd")
 const Combat := preload("res://scripts/combat.gd")
 const Twists := preload("res://scripts/twists.gd")
+const Chandler := preload("res://scripts/chandler_screen.gd")   # the Shop button's mark (draw_badge)
 const MODES_SAVE := "res://scripts/modes/modes_save.gd"
 const MODES_SCREEN := "res://scripts/modes/modes_screen.gd"
 const HUB_FROM := "1-2"           # the Challenges show once this is cleared (without ModesSave to say)
@@ -85,6 +89,7 @@ var _card_ok: Button = null
 var _card_alt: Button = null
 static var _resume_offered := ""   # the snapshot last offered (its "at"), once each
 var _marks := {"news": false, "resume": false, "t": 0.0}   # the Challenges button's marks, asked twice a second
+var shop_badge := {}              # the Shop button's mark (Game.shop_badge), asked on _refresh
 var _deny := 0.0
 var _deny_d := ""                 # the locked bell last tapped (it shakes)
 var _note := ""                   # why a locked bell or world tab won't open: over the name line for NOTE_TIME
@@ -135,7 +140,9 @@ func _ready() -> void:
 	_back_btn.custom_minimum_size = Vector2(70, UI.TAP_H)
 	_callings_btn = UI.make_button("Callings", false, func(): _open("callings"), "click", 15)
 	_sheet_btn = UI.make_button("Sheet", false, func(): _open("sheet"), "click", 15)
-	_chandler_btn = UI.make_button("Chandler", false, func(): _open("chandler"), "click", 15)
+	_chandler_btn = UI.make_button("Shop", false, func(): _open("chandler"), "click", 15)
+	_chandler_btn.name = "Shop"
+	_chandler_btn.draw.connect(func(): Chandler.draw_badge(_chandler_btn, shop_badge, _t))
 	_challenges_btn = UI.make_button("Challenges", false, func(): _open("challenges"), "click", 15)
 	_challenges_btn.name = "Challenges"
 	_challenges_btn.draw.connect(_draw_challenges_marks)
@@ -188,6 +195,8 @@ func _refresh() -> void:
 	var pts := int(Game.hero().get("points", 0))
 	_sheet_btn.text = "Sheet  +%d" % pts if pts > 0 else "Sheet"
 	_sheet_btn.add_theme_color_override("font_color", UI.GOLD if pts > 0 else UI.CREAM)
+	shop_badge = Game.shop_badge() if Game.has_method("shop_badge") else {}
+	_chandler_btn.queue_redraw()
 	queue_redraw()
 
 
@@ -795,6 +804,8 @@ func _process(dt: float) -> void:
 		if float(_marks["t"]) <= 0.0:
 			_marks = {"news": challenges_news(), "resume": challenges_resume(), "t": 0.5}
 		_challenges_btn.queue_redraw()
+	if str(shop_badge.get("kind", "")) == "new":
+		_chandler_btn.queue_redraw()   # its dot breathes
 	queue_redraw()
 
 

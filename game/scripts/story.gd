@@ -179,7 +179,8 @@ const SCENES_W1 := {
 	"meet_waxley": {"overlay": true, "shots": [{"beats": [
 		["waxley:grin", "A customer! A live one! Waxley, chandler: candles, charms and holy relics."],
 		["wick", "@waxley"],
-		["waxley:shifty", "Embers only, friend. No credit, no refunds, no questions."],
+		# (An overlay keeps to three lines: his buy-back comes with the terms.)
+		["waxley:shifty", "No credit, no refunds. But I buy what you don't wear: a quarter of my price!"],
 	]}]},
 
 	# A new calling made from the Callings screen: Taper has a word for it
@@ -1244,6 +1245,7 @@ const BARKS := {
 	# ---- Progression and screens
 	"second_capstone": ["hollin:grin", "Two flames on one wick! Mother never managed that. Don't tell her."],
 	"reserve_stocked": ["waxley:shifty", "Don't ask where I got it. Really. Don't."],
+	"satchel_full": ["waxley:grin", "Stuffed, friend? I'll buy the lot. After the bell, tap Shop."],   # world._take_item
 	# ---- A new calling (Taper's word, or Hollin's while she rests: REST_SUBS)
 	"new_keeper":        ["taper:proud", "@taper_react", "every"],
 	"new_keeper_hollin": ["hollin:grin", "A new {calling}! Mother's resting, so you get me. Welcome!", "every"],
