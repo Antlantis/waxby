@@ -6,7 +6,9 @@ extends RefCounted
 ## lands isn't where the plan said (a monster's knock, a crumble, a moving
 ## ledge's timing), it plans again from there. It swings at whatever is in
 ## front of it as it goes. At a boss (the arena reached) it fights as v2's bot
-## did: toward him, swinging, hopping his waves. It plans a few sims a tick,
+## did: toward him, swinging, hopping his waves; shut in a fight room (a
+## secret level's Warden, a sealed duel, ambush or hold) it fights the room's
+## foe the same way till the doors open (_room_pad). It plans a few sims a tick,
 ## so a route never stalls a frame; while it plans it stands still.
 ##
 ## v2's bot only held right and jumped every second: it stood forever at the
@@ -68,7 +70,7 @@ func setup(w: Node) -> void:
 			goal = g
 		elif g["what"] == "silver bell" and str(w.level.id).ends_with("-S"):
 			# A secret level: its S is where the silver bell rises once the
-			# Warden falls (features/secrets.gd); the fight is _warden_pad's.
+			# Warden falls (features/secrets.gd); the fight is _room_pad's.
 			goal = g
 	if goal.is_empty() and not goals.is_empty():
 		goal = goals[goals.size() - 1]
@@ -113,7 +115,7 @@ func pad(dt: float) -> Dictionary:
 		return {}
 	if goal.is_empty():
 		return _v2_pad()
-	var wp := _warden_pad(pl)
+	var wp := _room_pad(pl)
 	if not wp.is_empty():
 		return wp
 	if goal.has("altar"):
@@ -397,25 +399,36 @@ func _fight_pad(pl: Node2D) -> Dictionary:
 	return pd
 
 
-func _warden_pad(pl: Node2D) -> Dictionary:
-	## A secret level's Warden awake in its sealed room (features/secrets.gd:
-	## phase "fight"): toward it, swinging, hopping its blows; once it falls
-	## the plan goes on to the silver bell rising at the S. {} otherwise.
+func _room_pad(pl: Node2D) -> Dictionary:
+	## A shut fight room: the first feature module whose bot_target(pl) names
+	## one (secrets.gd: a secret level's Warden awake in its sealed room;
+	## sealed.gd: a duel's, an ambush's or a hold's nearest foe, or where to
+	## wait while they drop in). Toward it, swinging, hopping its blows; once
+	## the room opens the plan goes on from where he stands (to the silver
+	## bell rising at a secret level's S, or the level's bell). {} otherwise.
 	var f = world.get("features")
-	var sm = f.by_name.get("secrets") if f != null and f.get("by_name") != null else null
-	if sm == null or not bool(sm.get("secret_level")) or str(sm.get("phase")) != "fight":
+	var mods = f.get("modules") if f != null else null
+	if not (mods is Array):
 		return {}
-	var wd = sm.get("warden")
-	if wd == null or not is_instance_valid(wd) or not wd.alive or bool(sm.get("dormant")):
+	var target = null
+	for m in mods:
+		if m != null and m.has_method("bot_target"):
+			target = m.bot_target(pl)
+			if target != null:
+				break
+	if target == null:
 		return {}
+	var at: Vector2 = (target as Node2D).position if target is Node2D else target
 	_search = null
 	_route = []
 	state = "plan"
 	var pd := {"attack": (_i / 20) % 2 == 0}
-	var dx: float = wd.position.x - pl.position.x
+	var dx: float = at.x - pl.position.x
 	if absf(dx) > 36.0:
 		pd["right" if dx > 0.0 else "left"] = true
-	pd["jump"] = (_i / 50) % 3 == 0 or (wd.position.y < pl.position.y - 48.0 and absf(dx) < 96.0)
+	# Under a foe over his head: jump again and again (a held jump is one
+	# press; it stood under a Flit for good).
+	pd["jump"] = (_i / 50) % 3 == 0 or (at.y < pl.position.y - 48.0 and absf(dx) < 96.0 and (_i / 12) % 2 == 0)
 	pd["special"] = (_i / 90) % 4 == 0
 	return pd
 

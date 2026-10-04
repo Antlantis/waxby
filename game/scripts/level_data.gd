@@ -56,6 +56,8 @@ extends RefCounted
 ## story_end, par, tick, secret, secret_prize, gusts, hush, chase, cog_phase,
 ## weight_phase, rush. Every header, known or not, is also kept raw in
 ## `headers` (the modes' private keys: kind, tier, tags, deep, ...).
+## Build 2's `room: duel 98-109 rows 3-7; ambush 200-229; hold 300-327 @20`
+## (sealed fight rooms) is read raw by features/sealed.gd.
 
 const TILE := 32
 
