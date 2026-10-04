@@ -7,7 +7,12 @@ extends SceneTree
 ## it should. Build 1: pure down held a moment on a ledge drops through it
 ## (never on solid floor, never a down carried onto it), and a controller's
 ## d-pad, stick and buttons reach the actions; a boss's first kill, a
-## player's, offers his prize on the choice card (the Boss Boons).
+## player's, offers his prize on the choice card (the Boss Boons). Build 2:
+## every level file's own headers keep their rules (tests/level_rules.gd
+## header_problems: an anoint: that reads and anoints, a twist: id twists.gd
+## knows, a lesson: that fits, a roster: its rows keep, sealed rooms), and
+## each world's regular levels their rules across them (world_problems:
+## World 1-2's too, once they declare their tables).
 ##
 ##     godot --headless --path game --script res://tests/test_core.gd
 
@@ -22,6 +27,7 @@ const Combat := preload("res://scripts/combat.gd")
 const Reach := preload("res://scripts/reach.gd")
 const Movers := preload("res://scripts/movers.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const LAB_LEVELS := ["res://levels/lab-0.txt", "res://levels/lab-1.txt"]
 const TILE := 32
 const DT := 1.0 / 120.0
@@ -123,6 +129,20 @@ func _test_levels_parse() -> void:
 		_check(LevelData.is_solid(lv.tile(start.x, start.y + 1)), "%s: Wick starts on the floor" % lv.id)
 		_check(lv.area >= 1, "%s has an area level" % lv.id)
 		_check_placements(lv)
+		# Build 2's headers, whoever wrote them (a W1-W2 explicit header list
+		# too): a misspelt twist, an anoint that names no monster, a lesson
+		# too long for the band would otherwise play on silently.
+		var hp := Rules.header_problems(lv)
+		_check(hp.is_empty(), "%s: its Build 2 headers keep their rules %s" % [lv.id, hp])
+	# Each world's regular levels (not its boss level, not its secret) against
+	# their rules across them: the threat ramp, the roles, the variety.
+	for wn in range(1, 7):
+		var regular := []
+		for lv in _levels():
+			if int(lv.world) == wn and lv.boss == "":
+				regular.append(lv)
+		var wp := Rules.world_problems(regular)
+		_check(wp.is_empty(), "World %d's regular levels keep the world's rules %s" % [wn, wp])
 
 
 func _check_placements(lv: RefCounted) -> void:

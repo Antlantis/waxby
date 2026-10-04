@@ -34,6 +34,7 @@ const BARK_FALLBACK := {"who": "hollin", "mood": "relit", "text": "Two flames on
 
 var tab := "stats"
 var over_level := false           # over a paused level: a darker, see-through backdrop, the belt locked
+var world: Node = null            # that level's World (the Stats tab reads its flask: a twist's cut, a mode's own)
 var panel: Control                # the open tab's panel
 var _tabs := {}                   # name -> Button
 var _back_btn: Button

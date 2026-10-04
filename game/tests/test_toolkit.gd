@@ -12,12 +12,20 @@ extends SceneTree
 ##   - the cast (a nest as its Gutterwing) and each roster rule, shown to
 ##     catch what it should on edited copies (a Rattle over the cap, a kind
 ##     it doesn't declare, a missing headline, the fodder share, the count, a
-##     later world's headline, a guest that isn't one);
-##   - the threat: forced Anointed at x2.5, packs at their size, the 10%
-##     band and the X-1..X-3 ramp, all to the tile (40.5 over 162 tiles);
+##     later world's headline, a guest that isn't one, a banned kind placed,
+##     pack_leaders on a kind it doesn't list, a list of kinds for a roster),
+##     and let through what the spec writes (a Rattle listed, World 6's
+##     Brinejaw headline);
+##   - the threat: forced Anointed at x2.5, packs at their size (Hushlings'
+##     Dusk 2-3 without the twist, 3-5 under it or behind an Anointed leader,
+##     a roster's pack_leaders), the 10% band and the X-1..X-3 ramp (flat
+##     today, +1 once a world is re-cut), all to the tile (42.0 over 162);
 ##   - checkpoints: the gap, 3-5 altars, an altar by a sealed room's door;
 ##   - the anoint: cells' rules (an anointable kind, Omens from its Dusk
-##     pool, World 1-2's limit) and no two re-cut levels' roles alike;
+##     pool, World 1-2's limit), a twist id twists.gd knows, a lesson that
+##     fits; a re-cut world: every level declares its roles, no two share
+##     their landmarks or their altars' places, fodder falls, the X-3 mixes,
+##     no screen holds more than AWAKE_MAX in play;
 ##   - the stamps where they were drawn, standing where PLACEMENT says.
 ##
 ##     godot --headless --path game --script res://tests/test_toolkit.gd
@@ -51,6 +59,7 @@ func _initialize() -> void:
 		_test_headers()
 		_test_roster()
 		_test_threat()
+		_test_recut()
 		_test_checkpoints()
 		_test_anoint()
 		_test_stamps()
@@ -113,8 +122,28 @@ func _test_headers() -> void:
 			"range headers read back")
 	_check(Rules.roles_problems([lv]).is_empty(), "one re-cut level shares its roles with nobody")
 	var twin := _lv("6-2")
-	_check(_has(Rules.roles_problems([_lv("6-1"), twin]), "share their section roles"), "two re-cut levels with the same roles are caught")
-	_check(Rules.roles_problems([_lv("6-1"), _with(twin, "roles", "S C A V A B")]).is_empty(), "and different ones pass")
+	_check(_has(Rules.roles_problems([_lv("6-1"), twin]), "share their landmarks"), "two re-cut levels with the same roles are caught")
+	# A content section more, or an altar more in a run, is no change: the
+	# landmarks are the same (and so are the altars' places).
+	_check(_has(Rules.roles_problems([_lv("6-1"), _with(_lv("6-2"), "roles", "S C C A C A A C V A C B")]), "share their landmarks (S A V A B)"),
+			"a content section or an altar more in a run is still the same landmarks")
+	_check(_has(Rules.roles_problems([_lv("6-1"), _with(_lv("6-2"), "roles", "S V A A B")]), "altars within 8 tiles"),
+			"other landmarks but the altars in the same places are caught")
+	var moved := _with(_lv("6-2"), "roles", "S V A A B")
+	for e in moved.entities:
+		if e["kind"] == "altar":
+			e["cell"] = Vector2i(int(e["cell"].x) + 12, int(e["cell"].y))
+	_check(Rules.roles_problems([_lv("6-1"), moved]).is_empty(), "other landmarks and altars elsewhere pass (%s)" % [Rules.roles_problems([_lv("6-1"), moved])])
+	var plain := _with(_lv("6-3"), "roles", "")
+	_check(_has(Rules.roles_problems([_lv("6-1"), moved, plain]), "6-3 declares no roles"), "once one is re-cut, a sibling with no roles: is caught")
+	_check(Rules.roles_problems([_with(_lv("6-1"), "roles", ""), _with(_lv("6-2"), "roles", "")]).is_empty(), "a world of today's levels (no roles:) has none to compare")
+	_check(Rules.landmarks_of("S C C A C C A C V A C D A C B") == "S A V A D A B", "the landmarks: content left out, a run as one")
+	# The level's own headers (test_core sweeps every file): a twist id
+	# twists.gd knows, a lesson that fits.
+	_check(Rules.header_problems(_lv()).is_empty(), "the fixture's headers keep their rules (%s)" % [Rules.header_problems(_lv())])
+	_check(_has(Rules.twist_problems(_with(_lv(), "twist", "restles")), "none of twists.gd's"), "a twist typo is caught (it would be no rule, silently)")
+	_check(_has(Rules.twist_problems(_with(_lv(), "lesson", "First Frost|" + "x".repeat(Twists.LINE_MAX + 1))), "at most %d" % Twists.LINE_MAX)
+			and _has(Rules.twist_problems(_with(_lv(), "lesson", "Into the Orchard")), "Title|Line"), "a lesson line too long, or with no line, is caught")
 
 
 func _test_roster() -> void:
@@ -148,33 +177,90 @@ func _test_roster() -> void:
 			"a guest from this world is caught")
 	_check(_has(Rules.roster_problems(_lv(), 5), "hushling is World 6's"), "in World 5, a World 6 headline is caught")
 	_check(_has(Rules.roster_problems(_with(_lv(), "roster", "headline=hushling; support=skeleton; rattle_max=1; fodder_max=1; oops=2")), "unknown roster key oops")
-			and _has(Rules.roster_problems(_with(_lv(), "roster", "headline=hushling; support=skeleton; rattle_max=1; fodder_max=1")), "skeleton is listed"),
-			"an unknown key and a listed Rattle are caught")
+			and _has(Rules.roster_problems(_with(_lv(), "roster", "headline=hushling; support=lidlurk; rattle_max=1; fodder_max=1")), "lidlurk is listed"),
+			"an unknown key and a listed Lidlurk are caught")
+	# The spec's spellings: a Rattle listed is rattle_max's (left out), World
+	# 6 may headline World 2's Brinejaw, banned kinds, pack_leaders.
+	_check(Rules.roster_problems(_with(_lv(), "roster", "headline=hushling,stillmaw; support=bonebow,gutterwing,skeleton; " + base.substr(base.find("guest")))).is_empty(),
+			"a Rattle in a kind list is left out (rattle_max holds Rattles)")
+	var jaws := _lv()
+	jaws.entities.append({"kind": "brinejaw", "cell": Vector2i(40, 12)})
+	var jr := "headline=hushling,stillmaw,brinejaw; " + base.replace("count=15", "count=16").replace("0.67", "0.7")
+	_check(Rules.roster_problems(_with(jaws, "roster", jr)).is_empty() and _has(Rules.roster_problems(_with(jaws, "roster", jr), 5), "brinejaw is World 2's"),
+			"World 6 headlines the Brinejaw (HEADLINE_RETURN); World 5 may not")
+	_check(_has(Rules.roster_problems(_with(_lv(), "roster", "headline=hushling,stillmaw; " + base.replace("rootling", "bonebow").replace("support=bonebow,", "support=") + "; banned=rootling")), "2 rootling, banned"),
+			"a banned kind placed is caught")
+	_check(_has(Rules.roster_problems(_with(_lv(), "roster", "headline=hushling,stillmaw; " + base + "; pack_leaders=unwick:2")), "pack_leaders unwick"),
+			"pack_leaders on a kind it doesn't list is caught")
+	_check(_has(Rules.roster_problems(_with(_lv(), "roster", "skeleton,bat")), "not a list of kinds"), "a list of kinds for a roster (the spec's W1-W2 rows) is caught")
+	var rl := Rules.roster_of(_with(_lv(), "roster", "headline=hushling; rattle_max=1; fodder_max=1; banned=frostbuckle,tickwind; pack_leaders=glassmite:3,tickwind:2; stamps=crossfire"))
+	_check(rl["banned"] == ["frostbuckle", "tickwind"] and rl["pack_leaders"] == {"glassmite": 3, "tickwind": 2} and rl["stamps"] == ["crossfire"],
+			"banned, pack_leaders and stamps read back (%s)" % [rl])
 
 
 func _test_threat() -> void:
 	var lv := _lv()
-	# Forced (x2.5): the Bonebow, the Thornback at 37,12, the Stillmaw. Packs:
-	# the two Creepbones 8 apart are two packs of one (+1 each), the Hushlings
-	# a pair (+1) and one alone (+2).
+	# Forced (x2.5): the Bonebow, the Thornback at 37,12, the Stillmaw. Packs
+	# (the packs twist): each Creepbone its lane partner (+1 each), the
+	# Hushlings' packs at the twist's 3-5 mean, 4: a pair (+2) and one alone
+	# (+3).
 	var forced := 2.5 * (_c("bonebow") + _c("thornback") + _c("stillmaw"))
 	var plain := _c("thornback") + 2 * _c("creepbone") + 3 * _c("hushling") + _c("gutterwing") + _c("skeleton") + _c("rattlehound") \
 			+ 2 * _c("rootling") + _c("lidlurk")
-	var packs := 2 * _c("creepbone") + 3 * _c("hushling")
+	var packs := 2 * _c("creepbone") + 5 * _c("hushling")
 	var got := Rules.threat_of(lv)
-	_check(is_equal_approx(got, (forced + plain + packs) * 100.0 / WIDTH) and is_equal_approx(got, 25.0),
-			"the threat counts forced Anointed at x2.5 and packs at their size: %.3f (40.5 over 162 tiles)" % got)
-	_check(is_equal_approx(Rules.threat_of(_with(_lv(), "twist", "")), (forced + plain) * 100.0 / WIDTH), "with no packs twist, placed packs count as drawn")
+	_check(is_equal_approx(got, (forced + plain + packs) * 100.0 / WIDTH) and absf(got - 42.0 * 100.0 / WIDTH) < 0.0001,
+			"the threat counts forced Anointed at x2.5 and packs at their size: %.3f (42.0 over 162 tiles)" % got)
+	# With no twist the Hushlings still bring their Dusk pack (2-3, at 2.5):
+	# the pair +0.5, the one alone +1.5; the Creepbones count as drawn.
+	_check(is_equal_approx(Rules.threat_of(_with(_lv(), "twist", "")), (forced + plain + 2.0 * _c("hushling")) * 100.0 / WIDTH),
+			"with no packs twist, the Hushlings' Dusk packs (2.5) and the rest as drawn")
 	_check(is_equal_approx(Rules.threat_of(_with(_lv(), "anoint", "")), (forced / 2.5 + plain + packs) * 100.0 / WIDTH), "with no anoint:, nobody at x2.5")
+	# A forced Anointed Hushling leading its pack (behave_diff: Nightfall's
+	# 3-5, at 4), the twist off: the lone one at 80,12 brings three.
+	var led := _with(_with(_lv(), "twist", ""), "anoint", "80,12")
+	var at4 := forced / 2.5 + plain + 0.5 * _c("hushling") + (2.5 - 1.0) * _c("hushling") + 3.0 * _c("hushling")
+	_check(is_equal_approx(Rules.threat_of(led), at4 * 100.0 / WIDTH), "an Anointed Hushling leader at x2.5, its pack at 4 (%.3f)" % Rules.threat_of(led))
+	var pl := _with(_lv(), "roster", str(_lv().headers["roster"]) + "; pack_leaders=hushling:2,creepbone:3")
+	_check(is_equal_approx(Rules.threat_of(pl), (forced + plain + 3 * _c("hushling") + 4 * _c("creepbone")) * 100.0 / WIDTH),
+			"a roster's pack_leaders counts each placed one at its size (Hushlings 2, Creepbones 3)")
 	_check(is_equal_approx(Rules.threat_of(lv, 81.0), got * 2.0), "a stretch of tiles given (a boss level's approach)")
-	_check(is_equal_approx(Rules.declared_threat(lv), 25.0) and Rules.threat_problems([lv]).is_empty(), "the declared threat holds (25: the generator's own count)")
-	_check(_has(Rules.threat_problems([_with(_lv(), "threat", "30")]), "declared 30"), "a threat 17% off its declared one is caught")
-	var ramp := [_with(_lv("6-1"), "threat", "25"), _with(_lv("6-2"), "threat", "24"), _with(_lv("6-3"), "threat", "26")]
+	_check(is_equal_approx(Rules.declared_threat(lv), 25.9) and Rules.threat_problems([lv]).is_empty(), "the declared threat holds (25.9: the generator's own count)")
+	_check(_has(Rules.threat_problems([_with(_lv(), "threat", "30")]), "declared 30"), "a threat over 10% off its declared one is caught")
+	# Today's worlds (no roles:) ramp flat, within RAMP_TOL...
+	var ramp := [_with(_with(_lv("6-1"), "roles", ""), "threat", "25"), _with(_with(_lv("6-2"), "roles", ""), "threat", "24"),
+			_with(_with(_lv("6-3"), "roles", ""), "threat", "26")]
 	_check(_has(Rules.threat_problems(ramp), "the ramp"), "a world whose declared threat falls from X-1 to X-2 is caught")
-	ramp[1] = _with(_lv("6-2"), "threat", "24.8")
+	ramp[1] = _with(_with(_lv("6-2"), "roles", ""), "threat", "24.8")
 	_check(Rules.threat_problems(ramp).is_empty(), "and a fall within RAMP_TOL passes (%s)" % [Rules.threat_problems(ramp)])
+	# ...a re-cut world (roles:) +1 a step (RECUT_RAMP), or its own ramp.
+	var cut := [_with(_lv("6-1"), "threat", "24"), _with(_lv("6-2"), "threat", "24.5"), _with(_lv("6-3"), "threat", "26")]
+	_check(_has(Rules.threat_problems(cut), "the ramp: +1"), "a re-cut world's X-2 only 0.5 over its X-1 is caught (+1 a step)")
+	_check(Rules.threat_problems(cut, 0.5).is_empty(), "a world's own ramp (0.5) lets it through")
+	cut[1] = _with(_lv("6-2"), "threat", "25")
+	_check(Rules.threat_problems(cut).is_empty(), "and +1, then +1, passes (%s)" % [Rules.threat_problems(cut)])
 	_check(Rules.pack_groups([Vector2i(64, 12), Vector2i(67, 12), Vector2i(80, 12)]).size() == 2
 			and Rules.pack_groups([Vector2i(1, 12), Vector2i(4, 12), Vector2i(8, 11)]).size() == 1, "packs chain within 4 tiles and a row")
+
+
+func _test_recut() -> void:
+	## A re-cut world's variety (Rules.recut_problems), on the fixture read as
+	## 6-1..6-3: its screen of Hushling packs crowds past AWAKE_MAX; fodder
+	## must fall within FODDER_CAPS; the X-3 must mix.
+	var a := _lv("6-1")
+	var b := _lv("6-2")
+	var c := _lv("6-3")
+	var r := Rules.recut_problems([a, b, c])
+	_check(_has(r, "in play on the screen"), "under packs its Hushling screen holds more than %d in play (%s)" % [Rules.AWAKE_MAX, Rules.crowded_screens(a).slice(0, 1)])
+	_check(_has(r, "6-2: fodder_max 0.67, not under 6-1's"), "fodder_max that doesn't fall X-1 to X-3 is caught")
+	_check(not _has(r, "6-1: fodder_max"), "(0.67 is under X-1's cap, 0.85)")
+	_check(Rules.mixed_screens(c) >= 2 and not _has(r, "screens with"), "its stamps mix 3 kinds on %d screens (an X-3 needs 2)" % Rules.mixed_screens(c))
+	var thin := _lv("6-3")
+	thin.entities = thin.entities.filter(func(e): return not ["bonebow", "creepbone", "rootling", "rattlehound"].has(str(e["kind"])))
+	_check(_has(Rules.recut_problems([a, b, thin]), "6-3: %d screens with 3 kinds" % Rules.mixed_screens(thin)), "an X-3 that doesn't mix is caught")
+	_check(Rules.recut_problems([_with(_lv("6-1"), "roles", ""), _with(_lv("6-2"), "roles", "")]).is_empty(), "a world that isn't re-cut has none of these")
+	var calm := _with(_lv("6-1"), "twist", "")
+	_check(Rules.crowded_screens(calm).size() < Rules.crowded_screens(a).size(), "without the packs twist fewer screens crowd")
 
 
 func _test_checkpoints() -> void:
@@ -199,6 +285,7 @@ func _test_anoint() -> void:
 	_check(_has(Rules.anoint_problems(_with(_lv(), "anoint", "37,12:Swift+Swift")), "Omens"), "an Omen twice is caught")
 	_check(_has(Rules.anoint_problems(_with(_lv(), "anoint", "37,12:Swift; 26,12"), 2), "World 1-2") and Rules.anoint_problems(_with(_lv(), "anoint", "37,12:Swift"), 2).is_empty(),
 			"World 1-2: one set piece with one Omen at most")
+	_check(_has(Rules.anoint_problems(_with(_lv(), "anoint", "37,12:Swift; 179;12")), "doesn't read"), "a part that doesn't read is caught (it would anoint nothing, silently)")
 
 
 func _test_stamps() -> void:

@@ -2,10 +2,13 @@ extends SceneTree
 ## Build 2's level twists (scripts/twists.gd), each played in a small level
 ## built here, and the twist labs (levels/lab-*.txt, tools/levels/lab_twists.py):
 ##
-##   the registry   every twist has a name and a line (48 characters at most)
-##                  per world; an unknown id or none is no twist; a lesson is
-##                  Title|Line; dry heals x0.75; omens doubles the chance,
-##                  keeps the max and gives the second Omen two rolls
+##   the registry   every twist has a name (NAME_MAX) and a line (48
+##                  characters at most) per world, or per level (1-3's duel is
+##                  "Barbs' Loft"); an unknown id or none is no twist; a
+##                  lesson is Title|Line; dry heals x0.75 (its 0 row neutral,
+##                  World 4's "Cold Altars"); omens doubles the chance, keeps
+##                  the max and gives the second Omen two rolls; restless
+##                  raises Rattles in Worlds 1-2, the floor kinds from 3
 ##   unchanged      no level on the path or secret carries a twist, lesson or
 ##                  belt_flip header, and a World built for every one of them
 ##                  has no twist runtime, no painters, its own title line, no
@@ -14,19 +17,26 @@ extends SceneTree
 ##   the cards      "3-9 · Restless" over the name, then the twist's line and a
 ##                  lesson's in the top band, once per level and difficulty
 ##                  (Game.seen), never marked by the bot or in a lab; every
-##                  line and title line fits the phone's band at 12 px or more
+##                  line, every level file's lesson and title line fits the
+##                  phone's band at 14 px (the spec's; fit_size goes to 10);
+##                  the map shows a level's twist name under its title
 ##   dark           his light x0.8, floored with a douse at Dusk's 0.5
 ##   omens          about twice the Anointed over many seeds, never over the max
 ##   dry            a World 3 Dusk altar heals 0.30 (Build 1's 0.40), the
-##                  flask 0.30; a World 1 altar 0.375
+##                  flask 0.30; a World 1 altar 0.375; a lit altar burns
+##                  frost-blue; the Sheet's Stats show the flask's 30%
 ##   packs          a Hushling pack of 3-5 (2-3 without), a Glassmite trio, a
 ##                  Tickwind file, a Creepbone's partner, an Unwick's pair
 ##   restless       a stomped Rattle's remains twitch after 3 s for 1 s and it
 ##                  stands again (respawned, risen), once; a risen one pays no
 ##                  embers or XP; a swing lays the remains to rest; never within
 ##                  3 tiles of him or off the glass; a snuff clears them;
-##                  restless keeps to Rattles, restless_all raises the floor
-##                  kinds but a Hushling; no twist, no rise
+##                  restless keeps to Rattles in World 1 and raises a Rootling
+##                  in World 3, restless_all raises the floor kinds but a
+##                  Hushling; a monster back once (a respawn) stays down; no
+##                  twist, no rise
+##   the clock      a sealed hold's bar (info.clock) draws gold with no damage
+##                  trail, and a level-up waits out its doors
 ##   toll           a warning beat 15, then on beat 16 every monster in plain
 ##                  view is alerted (x1.3) for 4 beats, the far one not; it
 ##                  waits out stop_time
@@ -78,6 +88,7 @@ func _initialize() -> void:
 	await _test_unchanged()
 	await _test_cards()
 	await _test_fit()
+	await _test_map_and_clock()
 	await _test_dark()
 	await _test_omens()
 	await _test_dry()
@@ -175,9 +186,18 @@ func _test_registry() -> void:
 		_check(cards.has(0), "%s has a card for every world (row 0)" % id)
 		for wn in cards:
 			var c: Array = cards[wn]
-			_check(c.size() == 2 and str(c[0]) != "" and str(c[1]) != "", "%s (world %d) has a name and a line" % [id, wn])
-			_check(str(c[1]).length() <= Twists.LINE_MAX, "%s (world %d): its line is %d characters (at most %d)" % [id, wn, str(c[1]).length(), Twists.LINE_MAX])
+			_check(c.size() == 2 and str(c[0]) != "" and str(c[1]) != "", "%s (%s) has a name and a line" % [id, wn])
+			_check(str(c[1]).length() <= Twists.LINE_MAX, "%s (%s): its line is %d characters (at most %d)" % [id, wn, str(c[1]).length(), Twists.LINE_MAX])
+			_check(str(c[0]).length() <= Twists.NAME_MAX, "%s (%s): its name is %d characters (at most %d)" % [id, wn, str(c[0]).length(), Twists.NAME_MAX])
 	_check(Twists.card_of("dark", 6)[0] == "The Drowned Dark" and Twists.card_of("dark", 2)[0] == "Dark", "a world's own card, else row 0")
+	_check(Twists.card_of("duel", 1, "1-3")[0] == "Barbs' Loft" and Twists.card_of("duel", 1, "1-2")[0] == "Duel"
+			and not str(Twists.card_of("duel", 4)[1]).contains("loft"), "1-3's duel is Barbs' Loft; any other duel's card names no loft")
+	_check(Twists.card_of("dry", 4)[0] == "Cold Altars" and Twists.card_of("dry", 3)[0] != "Cold Altars" and not str(Twists.card_of("dry", 2)[1]).contains("Frozen"),
+			"dry: World 4's Cold Altars, a neutral card elsewhere (%s)" % [Twists.card_of("dry", 3)])
+	_check(Twists.kinds_of("restless", 1) == ["skeleton"] and Twists.kinds_of("restless", 0) == ["skeleton"] and str(Twists.kinds_of("restless", 3)) == "floor"
+			and str(Twists.kinds_of("restless_all", 1)) == "floor", "restless: Rattles in Worlds 1-2 (and the labs), the floor kinds from World 3")
+	_check(Twists.card_of("restless", 3)[1] != Twists.card_of("restless", 1)[1], "and World 3's card says the fallen, not the bones")
+	_check(Twists.id_from(" Toll ") == "toll" and Twists.id_from("restles") == "", "id_from: a header's value as an id, or none")
 	_check(Twists.card_of("nope", 3).is_empty() and Twists.rule_of("nope") == "", "an unknown twist has no card and no rule")
 	var lv := _level(".P", "twist:  Restless \nlesson: First Frost | Ice carries you.\n")
 	_check(Twists.id_in(lv) == "restless", "the header's id is read trimmed, in any case")
@@ -307,13 +327,20 @@ func _test_cards() -> void:
 
 
 func _test_fit() -> void:
-	## Every twist's line, an example lesson's, and every "6-3 · Name" title
-	## line fit the band at 12 px or more on the phone's three sizes.
+	## Every twist's line, every level file's lesson (and an example's), and
+	## every "6-3 · Name" title line fit the band at 14 px on the phone's
+	## three sizes (the spec's size; fit_size would go down to 10), their
+	## names at 22 px or more (the band's 26 px title).
 	var lines := []
 	for id in Twists.TWISTS:
 		for wn in Twists.TWISTS[id]["cards"]:
 			lines.append(Twists.TWISTS[id]["cards"][wn])
 	lines.append(["First Frost", "Ice carries you. Walls stop what slides."])
+	for f in DirAccess.get_files_at("res://levels"):
+		if f.ends_with(".txt"):
+			var l := Twists.lesson_in(LevelData.load_file("res://levels/" + f))
+			if not l.is_empty():
+				lines.append(l)
 	var old_size := root.size
 	var old_cs := root.content_scale_size
 	var old_safe: Rect2 = UI.safe_override
@@ -329,21 +356,58 @@ func _test_fit() -> void:
 		sw.add_child(hud)
 		await process_frame
 		var worst := 99
+		var worst_name := 99
 		var sub_ok := true
 		for c in lines:
 			var r: Rect2 = hud.band_card_rect(str(c[0]), str(c[1]))
 			worst = mini(worst, UI.fit_size(str(c[1]), r.size.x - 24.0, 14, 10))
+			worst_name = mini(worst_name, UI.fit_size(str(c[0]), r.size.x - 24.0, 26, 16, "title", 700))
 			var s: Rect2 = UI.safe_override
 			var room: float = r.size.x if r.size.x > 0.0 else s.size.x
 			sub_ok = sub_ok and UI.text_width("6-3 · %s" % c[0], 20, "body", 700) <= maxf(room, hud.title_rect(str(c[0])).size.x)
 			sub_ok = sub_ok and r.position.x >= s.position.x and r.end.x <= s.end.x
-		_check(worst >= 12, "every twist's line fits the band at %d px (at least 12; %d wide)" % [worst, size.x])
+		_check(worst >= 14, "every twist's and lesson's line fits the band at %d px (14, the spec's; %d wide)" % [worst, size.x])
+		_check(worst_name >= 22, "every card's name fits at %d px (22 or more of the band's 26; %d wide)" % [worst_name, size.x])
 		_check(sub_ok, "every title line '6-3 · Name' and card stays in the band (%d wide)" % size.x)
 		sw.queue_free()
 		await process_frame
 	root.size = old_size
 	root.content_scale_size = old_cs
 	UI.safe_override = old_safe
+	await process_frame
+
+
+func _test_map_and_clock() -> void:
+	## The map names a level's twist under its title (map_screen.gd:
+	## twist_name_of, its line and the sigils under it); a sealed hold's
+	## clock bar draws gold with no damage trail, and a level-up waits out
+	## its doors.
+	var Map = load("res://scripts/map_screen.gd")
+	_check(Map.twist_name_of({"twist": "toll"}, 4, "4-2") == "On the Hour" and Map.twist_name_of({"twist": "duel"}, 1, "1-3") == "Barbs' Loft"
+			and Map.twist_name_of({"twist": "dry"}, 4, "4-3") == "Cold Altars" and Map.twist_name_of({}, 4, "4-1") == ""
+			and Map.twist_name_of({"twist": "restles"}, 3, "3-2") == "", "the map's twist names: 4-2 On the Hour, 1-3 Barbs' Loft, none without")
+	var m = Map.new()
+	m._info = [{"twist": "On the Hour"}, {"twist": ""}]
+	_check(m.twist_line_y(0) > 0.0 and m.twist_line_y(1) == 0.0, "a medallion with a twist draws its name under the title; one without, nothing")
+	m.free()
+	var sw := _stub_world()
+	root.add_child(sw)
+	var hud = HudScript.new()
+	hud.world = sw
+	sw.add_child(hud)
+	await process_frame
+	hud.boss_bar({"id": "room", "name": "Hold · 0:20", "title": "4 left", "frac": 1.0, "awake": true, "clock": true})
+	_check((hud.bar_fill()[0] as Color).r > 0.8 and (hud.bar_fill()[0] as Color).g > 0.55, "a clock bar fills gold (%s)" % hud.bar_fill()[0])
+	hud.level_up(9)
+	_check(hud._lvl.is_empty() and not hud._lvl_held.is_empty() and not hud.top_card_showing(), "a level-up while the clock runs waits (the bar stays up)")
+	hud._process(0.1)
+	_check(hud._lvl.is_empty(), "(still waiting while it runs)")
+	hud.boss_bar({})
+	hud._process(0.1)
+	_check(not hud._lvl.is_empty() and int(hud._lvl["n"]) == 9 and hud._lvl_held.is_empty(), "the doors open: its card comes (%s)" % [hud._lvl])
+	hud.boss_bar({"id": "boss", "name": "Old Tollgrave", "frac": 1.0, "awake": true})
+	_check((hud.bar_fill()[0] as Color).r > 0.7 and (hud.bar_fill()[0] as Color).g < 0.3, "a life bar stays red")
+	sw.queue_free()
 	await process_frame
 
 
@@ -443,6 +507,30 @@ func _test_dry() -> void:
 	print("  dry's budget: 5 stretches x (altar %.2f + draught %.2f) = %.2f lives back; today's 4-3: 4 x (%.2f + %.2f) = %.2f" % [
 			dry[0], dry[1], back, plain[0], plain[1], today])
 	_check(back <= today, "dry gives back no more over a five-altar level than today's four (%.2f against %.2f)" % [back, today])
+	# What it looks like: a lit altar burns frost-blue (its sprite; glow.gd
+	# draws its flame FROST_FLAME), only under dry; the Sheet's Stats over the
+	# paused level show the flask as the World pours it.
+	var tint := []
+	for hd in ["twist: dry\n", ""]:
+		var w := _world(_level(".P....K", hd, "4-9"), "dusk", false)
+		await process_frame
+		w._light_altar(w.altars[0])
+		tint.append((w.altars[0]["sprite"] as CanvasItem).modulate)
+		if hd != "":
+			var sheet = load("res://scripts/hero_screen.gd").new()
+			sheet.world = w
+			var sp = load("res://scripts/stats_panel.gd").new()
+			sp.host = sheet
+			var flask: Array = (sp.rows() as Array).filter(func(r): return str(r[0]) == "Flask")
+			_check(not flask.is_empty() and str(flask[0][1]).ends_with("%d%%" % roundi(w.flask_heal() * 100.0)) and roundi(w.flask_heal() * 100.0) == 30,
+					"the Sheet's Stats in a dry level show the flask's 30%% (%s)" % [flask])
+			sp.free()
+			sheet.free()
+		await _done(w)
+	_check(tint[0] == Twists.FROST and tint[1] == Color.WHITE, "a lit altar burns frost-blue under dry, and only then (%s, %s)" % tint)
+	var Glow = load("res://scripts/glow.gd")
+	_check((Glow.FROST_FLAME as Dictionary).has("core") and (Glow.FROST_FLAME["mid"] as Color).b > (Glow.FROST_FLAME["mid"] as Color).r,
+			"its flame's palette is blue (glow.gd FROST_FLAME)")
 
 
 # ---------------------------------------------------------------- packs
@@ -559,6 +647,21 @@ func _test_restless() -> void:
 	_ticks(w, 2)
 	_stomp(w, root_e)
 	_check(tw.remains.is_empty(), "restless (World 1's) raises Rattles only: a Rootling stays down")
+	# A Rattle back once already (a respawn: a snuff's, the World's, a sealed
+	# room's reset) stays down when stomped: a retry costs no more stomps.
+	var again: Node2D = w.spawn_enemy("skeleton", Vector2(root_e.position.x + 64.0, 13 * TILE), {"cell": cell0, "respawned": true})
+	_ticks(w, 2)
+	_stomp(w, again)
+	_check(tw.remains.is_empty(), "a respawned Rattle, stomped, stays down")
+	await _done(w)
+	# World 3's restless raises every ordinary floor kind (3-2's).
+	w = await _restless("twist: restless\n", row, "3-9")
+	tw = w.twists
+	var rt3: Node2D = _of(w, "rootling")[0]
+	_stand(w, rt3.position.x - 200.0)
+	_ticks(w, 2)
+	_stomp(w, rt3)
+	_check(tw.remains.size() == 1, "restless in World 3: a stomped Rootling's remains wait too (%d)" % tw.remains.size())
 	await _done(w)
 	# Never within 3 tiles of him, and never off the glass.
 	w = await _restless("twist: restless\n", row)

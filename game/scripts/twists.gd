@@ -9,8 +9,11 @@ extends RefCounted
 ## The title card's line reads "4-2 · On the Hour" over the level's name,
 ## then a card in the top band gives the twist's line (or the lesson's),
 ## once per level and difficulty (Game.seen; world.gd _twist_cards). The
-## names and lines are per world (CARDS: a world's own, else the 0 row), 48
-## characters at most, so a line fits the band at 14 px on the phone.
+## names and lines are per level or per world (a twist's cards: its level's
+## own row, "1-3", else its world's, else the 0 row), a name NAME_MAX
+## characters at most and a line LINE_MAX, so a line fits the band at 14 px
+## on the phone (tools/levels/common.py holds a lesson: to the same). The
+## map shows a level's twist name under its title (map_screen.gd).
 ##
 ## The rules (TWISTS[id].rule; world.twist(rule) asks):
 ##   restless  a stomped ordinary monster's remains glow where it fell; after
@@ -22,16 +25,23 @@ extends RefCounted
 ##             the HUD) and never within RISE_CLEAR px of Waxby (it waits,
 ##             still twitching). A risen one is "respawned" and pays nothing
 ##             (no embers, no XP, no loot: world.gd _on_enemy_died) and never
-##             rises again. "restless" raises Rattles only (World 1's);
-##             "restless_all" every ordinary floor kind but the pack bringers.
-##             A snuff lays every waiting one to rest.
+##             rises again, nor does a monster already back once (a
+##             respawn: a snuff's, the World's or a sealed room's reset), so
+##             a retry costs no more stomps than the first try. "restless"
+##             raises Rattles in Worlds 1-2 (World 1's, and the labs') and
+##             every ordinary floor kind from World 3 (its "floor_from": 3-2's);
+##             "restless_all" every ordinary floor kind anywhere, but the pack
+##             bringers. A snuff lays every waiting one to rest.
 ##   dark      Waxby's light x DARK (world.dim "twist:dark"), floored with
 ##             every other dim at Combat.DIM_FLOOR (Dusk's 0.5); dim_resist
 ##             softens it. Lanterns, glowfruit and Vigil candles are not dimmed.
 ##   omens     the random Anointed chance x OMEN_CHANCE (the max unchanged),
 ##             and a second Omen gets two rolls (world.elite_rules)
 ##   dry       altars and the flask heal x DRY_HEAL (Build 1's 0.40 Dusk
-##             altars from World 3 heal 0.30, the 0.40 flask 0.30)
+##             altars from World 3 heal 0.30, the 0.40 flask 0.30); a lit
+##             altar burns frost-blue (its sprite FROST, its flame and burst
+##             glow.gd's FROST_FLAME), and the Sheet's Stats show the flask's
+##             heal as the World pours it (world.flask_heal)
 ##   packs     the pack kinds use their biggest pack rule (Witching's), with
 ##             their Dusk tells: Hushlings 3-5, Glassmite trios, Tickwinds
 ##             within FILE_X wind and charge as a file, a Creepbone's lane
@@ -46,7 +56,8 @@ extends RefCounted
 ##             firm when stood on (world.gd stood_on), with a warm glint on
 ##             its top; when the lantern gutters (its 3 s flicker is the tell)
 ##             and goes out, it is soft wax again and shakes its 0.55 s
-##   duel      a card only: the sealed room is the rooms' feature
+##   duel      a card only (1-3's is "Barbs' Loft"): the sealed room is the
+##             rooms' feature
 ## The belts' flip on the beat is a header of its own (belt_flip: x0-x1=N),
 ## read by features/clockwork.gd beside the toll.
 
@@ -55,28 +66,38 @@ const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
 const TILE := LevelData.TILE
 
-# id -> {rule, cards: {world: [name, line]}} (the 0 row for every world
-# without its own). "kinds" (restless): the kinds that rise, or "floor".
+# id -> {rule, cards: {level id or world: [name, line]}} (a level's own row,
+# else its world's, else the 0 row). "kinds" (restless): the kinds that
+# rise, or "floor" (every ordinary floor kind); "floor_from": the world from
+# which they're "floor" whatever kinds says.
 const TWISTS := {
-	"restless": {"rule": "restless", "kinds": ["skeleton"],
-			"cards": {0: ["Restless", "Stomped bones rise once. Strike them to rest."]}},
+	"restless": {"rule": "restless", "kinds": ["skeleton"], "floor_from": 3,
+			"cards": {0: ["Restless", "Stomped bones rise once. Strike them to rest."],
+				3: ["Restless", "The fallen rise once. Strike their remains."],
+				4: ["Restless", "The fallen rise once. Strike their remains."],
+				5: ["Restless", "The fallen rise once. Strike their remains."],
+				6: ["Restless", "The fallen rise once. Strike their remains."]}},
 	"restless_all": {"rule": "restless", "kinds": "floor",
 			"cards": {0: ["Restless", "The fallen rise once. Strike their remains."]}},
 	"dark": {"rule": "dark", "cards": {0: ["Dark", "Your flame is dim here. Lanterns light the way."],
 			6: ["The Drowned Dark", "Your light is small here. Ring the bells to see."]}},
 	"omens": {"rule": "omens", "cards": {0: ["Omens", "The Hush runs thick here. More of them glow."],
 			5: ["The Saint's Guard", "Her guard wears blue. Expect the Anointed."]}},
-	"dry": {"rule": "dry", "cards": {0: ["Cold Altars", "Frozen altars mend less, but there are more."]}},
+	"dry": {"rule": "dry", "cards": {0: ["Thin Altars", "Altars and the flask mend less here."],
+			4: ["Cold Altars", "Frozen altars mend less, but there are more."]}},
 	"packs": {"rule": "packs", "cards": {0: ["Hunted", "They hunt in packs now. Keep to the light."],
 			5: ["Swarming Glass", "Glassmites come in threes. The wind herds them."]}},
 	"toll": {"rule": "toll", "cards": {0: ["On the Hour", "Each toll wakes them. Fight between the bells."]}},
 	"lamplit": {"rule": "lamplit", "cards": {0: ["Lamplit", "Soft wax holds firm in lantern light."]}},
-	"duel": {"rule": "", "cards": {0: ["Duel", "Climb into the loft and it seals till one falls."]}},
+	"duel": {"rule": "", "cards": {0: ["Duel", "A room seals behind you till its foe falls."],
+			"1-3": ["Barbs' Loft", "Climb to Barbs' loft. It seals till one falls."]}},
 }
 const LINE_MAX := 48             # characters in a card's line (the band's 14 px on the phone)
+const NAME_MAX := 20             # characters in a card's name (the band's 26 px title, the map's line)
 const DARK := 0.8                # dark: Waxby's light
 const OMEN_CHANCE := 2.0         # omens: the random Anointed chance
 const DRY_HEAL := 0.75           # dry: what an altar or a draught heals of its own
+const FROST := Color(0.62, 0.84, 1.0)   # dry: a lit altar's sprite (its flame: glow.gd FROST_FLAME)
 const RISE_WAIT := 3.0           # restless: s the remains lie still...
 const RISE_TELL := 1.0           # ...then twitch (the tell) before it stands
 const RISE_CLEAR := 96.0         # px: never rises this near Waxby (3 tiles)
@@ -121,7 +142,13 @@ static func id_in(level: RefCounted) -> String:
 	var h = level.get("headers")
 	if not (h is Dictionary):
 		return ""
-	var v := str((h as Dictionary).get("twist", "")).strip_edges().to_lower()
+	return id_from(str((h as Dictionary).get("twist", "")))
+
+
+static func id_from(raw: String) -> String:
+	## A twist: header's value as an id ("" for none or one not in TWISTS;
+	## the map reads headers without a level).
+	var v := raw.strip_edges().to_lower()
 	return v if TWISTS.has(v) else ""
 
 
@@ -129,12 +156,23 @@ static func rule_of(twist_id: String) -> String:
 	return str((TWISTS.get(twist_id, {}) as Dictionary).get("rule", ""))
 
 
-static func card_of(twist_id: String, world_n: int) -> Array:
-	## [name, line] for the twist in this world (its own row, else row 0), or [].
+static func card_of(twist_id: String, world_n: int, level_id := "") -> Array:
+	## [name, line] for the twist in this level (its own row), else in this
+	## world (its row, else row 0), or [].
 	var cards: Dictionary = (TWISTS.get(twist_id, {}) as Dictionary).get("cards", {})
 	if cards.is_empty():
 		return []
+	if level_id != "" and cards.has(level_id):
+		return (cards[level_id] as Array).duplicate()
 	return (cards.get(world_n, cards.get(0, [])) as Array).duplicate()
+
+
+static func kinds_of(twist_id: String, world_n: int):
+	## restless: the kinds that rise in this world (["skeleton"]), or "floor".
+	var t: Dictionary = TWISTS.get(twist_id, {})
+	if t.has("floor_from") and world_n >= int(t["floor_from"]):
+		return "floor"
+	return t.get("kinds", [])
 
 
 static func lesson_in(level: RefCounted) -> Array:
@@ -196,7 +234,7 @@ func setup(w: Node, twist_id: String) -> void:
 	world = w
 	id = twist_id
 	rule = rule_of(twist_id)
-	_kinds = (TWISTS[id] as Dictionary).get("kinds", [])
+	_kinds = kinds_of(id, int(w.get("world_n")) if w.get("world_n") != null else 0)
 	_tick = float(w.level.tick) if float(w.level.tick) > 0.0 else LevelData.TICK
 	match rule:
 		"dark":
@@ -260,8 +298,8 @@ func rises(e: Node2D) -> bool:
 	## Would this monster's remains get up again (it was stomped)?
 	if rule != "restless" or e == null or not bool(e.get("ordinary")) or str(e.get("tier")) != "" or bool(e.get("copy")):
 		return false
-	if e == world.get("boss") or is_risen(e):
-		return false
+	if e == world.get("boss") or is_risen(e) or bool(e.get("respawned")):
+		return false   # (one back once already, risen or respawned, stays down)
 	var cell = (e.get("spawn") as Dictionary).get("cell", Vector2i(-1, -1)) if e.get("spawn") is Dictionary else Vector2i(-1, -1)
 	if not (cell is Vector2i) or (cell as Vector2i).x < 0:
 		return false   # (a pack's extra, a lane partner: brought, never placed)

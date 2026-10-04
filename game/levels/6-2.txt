@@ -7,7 +7,7 @@ dread: The Stitched Choir|stillmaw|Warded,Hushed
 secret: 6-S
 story_start: beat_6_2
 roster: headline=unwick,lurecoil,hushling; support=stillmaw,brinejaw,bonebow; guest=spurwheel,hollow_helm; rattle_max=4; fodder_max=0.79; count=28
-threat: 10.9
+threat: 13
 hints: Your shadow copies you a moment later. Keep moving|i remember a song. i do not remember how it went.
 ---
 ################################################################################################################################################################################################################################################################################################################################################################################

@@ -8,10 +8,13 @@ tests/level_rules.gd. It goes to the tests' fixtures, never game/levels: no
 registry, no bot, never played.
 
 Its numbers, for the test: 15 monsters (a nest as its Gutterwing), fodder
-10 of 15; under the packs twist the two Creepbones (8 apart) are budgeted at
-2 each and the Hushlings (a pair, then one alone) at 3 a pack; the Bonebow,
-one Thornback and the Stillmaw are forced Anointed (x2.5): 40.5 over 162
-tiles, a threat of 25.0.
+10 of 15; under the packs twist the two Creepbones are budgeted at 2 each (a
+lane partner apiece) and the Hushlings (a pair, then one alone) at 4 a pack
+(the twist's 3-5); the Bonebow, one Thornback and the Stillmaw are forced
+Anointed (x2.5): 42.0 over 162 tiles, a threat of 25.9. Its roster names the
+three stamps its sections hold. Unnumbered, it's no world's X-n: the variety
+rules a re-cut world's X-1..X-3 keep (a screen's crowd, the X-3's mix) are
+test_toolkit's to show on it, read as 6-1..6-3.
 """
 import os
 
@@ -150,8 +153,9 @@ LEVELS.append({
     'out_dir': OUT,
     'twist': 'packs',
     'roster': {'headline': ['hushling', 'stillmaw'], 'support': ['bonebow', 'gutterwing'],
-               'guest': ['thornback', 'creepbone', 'rattlehound', 'rootling'], 'rattle_max': 1, 'fodder_max': 0.67, 'count': 15},
-    'threat': 25.0,
+               'guest': ['thornback', 'creepbone', 'rattlehound', 'rootling'], 'rattle_max': 1, 'fodder_max': 0.67, 'count': 15,
+               'stamps': ['crossfire', 'lane_and_thorn', 'hound_and_mounds']},
+    'threat': 25.9,
     'roles': 'S C A C A V A B',
     'anoint': [(TK_POST, 17, 12, 'Swift+Warded', 'Sister Thistle'), (TK_POST, 13, 9, '', 'Old Quiver'), (TK_PACK, 12, 5)],
     'room': [('duel', TK_ROOM)],

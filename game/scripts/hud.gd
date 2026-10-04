@@ -50,7 +50,11 @@ extends CanvasLayer
 ##   special_pill(text)  a pill over the Special button ("Hold to give your
 ##                       flame"); "" takes it down. Never faded.
 ##   fade_for_finale(on) the HUD fades away for the finale (the pill stays)
-##   boss_bar(info)      info.segments ([0.65, 0.30]) splits the bar in three
+##   boss_bar(info)      info.segments ([0.65, 0.30]) splits the bar in three;
+##                       info.clock (a sealed hold's, features/sealed.gd) draws
+##                       it as a clock: a gold fill with no damage trail, and a
+##                       level-up while it runs waits for the doors (its card
+##                       would push the clock aside mid-fight)
 ## The level badge reads 40 with a gold "✦N" under it once Candlemarks land
 ## (its ring fills toward the next one), and the sigil row hides in a level
 ## with no sigils. The candle's flame takes the hero's palette (world.hero_flame).
@@ -158,6 +162,7 @@ var _boss_hide := 0.0             # 1 while a title or level-up card has the top
 var _boss_shown := 1.0
 var _boss_recent := 1.0
 var _boss_seen_t := -100.0        # _t the boss bar was last up (a snuff just after counts as the boss's)
+var _lvl_held := {}               # {n, from}: a level-up waiting out a clock bar (info.clock)
 
 # v3.
 var _pill := {}                   # mode_pill(state)
@@ -503,20 +508,27 @@ func boss_bar(info: Dictionary) -> void:
 	_boss = info.duplicate()
 
 
-func level_up(n: int) -> void:
+func level_up(n: int, held_from := -1) -> void:
 	## "Level up / Level n", what the levels gained bring (their damage and
 	## life, skill points, or Vigil ranks once the tree is full, a belt slot
 	## when one opens) and under it what they opened (a tier, a root rank)
 	## or else the next unlock and its level. Several levels at once (a
-	## boss) say it once, for all of them.
+	## boss) say it once, for all of them. While a clock bar runs (a sealed
+	## hold) it waits for the doors (_lvl_held; held_from: the level it
+	## was gained from then).
 	var pts := 0
 	var g := _game()
 	if g:
 		pts = int(g.hero().get("points", 0))
 	# The ring still shows the level before (it catches up in _process).
 	var from := _xp_level if _xp_level > 0 and _xp_level < n else n - 1
+	if held_from >= 0:
+		from = mini(held_from, from)
 	if not _lvl.is_empty():
 		from = mini(int(_lvl.get("from", from)), from)
+	if bool(_boss.get("clock", false)):
+		_lvl_held = {"n": maxi(n, int(_lvl_held.get("n", n))), "from": mini(from, int(_lvl_held.get("from", from)))}
+		return
 	var gained := maxi(n - from, 1)
 	var line := gains_line(from, n)
 	if pts > 0:
@@ -1181,6 +1193,11 @@ func _step_cards(dt: float) -> void:
 
 
 func _step_boss(dt: float) -> void:
+	if not _lvl_held.is_empty() and not bool(_boss.get("clock", false)):
+		# The clock's doors are open (or it's gone): the level-up it held.
+		var held := _lvl_held
+		_lvl_held = {}
+		level_up(int(held["n"]), int(held["from"]))
 	if _boss.is_empty():
 		return
 	var b = world.get("boss") if world != null else null
@@ -1698,10 +1715,11 @@ func _draw_boss(ci: Control) -> void:
 	sb.draw(ci.get_canvas_item(), r.grow(2.0))
 	var fx := r.position.x + r.size.x * clampf(_boss_shown, 0.0, 1.0)
 	var rx := r.position.x + r.size.x * clampf(_boss_recent, 0.0, 1.0)
-	if rx > fx:
+	var fill := bar_fill()
+	if rx > fx and not bool(_boss.get("clock", false)):
 		ci.draw_rect(Rect2(fx, r.position.y, rx - fx, r.size.y), Color(UI.CREAM, 0.85 * a))
-	ci.draw_rect(Rect2(r.position, Vector2(fx - r.position.x, r.size.y)), Color(Color("c93a3a"), a))
-	ci.draw_rect(Rect2(r.position + Vector2(0, 1), Vector2(maxf(fx - r.position.x - 1.0, 0.0), 3.0)), Color(Color("ff7a6a"), a))
+	ci.draw_rect(Rect2(r.position, Vector2(fx - r.position.x, r.size.y)), Color(fill[0], a))
+	ci.draw_rect(Rect2(r.position + Vector2(0, 1), Vector2(maxf(fx - r.position.x - 1.0, 0.0), 3.0)), Color(fill[1], a))
 	var segs: Array = _boss.get("segments", [])
 	if not segs.is_empty():
 		_draw_segments(ci, r, segs, a)
@@ -1711,6 +1729,14 @@ func _draw_boss(ci: Control) -> void:
 		var passed := _boss_shown <= float(ph)
 		ci.draw_line(Vector2(x, r.position.y - 3.0), Vector2(x, r.end.y + 3.0), Color(UI.INK, a), 3.0)
 		ci.draw_line(Vector2(x, r.position.y - 3.0), Vector2(x, r.end.y + 3.0), Color(UI.MUTED if passed else UI.GOLD, a), 1.2)
+
+
+func bar_fill() -> Array:
+	## The bar's fill and its top line: a life's red, or a clock's gold (a
+	## sealed hold's time, info.clock: never read as a life).
+	if bool(_boss.get("clock", false)):
+		return [Color("d9a520"), Color("ffe08a")]
+	return [Color("c93a3a"), Color("ff7a6a")]
 
 
 func boss_label_layout() -> Dictionary:

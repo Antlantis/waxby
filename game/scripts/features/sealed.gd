@@ -16,7 +16,12 @@ extends "res://scripts/features/feature.gd"
 ## With no header nothing here runs, and a level plays exactly as before.
 ## tools/levels/common.py writes the header (rooms_header) and checks every
 ## room for a monster, a way in and an altar within ALTAR_REACH tiles before
-## its door (check_rooms): a snuff inside relights by it.
+## its door (check_rooms): a snuff inside relights by it. Its doorways are
+## open air or stone that never opens (every end-column cell between ceiling
+## and floor: no water, vine, ledge, crumble, dawnglass, brick, rime or glass
+## that a body could pass or break while the slab is down), and no monster of
+## it stands within DOOR_CLEAR columns of either end (tests/level_rules.gd
+## room_problems holds every level file to the same).
 ##
 ## The room's monsters are the level's own glyphs inside it (every file test
 ## counts them). Once the World has anointed (the modules are built first,
@@ -25,20 +30,26 @@ extends "res://scripts/features/feature.gd"
 ## so the World's respawns (Nightfall, Dusk from World 3) never refill it:
 ##   duel    they sleep at their posts, dim and still (as a Warden does)
 ##   ambush  hidden till the doors shut; then they drop in at their posts,
-##           nearest him first, DROP_STAGGER s apart, each fading in over
-##           DROP_LEN s with dust (out of reach till it has)
+##           farthest from him first, DROP_STAGGER s apart, each fading in
+##           over DROP_LEN s with dust (out of reach till it has). One never
+##           drops while he stands within DROP_CLEAR px of its post (it waits,
+##           so no drop lands on him: twists.gd RISE_CLEAR's rule), nor off
+##           the glass (world.in_plain_view) but for DROP_WAIT s at most
 ##   hold    as an ambush, against the clock
 ## Wick wholly inside (DOOR_PAST past the door at either end, and between a
 ## rows room's ceiling and floor) and the doors grind shut: SEAL_TELL s of
 ## rumble, shake and dust while a slab comes down each doorway under its
 ## iron lintel (out again in time and they stay open), then stone at both
-## ends (boss_arena.gd seal_free: every open door cell no body stands in).
+## ends (boss_arena.gd seal_free: every open door cell no body stands in,
+## his, the World's monsters' or the room's own, asleep or hidden).
 ## The fight's bar takes the boss bar's place (never over a boss's or a
 ## Warden's): a duel's foe by name, its tier and Omens, its life, with a
 ## title card as it wakes (and no elite plate: the bar names it); an
 ## ambush's "Ambush · 5", its foes left; with a clock "Hold · 0:14", the
-## time left (the foes left under it). A foe holds the doors while it's alive
-## in the room: one of the room's own, a Twinned half, or one risen on a room
+## time left (the foes left under it), drawn as a clock (hud.gd: gold, no
+## damage trail; a level-up card waits till the doors open). A foe holds the
+## doors while it's alive in the room: one of the room's own, a Twinned half,
+## or one risen on a room
 ## cell (in a restless level, twists.gd, the remains of one of its own too,
 ## till they stand again or a swing lays them to rest; the bot goes for
 ## them); a nest's wings and other strays don't. One that falls out of it
@@ -49,6 +60,7 @@ extends "res://scripts/features/feature.gd"
 ## where loot is kept. A snuff while it's shut opens it and starts it over,
 ## as a boss room: everything alive in it gone, its monsters back at their
 ## posts (one already put out comes back as a respawn: less XP, no embers,
+## a Dread's or an Anointed's tier drops paid once, world.gd _on_enemy_died,
 ## and off the altar snapshot's killed list), and Wick relights at the altar
 ## by the door (the World's checkpoint).
 ## A room with none of its monsters in the World (no_monsters: the golden
@@ -70,6 +82,9 @@ const SEAL_TELL := 0.6           # s the doors grind before they're stone (the p
 const DROP_STAGGER := 0.15       # s between an ambush's drop-ins...
 const DROP_FIRST := 0.1          # ...the first this long after the doors shut
 const DROP_LEN := 0.45           # s each takes to fade in (out of reach till it has)
+const DROP_CLEAR := 96.0         # px: none drops this near him (3 tiles; twists.gd RISE_CLEAR)
+const DROP_WAIT := 2.0           # s one waits past its turn for its post to be on the glass
+const DOOR_CLEAR := 3            # columns inside each end no room monster stands in (common.py check_rooms)
 const HOLD_SECS := 20.0          # a hold's clock when its header gives none (5-3's)
 const WON_FX := 1.0              # s the open doors glow after a win
 const ALTAR_REACH := 8           # tiles: an altar this near before each door (common.py check_rooms)
@@ -387,8 +402,11 @@ func _step_closing(r: Dictionary, pl: Node2D) -> void:
 	if pl == null or not pl.alive or world.state != "play" or not _inside(r, pl):
 		r["phase"] = "wait"   # out again before they shut: they stay open
 		return
+	# Never stone round a body: his, the World's monsters', and the room's own
+	# still asleep or hidden (out of world.enemies till they wake).
 	var bodies: Array = [pl]
 	bodies.append_array(world.enemies)
+	bodies.append_array(r["away"])
 	r["sealed"] = Arena.seal_free(world, level, r["door"], bodies)
 	r["sealed_at"] = ftime()
 	r["phase"] = "fight"
@@ -420,9 +438,10 @@ func _wake(r: Dictionary, pl: Node2D) -> void:
 			if str(nf.tier) != "":
 				world.bark("first_dread" if str(nf.tier) == "dread" else "first_elite")
 		return
-	# Nearest him first, one after another.
+	# Farthest from him first, one after another (each waits its post's
+	# turn: _drop_ready).
 	var px: float = pl.position.x if pl != null else 0.0
-	away.sort_custom(func(a, b): return absf(a.position.x - px) < absf(b.position.x - px))
+	away.sort_custom(func(a, b): return absf(a.position.x - px) > absf(b.position.x - px))
 	var at := ftime() + DROP_FIRST
 	for en in away:
 		if is_instance_valid(en):
@@ -442,26 +461,29 @@ func _step_fight(r: Dictionary) -> void:
 
 
 func _step_drops(r: Dictionary) -> void:
-	## An ambush's drop-ins: each shows with dust and fades in over DROP_LEN
-	## (out of reach meanwhile), then joins the World's list asleep: the World
-	## wakes it in view, with an Anointed's plate.
+	## An ambush's drop-ins: each shows with dust once its turn has come and
+	## its post is clear of him and on the glass (_drop_ready), and fades in
+	## over DROP_LEN (out of reach meanwhile), then joins the World's list
+	## asleep: the World wakes it in view, with an Anointed's plate.
 	var keep: Array = []
+	var pl := player()
 	for d in r["drops"]:
 		var en = d["en"]
 		if en == null or not is_instance_valid(en):
 			continue
-		var k := (ftime() - float(d["at"])) / DROP_LEN
-		if k < 0.0:
-			keep.append(d)
-			continue
 		if not d["on"]:
+			if not _drop_ready(d, pl):
+				keep.append(d)
+				continue
 			d["on"] = true
+			d["at"] = ftime()
 			en.visible = true
 			en.modulate = Color(1, 1, 1, 0)
 			world.dust_at(en.position + Vector2(0, -4))
 			world._sfx("land", 0.7, 0.0, 0.7)
 			if world.glow:
 				world.glow.burst(en.center(), 10, Color(0.9, 0.86, 1.0, 0.9), 90.0, 0.5, -30.0, 2.2)
+		var k := (ftime() - float(d["at"])) / DROP_LEN
 		if k < 1.0:
 			en.modulate = Color(1, 1, 1, clampf(k, 0.0, 1.0))
 			keep.append(d)
@@ -470,6 +492,18 @@ func _step_drops(r: Dictionary) -> void:
 		if not world.enemies.has(en):
 			world.enemies.append(en)
 	r["drops"] = keep
+
+
+func _drop_ready(d: Dictionary, pl: Node2D) -> bool:
+	## Its turn has come, he's DROP_CLEAR px or more from its post (else it
+	## waits: never a drop onto him, every retry), and its post is on the
+	## glass (or it has waited DROP_WAIT s past its turn for that).
+	if ftime() < float(d["at"]):
+		return false
+	var en: Node2D = d["en"]
+	if pl != null and pl.alive and pl.center().distance_to(en.center()) < DROP_CLEAR:
+		return false
+	return ftime() - float(d["at"]) >= DROP_WAIT or world.in_plain_view(en.rect())
 
 
 func _put_out_lost(r: Dictionary) -> void:
@@ -495,14 +529,20 @@ func _win(r: Dictionary, how: String) -> void:
 	## Won: the doors open (dust, a chime, a gold burst at each), a toast, and
 	## an ambush's or a hold's REWARD.
 	_unseal(r)
-	# A clock out before every drop-in landed: the rest land now.
+	# A clock out before every drop-in landed: one fading in lands now; one
+	# still hidden (he kept by its post, or it waited for the glass) never
+	# comes, so nothing drops onto him as the doors open.
 	for d in r["drops"]:
 		var en = d["en"]
-		if en != null and is_instance_valid(en):
+		if en == null or not is_instance_valid(en):
+			continue
+		if d["on"]:
 			en.visible = true
 			en.modulate = Color.WHITE
 			if not world.enemies.has(en):
 				world.enemies.append(en)
+		elif not world.enemies.has(en):
+			en.queue_free()
 	r["drops"] = []
 	r["phase"] = "won"
 	r["won"] = how
@@ -624,8 +664,9 @@ func _bar() -> void:
 
 
 func bar_info(r: Dictionary) -> Dictionary:
-	## The bar: {id, name, title, frac, awake} (the tests read it). A duel's
-	## named foe while it stands; a clock's time left; else the foes left.
+	## The bar: {id, name, title, frac, awake[, clock]} (the tests read it).
+	## A duel's named foe while it stands; a clock's time left (clock: the
+	## HUD draws it gold, no trail); else the foes left.
 	var left := foes_left(r)
 	var nf = r["named"]
 	if str(r["kind"]) == "duel" and nf != null and is_instance_valid(nf) and nf.alive:
@@ -636,7 +677,7 @@ func bar_info(r: Dictionary) -> Dictionary:
 		var t_left := maxf(secs - (ftime() - float(r["sealed_at"])), 0.0)
 		var s := ceili(t_left)
 		return {"id": "room", "name": "%s · %d:%02d" % [WORD[r["kind"]], floori(s / 60.0), s % 60],
-				"title": "%d left" % left, "frac": t_left / secs, "awake": true}
+				"title": "%d left" % left, "frac": t_left / secs, "awake": true, "clock": true}
 	return {"id": "room", "name": "%s · %d" % [WORD[r["kind"]], left], "title": "",
 			"frac": float(left) / maxf(float(r["most"]), 1.0), "awake": true}
 
@@ -669,7 +710,8 @@ func _title_of(e: Node2D) -> String:
 func bot_target(pl: Node2D):
 	## The --autoplay bot's foe in a shut room (autoplay_bot.gd's room pad):
 	## the nearest that holds the doors; a restless level's remains still to
-	## stand (it swings over them); the room's middle while they drop in;
+	## stand (it swings over them); while they drop in, a spot clear of every
+	## post still to drop (_wait_spot: a drop waits while he's near it);
 	## null while no room is shut.
 	for r in rooms:
 		if r["phase"] != "fight":
@@ -682,8 +724,35 @@ func bot_target(pl: Node2D):
 			return best
 		for rm in remains_in(r):
 			return Vector2((rm["pos"] as Vector2).x, pl.position.y)
-		return Vector2((float(r["left"]) + float(r["right"])) * 0.5, pl.position.y)
+		return Vector2(_wait_spot(r, pl), pl.position.y)
 	return null
+
+
+func _wait_spot(r: Dictionary, pl: Node2D) -> float:
+	## Where to wait while drop-ins are due: the nearest x in the room at
+	## least DROP_CLEAR + 48 px from every post still to drop (the bot's pad
+	## stops 36 px short; beside one, so it's on the glass too), else the
+	## room's middle.
+	var posts: Array = []
+	for d in r["drops"]:
+		if not d["on"] and d["en"] != null and is_instance_valid(d["en"]):
+			posts.append((d["en"] as Node2D).center().x)
+	var mid := (float(r["left"]) + float(r["right"])) * 0.5
+	if posts.is_empty():
+		return mid
+	var gap := DROP_CLEAR + 48.0
+	var lo := float(r["left"]) + 20.0
+	var hi := float(r["right"]) - 20.0
+	var best := mid
+	var best_d := INF
+	for p in posts:
+		for x in [float(p) - gap, float(p) + gap]:
+			if x < lo or x > hi or posts.any(func(q): return absf(float(q) - x) < gap - 1.0):
+				continue
+			if absf(x - pl.position.x) < best_d:
+				best_d = absf(x - pl.position.x)
+				best = x
+	return best
 
 
 # ---------------------------------------------------------------- drawing

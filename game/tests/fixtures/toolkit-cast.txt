@@ -5,8 +5,8 @@ theme: stillshore
 area: 28
 anoint: 37,12:Swift+Warded:Sister Thistle; 33,9::Old Quiver; 72,5
 twist: packs
-roster: headline=hushling,stillmaw; support=bonebow,gutterwing; guest=thornback,creepbone,rattlehound,rootling; rattle_max=1; fodder_max=0.67; count=15
-threat: 25
+roster: headline=hushling,stillmaw; support=bonebow,gutterwing; guest=thornback,creepbone,rattlehound,rootling; rattle_max=1; fodder_max=0.67; count=15; stamps=crossfire,lane_and_thorn,hound_and_mounds
+threat: 25.9
 roles: S C A C A V A B
 room: duel 106-129
 belt_flip: 62-69=8

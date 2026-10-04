@@ -1,7 +1,10 @@
 extends Control
 ## The way down: a world's levels as medallions on a path of little flames.
-## Each shows its recommended level ("Lv 3"), this difficulty's three sigils
-## and, where the level has one, its Dread's skull (lit once beaten). Along
+## Each shows its recommended level ("Lv 3"), its name with its twist's name
+## under it where it has one (Build 2: "On the Hour", twists.gd card_of, so
+## two levels' rules read apart before either is played), this difficulty's
+## three sigils and, where the level has one, its Dread's skull (lit once
+## beaten). Along
 ## the top: back to the title, the difficulty bells (Dusk, Nightfall,
 ## Witching Hour, the deeper two with their "Lv 30+" / "Lv 40+" chips) and
 ## who's playing (his own name, then his calling and level, a gold "+" while
@@ -51,6 +54,7 @@ signal resume_altar(snapshot: Dictionary)
 const UI := preload("res://scripts/ui.gd")
 const Classes := preload("res://scripts/classes.gd")
 const Combat := preload("res://scripts/combat.gd")
+const Twists := preload("res://scripts/twists.gd")
 const MODES_SAVE := "res://scripts/modes/modes_save.gd"
 const MODES_SCREEN := "res://scripts/modes/modes_screen.gd"
 const HUB_FROM := "1-2"           # the Challenges show once this is cleared (without ModesSave to say)
@@ -66,7 +70,7 @@ var focus := 0                    # a global index into Game.LEVELS
 var focus_secret := ""            # a secret level picked instead ("1-S"), or ""
 var world_tab := 1
 var _t := 0.0
-var _info: Array = []             # per level: {id, sub, title, area, dread, boss, secret}
+var _info: Array = []             # per level: {id, sub, title, area, dread, boss, secret, twist (its name, or "")}
 var _secrets := {}                # world -> {id, from, title, area, built}
 var _play_btn: Button
 var _back_btn: Button
@@ -113,7 +117,8 @@ func _ready() -> void:
 		var h := level_headers(str(info["path"]))
 		_info.append({"id": str(info["id"]), "sub": str(h.get("subtitle", info["id"])), "title": str(h.get("title", "")),
 				"area": int(h.get("area", "1")) if str(h.get("area", "1")).is_valid_int() else 1,
-				"dread": str(h.get("dread", "")) != "", "boss": str(h.get("boss", "")) != "", "secret": str(h.get("secret", ""))})
+				"dread": str(h.get("dread", "")) != "", "boss": str(h.get("boss", "")) != "", "secret": str(h.get("secret", "")),
+				"twist": twist_name_of(h, int(info.get("world", 0)), str(info["id"]))})
 	_read_secrets()
 	focus = clampi(focus, 0, maxi(Game.LEVELS.size() - 1, 0))
 	if Game.LEVELS.size() > 0:
@@ -142,6 +147,19 @@ func _ready() -> void:
 	_challenges_btn.visible = challenges_shown()
 	_refresh()
 	_offer_resume.call_deferred()
+
+
+static func twist_name_of(h: Dictionary, world_n: int, level_id: String) -> String:
+	## A level's twist name from its headers (its card's name in its level or
+	## world, twists.gd card_of), or "".
+	var c := Twists.card_of(Twists.id_from(str(h.get("twist", ""))), world_n, level_id)
+	return str(c[0]) if not c.is_empty() else ""
+
+
+func twist_line_y(i: int) -> float:
+	## The twist name's baseline under a medallion's name (from its centre),
+	## and the sigils' row moves down past it: 0.0 for a level with none.
+	return 36.0 if str((_info[i] as Dictionary).get("twist", "")) != "" else 0.0
 
 
 static func level_headers(path: String) -> Dictionary:
@@ -1045,6 +1063,13 @@ func _medallion(i: int, c: Vector2) -> void:
 	UI.text(self, Vector2(tr.position.x, tr.position.y + 13.0), tag, 11, Color(tcol, 1.0 if open else 0.5), HORIZONTAL_ALIGNMENT_CENTER, tr.size.x, "body", 800)
 	var name_col := UI.CREAM if open else UI.MUTED
 	UI.text(self, Vector2(c.x - 90, c.y + r + 22.0), info["title"] if open else "Locked", 15, name_col, HORIZONTAL_ALIGNMENT_CENTER, 180, "body", 700, 4)
+	var dy := 0.0
+	if open and twist_line_y(i) > 0.0:
+		# Its twist, small and warm under the name: its rule, read on the map.
+		var twn := str(info["twist"])
+		UI.text(self, Vector2(c.x - 90, c.y + r + twist_line_y(i)), twn, UI.fit_size(twn, 180.0, 12, 10, "body", 700), Color(UI.EMBER, 0.95),
+				HORIZONTAL_ALIGNMENT_CENTER, 180, "body", 700, 3)
+		dy = 12.0
 	if open:
 		var n := 3 + (1 if info["dread"] else 0)
 		var x0 := c.x - n * 10.0 + 1.0
@@ -1052,7 +1077,7 @@ func _medallion(i: int, c: Vector2) -> void:
 		var empty := UI.tex("res://art/ui/sigil_empty.svg")
 		for k in 3:
 			var got: bool = rec["sigils"][k]
-			var sr := Rect2(x0 + k * 20.0, c.y + r + 30.0, 18, 18)
+			var sr := Rect2(x0 + k * 20.0, c.y + r + 30.0 + dy, 18, 18)
 			var tex: Texture2D = full if got else empty
 			if tex:
 				draw_texture_rect(tex, sr, false)
@@ -1060,7 +1085,7 @@ func _medallion(i: int, c: Vector2) -> void:
 				draw_circle(sr.get_center(), 6.0, UI.GOLD if got else UI.MUTED)
 		if info["dread"]:
 			var beaten: bool = rec.get("dread", false)
-			var sc := Vector2(x0 + 3 * 20.0 + 9.0, c.y + r + 39.0)
+			var sc := Vector2(x0 + 3 * 20.0 + 9.0, c.y + r + 39.0 + dy)
 			if beaten:
 				draw_circle(sc, 10.0, Color(1.0, 0.8, 0.3, 0.2))
 			UI.glyph(self, "skull", sc, 17.0, UI.DREAD if beaten else Color(UI.MUTED, 0.45))

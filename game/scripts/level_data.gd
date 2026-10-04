@@ -60,8 +60,9 @@ extends RefCounted
 ## Build 2's level-rule keys, raw only (tools/levels/common.py writes them
 ## from each world's tables; tests/level_rules.gd holds the file to them; the
 ## game plays the same without them): roster (the cast it declares:
-## headline=..; support=..; guest=..; rattle_max=n; fodder_max=f; count=a-b),
-## threat (its cost per 100 tiles), roles (a re-cut level's section roles).
+## headline=..; support=..; guest=..; rattle_max=n; fodder_max=f; count=a-b;
+## banned=..; pack_leaders=kind:n,..; stamps=..), threat (its cost per 100
+## tiles), roles (a re-cut level's section roles).
 ## Build 2's elite keys, read from there (elites.gd), both optional: anoint
 ## (`x,y[:Omen+Omen[:Name]]; ...`: the monsters placed there are Anointed
 ## every run, in any level) and elite_behave (`nightfall` | `dusk`: turns

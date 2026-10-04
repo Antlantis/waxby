@@ -17,8 +17,14 @@ extends SceneTree
 ##   snapshot's killed list); the last one's fall opens the doors with a
 ##   REWARD item (where loot is kept), and a snuff afterwards never refills
 ##   it (Dusk from World 3 respawns);
-## - a hold: 'Hold · 0:20' runs down and the doors open at 20 s with foes
-##   still up, or sooner once they're all down;
+## - the drop-ins: farthest from him first, never one within DROP_CLEAR px
+##   of him (it waits while he stands by its post, and drops once he steps
+##   off), the bot waiting clear of every post still to drop;
+## - a room's tiered foe put out and brought back by a snuff's reset pays
+##   its tier's drops once: the Anointed's item, the Dread's two, the first
+##   kill only (no farm);
+## - a hold: 'Hold · 0:20' runs down (a clock: gold, no trail) and the doors
+##   open at 20 s with foes still up, or sooner once they're all down;
 ## - a foe knocked into the hold's pit is put out (a pit kill): the doors
 ##   never stay shut for good; a Twinned one's halves hold them till they fall;
 ## - the loft: walk under it and it never seals; climb in and only its gap
@@ -28,8 +34,11 @@ extends SceneTree
 ## - the --autoplay bot clears every room it walks into on the lab and rings
 ##   its bell (walking under the loft); secrets.gd's Warden is its foe only
 ##   in its sealed fight;
-## - every level file with rooms: a monster in each, a way in, and an altar
-##   within ALTAR_REACH tiles before each door;
+## - every level file with rooms (tests/level_rules.gd room_problems): a
+##   monster in each, a way in, doorways of air or stone that never opens
+##   (water, a vine, a ledge or brick there is caught), no monster within
+##   DOOR_CLEAR columns of a door, and an altar within ALTAR_REACH tiles
+##   before each door;
 ## - with the other Build 2 streams: a forced Anointed (anoint:) on a room's
 ##   cell keeps its tier, Omens and name asleep or hidden, is the loft's
 ##   named foe, and comes back as it was after a snuff's reset; in a restless
@@ -44,9 +53,12 @@ const Sealed := preload("res://scripts/features/sealed.gd")
 const AutoBot := preload("res://scripts/autoplay_bot.gd")
 const EnemyKinds := preload("res://scripts/enemy_kinds.gd")
 const Twists := preload("res://scripts/twists.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const TILE := 32
 const DT := 1.0 / 120.0
 const LAB := "lab-rooms"
+const AMBUSH_AT := 66.0          # where he seals the ambush (62-89): clear of its posts (69, 75, 80, 83)
+const HOLD_AT := 104.5           # and the hold (102-127): its posts 108, 111, 114, 122
 const STUB_HUD := """extends CanvasLayer
 var said := []
 func _say(k: String, a = null, b = null) -> void:
@@ -116,6 +128,8 @@ func _initialize() -> void:
 	await _test_absent()
 	await _test_duel()
 	await _test_ambush()
+	await _test_drops()
+	await _test_tier_loot()
 	await _test_hold()
 	await _test_hold_cleared()
 	await _test_pit()
@@ -224,8 +238,9 @@ func _seal(w: Node2D, r: Dictionary, at: Vector2) -> void:
 
 
 func _dropped(w: Node2D, r: Dictionary) -> void:
-	## Every drop-in landed (in the World's list).
-	_until(w, func(): return (r["drops"] as Array).is_empty(), 3.0)
+	## Every drop-in landed (in the World's list): one off the glass waits
+	## DROP_WAIT past its turn at most.
+	_until(w, func(): return (r["drops"] as Array).is_empty(), Sealed.DROP_WAIT + 2.0)
 
 
 # ---------------------------------------------------------------- the header
@@ -247,43 +262,37 @@ func _test_parse() -> void:
 
 
 func _test_rules() -> void:
-	## Every level file with rooms: a monster in each, a way in at an end, an
-	## altar within ALTAR_REACH tiles before its door. Only the lab has any yet.
+	## Every level file with rooms keeps the rooms' rules (level_rules.gd
+	## room_problems, common.py check_rooms as it writes): a monster in each,
+	## a way in at an end, doorways of air or stone that never opens, no
+	## monster within DOOR_CLEAR columns of a door, an altar within
+	## ALTAR_REACH tiles before its door. Only the lab has any yet.
 	var with_rooms := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if not f.ends_with(".txt"):
 			continue
 		var lv = LevelData.load_file("res://levels/" + f)
-		var raw := str(lv.headers.get("room", ""))
-		if raw == "":
+		if str(lv.headers.get("room", "")) == "":
 			continue
 		with_rooms.append(str(lv.id))
-		var altars: Array = lv.entities.filter(func(e): return e["kind"] == "altar").map(func(e): return (e["cell"] as Vector2i).x)
-		for spec in Sealed.parse(raw):
-			var x0: int = spec["x0"]
-			var x1: int = spec["x1"]
-			var rows: Array = spec["rows"]
-			var y0: int = 0 if rows.is_empty() else int(rows[0])
-			var y1: int = lv.height - 1 if rows.is_empty() else int(rows[1])
-			var monsters: Array = []
-			for e in lv.entities:
-				var c: Vector2i = e["cell"]
-				if _is_monster(str(e["kind"])) and c.x >= x0 and c.x <= x1 and c.y >= y0 and c.y <= y1:
-					monsters.append(e)
-			_check(not monsters.is_empty(), "%s: the %s at %d-%d holds a monster" % [lv.id, spec["kind"], x0, x1])
-			var door := 0
-			for x in [x0, x1]:
-				for y in (range(0, lv.height - 1) if rows.is_empty() else range(y0 + 1, y1)):
-					if lv.tile(x, y) == LevelData.AIR:
-						door += 1
-			_check(door > 0, "%s: the %s at %d-%d has a way in" % [lv.id, spec["kind"], x0, x1])
-			_check(altars.any(func(ax): return ax >= x0 - Sealed.ALTAR_REACH and ax < x0),
-					"%s: an altar within %d tiles before the %s at %d (altars %s)" % [lv.id, Sealed.ALTAR_REACH, spec["kind"], x0, altars])
+		var rp := Rules.room_problems(lv)
+		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
 	_check(with_rooms == [LAB], "only the lab has rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
-
-
-static func _is_monster(kind: String) -> bool:
-	return kind == "dread" or EnemyKinds.known(kind)
+	# What the rules catch, on the lab's ambush (62-89, its doorways rows
+	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
+	# under the slab), brick (it breaks), a monster by the door.
+	var cases := {"water": [Vector2i(62, 11), LevelData.WATER], "vine": [Vector2i(89, 10), LevelData.VINE],
+			"ledge": [Vector2i(62, 10), LevelData.LEDGE], "brick": [Vector2i(89, 5), LevelData.BRICK]}
+	for what in cases:
+		var lv = LevelData.load_file("res://levels/%s.txt" % LAB)
+		var c: Vector2i = cases[what][0]
+		lv.set_tile(c.x, c.y, int(cases[what][1]))
+		_check(Rules.room_problems(lv).any(func(p): return str(p).contains("doorway cell %d,%d" % [c.x, c.y])),
+				"a doorway of %s is caught (%s)" % [what, Rules.room_problems(lv)])
+	var near = LevelData.load_file("res://levels/%s.txt" % LAB)
+	near.entities.append({"kind": "skeleton", "cell": Vector2i(64, 12)})
+	_check(Rules.room_problems(near).any(func(p): return str(p).contains("within %d columns" % Sealed.DOOR_CLEAR)),
+			"a monster within %d columns of a door is caught" % Sealed.DOOR_CLEAR)
 
 
 func _test_absent() -> void:
@@ -415,12 +424,12 @@ func _test_ambush() -> void:
 	var alt := _altar_at(w, 55)
 	pl.reset_at(alt["pos"])
 	_ticks(w, 0.5)
-	_seal(w, r, _floor(70.5))
+	_seal(w, r, _floor(AMBUSH_AT))
 	_check(r["phase"] == "fight" and _all(w, r["sealed"], LevelData.STONE) and (r["sealed"] as Array).size() == 6, "in: shut")
 	_check(m.foes_left(r) == 5 and specs.all(func(s): return not w.enemies.has(s["node"])), "none in reach the moment they shut")
 	var bar: Dictionary = m.bar_info(r)
 	_check(str(bar["name"]) == "Ambush · 5" and absf(float(bar["frac"]) - 1.0) < 0.01, "'Ambush · 5' (%s)" % [bar])
-	_ticks(w, Sealed.DROP_FIRST + 0.05)
+	_until(w, func(): return specs.any(func(s): return s["node"].visible), Sealed.DROP_WAIT + 1.0)
 	var shown: Array = specs.filter(func(s): return s["node"].visible)
 	_check(shown.size() == 1 and not w.enemies.has(shown[0]["node"]) and shown[0]["node"].modulate.a < 1.0,
 			"they drop in one by one, each out of reach till it has (%d showing)" % shown.size())
@@ -444,7 +453,7 @@ func _test_ambush() -> void:
 	_check(not w._killed.has(ent), "and off the snapshot's killed list")
 	# Again: every one down, the doors open, the reward.
 	pl.invuln = 1000.0
-	_seal(w, r, _floor(70.5))
+	_seal(w, r, _floor(AMBUSH_AT))
 	_dropped(w, r)
 	hud.said.clear()
 	_clear(m, r)
@@ -466,6 +475,118 @@ func _test_ambush() -> void:
 	await _done(w)
 
 
+# ---------------------------------------------------------------- the drop-ins
+
+func _test_drops() -> void:
+	## The ambush's drop-ins: farthest from him first; none within
+	## DROP_CLEAR px of him as it shows (it waits while he stands by its
+	## post, the others coming on); stepping off lets it drop; the bot waits
+	## clear of every post still to drop.
+	var w := _world(LAB)
+	await process_frame
+	var m = _mod(w)
+	var r: Dictionary = m.rooms[1]
+	var pl: Node2D = w.player
+	pl.invuln = 1000.0
+	_keep_alive = true
+	_seal(w, r, _floor(AMBUSH_AT))
+	var order: Array = (r["drops"] as Array).map(func(d): return absf((d["en"] as Node2D).position.x - pl.position.x))
+	var falls := true
+	for i in range(1, order.size()):
+		falls = falls and float(order[i]) <= float(order[i - 1]) + 0.01
+	_check(order.size() == 5 and falls, "they drop farthest from him first (%s)" % [order])
+	# He steps onto the near Rattle's post (69) before its turn: it waits.
+	var near: Node2D = null
+	for s in r["specs"]:
+		if s["cell"] == Vector2i(69, 12):
+			near = s["node"]
+	pl.reset_at(_floor(69.5))
+	var close := []
+	for i in int((Sealed.DROP_WAIT + 2.0) / DT):
+		var was: Array = (r["drops"] as Array).filter(func(d): return d["on"]).map(func(d): return d["en"])
+		_ticks(w, DT)
+		for d in r["drops"]:
+			if d["on"] and not was.has(d["en"]) and pl.center().distance_to((d["en"] as Node2D).center()) < Sealed.DROP_CLEAR:
+				close.append(d["en"].kind)
+	_check(close.is_empty(), "none shows within %d px of him (%s)" % [int(Sealed.DROP_CLEAR), close])
+	var waiting: Array = (r["drops"] as Array).filter(func(d): return not d["on"]).map(func(d): return d["en"])
+	_check(near != null and waiting.has(near) and not near.visible and not w.enemies.has(near),
+			"standing by its post, the Rattle there waits, hidden (%d waiting)" % waiting.size())
+	_check(waiting.size() < 5, "while the rest come on (%d of 5 still to drop)" % waiting.size())
+	var tgt = m.bot_target(pl)
+	var clear := tgt is Vector2 and waiting.all(func(e): return absf((e as Node2D).center().x - (tgt as Vector2).x) >= Sealed.DROP_CLEAR + 40.0)
+	_check(m.counted(r).is_empty() or clear or tgt is Node2D, "(the bot fights what's down, or waits clear of the posts)")
+	for e in m.counted(r):
+		_kill(e)
+	_ticks(w, 2 * DT)
+	tgt = m.bot_target(pl)
+	_check(tgt is Vector2 and waiting.all(func(e): return absf((e as Node2D).center().x - (tgt as Vector2).x) >= Sealed.DROP_CLEAR + 40.0),
+			"with only waiting drop-ins, the bot waits clear of their posts (%s)" % [tgt])
+	# Off the post: it drops.
+	pl.reset_at(_floor(AMBUSH_AT))
+	_dropped(w, r)
+	_check(near != null and near.visible and w.enemies.has(near), "stepped off, it drops in")
+	_keep_alive = false
+	await _done(w)
+
+
+func _test_tier_loot() -> void:
+	## A room's tiered foe put out, then brought back by a snuff's reset (a
+	## respawn at its post, its tier and name kept), pays its tier's drops
+	## the first time only: the second kill rolls as any respawn (no farm).
+	var lv := _story_lab()
+	var amb_c := _cell_of(lv, "thornback", 62, 89)
+	lv.headers["anoint"] = "%d,%d:Swift:Sister Snare" % [amb_c.x, amb_c.y]   # (Swift: no halves to drop their own)
+	var w := _world("", {"level": lv})
+	await process_frame
+	var m = _mod(w)
+	var r: Dictionary = m.rooms[1]
+	var pl: Node2D = w.player
+	pl.invuln = 1000.0
+	_keep_alive = true
+	_seal(w, r, _floor(AMBUSH_AT))
+	_dropped(w, r)
+	var snare: Node2D = _spec_at(r, amb_c).get("node")
+	var items := func(): return w.pickups.filter(func(p): return p["kind"] == "item").size()
+	snare.item_chance = 0.0   # (only the tier's drop can show)
+	var n0: int = items.call()
+	_kill(snare)
+	_ticks(w, 2 * DT)
+	_check(items.call() == n0 + 1, "her first kill drops the Anointed's item (%d -> %d)" % [n0, items.call()])
+	_keep_alive = false
+	pl.invuln = 0.0
+	w.hurt_player(99999.0, pl.position.x + 20.0, "lava")
+	_ticks(w, 2.0)
+	var back: Node2D = _spec_at(r, amb_c).get("node")
+	_check(back != null and back.tier == "anointed" and bool(back.respawned), "the reset brings her back Anointed, a respawn")
+	pl.invuln = 1000.0
+	_keep_alive = true
+	_seal(w, r, _floor(AMBUSH_AT))
+	_dropped(w, r)
+	back.item_chance = 0.0
+	var n1: int = items.call()
+	_kill(back)
+	_ticks(w, 2 * DT)
+	_check(not back.alive and items.call() == n1, "killed again, she drops no second tier item (%d -> %d)" % [n1, items.call()])
+	# A Dread brought back the same way: neither his dread item nor his boss item again.
+	var d: Node2D = w.spawn_enemy("thornback", Vector2(70 * TILE, 13 * TILE), {"tier": "dread", "name": "The Gaoler", "respawned": true})
+	d.item_chance = 0.0
+	d.relic_chance = 0.0
+	var n2: int = items.call()
+	_kill(d)
+	_ticks(w, 2 * DT)
+	_check(items.call() == n2, "a Dread back as a respawn drops neither of his items again (%d -> %d)" % [n2, items.call()])
+	var fresh: Node2D = w.spawn_enemy("thornback", Vector2(72 * TILE, 13 * TILE), {"tier": "dread", "name": "The Gaoler"})
+	fresh.item_chance = 0.0
+	fresh.relic_chance = 0.0
+	var n3: int = items.call()
+	_kill(fresh)
+	_ticks(w, 2 * DT)
+	_check(items.call() == n3 + 2, "(a fresh Dread still drops both: %d -> %d)" % [n3, items.call()])
+	_keep_alive = false
+	await _done(w)
+
+
 # ---------------------------------------------------------------- the hold
 
 func _test_hold() -> void:
@@ -481,12 +602,14 @@ func _test_hold() -> void:
 	pl.invuln = 1000.0
 	pl.reset_at(_altar_at(w, 95)["pos"])
 	_ticks(w, 0.3)
-	_seal(w, r, _floor(106.5))
+	_seal(w, r, _floor(HOLD_AT))
 	_check(r["phase"] == "fight", "in: shut")
 	var bar: Dictionary = m.bar_info(r)
 	_check(str(bar["name"]) == "Hold · 0:20" and str(bar["title"]) == "4 left" and float(bar["frac"]) > 0.99, "'Hold · 0:20', '4 left' (%s)" % [bar])
+	_check(bool(bar.get("clock", false)) and not bool(m.bar_info(m.rooms[1]).get("clock", false)),
+			"a hold's bar is a clock (the HUD draws it gold, no trail); a count's isn't")
 	_dropped(w, r)
-	_ticks(w, 9.0)
+	_until(w, func(): return float(w.ftime) - float(r["sealed_at"]) >= 9.5, 12.0)
 	bar = m.bar_info(r)
 	_check(r["phase"] == "fight" and str(bar["name"]).begins_with("Hold · 0:1") and float(bar["frac"]) < 0.55, "it runs down (%s)" % bar["name"])
 	_until(w, func(): return r["phase"] != "fight", 12.0)
@@ -506,7 +629,7 @@ func _test_hold_cleared() -> void:
 	var m = _mod(w)
 	var r: Dictionary = m.rooms[2]
 	w.player.invuln = 1000.0
-	_seal(w, r, _floor(106.5))
+	_seal(w, r, _floor(HOLD_AT))
 	_dropped(w, r)
 	_clear(m, r)
 	_until(w, func(): return r["phase"] == "won", 1.0)
@@ -526,7 +649,7 @@ func _test_pit() -> void:
 	var hows := []
 	w.enemy_killed.connect(func(e, how): hows.append([e, how]))
 	w.player.invuln = 1000.0
-	_seal(w, r, _floor(106.5))
+	_seal(w, r, _floor(HOLD_AT))
 	_dropped(w, r)
 	var rattle: Node2D = null
 	for s in r["specs"]:
@@ -558,7 +681,7 @@ func _test_twinned() -> void:
 	var twin: Node2D = r["specs"][0]["node"]
 	twin.make_elite("anointed", ["Twinned"])
 	w.player.invuln = 1000.0
-	_seal(w, r, _floor(70.5))
+	_seal(w, r, _floor(AMBUSH_AT))
 	_dropped(w, r)
 	var n0: int = m.foes_left(r)
 	_kill(twin)
@@ -615,7 +738,7 @@ func _test_no_monsters() -> void:
 	var m = _mod(w)
 	_check(m.rooms.all(func(r): return r["phase"] == "won" and r["won"] == "empty"), "no monsters: every room open for good")
 	w.player.invuln = 1000.0
-	for at in [_floor(30.5), _floor(70.5), _floor(106.5), _floor(146.5, 7)]:
+	for at in [_floor(30.5), _floor(AMBUSH_AT), _floor(HOLD_AT), _floor(146.5, 7)]:
 		w.player.reset_at(at)
 		_ticks(w, 1.0)
 	_check(m.rooms.all(func(r): return r["phase"] == "won" and _all(w, r["door"], LevelData.AIR)), "walked into each: none seals")
@@ -733,7 +856,7 @@ func _test_forced_anoint() -> void:
 	_keep_alive = true
 	pl.reset_at(_altar_at(w, 55)["pos"])
 	_ticks(w, 0.5)
-	_seal(w, amb, _floor(70.5))
+	_seal(w, amb, _floor(AMBUSH_AT))
 	_dropped(w, amb)
 	var snare: Node2D = as_["node"]
 	_check(w.enemies.has(snare) and snare.tier == "anointed" and snare.elite_name == "Sister Snare", "it drops in Anointed, named")
@@ -773,7 +896,7 @@ func _test_restless() -> void:
 	var r: Dictionary = m.rooms[1]
 	pl.reset_at(_altar_at(w, 55)["pos"])
 	_ticks(w, 0.5)
-	_seal(w, r, _floor(70.5))
+	_seal(w, r, _floor(AMBUSH_AT))
 	_dropped(w, r)
 	var rattles: Array = m.counted(r).filter(func(e): return str(e.kind) == "skeleton")
 	rattles.sort_custom(func(a, b): return a.position.x < b.position.x)
@@ -804,7 +927,7 @@ func _test_restless() -> void:
 	var h: Dictionary = m.rooms[2]
 	pl.reset_at(_altar_at(w, 95)["pos"])
 	_ticks(w, 0.3)
-	_seal(w, h, _floor(106.5))
+	_seal(w, h, _floor(HOLD_AT))
 	_dropped(w, h)
 	var hr: Array = m.counted(h).filter(func(e): return str(e.kind) == "skeleton")
 	hr.sort_custom(func(a, b): return a.position.x < b.position.x)

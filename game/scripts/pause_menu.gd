@@ -223,6 +223,7 @@ func open_sheet() -> void:
 	if g != null and int(g.hero().get("points", 0)) > 0:
 		_sheet.tab = "skills"
 	_sheet.over_level = true
+	_sheet.world = world
 	_sheet.back.connect(func(): show_page("main"))
 	_sheet.changed.connect(func():
 		if world and world.has_method("apply_hero"):

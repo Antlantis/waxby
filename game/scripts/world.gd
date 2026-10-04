@@ -872,7 +872,7 @@ func twist_heal() -> float:
 
 func title_sub() -> String:
 	## The title card's line: "4-2 · On the Hour" with a twist, else the subtitle.
-	var c := Twists.card_of(twist_id(), world_n)
+	var c := Twists.card_of(twist_id(), world_n, str(level.id))
 	return level.subtitle if c.is_empty() else "%s · %s" % [level.subtitle, c[0]]
 
 
@@ -881,7 +881,7 @@ func twist_cards() -> Array:
 	## line, then a lesson's (an X-1's `lesson: Title|Line`); [] for neither.
 	var out := []
 	var key := "twist:%s:%s" % [level_id, diff]
-	var c := Twists.card_of(twist_id(), world_n)
+	var c := Twists.card_of(twist_id(), world_n, str(level.id))
 	if not c.is_empty():
 		out.append([key, str(c[0]), str(c[1])])
 	var l := Twists.lesson_in(level) if mode == null else []
@@ -2860,10 +2860,11 @@ func _light_altar(a: Dictionary) -> void:
 	var lit := prop_path("altar_lit")
 	if ResourceLoader.exists(lit):
 		a["sprite"].texture = load(lit)
+	_frost_altar(a)
 	_sfx("altar")
 	_haptic(20)
 	if glow:
-		glow.burst(a["flame"], 22, Color("f7b64a"), 150.0, 0.8, -60.0, 2.6)
+		glow.burst(a["flame"], 22, Twists.FROST if twist("dry") else Color("f7b64a"), 150.0, 0.8, -60.0, 2.6)
 	if healed:
 		number(a["flame"] + Vector2(0, -10), pct * player.max_hp, "heal")
 	if hud:
@@ -2871,6 +2872,13 @@ func _light_altar(a: Dictionary) -> void:
 	bark("first_altar")
 	_write_suspend(a)
 	_altar_rites(a)
+
+
+func _frost_altar(a: Dictionary) -> void:
+	## dry (twists.gd): a lit altar burns frost-blue, so the rule shows on
+	## the altar and not only on its card (glow.gd draws its flame so).
+	if twist("dry") and a.get("sprite") is CanvasItem:
+		(a["sprite"] as CanvasItem).modulate = Twists.FROST
 
 
 # ---------------------------------------------------------------- the Altar Rites
@@ -3358,6 +3366,7 @@ func _apply_resume() -> void:
 		a["lit"] = true
 		if ResourceLoader.exists(lit):
 			a["sprite"].texture = load(lit)
+		_frost_altar(a)
 	checkpoint = altars[ai]["pos"]
 	player.reset_at(checkpoint)
 	cam = cam_on(player.position)
@@ -3683,7 +3692,14 @@ func _on_enemy_died(e: Node2D, how: String) -> void:
 			p["loose"] = true
 			p["vel"] = Vector2(randf_range(-110, 110), randf_range(-380, -220))
 	var chance := kill_item_chance(e)
-	if e.tier == "anointed":
+	# A tiered monster back again (a sealed room's reset brings a put-out
+	# Dread or Anointed back at its post, features/sealed.gd) paid its tier's
+	# drops the first time: now it rolls as any respawn (half the kill chance).
+	var paid: bool = e.respawned and (e.tier == "anointed" or e.tier == "dread")
+	if paid:
+		if rng.randf() < chance:
+			drop_item(at, "kill")
+	elif e.tier == "anointed":
 		drop_item(at, "anointed")
 	elif e.tier == "dread":
 		# The first Dread of World 3 drops boots, of World 4 a charm, while

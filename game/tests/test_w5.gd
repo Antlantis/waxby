@@ -849,8 +849,12 @@ func _test_cast() -> void:
 		else:
 			_check(n == int(SPEC[id]["monsters"]), "5-4: %d monsters on the approach (%d)" % [SPEC[id]["monsters"], n])
 		_check(brutes <= 3, "%s: at most 3 brutes" % id)
-	var tp := Rules.threat_problems(regular)
-	_check(tp.is_empty(), "5-1 to 5-3: each threat as declared (within 10%%), ramping %s" % [tp])
+	# The world's rules across its regular levels (tests/level_rules.gd
+	# world_problems): each threat as declared, ramping (flat today, +1 a
+	# step once re-cut); once re-cut, roles on every level, no two with the
+	# same landmarks or altars, fodder falling, the X-3 mixing, no crowding.
+	var tp := Rules.world_problems(regular)
+	_check(tp.is_empty(), "5-1 to 5-3: the world's rules (threat, ramp, roles, variety) %s" % [tp])
 	# The ruling for 5-3: no Frostbuckle, no Tickwind, no Hollow Helm (an
 	# Anointed one breaks the cap); its Paneguards stand where none can be
 	# anointed (the scan knows placement since the track B merge: w5.py

@@ -84,8 +84,12 @@ func rows() -> Array:
 	if float(s["on_kill_heal"]) > 0.0:
 		out.append(["Heal on kill", "%.1f%%" % (float(s["on_kill_heal"]) * 100.0), ""])
 	# v3: the flask (charges on this difficulty, and what a draught heals),
-	# and the new keys where they're more than nothing.
-	if g != null and g.has_method("flask_charges"):
+	# and the new keys where they're more than nothing. Over a paused level,
+	# what that World pours (a dry twist's cut, a mode's own flask).
+	var w = host.get("world") if host != null else null
+	if w != null and is_instance_valid(w) and w.has_method("flask_heal") and w.has_method("flask_max"):
+		out.append(["Flask", "%d × %d%%" % [int(w.flask_max()), roundi(float(w.flask_heal()) * 100.0)], "charges · heal"])
+	elif g != null and g.has_method("flask_charges"):
 		out.append(["Flask", "%d × %d%%" % [int(g.flask_charges(diff)), roundi(float(g.flask_heal(diff)) * 100.0)], "charges · heal"])
 	if float(s.get("dim_resist", 0.0)) > 0.0:
 		out.append(["Dimming eased", "%d%%" % roundi(float(s["dim_resist"]) * 100.0), "cap %d%%" % roundi(Combat.DIM_RESIST_CAP * 100.0)])

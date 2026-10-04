@@ -6,7 +6,7 @@ area: 28
 dread: The Hush-a-Bye|hushling|Twinned,Hushed
 story_start: beat_6_1
 roster: headline=hushling,stillmaw; support=brinejaw,gutterwing,dripkin,bonebow; guest=hollow_helm,creepbone; rattle_max=11; fodder_max=0.89; count=34
-threat: 11
+threat: 12.1
 vigil_crown: 149:129,134,139,144,152
 hush: 56-75, 200-227
 hints: Hushlings won't enter lantern light. Stay near one|no one comes here. why did you?

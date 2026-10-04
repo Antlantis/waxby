@@ -38,7 +38,9 @@ ROSTER = {
             'guest': ['refractor', 'rattlehound', 'frostbuckle', 'hollow_helm', 'paneguard'],
             'rattle_max': 3, 'fodder_max': 0.68, 'count': 25},
 }
-THREAT = {'6-1': 11.0, '6-2': 10.9, '6-3': 11.0}
+# (Hushlings counted with the pack each placed one brings on Dusk, 2-3 at its
+# mean: common.in_play. Before that count, 11.0 / 10.9 / 11.0.)
+THREAT = {'6-1': 12.1, '6-2': 13.0, '6-3': 14.2}
 MAX_GAP = 78                 # tiles between checkpoints (World 6)
 
 LEVELS = []

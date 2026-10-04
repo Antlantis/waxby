@@ -789,8 +789,12 @@ func _test_threat(levels: Dictionary) -> void:
 		if levels[id].boss == "":
 			regular.append(levels[id])
 			_check(Rules.declared_threat(levels[id]) > 0.0, "%s declares its threat" % id)
-	var tp := Rules.threat_problems(regular)
-	_check(tp.is_empty(), "3-1 to 3-3: each threat as declared, ramping %s" % [tp])
+	# The world's rules across its regular levels (tests/level_rules.gd
+	# world_problems): each threat as declared, ramping (flat today, +1 a
+	# step once re-cut); once re-cut, roles on every level, no two with the
+	# same landmarks or altars, fodder falling, the X-3 mixing, no crowding.
+	var tp := Rules.world_problems(regular)
+	_check(tp.is_empty(), "3-1 to 3-3: the world's rules (threat, ramp, roles, variety) %s" % [tp])
 	for id in levels:
 		var lv = levels[id]
 		if lv.boss == "":

@@ -49,12 +49,48 @@ section's columns for a range header (a belt_flip: run, written x0-x1=N as
 features/clockwork.gd reads it; a sealed room is rooms_header's room:), and
 each world's regular levels declare their own
 cast and threat density (world_tables: ROSTER and THREAT), checked as each
-file is written (check_roster, check_threat), with the world's rules across
-them (check_roles: the ramp, the checkpoints, the section roles), and
-written as roster: and threat: headers, which tests/level_rules.gd holds
-each file to. An entry's 'anoint' may be a list of (section, dx, row[,
-omens[, name]]); anoint_header() writes it, Omens and names and all. Every
-key is optional; toolkit.py proves the toolkit with every build.
+file is written (check_headers: roster_problems, threat_of), with the
+world's rules across them (check_roles: the ramp, the checkpoints, the
+section roles and, once re-cut, the variety rules), and written as roster:
+and threat: headers, which tests/level_rules.gd holds each file to. An
+entry's 'anoint' may be a list of (section, dx, row[, omens[, name]]);
+anoint_header() writes it, Omens and names and all. Every key is optional;
+toolkit.py proves the toolkit with every build.
+
+Whoever writes a header (a world's tables, an explicit v2 'header' list, a
+lab), write() holds its Build 2 keys to their rules (check_headers): room:,
+anoint:, twist: (an id twists.gd knows), lesson: (Title|Line, short enough
+for the band), roster: (it reads, and the rows keep it), threat: and roles:.
+A v2 entry's explicit header list takes the toolkit's keys from the entry
+too ('roster', 'threat', 'roles', 'anoint', 'twist', 'lesson', 'room'), so
+w1.py and w2.py fill ROSTER and THREAT and call world_tables as W3-W6 do.
+
+The spec's tables were written before the toolkit; as the toolkit takes them
+(write() refuses the old spellings, SPEC_KEYS):
+    the spec                                  the toolkit
+    ('duel', '98-109')                        'room': [('duel', (98, 109))]
+    'ambush': SEC                             'room': [('ambush', SEC)]
+    'ambush': SEC '@20' (5-3)                 'room': [('hold', SEC, {'secs': 20})]
+    'twist': 'orchard_lesson' (an X-1's       'lesson': 'Into the Orchard|Roots follow
+      card with no rule)                        your steps. Keep moving.'
+    ('roster', 'skeleton,bat') (W1-W2)        'roster': {'headline': ['bat'],
+                                                'rattle_max': 8, 'fodder_max': 1.0}
+    a Rattle in a kind list (3-1, 3-2, 4-1)   fine: rattle_max holds Rattles (never
+                                                a headline, so it's left out)
+    'banned': [...] (5-3)                     a roster key: those kinds absent
+    'pack_leaders': {glassmite: 3, ...}       a roster key: each placed one counted
+                                                at that size (threat_of, in_play)
+    Brinejaw a W6 headline (6-1, 6-3)         fine: HEADLINE_RETURN (the drowned
+                                                deep's water kind comes back)
+    'twist': 'restless' (1-2 and 3-2)         one id: Rattles in Worlds 1-2, every
+                                                ordinary floor kind from World 3
+    'twist': 'duel' (1-3)                     a card only ("Barbs' Loft"); the
+                                                room itself is room:
+    the set pieces grove_light, bone_niche,   drawn by hand in their sections (they
+      spore_door, ice_to_wall and               need terrain: niches, pods, ice up
+      pendulum_knight                           to a wall, weights); STAMPS holds
+                                                the air-only groups
+    'feats'                                   cut (deferred past Build 2)
 """
 import ast
 import functools
@@ -99,6 +135,7 @@ class Section(list):
     Hashed and compared by identity, so a section can key a dict (cog_phase:
     {(ES_COG, 4): 0.25})."""
     overlay = None
+    stamps = ()   # [(name, dx, dy)]: the STAMPS drawn into it (stamp())
 
     def __hash__(self):
         return id(self)
@@ -233,6 +270,16 @@ ROOM_KINDS = ('duel', 'ambush', 'hold')
 ROOM_ALTAR_REACH = 8
 MONSTER_GLYPHS = set('sbtahgkfMD' + 'rpmijqeuxzyln567')
 SOLID_GLYPHS = set('#B?WRUFIZ<>G')
+# A doorway's cells (each end column between the room's ceiling and floor):
+# open air, where the slab comes down (sealed.gd seals only air), or what
+# never opens: stone, a reliquary or a spent one, wax-ice, a belt. Never
+# water, a vine, a ledge or crumble, dawnglass, a mover (a body passes them
+# under the slab), brick, false stone, rime or glass (they break or melt).
+DOOR_SOLID = set('#?WRUI<>')
+# No monster of a room within this many columns of either end (sealed.gd
+# DOOR_CLEAR): a drop-in by the door lands on him as he comes in; one in the
+# doorway is sealed into the wall.
+ROOM_DOOR_CLEAR = 3
 
 
 def rooms_header(rows, rooms):
@@ -281,30 +328,56 @@ def rooms_of(value):
     return out
 
 
-def check_rooms(name, rows, value):
-    """Every sealed room (a written 'room' header) holds a monster, has a way
-    in at an end, and has an altar within ROOM_ALTAR_REACH tiles before its
-    door: a snuff inside relights by it, as at a boss's door."""
-    if not value:
-        return
+def room_problems(rows, value):
+    """What breaks the sealed rooms of a written 'room' header, as strings:
+    each holds a monster, has a way in at an end, and has an altar within
+    ROOM_ALTAR_REACH tiles before its door (a snuff inside relights by it,
+    as at a boss's door); every doorway cell is air or DOOR_SOLID; no
+    monster of it stands within ROOM_DOOR_CLEAR columns of either end
+    (tests/level_rules.gd room_problems reads the file the same)."""
+    out = []
     altars = [x for r in rows for x, ch in enumerate(r) if ch == 'K']
-    for part in value.split(';'):
+    for part in str(value).split(';'):
         bits = part.split()
+        if len(bits) < 2 or bits[0] not in ROOM_KINDS:
+            continue
         x0, x1 = (int(v) for v in bits[1].split('-'))
         y0, y1 = 0, len(rows) - 1
         if 'rows' in bits:
             y0, y1 = (int(v) for v in bits[bits.index('rows') + 1].split('-'))
         door_rows = range(0, len(rows) - 1) if 'rows' not in bits else range(y0 + 1, y1)
+        room = 'room "%s"' % part.strip()
 
         def at(x, y):
             return rows[y][x] if 0 <= y < len(rows) and 0 <= x < len(rows[y]) else '.'
-        assert any(at(x, y) in MONSTER_GLYPHS for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)), \
-            '%s: room "%s" holds no monster' % (name, part.strip())
-        assert any(at(x, y) not in SOLID_GLYPHS for x in (x0, x1) for y in door_rows), \
-            '%s: room "%s" has no doorway at either end' % (name, part.strip())
-        assert any(x0 - ROOM_ALTAR_REACH <= x < x0 for x in altars), \
-            '%s: room "%s" has no altar within %d tiles before its door (altars at %s)' % (
-                name, part.strip(), ROOM_ALTAR_REACH, altars)
+        mons = [(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1) if at(x, y) in MONSTER_GLYPHS]
+        if not mons:
+            out.append('%s holds no monster' % room)
+        if not any(at(x, y) == '.' or (at(x, y) in ENTITY_GLYPHS and _tile(rows, x, y, 'solid') == 'air')
+                   for x in (x0, x1) for y in door_rows):
+            out.append('%s has no doorway at either end' % room)
+        for x in (x0, x1):
+            for y in door_rows:
+                ch = at(x, y)
+                open_air = ch == '.' or (ch in ENTITY_GLYPHS and _tile(rows, x, y, 'solid') == 'air')
+                if not open_air and ch not in DOOR_SOLID:
+                    out.append('%s: its doorway cell %d,%d is %r (air, or stone that never opens: %s)'
+                               % (room, x, y, ch, ''.join(sorted(DOOR_SOLID))))
+        near = [(x, y) for x, y in mons if x - x0 <= ROOM_DOOR_CLEAR or x1 - x <= ROOM_DOOR_CLEAR]
+        if near:
+            out.append('%s has monsters within %d columns of a door at %s' % (room, ROOM_DOOR_CLEAR, near))
+        if not any(x0 - ROOM_ALTAR_REACH <= x < x0 for x in altars):
+            out.append('%s has no altar within %d tiles before its door (altars at %s)' % (room, ROOM_ALTAR_REACH, altars))
+    return out
+
+
+def check_rooms(name, rows, value):
+    """Asserts every sealed room of a written 'room' header keeps its rules
+    (room_problems)."""
+    if not value:
+        return
+    probs = room_problems(rows, value)
+    assert not probs, '%s: %s' % (name, '; '.join(probs))
 
 
 def mirror_rows(rows):
@@ -354,7 +427,9 @@ def check_sign_budget(name, rows):
         '%s has %d signs: the budget is %d' % (name, n, 4 if name == '1-1' else 3)
 
 
-def write(name, header, rows, out_dir=None):
+def write(name, header, rows, out_dir=None, world=None):
+    """Writes game/levels/<name>.txt (or out_dir's), its header's Build 2
+    keys checked first (check_headers; world: the level's, else its id's)."""
     check_legend(name, rows)
     if SIGN_BUDGET:
         check_sign_budget(name, rows)
@@ -373,7 +448,7 @@ def write(name, header, rows, out_dir=None):
         at = keys.index('hints') if 'hints' in keys else len(header)
         header = header[:at] + extra + header[at:]
     header = [_order_hints(kv, rows) for kv in header]
-    check_rooms(name, rows, dict(header).get('room', ''))
+    check_headers(name, rows, header, world)
     text = ''.join('%s: %s\n' % kv for kv in header) + '---\n' + '\n'.join(r.rstrip('.') for r in rows) + '\n'
     d = out_dir or OUT
     os.makedirs(d, exist_ok=True)
@@ -383,14 +458,46 @@ def write(name, header, rows, out_dir=None):
     return text
 
 
-def header_of(entry, rows):
-    """An entry's ordered header: its own 'header' list verbatim, or one built
-    from its keys in HEADER_ORDER (x-valued keys resolved against rows; a
+# The toolkit's keys a v2 entry's explicit header list takes from the entry
+# (header_of), where the list doesn't already hold them.
+MERGE_KEYS = ('anoint', 'twist', 'lesson', 'roster', 'threat', 'roles', 'room')
+
+
+def _header_value(k, v, rows, entry):
+    """One header's written value: x-valued keys resolved against rows; a
     roster dict, a threat number, an anoint list and any span-valued key
-    written by their toolkit helpers). An entry's 'world' (a fixture's) and
-    'out_dir' aren't headers."""
+    written by their toolkit helpers."""
+    if k == 'hints' and not isinstance(v, str):
+        v = '|'.join(v)
+    elif k in ('cog_phase', 'weight_phase') and isinstance(v, dict):
+        v = phases_header({_place(rows, p): t for p, t in v.items()})
+    elif k == 'chase' and not isinstance(v, str):
+        v = ranges_header([(_place(rows, a), _place(rows, b)) for a, b in v])
+    elif k == 'room' and not isinstance(v, str):
+        v = rooms_header(rows, v)
+    elif k == 'roster' and isinstance(v, dict):
+        v = roster_header(v)
+    elif k == 'threat' and not isinstance(v, str):
+        v = _num(v)
+    elif k == 'anoint' and not isinstance(v, str):
+        v = anoint_header(rows, v, entry_world(entry), entry['id'])
+    elif _has_span(v):
+        v = spans_header(rows, v, SPAN_SEP.get(k, '@'))
+    return str(v)
+
+
+def header_of(entry, rows):
+    """An entry's ordered header: its own 'header' list (v2's, kept as it
+    was, with the toolkit's MERGE_KEYS from the entry put before its hints),
+    or one built from its keys in HEADER_ORDER (_header_value). An entry's
+    'world' (a fixture's) and 'out_dir' aren't headers."""
     if 'header' in entry:
-        return list(entry['header'])
+        out = list(entry['header'])
+        have = {k for k, _v in out}
+        extra = [(k, _header_value(k, entry[k], rows, entry)) for k in HEADER_ORDER if k in MERGE_KEYS and k in entry and k not in have]
+        if extra and out and out[-1][0] == 'hints':
+            return out[:-1] + extra + [out[-1]]
+        return out + extra
     vals = {}
     if 'name' in entry:
         vals['title'] = entry['name']
@@ -399,23 +506,7 @@ def header_of(entry, rows):
     for k, v in entry.items():
         if k in skip:
             continue
-        if k == 'hints' and not isinstance(v, str):
-            v = '|'.join(v)
-        elif k in ('cog_phase', 'weight_phase') and isinstance(v, dict):
-            v = phases_header({_place(rows, p): t for p, t in v.items()})
-        elif k == 'chase' and not isinstance(v, str):
-            v = ranges_header([(_place(rows, a), _place(rows, b)) for a, b in v])
-        elif k == 'room' and not isinstance(v, str):
-            v = rooms_header(rows, v)
-        elif k == 'roster' and isinstance(v, dict):
-            v = roster_header(v)
-        elif k == 'threat' and not isinstance(v, str):
-            v = _num(v)
-        elif k == 'anoint' and not isinstance(v, str):
-            v = anoint_header(rows, v, entry_world(entry), entry['id'])
-        elif _has_span(v):
-            v = spans_header(rows, v, SPAN_SEP.get(k, '@'))
-        vals[k] = str(v)
+        vals[k] = _header_value(k, v, rows, entry)
     out = [(k, vals.pop(k)) for k in HEADER_ORDER if k in vals]
     # Keys HEADER_ORDER doesn't know (the modes' private ones) go before the hints.
     extra = [(k, v) for k, v in vals.items()]
@@ -425,12 +516,11 @@ def header_of(entry, rows):
 
 
 def build(entry, out_dir=None):
-    """Joins an entry's sections, checks its Build 2 tables (check_entry)
-    and writes its file."""
+    """Joins an entry's sections and writes its file (write() checks its
+    Build 2 headers as written: check_headers)."""
     rows = join(*entry['sections'])
     header = header_of(entry, rows)
-    check_entry(entry, rows, header)
-    return write(entry['id'], header, rows, out_dir or entry.get('out_dir'))
+    return write(entry['id'], header, rows, out_dir or entry.get('out_dir'), entry_world(entry))
 
 
 # The seam every section of every world meets at a door (1-4 and 2-4 put it
@@ -464,17 +554,29 @@ GAME = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'gam
 
 # A level's threat (cost per 100 tiles, EnemyKinds.COST) within 10% of its
 # declared THREAT; in a world each regular level's declared threat at least
-# RAMP_STEP over the level before it, less RAMP_TOL (today's worlds are flat,
-# so the step is 0 and the tolerance a Rattle or so in 340 tiles; the
-# redesign's ramp is +1.0 a step: X-1 < X-2 < X-3).
+# the ramp over the level before it, less RAMP_TOL: RAMP_STEP (0) while a
+# world's levels are today's (flat: the tolerance a Rattle or so in 340
+# tiles), RECUT_RAMP (+1.0 a step: X-1 < X-2 < X-3) once they're re-cut
+# (they declare their roles:), or world_tables' ramp= for a world's own.
 THREAT_SLACK = 0.10
 RAMP_STEP = 0.0
+RECUT_RAMP = 1.0
 RAMP_TOL = 0.25
-# Under the packs twist a placed pack (one kind within PACK_TILES on a floor,
-# hushling.gd's pack_tiles) is budgeted at the size it comes to in play: the
-# Hushlings' pack and a Glassmite trio 3, a Creepbone's lane partner and an
-# Unwick's pair 2 (the spec's menu: hushling, glassmite, creepbone, unwick).
-PACK_SIZE = {'hushling': 3, 'glassmite': 3, 'creepbone': 2, 'unwick': 2}
+# Packs (in_play, threat_of): each placed monster counts at the bodies it
+# comes to in play. Under the packs twist each placed one of PACK_EACH brings
+# its own (every Glassmite two more, a Creepbone its lane partner, an Unwick
+# its pair: each script's per-placed rule), and each placed pack of a
+# PACK_GROUP kind (one kind within PACK_TILES across and a row of one
+# another, hushling.gd's pack_tiles; its leftmost brings it) comes to that
+# size at least: the Hushlings' 3-5 at its mean, a Tickwind file at two.
+# Hushlings bring a pack without the twist too: DUSK_PACK on a story Dusk
+# (2-3, at its mean), ANOINTED_PACK behind a forced Anointed leader from
+# World 3 (behave_diff: Nightfall's 3-5). A roster's pack_leaders ({kind: n})
+# counts each placed one of a kind at n instead.
+PACK_EACH = {'glassmite': 3, 'creepbone': 2, 'unwick': 2}
+PACK_GROUP = {'hushling': 4, 'tickwind': 2}
+DUSK_PACK = {'hushling': 2.5}
+ANOINTED_PACK = {'hushling': 4}
 PACK_TILES = 4
 # A regular level's altars (3-5, as its gaps need), and a sealed room's door
 # (the left column of each room in its room: header, rooms_of) has an altar
@@ -489,11 +591,44 @@ HOME = {'brinejaw': 2, 'rootling': 3, 'weepcap': 3, 'rattlehound': 3, 'creepbone
         'tickwind': 4, 'spurwheel': 4, 'frostbuckle': 4, 'hoarowl': 4,
         'glassmite': 5, 'gustling': 5, 'refractor': 5, 'paneguard': 5,
         'hushling': 6, 'stillmaw': 6, 'unwick': 6, 'lurecoil': 6}
-ROSTER_KEYS = ('headline', 'support', 'guest', 'rattle_max', 'fodder_max', 'count')
+# A kind from another world that a world may headline all the same: World
+# 6's drowned deep brings back World 2's water kind (the spec's 6-1, 6-3).
+HEADLINE_RETURN = {6: ('brinejaw',)}
+# A roster's keys: its kinds (a Rattle in a list is rattle_max's, so it's
+# left out), the caps, and banned (kinds it must not place: 5-3's share-cap
+# ruling), pack_leaders ({kind: n}: each placed one counted at n) and stamps
+# (the STAMPS it uses, each stamp() drawn into its sections: check_headers).
+ROSTER_KEYS = ('headline', 'support', 'guest', 'rattle_max', 'fodder_max', 'count', 'banned', 'pack_leaders', 'stamps')
 # Section roles (check_roles): each section's letters, in this order, from
 # what it holds (start, a Lidlurk's vault, the Dread, an altar, the bell, a
 # boss); a section with none is content, C.
 ROLE_MARKS = (('P', 'S'), ('M', 'V'), ('D', 'D'), ('K', 'A'), ('E', 'B'), ('X', 'X'))
+# A re-cut world (every regular level declares its roles:) is held to the
+# spec's variety rules across its levels (world_problems): no two with the
+# same landmarks (landmarks_of: the roles less the content, a run of one
+# landmark as one) or with their altars within ALTAR_NEAR tiles of each
+# other's; the fodder ceilings falling X-1 > X-2 > X-3 and at most
+# FODDER_CAPS; its X-3 with MIXED_SCREENS screens (SCREEN tiles, apart) of
+# MIXED_KINDS kinds or more; no screen with more than AWAKE_MAX bodies in
+# play (in_play: packs at their size; what the phone reads at once). Any
+# X-1 keeps its stamps to its second half (it teaches alone first).
+ALTAR_NEAR = 8
+FODDER_CAPS = (0.85, 0.75, 0.65)
+SCREEN = 26
+MIXED_KINDS = 3
+MIXED_SCREENS = 2
+AWAKE_MAX = 6
+# Header keys the spec wrote that the toolkit spells otherwise (write()
+# refuses them, saying how; the module docstring's table).
+SPEC_KEYS = {
+    'duel': "a sealed room is 'room': [('duel', where[, opts])] (rooms_header)",
+    'ambush': "a sealed room is 'room': [('ambush', where)]; a timed one [('hold', where, {'secs': 20})]",
+    'hold': "a sealed room is 'room': [('hold', where, {'secs': 20})] (rooms_header)",
+    'feats': 'feats were cut (deferred past Build 2)',
+    'banned': "banned is a roster key: 'roster': {..., 'banned': [kinds]}",
+    'pack_leaders': "pack_leaders is a roster key: 'roster': {..., 'pack_leaders': {kind: n}}",
+    'stamps': "stamps is a roster key: 'roster': {..., 'stamps': [names]}",
+}
 
 
 def _gd_const(script, name):
@@ -562,6 +697,14 @@ def game():
     return g
 
 
+@functools.lru_cache(maxsize=None)
+def twists():
+    """twists.gd's registry, as the header checks need it: its ids, and the
+    longest card name and line (NAME_MAX, LINE_MAX)."""
+    return {'ids': set(_gd_const('twists.gd', 'TWISTS')), 'name_max': _gd_const('twists.gd', 'NAME_MAX'),
+            'line_max': _gd_const('twists.gd', 'LINE_MAX')}
+
+
 def world_of(level_id):
     """'3-2' -> 3, '1-S' -> 1, anything else (a lab, a fixture) 0 (as
     LevelData.world_of)."""
@@ -574,6 +717,14 @@ def entry_world(entry):
     """An entry's world: its 'world' (a fixture's, whose id names none), else
     its id's."""
     return int(entry.get('world', world_of(entry['id'])))
+
+
+def level_no(level_id):
+    """'3-2' -> 2 (its place in its world: X-1, X-2, X-3), 0 for anything
+    else (a secret, a lab, a fixture)."""
+    if len(level_id) == 3 and level_id[1] == '-' and level_id[0].isdigit() and level_id[2].isdigit():
+        return int(level_id[2])
+    return 0
 
 
 def home_of(kind):
@@ -604,6 +755,7 @@ def swap(sec, cells=None, glyphs=None):
         rows[y][x] = ch
     out = Section(''.join(r) for r in rows)
     out.overlay = getattr(sec, 'overlay', None)
+    out.stamps = list(getattr(sec, 'stamps', ()))
     return out
 
 
@@ -675,8 +827,13 @@ def placement_problems(rows, edge='solid', only=None):
 # Encounter stamps (the spec's mixed groups): small authored fights where two
 # or three kinds make each other worse, as (dx, dy, glyph) from the stamp's
 # anchor (the first monster's cell). stamp() draws one into a copy of a
-# section; the section's own drawing gives it the post, the vines, the glass
-# or the belts it plays on. Each fits one 26 x 12 view (self_check).
+# section and records it there (Section.stamps: a level's roster names every
+# stamp it uses, and an X-1 keeps them to its second half); the section's
+# own drawing gives it the post, the vines, the glass or the belts it plays
+# on. Each fits one 26 x 12 view (self_check). The designs' set pieces that
+# need terrain a stamp can't write (it writes into air only) are drawn by
+# hand in their sections: grove_light (3-1), bone_niche and spore_door
+# (3-2), ice_to_wall (4-1) and pendulum_knight (4-3).
 STAMPS = {
     # A Bonebow on a post covers a Thornback on the floor 3 rows down, 4 on.
     'crossfire': [(0, 0, 'a'), (4, 3, 't')],
@@ -712,7 +869,14 @@ def stamp(sec, name, dx, dy):
     out = swap(sec, cells)
     bad = placement_problems(out, 'air', sorted(cells))
     assert not bad, 'stamp %s at (%d, %d): %s' % (name, dx, dy, ', '.join('%s at %d,%d' % (w, x, y) for x, y, _c, w in bad))
+    out.stamps = list(out.stamps) + [(name, dx, dy)]
     return out
+
+
+def level_stamps(rows):
+    """[(name, x, y)]: every stamp drawn into a level's sections (rows: the
+    joined Rows), absolute."""
+    return [(n, x0 + dx, dy) for sec, x0 in getattr(rows, 'parts', ()) for n, dx, dy in getattr(sec, 'stamps', ())]
 
 
 # ---------------------------------------------------------------- range headers
@@ -807,11 +971,11 @@ def anoint_header(rows, cells, world=0, level_id=''):
     'x,y[:Omen+Omen[:Name]]; x,y', from cells (section, dx, row[, omens[,
     name]]) or (x, y[, ...]) absolute, omens 'Swift+Warded' or a list ('':
     rolled as the World would, as 3-S's are). rows: the level's joined rows,
-    or its sections. Checked: each cell holds a kind elites.gd may anoint,
-    each Omen is in its Dusk pool there (omen_pool: so no difficulty falls
-    back to a roll), at most MAX_OMENS; World 1-2 at most one, with one
-    Omen, and never in 1-1 (the gentle on-ramp)."""
-    g = game()
+    or its sections. Checked as written (anoint_problems): each cell holds a
+    kind elites.gd may anoint, each Omen is in its Dusk pool there
+    (omen_pool: so no difficulty falls back to a roll), at most MAX_OMENS;
+    World 1-2 at most one, with one Omen, and never in 1-1 (the gentle
+    on-ramp)."""
     if not isinstance(rows, Rows):
         rows = join(*rows)
     out = []
@@ -823,26 +987,20 @@ def anoint_header(rows, cells, world=0, level_id=''):
         omens = rest[0] if rest else ''
         name = rest[1] if len(rest) > 1 else ''
         omens = [o for o in (omens.split('+') if isinstance(omens, str) else omens) if o]
-        where = '%s anoint %d,%d' % (level_id or 'a level', x, y)
-        assert 0 <= y < len(rows) and 0 <= x < len(rows[y]), '%s is outside the level' % where
-        kind = g['monsters'].get(rows[y][x])
-        assert kind in g['eligible'], '%s holds %r, no kind elites.gd may anoint' % (where, rows[y][x])
-        pool = omen_pool(kind, world)
-        for o in omens:
-            assert o in pool, '%s: a %s may not carry %s in World %d on Dusk (%s)' % (where, kind, o, world, '+'.join(pool))
-        assert len(set(omens)) == len(omens) and len(omens) <= g['max_omens'], '%s: Omens %s' % (where, omens)
+        # (A name or an Omen with ; : , or + would write a header that reads otherwise.)
         assert not re.search(r'[;:,]', name) and len(name) <= 24, \
-            '%s: its name %r (no ; : or , and 24 letters at most)' % (where, name)
-        if 1 <= world <= 2:
-            assert level_id != '1-1' and len(cells) <= 1 and len(omens) <= 1, \
-                '%s: World 1-2 takes at most one set piece, with one Omen, and none in 1-1' % where
+            '%s anoint %d,%d: its name %r (no ; : or , and 24 letters at most)' % (level_id or 'a level', x, y, name)
+        assert not any(re.search(r'[;:,+]', o) for o in omens), '%s anoint %d,%d: Omens %s' % (level_id or 'a level', x, y, omens)
         s = '%d,%d' % (x, y)
         if omens or name:
             s += ':' + '+'.join(omens)
         if name:
             s += ':' + name
         out.append(s)
-    return '; '.join(out)
+    value = '; '.join(out)
+    probs = anoint_problems(rows, value, world, level_id)
+    assert not probs, '%s: %s' % (level_id or 'a level', '; '.join(probs))
+    return value
 
 
 def anoint_cells(value):
@@ -855,6 +1013,38 @@ def anoint_cells(value):
             continue
         omens = [o.strip() for o in bits[1].split('+') if o.strip()] if len(bits) > 1 else []
         out.append((int(xy[0]), int(xy[1]), omens, bits[2].strip() if len(bits) > 2 else ''))
+    return out
+
+
+def anoint_problems(rows, value, world=0, level_id=''):
+    """What breaks a written anoint: header, as strings (anoint_header's
+    rules, read back from the value as tests/level_rules.gd anoint_problems
+    reads the file; write() runs it on every header, an explicit v2 list's
+    too): each part reads, each cell inside the level holding a kind
+    elites.gd may anoint, its Omens from that kind's Dusk pool there,
+    distinct and at most MAX_OMENS, its name with no ; : or , and 24 letters
+    at most; World 1-2 at most one, with one Omen, and none in 1-1."""
+    g = game()
+    out = ["the anoint part %r doesn't read (x,y[:Omen+Omen[:Name]])" % p.strip()
+           for p in str(value).split(';') if p.strip() and not anoint_cells(p)]
+    cells = anoint_cells(value)
+    for x, y, omens, name in cells:
+        where = 'the anoint at %d,%d' % (x, y)
+        if not (0 <= y < len(rows) and 0 <= x < len(rows[y])):
+            out.append('%s is outside the level' % where)
+            continue
+        kind = g['monsters'].get(rows[y][x])
+        if kind not in g['eligible']:
+            out.append('%s holds %r, no kind elites.gd may anoint' % (where, rows[y][x]))
+            continue
+        pool = omen_pool(kind, world)
+        out += ['%s: a %s may not carry %s in World %d on Dusk (%s)' % (where, kind, o, world, '+'.join(pool)) for o in omens if o not in pool]
+        if len(set(omens)) != len(omens) or len(omens) > g['max_omens']:
+            out.append('%s: Omens %s' % (where, omens))
+        if re.search(r'[;:,]', name) or len(name) > 24:
+            out.append('%s: its name %r (no ; : or , and 24 letters at most)' % (where, name))
+        if 1 <= world <= 2 and (level_id == '1-1' or len(cells) > 1 or len(omens) > 1):
+            out.append('%s: World 1-2 takes at most one set piece, with one Omen, and none in 1-1' % where)
     return out
 
 
@@ -887,26 +1077,55 @@ def _packs(cells):
     return groups
 
 
-def threat_of(rows, anoint=(), twist=''):
-    """Threat cost per 100 tiles (EnemyKinds.COST, the Dread aside): a
-    forced Anointed (a cell in anoint) at TIER_COST's x2.5, and under the
-    packs twist each placed pack of a PACK_SIZE kind at that size at least
-    (tests/level_rules.gd threat_of counts the same)."""
+def in_play(rows, anoint=(), twist='', world=0, pack_leaders=None):
+    """[(x, y, kind, n)]: each placed monster (the Dread and the boss aside)
+    and the bodies it comes to in play, itself and the pack it brings: a
+    roster's pack_leaders at its n; under the packs twist PACK_EACH apiece;
+    each placed pack of a PACK_GROUP or DUSK_PACK kind up to its size, on its
+    leftmost (ANOINTED_PACK when that one is a forced Anointed, from World 3;
+    else PACK_GROUP under the twist; else DUSK_PACK). A cell in anoint is a
+    forced Anointed. tests/level_rules.gd in_play counts the same."""
     g = game()
     forced = set(anoint)
-    packs = {}
-    cost = 0.0
+    leaders = dict(pack_leaders or {})
+    placed = []
+    groups = {}
     for y, r in enumerate(rows):
         for x, ch in enumerate(r):
             k = g['monsters'].get(ch)
             if not k:
                 continue
-            cost += g['cost'][k] * (g['tier_cost']['anointed'] if (x, y) in forced else 1.0)
-            if twist == 'packs' and k in PACK_SIZE:
-                packs.setdefault(k, []).append((x, y))
-    for k, cells in packs.items():
-        for group in _packs(cells):
-            cost += g['cost'][k] * max(0, PACK_SIZE[k] - len(group))
+            p = [x, y, k, 1.0]
+            placed.append(p)
+            if k in leaders:
+                p[3] = float(leaders[k])
+            elif twist == 'packs' and k in PACK_EACH:
+                p[3] = float(PACK_EACH[k])
+            elif k in PACK_GROUP or k in DUSK_PACK:
+                groups.setdefault(k, {})[(x, y)] = p
+    for k, by in groups.items():
+        for group in _packs(list(by)):
+            lead = by[min(group)]
+            if (lead[0], lead[1]) in forced and world >= 3 and k in ANOINTED_PACK:
+                size = ANOINTED_PACK[k]
+            elif twist == 'packs' and k in PACK_GROUP:
+                size = PACK_GROUP[k]
+            else:
+                size = DUSK_PACK.get(k, 0.0)
+            lead[3] += max(0.0, size - len(group))
+    return [tuple(p) for p in placed]
+
+
+def threat_of(rows, anoint=(), twist='', world=0, pack_leaders=None):
+    """Threat cost per 100 tiles (EnemyKinds.COST, the Dread aside): each
+    placed monster at the bodies it comes to in play (in_play: its pack's
+    extras at its kind's cost), a forced Anointed (a cell in anoint) itself
+    at TIER_COST's x2.5 (tests/level_rules.gd threat_of counts the same)."""
+    g = game()
+    forced = set(anoint)
+    cost = 0.0
+    for x, y, k, n in in_play(rows, anoint, twist, world, pack_leaders):
+        cost += g['cost'][k] * ((g['tier_cost']['anointed'] if (x, y) in forced else 1.0) + n - 1.0)
     return cost * 100.0 / max(len(r) for r in rows)
 
 
@@ -916,35 +1135,93 @@ def _band(v):
 
 def roster_header(roster):
     """'headline=a,b; support=c; guest=d; rattle_max=3; fodder_max=0.75;
-    count=18-24' (empty lists and an absent count left out)."""
+    count=18-24; banned=e; pack_leaders=glassmite:3; stamps=crossfire'
+    (empty lists and an absent count left out)."""
     parts = ['%s=%s' % (k, ','.join(roster[k])) for k in ('headline', 'support', 'guest') if roster.get(k)]
     parts.append('rattle_max=%d' % roster['rattle_max'])
     parts.append('fodder_max=%s' % _num(roster['fodder_max']))
     if 'count' in roster:
         lo, hi = _band(roster['count'])
         parts.append('count=%d' % lo if lo == hi else 'count=%d-%d' % (lo, hi))
+    if roster.get('banned'):
+        parts.append('banned=%s' % ','.join(roster['banned']))
+    if roster.get('pack_leaders'):
+        parts.append('pack_leaders=%s' % ','.join('%s:%d' % (k, n) for k, n in sorted(roster['pack_leaders'].items())))
+    if roster.get('stamps'):
+        parts.append('stamps=%s' % ','.join(roster['stamps']))
+    for k in sorted(set(roster) - set(ROSTER_KEYS)):
+        parts.append('%s=%s' % (k, roster[k]))
     return '; '.join(parts)
+
+
+def roster_of(value):
+    """A written roster: header read back as roster_header's dict (as
+    tests/level_rules.gd roster_of reads it): lists, numbers, a count band,
+    pack_leaders {kind: n}; a key it doesn't know kept as written (so
+    roster_problems names it); {} for none."""
+    out = {}
+    for part in str(value).split(';'):
+        if not part.strip():
+            continue
+        k, _eq, v = part.partition('=')
+        k, v = k.strip(), v.strip()
+        if k in ('headline', 'support', 'guest', 'banned', 'stamps'):
+            out[k] = [s.strip() for s in v.split(',') if s.strip()]
+        elif k == 'rattle_max':
+            out[k] = int(v)
+        elif k == 'fodder_max':
+            out[k] = float(v)
+        elif k == 'count':
+            ab = v.split('-')
+            out[k] = (int(ab[0]), int(ab[-1]))
+        elif k == 'pack_leaders':
+            out[k] = {a.split(':')[0].strip(): int(a.split(':')[1]) for a in v.split(',') if ':' in a}
+        else:
+            out[k] = v
+    return out
 
 
 def roster_problems(level_id, cast, roster, world=None):
     """What breaks a level's declared roster (the spec's per-level rosters),
     as strings: every kind it places is declared (headline, support or
-    guest), a Rattle only up to rattle_max (never listed) and one Lidlurk
-    (the vault's, never listed); every headline kind placed; from World 3 a
-    headline kind is the world's own, a guest an earlier world's and no
-    support kind a later one's; the fodder share (EnemyKinds.ROLE, of every
+    guest; a Rattle listed is left out: rattle_max holds Rattles), a Rattle
+    only up to rattle_max and one Lidlurk (the vault's, never listed); every
+    headline kind placed; from World 3 a headline kind is the world's own
+    (or one HEADLINE_RETURN brings back), a guest an earlier world's and no
+    support kind a later one's; no banned kind placed; pack_leaders and
+    stamps naming what's there; the fodder share (EnemyKinds.ROLE, of every
     monster) within fodder_max, and the count within count (n or (lo, hi)).
     world: the level's (else its id's)."""
     g = game()
     out = ['unknown roster key %s' % k for k in sorted(set(roster) - set(ROSTER_KEYS))]
+    if any('=' not in str(k) and ',' in str(k) for k in roster):
+        out.append("a roster is keys (headline=..; rattle_max=..; fodder_max=..), not a list of kinds: "
+                   "write the dict, {'headline': [...], 'rattle_max': n, 'fodder_max': f}")
     out += ['the roster has no %s' % k for k in ('headline', 'rattle_max', 'fodder_max') if k not in roster]
     if out:
         return out
     world = world_of(level_id) if world is None else world
-    head, sup, guest = list(roster['headline']), list(roster.get('support', [])), list(roster.get('guest', []))
-    for k in head + sup + guest:
-        if k in ('skeleton', 'lidlurk') or k not in g['cost']:
-            out.append('%s is listed (a Rattle is rattle_max, a Lidlurk the vault, else no kind)' % k)
+    head, sup, guest = ([k for k in roster.get(n, []) if k != 'skeleton'] for n in ('headline', 'support', 'guest'))
+    listed = head + sup + guest
+    if not head:
+        out.append('the roster has no headline kind but the Rattle (rattle_max holds Rattles)')
+    for k in listed:
+        if k == 'lidlurk' or k not in g['cost']:
+            out.append('%s is listed (a Lidlurk is the vault, else no kind)' % k)
+    banned = list(roster.get('banned', []))
+    for k in banned:
+        if k not in g['cost']:
+            out.append('%s is banned, but no kind' % k)
+        elif k in listed:
+            out.append('%s is both listed and banned' % k)
+        elif cast.get(k, 0):
+            out.append('%d %s, banned' % (cast[k], k))
+    for k, n in sorted(dict(roster.get('pack_leaders', {})).items()):
+        if k not in listed or int(n) < 1:
+            out.append('pack_leaders %s:%s (a listed kind, at 1 or more)' % (k, n))
+    for st in roster.get('stamps', []):
+        if st not in STAMPS:
+            out.append('stamps names %s, no stamp (STAMPS)' % st)
     for k, n in sorted(cast.items()):
         if k == 'skeleton':
             if n > roster['rattle_max']:
@@ -952,13 +1229,14 @@ def roster_problems(level_id, cast, roster, world=None):
         elif k == 'lidlurk':
             if n > 1:
                 out.append('%d Lidlurks (one: the vault)' % n)
-        elif k not in head + sup + guest:
+        elif k not in listed and k not in banned:
             out.append('%d %s it does not declare' % (n, k))
     for k in head:
         if cast.get(k, 0) == 0:
             out.append('no %s, a headline kind' % k)
     if world >= 3:
-        out += ['%s is World %d\'s, no headline in World %d' % (k, home_of(k), world) for k in head if home_of(k) != world]
+        back = HEADLINE_RETURN.get(world, ())
+        out += ['%s is World %d\'s, no headline in World %d' % (k, home_of(k), world) for k in head if home_of(k) != world and k not in back]
         out += ['%s is no guest from an earlier world' % k for k in guest if home_of(k) >= world]
         out += ['%s is from a later world' % k for k in sup if home_of(k) > world]
     n = sum(cast.values())
@@ -978,28 +1256,72 @@ def check_roster(name, rows, roster, world=None):
     assert not probs, '%s breaks its roster: %s' % (name, '; '.join(probs))
 
 
-def check_threat(name, rows, target, anoint=(), twist=''):
+def check_threat(name, rows, target, anoint=(), twist='', world=0, pack_leaders=None):
     """Asserts a level's threat (threat_of) within THREAT_SLACK of its
     declared one, and returns it."""
-    got = threat_of(rows, anoint, twist)
+    got = threat_of(rows, anoint, twist, world, pack_leaders)
     assert abs(got - target) <= target * THREAT_SLACK + 1e-9, \
         '%s: threat %.2f per 100 tiles, declared %s (within %d%%)' % (name, got, _num(target), round(THREAT_SLACK * 100))
     return got
 
 
-def check_entry(entry, rows, header):
-    """An entry's Build 2 tables, checked as its file is written: its roster
-    (roster_problems) and its threat (threat_of within THREAT_SLACK of its
-    declared one, its anoint: cells at x2.5). The anoint: cells and the
-    stamps are checked where they're made (anoint_header, stamp)."""
-    if not isinstance(entry.get('roster'), dict) and 'threat' not in entry:
-        return
+def lesson_problems(value):
+    """What breaks a lesson: header (an X-1's card, twists.gd lesson_in), as
+    strings: Title|Line, the title at most NAME_MAX characters and the line
+    at most LINE_MAX (the band's 14 px on the phone; test_twists measures)."""
+    t = twists()
+    title, bar, line = str(value).partition('|')
+    title, line = title.strip(), line.strip()
+    out = []
+    if not bar or not title or not line:
+        out.append('a lesson is Title|Line: %r' % value)
+    if len(title) > t['name_max']:
+        out.append('the lesson title %r is %d characters (at most %d)' % (title, len(title), t['name_max']))
+    if len(line) > t['line_max']:
+        out.append('the lesson line %r is %d characters (at most %d)' % (line, len(line), t['line_max']))
+    return out
+
+
+def check_headers(name, rows, header, world=None):
+    """The Build 2 keys of a header about to be written, whoever wrote it (a
+    world's tables, an explicit v2 header list, a lab): a spelling the spec
+    used that the toolkit replaced is refused (SPEC_KEYS, saying how);
+    room: (check_rooms), anoint: (anoint_problems), twist: (an id in
+    twists.gd TWISTS), lesson: (lesson_problems), roster: (it reads and the
+    rows keep it, roster_problems, and it names every stamp the sections
+    hold), threat: (threat_of within THREAT_SLACK, its anoint: cells, twist
+    and pack_leaders counted) and roles: (what the sections hold) keep their
+    rules. world: the level's (else its id's)."""
+    world = world_of(name) if world is None else world
     hd = dict(header)
-    if isinstance(entry.get('roster'), dict):
-        check_roster(entry['id'], rows, entry['roster'], entry_world(entry))
-    if 'threat' in entry:
+    for k in hd:
+        assert k not in SPEC_KEYS, '%s: a %r header: %s' % (name, k, SPEC_KEYS[k])
+    check_rooms(name, rows, hd.get('room', ''))
+    if hd.get('anoint', '').strip():
+        probs = anoint_problems(rows, hd['anoint'], world, name)
+        assert not probs, '%s: %s' % (name, '; '.join(probs))
+    tw = hd.get('twist', '').strip()
+    assert not tw or tw.lower() in twists()['ids'], \
+        "%s: twist %r is none of twists.gd's (%s); an X-1's card with no rule is lesson: Title|Line" % (
+            name, tw, ', '.join(sorted(twists()['ids'])))
+    if 'lesson' in hd:
+        probs = lesson_problems(hd['lesson'])
+        assert not probs, '%s: %s' % (name, '; '.join(probs))
+    roster = {}
+    if hd.get('roster', '').strip():
+        roster = roster_of(hd['roster'])
+        probs = roster_problems(name, cast_of(rows), roster, world)
+        assert not probs, '%s breaks its roster: %s' % (name, '; '.join(probs))
+        used = sorted({n for n, _x, _y in level_stamps(rows)})
+        assert used == sorted(set(roster.get('stamps', []))), \
+            '%s: its roster names stamps %s, its sections hold %s' % (name, sorted(set(roster.get('stamps', []))), used)
+    if hd.get('threat', '').strip():
         anoint = [(x, y) for x, y, _o, _n in anoint_cells(hd.get('anoint', ''))]
-        check_threat(entry['id'], rows, float(entry['threat']), anoint, hd.get('twist', '').strip())
+        check_threat(name, rows, float(hd['threat']), anoint, tw.lower(), world, roster.get('pack_leaders'))
+    parts = [sec for sec, _x in getattr(rows, 'parts', ())]
+    if hd.get('roles', '').strip() and parts:
+        assert ' '.join(hd['roles'].split()) == roles_of(parts), \
+            '%s declares roles %s but its sections hold %s' % (name, hd['roles'], roles_of(parts))
 
 
 # ---------------------------------------------------------------- a world's rules
@@ -1013,75 +1335,170 @@ def roles_of(sections):
     return ' '.join(out)
 
 
-def checkpoint_problems(rows, header, max_gap):
+def landmarks_of(roles):
+    """A roles string's landmarks: its content (C) left out and a run of one
+    landmark taken as one ('S C C A C A C V A D B' -> 'S A V A D B'), so a
+    content section added or split, or an altar more in a run, is no change."""
+    out = []
+    for r in str(roles).split():
+        if r != 'C' and (not out or out[-1] != r):
+            out.append(r)
+    return ' '.join(out)
+
+
+def checkpoint_problems(rows, header, max_gap, altar_band=ALTARS):
     """A regular level's checkpoints (start, altars, bell): at most max_gap
-    apart, ALTARS altars, and an altar at most DOOR_ALTAR tiles before every
-    sealed room's door (the left column of each room: room, rooms_of)."""
+    apart, altar_band altars (ALTARS; World 1-2's own, w1.py and w2.py), and
+    an altar at most DOOR_ALTAR tiles before every sealed room's door (the
+    left column of each room: room, rooms_of)."""
     marks = sorted(x for r in rows for x, ch in enumerate(r) if ch in 'PKEX')
     altars = sorted(x for r in rows for x, ch in enumerate(r) if ch == 'K')
     out = []
     worst = max([b - a for a, b in zip(marks, marks[1:])] or [0])
     if worst > max_gap:
         out.append('checkpoints %d tiles apart (at most %d): %s' % (worst, max_gap, marks))
-    if not ALTARS[0] <= len(altars) <= ALTARS[1]:
-        out.append('%d altars (%d-%d)' % (len(altars), ALTARS[0], ALTARS[1]))
+    if not altar_band[0] <= len(altars) <= altar_band[1]:
+        out.append('%d altars (%d-%d)' % (len(altars), altar_band[0], altar_band[1]))
     for kind, x0, _x1 in rooms_of(header.get('room', '')):
         if not any(0 <= x0 - a <= DOOR_ALTAR for a in altars):
             out.append('no altar within %d tiles of the %s door at %d (altars %s)' % (DOOR_ALTAR, kind, x0, altars))
     return out
 
 
-def world_problems(entries, max_gap):
+def mixed_screens(rows):
+    """How many screens (SCREEN tiles wide, none overlapping: the most such
+    a level holds) have MIXED_KINDS kinds or more of monster in them."""
+    mons = game()['monsters']
+    cols = {}
+    for r in rows:
+        for x, ch in enumerate(r):
+            if ch in mons:
+                cols.setdefault(x, set()).add(mons[ch])
+    width = max(len(r) for r in rows)
+    n = 0
+    x0 = 0
+    while x0 < width:
+        kinds = set()
+        for x in range(x0, x0 + SCREEN):
+            kinds |= cols.get(x, set())
+        if len(kinds) >= MIXED_KINDS:
+            n += 1
+            x0 += SCREEN
+        else:
+            x0 += 1
+    return n
+
+
+def crowded_screens(rows, anoint=(), twist='', world=0, pack_leaders=None):
+    """[(x0, n)]: each screen (SCREEN tiles from x0) with more than
+    AWAKE_MAX bodies in play in it (in_play: packs at their size)."""
+    at = {}
+    for x, _y, _k, n in in_play(rows, anoint, twist, world, pack_leaders):
+        at[x] = at.get(x, 0.0) + n
+    width = max(len(r) for r in rows)
+    out = []
+    for x0 in range(0, max(width - SCREEN, 0) + 1):
+        n = sum(at.get(x, 0.0) for x in range(x0, x0 + SCREEN))
+        if n > AWAKE_MAX + 1e-9:
+            out.append((x0, n))
+    return out
+
+
+def world_problems(entries, max_gap, ramp=None, altar_band=ALTARS):
     """What breaks a world's rules across its regular levels (the entries
     with a roster), as strings: the threat ramp (each declared threat at
-    least RAMP_STEP over the one before, less RAMP_TOL), each level's
-    checkpoint_problems, a declared 'roles' that isn't what its sections
-    hold, and a re-cut level (one that declares its 'roles') that shares its
-    section roles with a sibling (the spec: no two alike)."""
+    least the ramp over the one before, less RAMP_TOL: ramp, else RECUT_RAMP
+    in a re-cut world, else RAMP_STEP), each level's checkpoint_problems,
+    any X-1's stamps in its first half; and once any level is re-cut (it
+    declares its roles:, which must be what its sections hold), every one
+    declares them, and the variety rules (ALTAR_NEAR and on): no two share
+    their landmarks (landmarks_of) or line their altars up, the fodder
+    ceilings fall within FODDER_CAPS, the X-3 mixes MIXED_SCREENS screens and
+    no screen of an X-1..X-3 holds more than AWAKE_MAX in play (a fixture,
+    unnumbered, is no X-n)."""
     regular = sorted((e for e in entries if 'roster' in e), key=lambda e: e['id'])
+    recut = any('roles' in e for e in regular)
+    step = ramp if ramp is not None else (RECUT_RAMP if recut else RAMP_STEP)
     out = []
     prev = None
     for e in regular:
         t = e.get('threat')
         if t is None:
             continue
-        if prev is not None and float(t) < prev[1] + RAMP_STEP - RAMP_TOL:
+        if prev is not None and float(t) < prev[1] + step - RAMP_TOL:
             out.append('threat %s in %s after %s in %s (the ramp: +%s, less %s)'
-                       % (_num(t), e['id'], _num(prev[1]), prev[0], _num(RAMP_STEP), _num(RAMP_TOL)))
+                       % (_num(t), e['id'], _num(prev[1]), prev[0], _num(step), _num(RAMP_TOL)))
         prev = (e['id'], float(t))
-    seqs = {}
+    info = {}
     for e in regular:
         rows = join(*e['sections'])
-        out += ['%s: %s' % (e['id'], p) for p in checkpoint_problems(rows, dict(header_of(e, rows)), max_gap)]
-        seqs[e['id']] = roles_of(e['sections'])
-        if 'roles' in e and ' '.join(e['roles'].split()) != seqs[e['id']]:
-            out.append('%s declares roles %s but its sections hold %s' % (e['id'], e['roles'], seqs[e['id']]))
+        hd = dict(header_of(e, rows))
+        out += ['%s: %s' % (e['id'], p) for p in checkpoint_problems(rows, hd, max_gap, altar_band)]
+        seq = roles_of(e['sections'])
+        if 'roles' in e and ' '.join(e['roles'].split()) != seq:
+            out.append('%s declares roles %s but its sections hold %s' % (e['id'], e['roles'], seq))
+        width = max(len(r) for r in rows)
+        if level_no(e['id']) == 1:
+            early = [(n, x) for n, x, _y in level_stamps(rows) if x < width // 2]
+            if early:
+                out.append('%s: stamps in its first half %s (an X-1 teaches alone first)' % (e['id'], early))
+        roster = e['roster'] if isinstance(e['roster'], dict) else roster_of(e['roster'])
+        info[e['id']] = {'rows': rows, 'hd': hd, 'seq': seq, 'roster': roster,
+                         'altars': sorted(x for r in rows for x, ch in enumerate(r) if ch == 'K')}
+    if not recut:
+        return out
+    out += ['%s declares no roles: (a re-cut world\'s levels all do)' % e['id'] for e in regular if 'roles' not in e]
     for i, a in enumerate(regular):
         for b in regular[i + 1:]:
-            if ('roles' in a or 'roles' in b) and seqs[a['id']] == seqs[b['id']]:
-                out.append('%s and %s share their section roles (%s)' % (a['id'], b['id'], seqs[a['id']]))
+            ia, ib = info[a['id']], info[b['id']]
+            if landmarks_of(ia['seq']) == landmarks_of(ib['seq']):
+                out.append('%s and %s share their landmarks (%s)' % (a['id'], b['id'], landmarks_of(ia['seq'])))
+            if len(ia['altars']) == len(ib['altars']) and all(abs(p - q) <= ALTAR_NEAR for p, q in zip(ia['altars'], ib['altars'])):
+                out.append('%s and %s have their altars within %d tiles of each other\'s (%s, %s)'
+                           % (a['id'], b['id'], ALTAR_NEAR, ia['altars'], ib['altars']))
+    last = None
+    for e in regular:
+        n = level_no(e['id'])
+        fm = float(info[e['id']]['roster']['fodder_max'])
+        if 1 <= n <= len(FODDER_CAPS) and fm > FODDER_CAPS[n - 1] + 1e-9:
+            out.append('%s: fodder_max %s (an X-%d at most %s)' % (e['id'], _num(fm), n, _num(FODDER_CAPS[n - 1])))
+        if last is not None and fm >= last[1] - 1e-9:
+            out.append('%s: fodder_max %s, not under %s\'s %s (it falls X-1 to X-3)' % (e['id'], _num(fm), last[0], _num(last[1])))
+        last = (e['id'], fm)
+        it = info[e['id']]
+        anoint = [(x, y) for x, y, _o, _n in anoint_cells(it['hd'].get('anoint', ''))]
+        if n == 3 and mixed_screens(it['rows']) < MIXED_SCREENS:
+            out.append('%s: %d screens with %d kinds or more (an X-3 mixes: at least %d)'
+                       % (e['id'], mixed_screens(it['rows']), MIXED_KINDS, MIXED_SCREENS))
+        crowd = crowded_screens(it['rows'], anoint, it['hd'].get('twist', '').strip(), entry_world(e), it['roster'].get('pack_leaders')) if n else []
+        if crowd:
+            x0, k = max(crowd, key=lambda c: c[1])
+            out.append('%s: %s in play on the screen from x %d (at most %d a screen)' % (e['id'], _num(k), x0, AWAKE_MAX))
     return out
 
 
-def check_roles(entries, max_gap):
+def check_roles(entries, max_gap, ramp=None, altar_band=ALTARS):
     """Asserts a world's rules across its regular levels (world_problems:
-    the threat ramp, each level's checkpoints and altar gaps, and its
-    section roles)."""
-    probs = world_problems(entries, max_gap)
+    the threat ramp, each level's checkpoints and altar gaps, its section
+    roles and, once re-cut, the variety rules)."""
+    probs = world_problems(entries, max_gap, ramp, altar_band)
     assert not probs, 'the world\'s rules: ' + '; '.join(probs)
 
 
-def world_tables(entries, roster, threat, max_gap):
+def world_tables(entries, roster, threat, max_gap, ramp=None, altar_band=ALTARS):
     """Hands each regular level its row of its world's ROSTER and THREAT
     (written as its roster: and threat: headers, and checked as it's
-    written: check_entry), then checks the world's rules across them
-    (check_roles). A level in neither table keeps its old header."""
+    written: check_headers; a v2 entry's explicit header list takes them
+    too, header_of), then checks the world's rules across them (check_roles;
+    ramp: this world's step, else RECUT_RAMP once it's re-cut, else
+    RAMP_STEP; altar_band: its levels' altars, ALTARS but World 1-2's). A
+    level in neither table keeps its old header."""
     for e in entries:
         if e['id'] in roster:
             e['roster'] = roster[e['id']]
         if e['id'] in threat:
             e['threat'] = threat[e['id']]
-    check_roles(entries, max_gap)
+    check_roles(entries, max_gap, ramp, altar_band)
 
 
 # ---------------------------------------------------------------- the toolkit's proof
@@ -1148,32 +1565,85 @@ def self_check():
     assert _fails(anoint_header, [a], [(15, 12)], 6) and _fails(anoint_header, [a], [(12, 12, 'Glassed')], 3), 'anoint fails'
     assert _fails(anoint_header, [a], [(12, 12, 'Vengeful')], 5) and not _fails(anoint_header, [a], [(12, 12, 'Vengeful')], 6), 'Vengeful from W6'
     assert _fails(anoint_header, [a], [(12, 12, 'Swift+Warded')], 2, '2-2') and _fails(anoint_header, [a], [(12, 12)], 1, '1-1'), 'W1-W2'
-    # threat: a forced Anointed at x2.5; under packs a lone Hushling as 3.
+    # threat: a forced Anointed at x2.5; a lone Hushling brings its Dusk pack
+    # (2.5), under packs the twist's (4), behind a forced Anointed leader from
+    # World 3 Nightfall's (4); each placed Glassmite under packs a trio, a
+    # Tickwind file two; a roster's pack_leaders its own size.
     t = swap(sec, {(3, 12): 's', (12, 12): 't', (16, 12): 'n'})
     c = g['cost']
-    assert abs(threat_of(t) - (c['skeleton'] + c['thornback'] + c['hushling']) * 5) < 1e-9, 'threat_of'
-    assert abs(threat_of(t, [(12, 12)]) - (c['skeleton'] + 2.5 * c['thornback'] + c['hushling']) * 5) < 1e-9, 'threat_of forced'
-    assert abs(threat_of(t, (), 'packs') - (c['skeleton'] + c['thornback'] + 3 * c['hushling']) * 5) < 1e-9, 'threat_of packs'
+    assert abs(threat_of(t) - (c['skeleton'] + c['thornback'] + 2.5 * c['hushling']) * 5) < 1e-9, 'threat_of'
+    assert abs(threat_of(t, [(12, 12)]) - (c['skeleton'] + 2.5 * c['thornback'] + 2.5 * c['hushling']) * 5) < 1e-9, 'threat_of forced'
+    assert abs(threat_of(t, (), 'packs') - (c['skeleton'] + c['thornback'] + 4 * c['hushling']) * 5) < 1e-9, 'threat_of packs'
+    assert abs(threat_of(t, [(16, 12)], '', 6) - (c['skeleton'] + c['thornback'] + (2.5 + 3) * c['hushling']) * 5) < 1e-9, 'an Anointed leader'
+    gx = swap(sec, {(3, 12): 'x', (5, 12): 'x', (16, 12): 'j'})
+    assert abs(threat_of(gx, (), 'packs') - (6 * c['glassmite'] + 2 * c['tickwind']) * 5) < 1e-9, 'threat_of packs: trios apiece, a file of two'
+    assert abs(threat_of(gx) - (2 * c['glassmite'] + c['tickwind']) * 5) < 1e-9, 'no twist: as drawn'
+    assert abs(threat_of(gx, (), '', 5, {'glassmite': 3, 'tickwind': 2}) - (6 * c['glassmite'] + 2 * c['tickwind']) * 5) < 1e-9, 'pack_leaders'
     assert len(_packs([(1, 12), (4, 12), (8, 11), (20, 12)])) == 2, 'packs chain within 4 tiles and a row'
-    # roster: each rule caught.
+    # roster: each rule caught; a Rattle listed is rattle_max's (left out);
+    # banned kinds, pack_leaders and stamps; World 6 may headline the Brinejaw.
     cast = {'hushling': 4, 'skeleton': 2, 'lidlurk': 1, 'thornback': 1, 'bonebow': 1}
     good = {'headline': ['hushling'], 'support': ['bonebow'], 'guest': ['thornback'], 'rattle_max': 2, 'fodder_max': 0.8, 'count': (8, 10)}
     assert roster_problems('6-1', cast, good) == [], roster_problems('6-1', cast, good)
     assert roster_header(good) == 'headline=hushling; support=bonebow; guest=thornback; rattle_max=2; fodder_max=0.8; count=8-10', 'roster_header'
+    full = dict(good, support=['bonebow', 'skeleton'], banned=['frostbuckle'], pack_leaders={'hushling': 3}, stamps=['crossfire'])
+    assert roster_of(roster_header(full)) == dict(full, count=(8, 10)), 'roster_of reads roster_header back (%s)' % (roster_of(roster_header(full)),)
+    assert roster_problems('6-1', cast, dict(full, stamps=[])) == [], 'a Rattle listed, a banned kind absent, pack_leaders on a listed kind'
     for bad, what in ((dict(good, rattle_max=1), 'Rattles'), (dict(good, headline=['hushling', 'stillmaw']), 'no stillmaw'),
                       (dict(good, guest=[]), 'thornback it does not declare'), (dict(good, fodder_max=0.7), 'fodder'),
                       (dict(good, count=8), 'count'), (dict(good, guest=['thornback', 'unwick']), 'no guest'),
-                      (dict(good, support=['bonebow', 'skeleton']), 'listed'), (dict(good, oops=1), 'unknown')):
+                      (dict(good, support=['bonebow', 'lidlurk']), 'listed'), (dict(good, oops=1), 'unknown'),
+                      (dict(good, guest=[], banned=['thornback']), 'banned'), (dict(good, banned=['thornback']), 'listed and banned'),
+                      (dict(good, pack_leaders={'stillmaw': 2}), 'pack_leaders'), (dict(good, stamps=['nope']), 'no stamp'),
+                      (dict(good, headline=['skeleton']), 'no headline kind'), (roster_of('skeleton,bat'), 'not a list of kinds')):
         p = roster_problems('6-1', cast, bad)
         assert any(what in s for s in p), 'roster catches %s (%s)' % (what, p)
     assert any('later world' in s for s in roster_problems('5-1', cast, dict(good, support=['bonebow', 'hushling']))), 'a later world'
-    # A world: the ramp, the gaps, an altar by a sealed room's door, re-cut
-    # levels' roles.
+    jaws = {'brinejaw': 3, 'hushling': 2}
+    assert roster_problems('6-1', jaws, {'headline': ['brinejaw', 'hushling'], 'rattle_max': 0, 'fodder_max': 1.0}) == [] \
+        and any('World 2' in s for s in roster_problems('5-1', jaws, {'headline': ['brinejaw'], 'guest': ['hushling'], 'rattle_max': 0, 'fodder_max': 1.0})), \
+        'World 6 headlines the Brinejaw (HEADLINE_RETURN), World 5 may not'
+    # A sealed room: a monster, a doorway of air or stone that never opens, no
+    # monster by a door, an altar before it.
+    rm = block('\n'.join(['#' * 24] * 2 + ['#' + '.' * 22 + '#'] * 7 + ['.' * 24] * 3 + ['.' * 12 + 's' + '.' * 11] + ['#' * 24] * 2))
+    door_k = block('\n'.join(['.' * 10] * 12 + ['....K.....'] + ['#' * 10] * 2))
+    lvr = join(door_k, rm)
+    assert room_problems(lvr, 'ambush 10-33') == [], room_problems(lvr, 'ambush 10-33')
+    for bad, what in ((swap(rm, {(0, 10): ':'}), 'doorway cell'), (swap(rm, {(23, 11): '{'}), 'doorway cell'),
+                      (swap(rm, {(0, 9): 'B'}), 'doorway cell'), (swap(rm, {(21, 12): 's'}), 'within 3 columns'),
+                      (swap(rm, {(12, 12): '.'}), 'no monster')):
+        lb = join(door_k, bad)
+        p = room_problems(lb, 'ambush 10-33')
+        assert any(what in s for s in p), 'a room catches %s (%s)' % (what, p)
+    assert any('altar' in s for s in room_problems(join(rm), 'ambush 0-23')), 'a room with no altar before it'
+    # The written headers (check_headers): a spec spelling, an unknown twist, a
+    # long lesson, a roster that's a list of kinds or misses a stamp all fail.
+    lv0 = join(block('\n'.join(['.' * 20] * 12 + ['..P.....s.....K...E.'] + ['#' * 20] * 2)))
+    ok_hd = [('twist', 'restless'), ('lesson', 'First Frost|Ice carries you.'), ('roster', 'headline=bat; rattle_max=1; fodder_max=1')]
+    assert not _fails(check_headers, 'x-lab', lv0, ok_hd[:2]), 'check_headers passes a known twist and a lesson'
+    for bad in ([('duel', '98-109')], [('twist', 'orchard_lesson')], [('lesson', 'Into the Orchard')],
+                [('lesson', 'A Title Far Too Long For Its Band|x')], [('lesson', 'T|' + 'x' * 49)],
+                [('roster', 'skeleton,bat')], [('anoint', '8,12:Glassed')], [('anoint', '9,12')]):
+        assert _fails(check_headers, '3-9', lv0, bad), 'check_headers refuses %s' % (bad,)
+    stamped = join(st, T_OPEN)
+    assert level_stamps(stamped) == [('crossfire', 13, 9)] and level_stamps(join(T_OPEN, swap(st, {}))) == [('crossfire', 15, 9)], 'stamps recorded'
+    rost = 'headline=bonebow,thornback; rattle_max=0; fodder_max=1'
+    assert _fails(check_headers, 'x-lab', stamped, [('roster', rost)]) and not _fails(check_headers, 'x-lab', stamped, [('roster', rost + '; stamps=crossfire')]), \
+        'a roster names the stamps its sections hold'
+    # A v2 entry's explicit header list takes the toolkit's keys from the entry.
+    v2 = header_of({'id': '1-9', 'header': [('title', 'T'), ('hints', 'h')], 'twist': 'restless', 'threat': 4.5,
+                    'roster': {'headline': ['bat'], 'rattle_max': 8, 'fodder_max': 1.0}, 'sections': [sec]}, join(sec))
+    assert [k for k, _v in v2] == ['title', 'twist', 'roster', 'threat', 'hints'] and dict(v2)['threat'] == '4.5', 'merged into a v2 list (%s)' % (v2,)
+    # A world: the ramp, the gaps, an altar by a sealed room's door; once
+    # re-cut, every level declares its roles, none shares its landmarks or its
+    # altars' places, the ramp is +1, fodder falls, X-3 mixes, no crowding.
     alt = block('\n'.join(['.' * 20] * 12 + ['.' * 14 + 'K' + '.' * 5] + ['#' * 20] * 2))
     plain = block('\n'.join(['.' * 20] * 13 + ['#' * 20] * 2))
     room = block('\n'.join(['#' * 24] * 2 + ['#' + '.' * 22 + '#'] * 11 + ['#' * 24] * 2))
     start = swap(alt, {(14, 12): 'P'})
     bell = swap(alt, {(14, 12): 'E'})
+    vault = swap(plain, {(10, 12): 'M'})
+    mix = swap(plain, {(2, 12): 's', (8, 12): 't', (14, 12): 'h'})
 
     def ent(i, t, secs, **kw):
         return dict({'id': i, 'roster': good, 'threat': t, 'sections': secs}, **kw)
@@ -1181,6 +1651,7 @@ def self_check():
          ent('6-3', 12.0, [start, alt, room, alt, alt, bell], room=[('duel', room)])]
     assert world_problems(w, 78) == [], world_problems(w, 78)
     assert roles_of(w[2]['sections']) == 'S A C A A B', roles_of(w[2]['sections'])
+    assert landmarks_of('S C C A C C A C V A C D A C B') == 'S A V A D A B' and landmarks_of('S A A C A V') == 'S A V', 'landmarks_of'
     for bad, what in (([w[0], dict(w[1], threat=9.0), w[2]], 'ramp'),
                       ([w[0], dict(w[1], sections=[start, alt, plain, room, alt, bell], room=[('ambush', room)]), w[2]], 'ambush door'),
                       ([w[0], w[1], dict(w[2], sections=[start, alt, room, room, room, alt, alt, bell])], 'apart'),
@@ -1189,3 +1660,25 @@ def self_check():
                       ([w[0], dict(w[1], sections=[start] + [alt] * 6 + [bell]), w[2]], 'altars')):
         p = world_problems(bad, 30 if what == 'apart' else 78)
         assert any(what in s for s in p), 'a world catches %s (%s)' % (what, p)
+    # Re-cut: three levels with their own landmarks and altars, the ramp +1,
+    # fodder falling, the X-3 mixing on two screens.
+    r1 = dict(good, fodder_max=0.85)
+    r2 = dict(good, fodder_max=0.75)
+    r3 = dict(good, fodder_max=0.65, headline=['thornback'], support=['bonebow', 'hollow_helm'], guest=[])
+    rc = [ent('6-1', 10.0, [start, plain, alt, plain, alt, vault, alt, bell], roster=r1, roles='S C A C A V A B'),
+          ent('6-2', 11.0, [start, vault, alt, alt, plain, plain, alt, bell], roster=r2, roles='S V A A C C A B'),
+          ent('6-3', 12.0, [start, mix, alt, plain, mix, alt, alt, vault, plain, bell], roster=r3, roles='S C A C C A A V C B')]
+    assert world_problems(rc, 78) == [], world_problems(rc, 78)
+    assert any('ramp: +1' in s for s in world_problems([rc[0], dict(rc[1], threat=10.5), rc[2]], 78)), 'a re-cut world ramps +1'
+    assert world_problems([rc[0], dict(rc[1], threat=10.5), rc[2]], 78, 0.5) == [], "world_tables' ramp= is the world's own"
+    for bad, what in (([rc[0], {k: v for k, v in rc[1].items() if k != 'roles'}, rc[2]], 'declares no roles'),
+                      ([rc[0], dict(rc[1], sections=[start, plain, alt, plain, plain, alt, vault, alt, bell], roles='S C A C C A V A B'), rc[2]], 'landmarks'),
+                      ([rc[0], dict(rc[1], sections=[start, vault, alt, plain, alt, plain, alt, bell], roles='S V A C A C A B'), rc[2]], 'within 8 tiles'),
+                      ([dict(rc[0], roster=dict(r1, fodder_max=0.9)), rc[1], rc[2]], 'at most 0.85'),
+                      ([rc[0], dict(rc[1], roster=dict(r2, fodder_max=0.86)), rc[2]], 'not under'),
+                      ([rc[0], rc[1], dict(rc[2], sections=[start, plain, alt, plain, mix, alt, alt, vault, plain, bell], roles='S C A C C A A V C B')], 'screens with 3 kinds'),
+                      ([rc[0], rc[1], dict(rc[2], sections=[start, swap(mix, {(4, 12): 'h', (6, 12): 'h', (10, 12): 'h', (12, 12): 'h'}), alt, plain, mix, alt, alt, vault, plain, bell])], 'in play')):
+        p = world_problems(bad, 78)
+        assert any(what in s for s in p), 'a re-cut world catches %s (%s)' % (what, p)
+    assert any('first half' in s for s in world_problems([dict(rc[0], sections=[start, st, alt, plain, alt, vault, alt, bell], roster=dict(r1, stamps=['crossfire']))] + rc[1:], 78)), \
+        'an X-1 keeps its stamps to its second half'

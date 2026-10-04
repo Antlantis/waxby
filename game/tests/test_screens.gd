@@ -721,6 +721,14 @@ func _test_screen_layouts() -> void:
 		_inside(mr, "map medallion %d" % i)
 		for b in bs:
 			_apart(mr, b.get_global_rect(), "medallion %d and button '%s'" % [i, b.text])
+		# With a twist (Build 2) its name sits under the title and the sigils
+		# move 12 down: still on the glass and clear of the buttons.
+		m._info[i]["twist"] = "The Saint's Guard"
+		var tr := Rect2(N[i] - Vector2(40, 58), Vector2(80, 146 + 12))
+		_inside(tr, "map medallion %d with a twist's name" % i)
+		for b in bs:
+			_apart(tr, b.get_global_rect(), "medallion %d (a twist's name) and button '%s'" % [i, b.text])
+		m._info[i]["twist"] = ""
 	m.queue_free()
 	# Keeper.
 	var k = load("res://scripts/keeper_screen.gd").new()

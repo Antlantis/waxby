@@ -1,7 +1,18 @@
 """World 1, the Sunken Cathedral: 1-1 to 1-4 (v1's layouts with the v2
 retrofit). Kept byte for byte by tools/make_levels.py; see common.py for the
 format. WLS owns this file after Phase 0 (the 1-3 secret exit)."""
+import common
 from common import block, T_OPEN
+
+# Build 2's tables (common.world_tables, at the end; w3.py says what a row
+# holds): each regular level's roster and threat, written into its explicit
+# header list (common.header_of) and checked as it's written, with the
+# world's rules across them. Empty until the World 1 redesign fills them:
+# the levels are written as before.
+ROSTER = {}
+THREAT = {}
+MAX_GAP = 165                 # tiles between checkpoints (1-1's 162 between its one altar and the start; its altars 1-3)
+ALTAR_BAND = (1, 3)
 
 LEVELS = []
 
@@ -627,3 +638,7 @@ LEVELS.append({'id': '1-4', 'header': [
     ('boss', 'tollgrave'), ('story_start', 'beat_1_4'), ('story_boss', 'boss_1_before'), ('story_end', 'boss_1_after'),
     ('hints', 'Strike his head while the bell is stuck'),
 ], 'sections': [T_CLIMB, T_ALTAR, T_OPEN, T_ARENA]})
+
+# Build 2: each regular level's ROSTER and THREAT rows, and the world's rules
+# across them (common.world_tables).
+common.world_tables(LEVELS, ROSTER, THREAT, MAX_GAP, altar_band=ALTAR_BAND)

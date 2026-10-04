@@ -909,8 +909,12 @@ func _test_rules(ids: Array) -> void:
 		var bad := _stone_gaps(lv)
 		_check(bad.is_empty(), "%s: stone every 14 tiles over its pits %s" % [id, bad])
 	if not regular.is_empty():
-		var tp := Rules.threat_problems(regular)
-		_check(tp.is_empty(), "4-1 to 4-3: each threat as declared (within 10%%), ramping %s" % [tp])
+		# The world's rules across its regular levels (tests/level_rules.gd
+		# world_problems): each threat as declared, ramping (flat today, +1 a
+		# step once re-cut); once re-cut, roles on every level, no two with the
+		# same landmarks or altars, fodder falling, the X-3 mixing, no crowding.
+		var tp := Rules.world_problems(regular)
+		_check(tp.is_empty(), "4-1 to 4-3: the world's rules (threat, ramp, roles, variety) %s" % [tp])
 
 
 func _pit_col(lv: RefCounted, x: int) -> bool:

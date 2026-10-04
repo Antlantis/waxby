@@ -9,7 +9,8 @@ extends Node2D
 ## shift, alpha} (empty = the candle's own colours; world.hero_flame holds
 ## the hero's); flames over a reflecting span (world.lights.mirrors: ice,
 ## the lake) get a squashed upside-down twin at alpha 0.3; and the mode's
-## draw_glow(glow) runs after the features'.
+## draw_glow(glow) runs after the features'. Build 2: under the dry twist
+## a lit altar's flame burns frost-blue (FROST_FLAME).
 
 const LevelData := preload("res://scripts/level_data.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
@@ -17,6 +18,8 @@ const TILE := LevelData.TILE
 const FLAME_OUT := Color("f07a2a")
 const FLAME_MID := Color("f7b64a")
 const FLAME_CORE := Color("fff4cf")
+# A lit altar's flame under the dry twist (twists.gd: Cold Altars): frost-blue.
+const FROST_FLAME := {"out": Color("4f9ee8"), "mid": Color("9fd4ff"), "core": Color("eef8ff"), "halo": Color(0.55, 0.8, 1.0)}
 const TEAR_POINTS := 22          # the rim of one flame teardrop (see _tear)
 const MAX_SPARKS := 400
 const SPARK_SEG := 64            # draw_circle's own segments: sparks look exactly as in v2
@@ -90,9 +93,10 @@ func _draw() -> void:
 	for s in world.sconces:
 		if view.has_point(s):
 			flame(s, 11.0, s.x * 0.13)
+	var frost: Dictionary = FROST_FLAME if world.has_method("twist") and bool(world.twist("dry")) else {}
 	for a in world.altars:
 		if a["lit"] and view.has_point(a["flame"]):
-			flame(a["flame"], 15.0 + a["glow"] * 10.0, a["flame"].x * 0.07)
+			flame(a["flame"], 15.0 + a["glow"] * 10.0, a["flame"].x * 0.07, false, false, frost)
 	_draw_mirrors()
 	if world.features:
 		world.features.draw_glow(self)

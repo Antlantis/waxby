@@ -2,7 +2,18 @@
 2-4 ends in the Snuffer's arena. Kept byte for byte by tools/make_levels.py;
 see common.py for the format. WLS owns this file after Phase 0 (the 2-2
 secret exit)."""
+import common
 from common import block, T_OPEN
+
+# Build 2's tables (common.world_tables, at the end; w3.py says what a row
+# holds): each regular level's roster and threat, written into its explicit
+# header list (common.header_of) and checked as it's written, with the
+# world's rules across them. Empty until the World 2 redesign fills them:
+# the levels are written as before.
+ROSTER = {}
+THREAT = {}
+MAX_GAP = 90                 # tiles between checkpoints (2-1's 90; its altars 2-3)
+ALTAR_BAND = (2, 3)
 
 LEVELS = []
 
@@ -712,3 +723,7 @@ LEVELS.append({'id': '2-4', 'header': [
     ('boss', 'snuffer'), ('story_start', 'beat_2_4'), ('story_boss', 'boss_2_before'), ('story_end', 'boss_2_after'),
     ('hints', "Hit him by a lit brazier. In the dark he's hollow"),
 ], 'sections': [U_STAIR, U_ALTAR, T_OPEN, U_ARENA]})
+
+# Build 2: each regular level's ROSTER and THREAT rows, and the world's rules
+# across them (common.world_tables).
+common.world_tables(LEVELS, ROSTER, THREAT, MAX_GAP, altar_band=ALTAR_BAND)
