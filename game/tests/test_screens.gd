@@ -19,7 +19,7 @@ extends SceneTree
 ## first. The life numbers are never cut and stay clear of the flame at any
 ## life, 2- to 5-digit. Barks follow story.gd's once / every
 ## rule, and the HUD's clocks hold while the level is paused. The Sheet buys
-## a skill and respecs, equips from the satchel, salvages, and edits the belt
+## a skill and respecs, equips from the satchel, sells, and edits the belt
 ## only where it may; its Stats tab names the hero and renames him (the
 ## oath's name entry: Confirm, Cancel, Escape, above a phone's keyboard). Real taps (sent through Input, as a phone sends them)
 ## do one thing each on the belt, the keeper, the map and the Sheet. The
@@ -224,6 +224,8 @@ func _initialize() -> void:
 	_no_errors("results_shop")
 	await _test_shop_tells()
 	_no_errors("shop_tells")
+	await _test_sold_meets_shop()
+	_no_errors("sold_meets_shop")
 	await _test_results_from_main()
 	_no_errors("results_from_main")
 	await _test_milestones()
@@ -3893,6 +3895,102 @@ func _test_shop_tells() -> void:
 	var queued: bool = hud._msgs.any(func(q): return str(q.get("key", "")) == "bark:satchel_full") or str(hud._msg.get("key", "")) == "bark:satchel_full"
 	_check(queued, "in the message slot")
 	game.set_setting("auto_equip", true)
+	w.queue_free()
+	await _frames(2)
+
+
+func _test_sold_meets_shop() -> void:
+	## The drops and the Shop together: a find sold on touch pays what the
+	## Sell tab would (Items.sell_value, its square's price); it's never a
+	## ghost there nor bought back (only the shop's own sales are), and the
+	## results' found list says it was sold. A tap keeps it, and then it
+	## counts like any piece: the shop opening on Sell from SELL_FROM, the
+	## Shop's red N/16, and the Sell tab selling it for the same price. A full
+	## satchel's weaker find still sells (a note, no card), staying at 16.
+	_where = "sold meets shop"
+	_fresh_hero(6)
+	game.mark_seen("meet_waxley")
+	var Chandler = load("res://scripts/chandler_screen.gd")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	var lv = LevelData.load_file("res://levels/1-1.txt")
+	var w = WorldScript.new()
+	w.setup(lv, true)
+	root.add_child(w)
+	await _frames(1)
+	var hud = HudScript.new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	await _frames(2)
+	var h: Dictionary = game.hero()
+	h["satchel"].clear()
+	for i in Chandler.SELL_FROM - 1:
+		h["satchel"].append(_zero_implicit(Items.make(["weapon", "candle", "coat"][i % 3], "knight", 1, "magic", rng)))
+	# Sold on touch, at the Sell tab's price.
+	var worse: Dictionary = _zero_implicit(Items.make("coat", "knight", 6, "rare", rng))
+	var price := int(game.sell_look(worse)["price"])
+	var purse := int(game.embers())
+	_check(price == Items.sell_value(worse) and w._take_item(worse) == "sold" and int(game.embers()) == purse + price,
+			"a weaker find sells on touch for the Sell tab's price (+%d)" % price)
+	hud._process(0.05)
+	_check(str(hud._card.get("where", "")) == "sold" and int(hud._card.get("embers", 0)) == price and hud._tick == price,
+			"its card and the \"+N sold\" say the same %d" % price)
+	_check((h["satchel"] as Array).size() == Chandler.SELL_FROM - 1 and Chandler.default_tab() == "buy" and str(game.shop_badge().get("kind", "")) != "full",
+			"sold, it isn't in the satchel: %d pieces, the shop opens on Buy" % (h["satchel"] as Array).size())
+	_check(game.sold_price(worse) == 0 and game.buy_back_verdict(worse) == "gone", "nor among the shop's sales: nothing to buy back")
+	hud.set_process(false)   # (the card's window waits while the shop is looked at)
+	var c = Chandler.new()
+	root.add_child(c)
+	await _frames(2)
+	c.show_tab("sell")
+	await _frames(1)
+	var ghosts := 0
+	for k in c._grid.size():
+		if c.grid_square(k).has("ghost"):
+			ghosts += 1
+	_check(ghosts == 0 and c._square_of(str(worse["uid"])) < 0, "the Sell tab has no square for it, ghost or piece (%d ghosts)" % ghosts)
+	c.queue_free()
+	await _frames(1)
+	var r = load("res://scripts/results_screen.gd").new()
+	r.result = {"level": "1-1", "cleared": true, "embers": 0, "embers_total": 0, "sigils": [false, false, false], "time": 60.0,
+			"relics": [], "items": [worse, h["equip"]["weapon"]], "xp": 0, "levels": 0, "diff": "dusk"}
+	_check(r.sold_find(worse) and not r.sold_find(h["equip"]["weapon"]), "the results' found list says it was sold (and not what's worn)")
+	r.free()
+	# Kept: it counts.
+	hud.set_process(true)
+	_check(hud.tap_card() and str(hud._card["where"]) == "kept" and int(game.embers()) == purse, "a tap keeps it: the embers back")
+	_check((h["satchel"] as Array).size() == Chandler.SELL_FROM and Chandler.default_tab() == "sell",
+			"kept, it counts: %d pieces, the shop opens on Sell" % (h["satchel"] as Array).size())
+	c = Chandler.new()
+	root.add_child(c)
+	await _frames(2)
+	var at: int = c._square_of(str(worse["uid"]))
+	_check(c.tab == "sell" and at >= 0 and c.grid_square(at).has("uid") and c.is_marked(worse) and int(c._looks[str(worse["uid"])]["price"]) == price,
+			"on Sell it's a piece in its square, marked, at the same %d" % price)
+	c.tap_square(at)
+	_check(c.sell_picked() == price and c.grid_square(at).has("ghost") and int(c.grid_square(at)["price"]) == price and int(game.embers()) == purse + price,
+			"sold there, it leaves its ghost at the same price")
+	_check(c.buy_back(at) == "satchel" and int(game.embers()) == purse, "and comes back for it")
+	c.queue_free()
+	await _frames(1)
+	# A full satchel: the red 16/16, and a weaker find sold leaves it there.
+	while (h["satchel"] as Array).size() < game.SATCHEL_MAX:
+		h["satchel"].append(_zero_implicit(Items.make("candle", "knight", 1, "magic", rng)))
+	_check(game.shop_badge() == {"kind": "full", "text": "16/16"}, "a full satchel: the Shop's 16/16 (%s)" % game.shop_badge())
+	hud._card = {}
+	hud._cards.clear()
+	hud._msgs.clear()
+	hud._msg = {}
+	var worse2: Dictionary = _zero_implicit(Items.make("boots", "knight", 6, "rare", rng))
+	if not (h["equip"].get("boots") is Dictionary):
+		h["equip"]["boots"] = Items.make("boots", "knight", 6, "rare", rng)
+	var price2 := int(game.sell_look(worse2)["price"])
+	var p2 := int(game.embers())
+	_check(w._take_item(worse2) == "sold" and int(game.embers()) == p2 + price2 and (h["satchel"] as Array).size() == game.SATCHEL_MAX
+			and game.shop_badge() == {"kind": "full", "text": "16/16"}, "full: a weaker find sells at the Sell tab's price (+%d), still 16/16" % price2)
+	var notes: Array = hud._msgs.filter(func(q): return str(q.get("sub", "")) == "Satchel full · sold  +%d embers" % price2)
+	_check(notes.size() == 1 and hud._cards.is_empty() and str(hud._card.get("where", "")) != "sold", "a note says so; no card to keep it by")
 	w.queue_free()
 	await _frames(2)
 

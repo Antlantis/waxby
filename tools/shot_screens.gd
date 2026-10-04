@@ -454,8 +454,10 @@ func _set_results() -> void:
 	var it1: Dictionary = _item("weapon", "rare")
 	var it2: Dictionary = _item("coat", "magic")
 	var it3: Dictionary = _item("candle", "common")
+	game.equip(it1)   # (worn and stowed; the Common was sold on touch: "Sold +N")
+	(h["satchel"] as Array).append(it2)
 	var res := {"level": "1-2", "cleared": true, "embers": 38, "embers_total": 52, "sigils": [true, false, true], "time": 148.2,
-			"relics": ["bell_shard"], "items": [it1, it2, it3], "xp": int(h["xp"]) - before, "levels": 1,
+			"relics": ["bell_shard"], "items": [it3, it1, it2], "xp": int(h["xp"]) - before, "levels": 1,
 			"level_start": 4, "level_now": 5, "diff": "dusk", "dread": true}
 	var r = load("res://scripts/results_screen.gd").new()
 	r.result = res

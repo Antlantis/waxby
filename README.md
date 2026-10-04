@@ -59,7 +59,8 @@ ring them again.
   vault once every relic is found and a boss killed again each drop one
   Trophy: Rare or better, made for the slot it helps most. A boss's first
   kill gives his prize. A find no better than what Waxby wears sells as he
-  touches it ("Sell weaker finds"; a tap on its card keeps it). Nightfall,
+  touches it, for what the Shop's Sell tab pays ("Sell weaker finds"; a tap
+  on its card keeps it). Nightfall,
   Witching and the modes keep their drop tables (world.gd trophies()).
 - **Illustrated story scenes** between the worlds, with portraits and voices.
   Waxby is the hero's name until you give him your own at the oath (up to 12

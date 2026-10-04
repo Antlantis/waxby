@@ -2,7 +2,8 @@ extends Control
 ## After the bell: what the level gave, counted up one by one. On the left
 ## the embers, the sigils, the time and the XP bar filling (with a fanfare
 ## at each level gained); on the right the loot (items and relics in their
-## rarity colours) and any sigil-milestone reward; along the bottom Mother
+## rarity colours, a piece sold since it was found saying "Sold +N": sold_find)
+## and any sigil-milestone reward; along the bottom Mother
 ## Taper's line about the level (story.gd AFTER), then on to the next.
 ## main.gd sets result, index and rewards (record_result()'s "rewards").
 ##
@@ -534,8 +535,11 @@ func _draw_loot(x: float, y: float, w: float, bottom: float) -> void:
 		rows.append({"tex": UI.relic_icon(id), "name": r["name"], "col": UI.rarity_color(r["rarity"]), "sub": Relics.RARITY_NAME[r["rarity"]] + " relic"})
 	for it in result.get("items", []):
 		if it is Dictionary:
+			var sub := "%s %s" % [Items.RARITY_NAME.get(str(it.get("rarity", "")), ""), UI.SLOT_NAME.get(str(it.get("slot", "")), "")]
+			if sold_find(it):
+				sub = "Sold  +%d" % Items.sell_value(it)
 			rows.append({"tex": _item_icons.get(str(it.get("uid", ""))), "glyph": UI.slot_glyph(str(it.get("slot", ""))), "name": str(it.get("name", "")),
-					"col": UI.rarity_color(str(it.get("rarity", "common"))), "sub": "%s %s" % [Items.RARITY_NAME.get(str(it.get("rarity", "")), ""), UI.SLOT_NAME.get(str(it.get("slot", "")), "")]})
+					"col": UI.rarity_color(str(it.get("rarity", "common"))), "sub": sub})
 	var rew: Array = []
 	for r in rewards:
 		match str(r.get("kind", "")):
@@ -577,6 +581,25 @@ func _draw_loot(x: float, y: float, w: float, bottom: float) -> void:
 		var sub_r := _loot_row(x, yy, w - PILL_PAD, r, ar)
 		pills.append({"panel": pill, "sub": sub_r, "text": str(r.get("sub", ""))})
 		yy += 30.0
+
+
+func sold_find(it: Dictionary) -> bool:
+	## A piece found this level that's no longer the hero's, neither worn nor
+	## in the satchel: sold on touch ("Sell weaker finds"), for room, or since
+	## at the Shop. Its row says what it fetched (Items.sell_value), so the
+	## found list agrees with the Shop's Sell tab, which hasn't got it.
+	if not Game.hero_made() or Game.borrowing():
+		return false
+	var h: Dictionary = Game.hero()
+	var uid := str(it.get("uid", "-"))
+	for slot in h.get("equip", {}):
+		var e = h["equip"][slot]
+		if e is Dictionary and str(e.get("uid", "")) == uid:
+			return false
+	for o in h.get("satchel", []):
+		if o is Dictionary and str(o.get("uid", "")) == uid:
+			return false
+	return true
 
 
 func _loot_row(x: float, y: float, w: float, r: Dictionary, a: float) -> Rect2:

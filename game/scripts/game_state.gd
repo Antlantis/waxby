@@ -72,7 +72,9 @@ extends Node
 ## Items.sell_value, a quarter of his price (sell_item, sell_marked). A piece
 ## sold can be bought back for what it fetched (buy_back) until the shop
 ## forgets its sales (forget_sold, as it opens and closes); that list is
-## never saved.
+## never saved. A find sold on touch (add_item, "Sell weaker finds") or for
+## room pays the same price but isn't one of those sales: its pickup card's
+## tap (keep_sold) is its only undo, so the Sell tab never shows its ghost.
 
 const Relics := preload("res://scripts/relics.gd")
 const Hero := preload("res://scripts/hero.gd")
@@ -1950,16 +1952,11 @@ func sell_look(it: Dictionary, h: Dictionary = {}) -> Dictionary:
 func weaker_items() -> Array:
 	## The satchel items no better than what's worn in their slot (both chips
 	## at or below zero), never a Legendary (like a full satchel, the Sheet's
-	## Sell weaker never sells one): what sell_weaker() takes.
-	var h := hero()
+	## Sell weaker never sells one): what sell_weaker() takes. The same rule
+	## as a find sold on touch (weaker_find).
 	var out: Array = []
-	for it in (h["satchel"] as Array):
-		if not (it is Dictionary) or str(it.get("rarity", "")) == "legendary":
-			continue
-		if not (h["equip"].get(it["slot"]) is Dictionary):
-			continue
-		var chips := Hero.compare(h, it["slot"], it, h.get("belt", []), diff())
-		if float(chips["dmg"]) <= 0.0 and float(chips["life"]) <= 0.0:
+	for it in (hero()["satchel"] as Array):
+		if it is Dictionary and weaker_find(it):
 			out.append(it)
 	return out
 
