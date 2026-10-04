@@ -512,6 +512,7 @@ func _build() -> void:
 	add_child(player)
 	checkpoint = LevelData.cell_floor(level.start)
 	player.reset_at(checkpoint)
+	player.facing = int(level.facing)   # `facing: left`: he starts facing the way the level runs
 	apply_hero()
 	player.hp = player.max_hp
 	player.res = float(info["res_start"]) if float(info["res_max"]) > 0.0 else 0.0
@@ -1484,7 +1485,7 @@ func spawn_enemy(kind: String, pos: Vector2, opts := {}) -> Node2D:
 	en.level = level
 	en.world = self
 	en.position = pos
-	en.facing = int(opts.get("facing", -1))
+	en.facing = int(opts.get("facing", -int(level.facing)))   # toward him: right in a level played right to left
 	en.tier = opts.get("tier", "")
 	en.elite_name = opts.get("name", "")
 	en.omens = opts.get("omens", [])

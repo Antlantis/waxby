@@ -1,10 +1,10 @@
 """What every level module shares: drawing sections, joining them, the
 overlay row, the header writers, and writing game/levels/<id>.txt.
 
-Every section is 15 rows tall (row 13 is the usual floor), drawn with '.'
-for air so the columns line up; see game/scripts/level_data.gd for the
-legend. A row may carry a label before a '|' (only the first '|' splits, so
-the '|' mover glyph inside a row is safe):
+Every section is 15 rows tall (row 13 is the usual floor; block(s, h) draws
+a taller one), drawn with '.' for air so the columns line up; see
+game/scripts/level_data.gd for the legend. A row may carry a label before a
+'|' (only the first '|' splits, so the '|' mover glyph inside a row is safe):
 
     B_RISE = block('''
      0|..........................
@@ -34,6 +34,23 @@ A level module exports LEVELS, a list of entries:
      'cog_phase': {(ES_COG, 4): 0.25},          # (section, dx[, n]) -> turns
      'chase': [((C_A, 2), (C_B, 30))],          # (start, end) ranges
      'sections': [BG_START, BG_CLIMB, ...]}
+
+Shapes (the shapes part below): a level is 15 to 36 rows tall (H_MIN,
+H_MAX). An entry's 'height' places each of its 15-row sections given as
+(section, dy) with its row 0 on row dy (place: rock above, its pits and
+pools carried down to the level's bottom), so 'sections': [(B_LOW, 9),
+(B_STAIR, 4), (B_TOP, 0)] climbs from a floor on row 22 to one on row 13;
+seam(dy, h) is T_OPEN at that height. A multi-storey level gives 'rows':
+stack() of storeys (each a join(), its sections cropped to the storey's
+rows: crop) instead of 'sections'. A level taller than H gets a stone
+ceiling row ('ceiling': False leaves its top open). 'mirror': True mirrors
+the joined level (mirror_rows: it plays right to left, written with
+'facing: left'); mirror_rows(SEC) mirrors one section. Every place, crop and
+mirror remembers its source, so (section, dx) places, span(), anoint and
+room cells still name the section as drawn (x_of, y_of). A tall level's
+route is the walk map's (WalkMap: the hints' order, its checkpoints' gaps on
+foot) and it keeps the shape rules as it's written (shape_problems: the
+descent and catch rules, the HUD band); a strip's route is x, in its facing.
 
 or, for the v2 levels (kept byte for byte), an explicit ordered 'header'
 list of (key, value) pairs. Header values holding x (cog_phase,
@@ -94,10 +111,16 @@ The spec's tables were written before the toolkit; as the toolkit takes them
 """
 import ast
 import functools
+import heapq
+import math
 import os
 import re
 
+# A section's rows (and a strip's): row 13 its usual floor (FLOOR). A level
+# is H_MIN to H_MAX rows (shapes: place, stack); the modes' rooms keep H.
 H = 15
+FLOOR = 13
+H_MIN, H_MAX = 15, 36
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'game', 'levels')
 
 # The full v3 legend (contract.md 2.2). Nothing else may appear in a row.
@@ -124,7 +147,8 @@ SIGN_BUDGET = True
 # level's rule: twists.gd) and lesson (an X-1's card), roster and threat
 # (world_tables), roles (a re-cut level's section roles: world_problems),
 # room (the sealed rooms: rooms_header) and belt_flip (span(): x0-x1=N).
-HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'boss', 'boss_music', 'dread', 'warden',
+# facing (left: a level played right to left, mirror_rows) follows the area.
+HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'facing', 'boss', 'boss_music', 'dread', 'warden',
                 'secret', 'secret_prize', 'tick', 'story_start', 'story_boss', 'story_end', 'par', 'rush',
                 'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'warden_room', 'elite_behave', 'anoint', 'twist',
                 'lesson', 'roster', 'threat', 'roles', 'room', 'belt_flip', 'hints']
@@ -133,9 +157,15 @@ HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'boss
 class Section(list):
     """A section's 15 rows (a list of str), and its overlay row or None.
     Hashed and compared by identity, so a section can key a dict (cog_phase:
-    {(ES_COG, 4): 0.25})."""
+    {(ES_COG, 4): 0.25}). A placed, cropped or mirrored copy (place, crop,
+    mirror_rows) keeps its source, where its source's row 0 sits in it (dy)
+    and whether it's mirrored (flip), so x_of and y_of find the source's dx
+    and rows in it; a swap() copy is a section of its own."""
     overlay = None
     stamps = ()   # [(name, dx, dy)]: the STAMPS drawn into it (stamp())
+    source = None
+    dy = 0
+    flip = False
 
     def __hash__(self):
         return id(self)
@@ -149,12 +179,16 @@ class Section(list):
 
 class Rows(list):
     """A level's joined rows, with the joined overlay and where each section
-    starts: parts = [(section, x0)]."""
+    starts: parts = [(section, x0, y0)] (y0: the level row of its row 0,
+    stack()'s storeys). mirrored: the whole level mirrored (mirror_rows), so
+    an absolute x an entry gives is the unmirrored level's (_place)."""
     overlay = None
     parts = ()
+    mirrored = False
 
 
-def block(s):
+def block(s, h=H):
+    """A section from its drawing: H rows, or h (a taller one, up to H_MAX)."""
     lines = s.strip('\n').split('\n')
     over = None
     last = lines[-1] if lines else ''
@@ -162,12 +196,13 @@ def block(s):
         over = last.split('|', 1)[1]
         lines = lines[:-1]
     lines = [l.split('|', 1)[1] if '|' in l else l for l in lines]
-    assert len(lines) == H, 'section has %d rows: %r' % (len(lines), lines[0])
+    assert H <= h <= H_MAX, 'a section is %d to %d rows, not %d' % (H, H_MAX, h)
+    assert len(lines) == h, 'section has %d rows: %r' % (len(lines), lines[0])
     w = max(len(l) for l in lines)
     # Short rows are padded with air. Never the floor rows (the bottom two)
     # past a solid end: that pads a hole to the bottom of the level (lab-1's
     # chain had one, from rows one wider above).
-    for i in range(H - 2, H):
+    for i in range(h - 2, h):
         l = lines[i]
         assert len(l) == w or not l or l[-1] == '.', \
             'floor row %d is %d wide in a %d-wide section: padding would open a hole after %r' % (i, len(l), w, l[-6:])
@@ -181,13 +216,20 @@ def block(s):
 
 
 def join(*blocks):
-    rows = Rows(''.join(b[i] for b in blocks) for i in range(H))
+    """Sections side by side (all as tall: place() pads a 15-row one); a
+    stack() of storeys among them keeps its own parts."""
+    hs = sorted({len(b) for b in blocks})
+    assert len(hs) == 1, 'joined sections are %s rows tall: place() them at the level\'s height' % hs
+    rows = Rows(''.join(b[i] for b in blocks) for i in range(hs[0]))
     parts = []
     x = 0
     over = []
     any_over = False
     for b in blocks:
-        parts.append((b, x))
+        if isinstance(b, Rows) and b.parts:
+            parts += [(pb, x + px, py) for pb, px, py in b.parts]
+        else:
+            parts.append((b, x, 0))
         o = getattr(b, 'overlay', None)
         if o is not None:
             any_over = True
@@ -198,20 +240,53 @@ def join(*blocks):
     return rows
 
 
-def x_of(rows, section, dx=0, n=0):
-    """The absolute column of dx within the n-th use of section in rows."""
-    k = 0
-    for b, x0 in rows.parts:
-        if b is section:
-            if k == n:
-                return x0 + dx
-            k += 1
+def _root(sec):
+    return getattr(sec, 'source', None) or sec
+
+
+def _part(rows, section, n=0):
+    """(b, x0, y0) of the n-th use of section in rows (as drawn: a mirrored
+    level keeps its parts' order): the section itself where it's there, else
+    the placed, cropped or mirrored copies of its source."""
+    mine = [p for p in rows.parts if p[0] is section]
+    if not mine:
+        mine = [p for p in rows.parts if _root(p[0]) is _root(section)]
+    if n < len(mine):
+        return mine[n]
     raise AssertionError('section not in this level (use %d)' % n)
 
 
-def _place(rows, p):
-    """An absolute x (int), or (section, dx) / (section, dx, n)."""
+def x_of(rows, section, dx=0, n=0):
+    """The absolute column of dx within the n-th use of section in rows (dx
+    as section is drawn: in a mirrored copy its mirror's column)."""
+    b, x0, _y0 = _part(rows, section, n)
+    if getattr(b, 'flip', False) != getattr(section, 'flip', False):
+        return x0 + len(b[0]) - 1 - dx
+    return x0 + dx
+
+
+def y_of(rows, section, row=0, n=0):
+    """The level row of section's row (as it's drawn) in its n-th use: its
+    row in a 15-row strip, row + dy where place() put it lower."""
+    b, _x0, y0 = _part(rows, section, n)
+    return y0 + getattr(b, 'dy', 0) - getattr(section, 'dy', 0) + row
+
+
+def _flipped(rows, p):
+    """True when the place p names a column of a section mirrored in rows
+    (its phases turn the other way: _header_value)."""
     if isinstance(p, int):
+        return bool(getattr(rows, 'mirrored', False))
+    b, _x0, _y0 = _part(rows, p[0], p[2] if len(p) > 2 else 0)
+    return getattr(b, 'flip', False) != getattr(p[0], 'flip', False)
+
+
+def _place(rows, p):
+    """An absolute x (int; in a mirrored level the unmirrored level's), or
+    (section, dx) / (section, dx, n)."""
+    if isinstance(p, int):
+        if getattr(rows, 'mirrored', False):
+            return max(len(r) for r in rows) - 1 - p
         return p
     return x_of(rows, *p)
 
@@ -289,26 +364,39 @@ def rooms_header(rows, rooms):
     ((section, dx[, n]) or an absolute x); opts may hold rows=(y0, y1) (its
     rows, ceiling and floor included: a room up off the path, which seals
     only once he climbs in), secs=N (the doors open after N s: a hold) and
-    foe=(place, y) (a duel's named foe)."""
+    foe=(place, y) (a duel's named foe). Rows and a foe's y are the
+    section's as drawn where the room names one (y_of: lower in a tall
+    level), else the level's; a mirrored section's columns come out left to
+    right all the same."""
     out = []
     for room in rooms:
         assert len(room) in (2, 3), 'a room is (kind, where[, opts]): %r' % (room,)
         kind, where = room[0], room[1]
         opts = room[2] if len(room) > 2 else {}
         assert kind in ROOM_KINDS, 'room kind %r (one of %s)' % (kind, ', '.join(ROOM_KINDS))
+        sec, sn = None, 0
         if isinstance(where, Section):
-            x0 = x_of(rows, where)
-            x1 = x0 + len(where[0]) - 1
+            sec = where
+            x0, x1 = x_of(rows, where), x_of(rows, where, len(where[0]) - 1)
         else:
             assert len(where) == 2, "a room's where is a section or a pair of places: %r" % (where,)
             x0, x1 = _place(rows, where[0]), _place(rows, where[1])
+            if not isinstance(where[0], int):
+                sec, sn = where[0][0], (where[0][2] if len(where[0]) > 2 else 0)
+        x0, x1 = min(x0, x1), max(x0, x1)
         s = '%s %d-%d' % (kind, x0, x1)
         if 'rows' in opts:
-            s += ' rows %d-%d' % tuple(opts['rows'])
+            y0, y1 = opts['rows']
+            if sec is not None:
+                y0, y1 = y_of(rows, sec, y0, sn), y_of(rows, sec, y1, sn)
+            s += ' rows %d-%d' % (y0, y1)
         if 'secs' in opts:
             s += ' @%s' % _num(opts['secs'])
         if 'foe' in opts:
-            s += ' foe %d,%d' % (_place(rows, opts['foe'][0]), opts['foe'][1])
+            fp, fy = opts['foe']
+            if not isinstance(fp, int):
+                fy = y_of(rows, fp[0], fy, fp[2] if len(fp) > 2 else 0)
+            s += ' foe %d,%d' % (_place(rows, fp), fy)
         out.append(s)
     return '; '.join(out)
 
@@ -328,13 +416,34 @@ def rooms_of(value):
     return out
 
 
-def room_problems(rows, value):
+def room_entry(rows, x0, x1, y0, y1, facing=1):
+    """The door the route comes in by: -1 the left (x0), +1 the right (x1).
+    A strip's route meets its left door first (its right, facing left); a
+    taller level's is where the walk map's route first steps inside the
+    room's box, from the side it comes from (a room it never enters: the
+    way the route runs past it)."""
+    if len(rows) <= H:
+        return -facing
+    wm = WalkMap(rows)
+    path = wm.route() or []
+    for i, (_k, x, y) in enumerate(path):
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            px = path[i - 1][1] if i else x
+            if px < x0 or px > x1:
+                return -1 if px < x0 else 1
+            return -1 if x - x0 <= x1 - x else 1
+    return -wm.dir_at(wm.proj(((x0 + x1) // 2, (y0 + y1) // 2)))
+
+
+def room_problems(rows, value, facing=1):
     """What breaks the sealed rooms of a written 'room' header, as strings:
     each holds a monster, has a way in at an end, and has an altar within
-    ROOM_ALTAR_REACH tiles before its door (a snuff inside relights by it,
-    as at a boss's door); every doorway cell is air or DOOR_SOLID; no
-    monster of it stands within ROOM_DOOR_CLEAR columns of either end
-    (tests/level_rules.gd room_problems reads the file the same)."""
+    ROOM_ALTAR_REACH tiles before the door the route comes in by
+    (room_entry: the left one in a strip, the right facing left; a snuff
+    inside relights by it, as at a boss's door); every doorway cell is air
+    or DOOR_SOLID; no monster of it stands within ROOM_DOOR_CLEAR columns of
+    either end (tests/level_rules.gd room_problems reads the file the
+    same)."""
     out = []
     altars = [x for r in rows for x, ch in enumerate(r) if ch == 'K']
     for part in str(value).split(';'):
@@ -366,51 +475,73 @@ def room_problems(rows, value):
         near = [(x, y) for x, y in mons if x - x0 <= ROOM_DOOR_CLEAR or x1 - x <= ROOM_DOOR_CLEAR]
         if near:
             out.append('%s has monsters within %d columns of a door at %s' % (room, ROOM_DOOR_CLEAR, near))
-        if not any(x0 - ROOM_ALTAR_REACH <= x < x0 for x in altars):
-            out.append('%s has no altar within %d tiles before its door (altars at %s)' % (room, ROOM_ALTAR_REACH, altars))
+        side = room_entry(rows, x0, x1, y0, y1, facing)
+        if not any((x0 - ROOM_ALTAR_REACH <= x < x0) if side < 0 else (x1 < x <= x1 + ROOM_ALTAR_REACH) for x in altars):
+            out.append('%s has no altar within %d tiles before its %s door (altars at %s)'
+                       % (room, ROOM_ALTAR_REACH, 'left' if side < 0 else 'right', altars))
     return out
 
 
-def check_rooms(name, rows, value):
+def check_rooms(name, rows, value, facing=1):
     """Asserts every sealed room of a written 'room' header keeps its rules
     (room_problems)."""
     if not value:
         return
-    probs = room_problems(rows, value)
+    probs = room_problems(rows, value, facing)
     assert not probs, '%s: %s' % (name, '; '.join(probs))
 
 
 def mirror_rows(rows):
-    """The Descent's mirror of rows (and its overlay): reversed, with exactly
-    the MIRROR swaps."""
-    out = Rows(''.join(MIRROR.get(c, c) for c in reversed(r)) for r in rows)
-    if getattr(rows, 'overlay', None) is not None:
-        out.overlay = ''.join(MIRROR_OVERLAY.get(c, c) for c in reversed(rows.overlay))
+    """The mirror of a section or a level (the Descent's mirror too):
+    reversed, with exactly the MIRROR swaps (a belt's way, a cog's turn) and
+    its overlay's gusts turned. A Section comes back a Section that knows its
+    source (flip), its stamps mirrored, so x_of finds the source's dx in it; a
+    level's Rows keeps its parts (in their order as drawn), each mirrored in
+    its new place, and is marked mirrored (an absolute x an entry gives is
+    the unmirrored level's: _place). The phases that turn with the mirror
+    (weight_phase, cog_phase) are header_of's (mirror_phases)."""
+    w = max(len(r) for r in rows) if rows else 0
+    flipped = [''.join(MIRROR.get(c, c) for c in reversed(r.ljust(w, '.'))) for r in rows]
+    over = getattr(rows, 'overlay', None)
+    if isinstance(rows, Section):
+        out = Section(flipped)
+        out.source = _root(rows)
+        out.dy = rows.dy
+        out.flip = not rows.flip
+        out.stamps = [(nm, w - 1 - sx, sy) for nm, sx, sy in rows.stamps]
+    else:
+        out = Rows(flipped)
+        out.parts = [(mirror_rows(b), w - x0 - len(b[0]), y0) for b, x0, y0 in getattr(rows, 'parts', ())]
+        out.mirrored = not getattr(rows, 'mirrored', False)
+    if over is not None:
+        out.overlay = ''.join(MIRROR_OVERLAY.get(c, c) for c in reversed(over.ljust(w, '.')))
     return out
 
 
 # ---------------------------------------------------------------- writing
 
-def _order_hints(kv, rows):
-    """Hints are written left to right; the game hands them to the signs in
-    reading order (row by row), so reorder them to match."""
+def _order_hints(kv, rows, facing=1):
+    """Hints are written in the order the route meets their signs (a
+    strip's left to right, or right to left facing left; a taller level's
+    along the walk map's route: route_order); the game hands them to the
+    signs in reading order (row by row), so reorder them to match."""
     key, value = kv
     if key != 'hints':
         return kv
     hints = value.split('|')
     signs = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == '@']
     assert len(signs) == len(hints), 'level has %d signs but %d hints' % (len(signs), len(hints))
-    by_x = sorted(signs)
-    text = {pos: hints[i] for i, pos in enumerate(by_x)}
+    by_route = route_order(rows, signs, facing)
+    text = {pos: hints[i] for i, pos in enumerate(by_route)}
     reading = sorted(signs, key=lambda p: (p[1], p[0]))
     return (key, '|'.join(text[p] for p in reading))
 
 
 def _report(name, rows):
-    """Where the start, altars, bell and boss are, for the checkpoint-gap rule."""
-    marks = sorted([x for y, r in enumerate(rows) for x, ch in enumerate(r) if ch in 'PKEX'])
-    gaps = [b - a for a, b in zip(marks, marks[1:])]
-    return 'checkpoints at %s (gaps %s)' % (marks, gaps)
+    """Where the start, altars, bell and boss are, for the checkpoint-gap rule
+    (a taller level's along its route: checkpoint_gaps)."""
+    marks, gaps = checkpoint_gaps(rows)
+    return 'checkpoints %s %s (gaps %s)' % ('at' if len(rows) <= H else 'along the route at', marks, gaps)
 
 
 def check_legend(name, rows):
@@ -429,7 +560,8 @@ def check_sign_budget(name, rows):
 
 def write(name, header, rows, out_dir=None, world=None):
     """Writes game/levels/<name>.txt (or out_dir's), its header's Build 2
-    keys checked first (check_headers; world: the level's, else its id's)."""
+    keys and its shape checked first (check_headers, check_shape; world: the
+    level's, else its id's)."""
     check_legend(name, rows)
     if SIGN_BUDGET:
         check_sign_budget(name, rows)
@@ -447,8 +579,9 @@ def write(name, header, rows, out_dir=None, world=None):
         # Before the hints (which stay last, as v2 wrote them).
         at = keys.index('hints') if 'hints' in keys else len(header)
         header = header[:at] + extra + header[at:]
-    header = [_order_hints(kv, rows) for kv in header]
+    header = [_order_hints(kv, rows, facing_of(header)) for kv in header]
     check_headers(name, rows, header, world)
+    check_shape(name, rows, header)
     text = ''.join('%s: %s\n' % kv for kv in header) + '---\n' + '\n'.join(r.rstrip('.') for r in rows) + '\n'
     d = out_dir or OUT
     os.makedirs(d, exist_ok=True)
@@ -470,7 +603,8 @@ def _header_value(k, v, rows, entry):
     if k == 'hints' and not isinstance(v, str):
         v = '|'.join(v)
     elif k in ('cog_phase', 'weight_phase') and isinstance(v, dict):
-        v = phases_header({_place(rows, p): t for p, t in v.items()})
+        v = phases_header({_phase_key(rows, k, _place(rows, p), _flipped(rows, p)): _turned(k, t, _flipped(rows, p))
+                           for p, t in v.items()})
     elif k == 'chase' and not isinstance(v, str):
         v = ranges_header([(_place(rows, a), _place(rows, b)) for a, b in v])
     elif k == 'room' and not isinstance(v, str):
@@ -486,11 +620,34 @@ def _header_value(k, v, rows, entry):
     return str(v)
 
 
+def _turned(k, t, flipped):
+    """A phase in a mirrored section: a weight's or swing's half a swing on,
+    a cog's 1 - turns (mirror_phases)."""
+    if not flipped:
+        return t
+    return (float(t) + 0.5) % 1.0 if k == 'weight_phase' else (1.0 - float(t)) % 1.0
+
+
+def _phase_key(rows, k, x, flipped):
+    """A weight_phase key in a mirrored section: a swing's is its run's
+    first column, which the mirror made its last."""
+    if k == 'weight_phase' and flipped:
+        for r in rows:
+            if x < len(r) and r[x] == 'T':
+                while x > 0 and r[x - 1] == 'T':
+                    x -= 1
+                return x
+    return x
+
+
 def header_of(entry, rows):
     """An entry's ordered header: its own 'header' list (v2's, kept as it
     was, with the toolkit's MERGE_KEYS from the entry put before its hints),
     or one built from its keys in HEADER_ORDER (_header_value). An entry's
-    'world' (a fixture's) and 'out_dir' aren't headers."""
+    'world' (a fixture's) and 'out_dir' aren't headers, nor its shape's
+    keys ('rows', 'height', 'ceiling', 'mirror'); a mirrored one is written
+    'facing: left', its every weight's, swing's and cog's phase turned with
+    it (mirror_phases)."""
     if 'header' in entry:
         out = list(entry['header'])
         have = {k for k, _v in out}
@@ -502,7 +659,18 @@ def header_of(entry, rows):
     if 'name' in entry:
         vals['title'] = entry['name']
     vals['subtitle'] = entry.get('subtitle', entry['id'])
-    skip = {'id', 'name', 'sections', 'header', 'subtitle', 'out_dir', 'world'}
+    skip = {'id', 'name', 'sections', 'header', 'subtitle', 'out_dir', 'world', 'rows', 'height', 'ceiling', 'mirror'}
+    mirrored = bool(entry.get('mirror'))
+    if mirrored:
+        vals['facing'] = entry.get('facing', 'left')
+        rows0 = level_rows(entry, False)
+        wp, cp = mirror_phases(rows0, {_place(rows0, p): t for p, t in entry.get('weight_phase', {}).items()},
+                               {_place(rows0, p): t for p, t in entry.get('cog_phase', {}).items()})
+        if wp:
+            vals['weight_phase'] = phases_header(wp)
+        if cp:
+            vals['cog_phase'] = phases_header(cp)
+        skip |= {'facing', 'weight_phase', 'cog_phase'}
     for k, v in entry.items():
         if k in skip:
             continue
@@ -516,9 +684,10 @@ def header_of(entry, rows):
 
 
 def build(entry, out_dir=None):
-    """Joins an entry's sections and writes its file (write() checks its
-    Build 2 headers as written: check_headers)."""
-    rows = join(*entry['sections'])
+    """Joins an entry's sections (level_rows: placed, stacked, mirrored) and
+    writes its file (write() checks its Build 2 headers and its shape as
+    written: check_headers, check_shape)."""
+    rows = level_rows(entry)
     header = header_of(entry, rows)
     return write(entry['id'], header, rows, out_dir or entry.get('out_dir'), entry_world(entry))
 
@@ -542,6 +711,717 @@ T_OPEN = block('''
 13|##
 14|##
 ''')
+
+
+# ================================================================ shapes
+# Build 2's shaped levels (the shape plan's E1, E2, E7, E8): a level up to
+# H_MAX rows, cut from 15-row sections placed at a height, storeys stacked,
+# or mirrored to play right to left; the walk map that finds its route; and
+# the rules a shaped level keeps (shape_problems). A strip (H rows, played
+# left to right) is written and checked exactly as before.
+
+# The cells under a placed section's bottom row (place): rock under solid,
+# water under its water (a pool stays deep), air under the rest (a pit stays
+# a pit to the level's bottom).
+_UNDER_WATER = set(':&fJH7')
+
+
+def place(section, dy, h, above='#'):
+    """section (15 rows, or any up to h) as h rows with its row 0 on row dy:
+    rock above it ('.': open air), and under its bottom row rock under each
+    solid cell, water under water, air under the rest. Its stamps move down
+    with it; it remembers its source and dy (x_of, y_of find the source's
+    columns and rows)."""
+    n, w = len(section), len(section[0])
+    assert 0 <= dy and dy + n <= h <= H_MAX, 'place: %d rows at dy %d in %d (at most %d)' % (n, dy, h, H_MAX)
+    assert above in ('#', '.'), "place: above is '#' (rock) or '.' (air), not %r" % above
+    under = ''.join('#' if c in SOLID else (':' if c in _UNDER_WATER else '.') for c in section[-1])
+    out = Section([above * w] * dy + list(section) + [under] * (h - dy - n))
+    out.overlay = getattr(section, 'overlay', None)
+    out.stamps = [(nm, sx, sy + dy) for nm, sx, sy in getattr(section, 'stamps', ())]
+    out.source = _root(section)
+    out.dy = getattr(section, 'dy', 0) + dy
+    out.flip = getattr(section, 'flip', False)
+    return out
+
+
+def crop(section, top=0, bottom=0):
+    """section less its top rows and bottom rows (a storey's rows, for
+    stack()); what's cut must be bare air and stone, so nothing drawn is
+    lost."""
+    n = len(section)
+    cut = list(section[:top]) + list(section[n - bottom:] if bottom else [])
+    assert all(set(r) <= set('.#') for r in cut), 'crop: the rows cut hold more than air and stone: %r' % cut
+    out = Section(section[top:n - bottom])
+    out.overlay = getattr(section, 'overlay', None)
+    out.stamps = [(nm, sx, sy - top) for nm, sx, sy in getattr(section, 'stamps', ())]
+    assert all(0 <= sy < len(out) for _nm, _sx, sy in out.stamps), 'crop: a stamp is in the rows cut'
+    out.source = _root(section)
+    out.dy = getattr(section, 'dy', 0) - top
+    out.flip = getattr(section, 'flip', False)
+    return out
+
+
+def seam(dy=0, h=H):
+    """T_OPEN (the doorway every world's sections meet at) with its floor on
+    row FLOOR + dy of an h-row level."""
+    return T_OPEN if (dy, h) == (0, H) else place(T_OPEN, dy, h)
+
+
+def floor_row(dy=0):
+    """The usual floor row of a section placed at dy."""
+    return FLOOR + dy
+
+
+def stack(*storeys):
+    """Storeys top to bottom (each a join() or a section, all as wide), as
+    one level's rows: their parts keep their rows (y0), and their overlays
+    merge (a gust or Hush column is a whole column of the level)."""
+    out = Rows()
+    parts = []
+    over = None
+    width = None
+    top = 0
+    for s in storeys:
+        r = s if isinstance(s, Rows) else join(s)
+        w = max(len(x) for x in r)
+        assert width is None or w == width, 'stack: storeys are %d and %d wide' % (width, w)
+        width = w
+        out.extend(x.ljust(w, '.') for x in r)
+        parts += [(b, x0, y0 + top) for b, x0, y0 in r.parts]
+        o = getattr(r, 'overlay', None)
+        if o is not None:
+            o = o.ljust(w, '.')
+            if over is None:
+                over = o
+            else:
+                assert all(a == '.' or b == '.' or a == b for a, b in zip(over, o)), 'stack: two storeys overlay one column'
+                over = ''.join(b if a == '.' else a for a, b in zip(over, o))
+        top += len(r)
+    out.parts = parts
+    out.overlay = over
+    return out
+
+
+def ceiling(rows):
+    """A tall level's stone ceiling: row 0's air made stone (nothing climbs
+    out of the top of a tower)."""
+    out = Rows([rows[0].replace('.', '#')] + list(rows[1:]))
+    out.parts, out.overlay = getattr(rows, 'parts', ()), getattr(rows, 'overlay', None)
+    out.mirrored = getattr(rows, 'mirrored', False)
+    return out
+
+
+def level_rows(entry, mirror=True):
+    """An entry's rows: its 'rows' (a stack() of storeys), or its 'sections'
+    joined, a (section, dy) among them placed at the entry's 'height' (H by
+    default); a tall level's stone ceiling (ceiling(); 'ceiling': False
+    leaves it open), and 'mirror': True mirrors the lot (mirror=False: as
+    drawn, the phases' reference: mirror_phases)."""
+    if 'rows' in entry:
+        rows = entry['rows']
+    else:
+        h = int(entry.get('height', H))
+        secs = [place(s[0], s[1], h) if isinstance(s, tuple) else s for s in entry['sections']]
+        rows = join(*secs)
+    if len(rows) > H and entry.get('ceiling', True):
+        rows = ceiling(rows)
+    if mirror and entry.get('mirror'):
+        rows = mirror_rows(rows)
+    return rows
+
+
+def phases_of(rows, weight_phase=None):
+    """{x: turns} for every pendulum weight (Y, keyed by its column) and
+    swing (a T run, by its first column) as features/clockwork.gd sets them:
+    weight_phase's {x: turns}, else 0 and 0.5 in turn in reading order (one
+    count for the weights, one for the swings)."""
+    given = dict(weight_phase or {})
+    out = {}
+    n_weight = n_swing = 0
+    for r in rows:
+        x = 0
+        while x < len(r):
+            ch = r[x]
+            if ch == 'T':
+                x1 = x
+                while x1 + 1 < len(r) and r[x1 + 1] == 'T':
+                    x1 += 1
+                out[x] = given.get(x, 0.5 * (n_swing % 2))
+                n_swing += 1
+                x = x1 + 1
+                continue
+            if ch == 'Y':
+                out[x] = given.get(x, 0.5 * (n_weight % 2))
+                n_weight += 1
+            x += 1
+    return out
+
+
+def mirror_phases(rows, weight_phase=None, cog_phase=None):
+    """A level's phases in its mirror (rows: the unmirrored level): every
+    weight and swing written (phases_of: the defaults count in reading order,
+    which a mirror reverses), each at its mirrored column (a swing's first
+    column is its run's mirrored end) half a swing on (the mirror's angle is
+    the other way); each cog_phase at its mirrored hub, 1 - turns (the MIRROR
+    swap turns it the other way). Returns (weight_phase, cog_phase) {x: turns}."""
+    w = max(len(r) for r in rows)
+    runs = {}
+    for r in rows:
+        x = 0
+        while x < len(r):
+            if r[x] == 'T':
+                x1 = x
+                while x1 + 1 < len(r) and r[x1 + 1] == 'T':
+                    x1 += 1
+                runs[x] = x1 - x + 1
+                x = x1 + 1
+            else:
+                x += 1
+    wp = {}
+    for x, t in phases_of(rows, weight_phase).items():
+        mx = w - x - runs[x] if x in runs else w - 1 - x
+        wp[mx] = (float(t) + 0.5) % 1.0
+    cp = {w - 1 - x: (1.0 - float(t)) % 1.0 for x, t in (cog_phase or {}).items()}
+    return wp, cp
+
+
+# ---------------------------------------------------------------- the walk map
+# A coarse map of where Waxby can go, for the rules that need a level's
+# route where it isn't a strip (taller than H): the order the route meets
+# things (the hints, the barks), how far apart its checkpoints are on foot,
+# and the descent rules. game/scripts/walk_map.gd is the same map, move for
+# move (the barks and tests/level_rules.gd read it). A strip's route is x, in
+# its facing.
+#
+# A state is standing in a cell (S: it and the cell over it clear of solid,
+# no hazard in either, a floor under it: solid, a one-way top, dawnglass, a
+# float, or a mover's swept band) or holding a vine cell (C). The moves, in
+# this order, each with its cost (columns, rows climbed, a jump's 1, a
+# break's 2) and its drop (rows fallen):
+#   S: walk a column (onto a cell or off an edge: a fall; into brick, false
+#      stone or rime: +2); drop through a one-way top (or a breakable floor,
+#      as broken when he came in: +2); grab a vine where he
+#      stands or just over him; jump: feet up 0-3 rows, then 0-8 columns at
+#      that height, then a fall, landing h rows up at most JUMP_REACH[h]
+#      columns away (or a vine caught on the way), counted cell to cell at
+#      the most a run and the coyote time carry him (a held jump clears 3
+#      rows; on the flat a 6-tile gap at a pinch: generous, so a rule never
+#      calls a way the bot proves closed)
+#   C: climb, slide, stand at its foot, hop off sideways, mount a floor 1-2
+#      columns off its top cell (no roof), let go at its bottom, leap: feet
+#      up 0-2 rows, a fall, LEAP_REACH (4 columns vine to vine)
+# A fall catches the first vine cell it passes (or goes on, down held) and
+# ends on the first floor; a hazard (spikes, lava, deep water) or the
+# level's bottom ends it with no state (a snuff). Monsters aren't there.
+# The goal is touched from its cell, the cells either side and the two over
+# it (the bell's rope hangs 70 px: rung from its roof, as 3-1's alcove is).
+# Breakable cells (brick, false stone, rime) are floors to land on and
+# doors to walk into. Movers sweep: a lift 3 rows up and down, a moving
+# ledge or a swing 3 columns either way, a cog's teeth its ring (radius 3).
+JUMP_UP = 3
+JUMP_ACROSS = 8
+JUMP_REACH = {3: 4, 2: 5, 1: 6, 0: 7, -1: 7, -2: 7}    # rows up -> columns (lower: 8)
+LEAP_UP = 2
+LEAP_ACROSS = 5
+LEAP_REACH = {2: 2, 1: 3, 0: 4, -1: 4}                 # lower: 5
+MOUNT_REACH = 2
+MOVER_SWEEP = 3
+COG_RING = 3
+BREAKABLE = set('BFZ')
+HAZARD_GLYPHS = set('^v~')
+WALK_SUPPORT = SOLID_GLYPHS | set('=%_A')
+
+
+class WalkMap(object):
+    """The walk map of a level's rows (see above). route() is the cheapest
+    way from the start to the goal (the bell, else the boss, else a silver
+    bell), as states (kind, x, y); proj(cell) the index on it nearest a
+    cell; reach() every state reachable and the edges between them."""
+
+    def __init__(self, rows):
+        self.w = max(len(r) for r in rows)
+        self.h = len(rows)
+        self.g = [r.ljust(self.w, '.') for r in rows]
+        w, h = self.w, self.h
+        self.cls = [[_tile(self.g, x, y, 'solid') for x in range(w)] for y in range(h)]
+        self.band = set()
+        for y, r in enumerate(self.g):
+            x = 0
+            while x < w:
+                ch = r[x]
+                if ch in '-|T':
+                    x1 = x
+                    while x1 + 1 < w and r[x1 + 1] == ch:
+                        x1 += 1
+                    if ch == '|':
+                        self.band |= {(cx, y + o) for cx in range(x, x1 + 1) for o in range(-MOVER_SWEEP, MOVER_SWEEP + 1)}
+                    else:
+                        self.band |= {(cx, y) for cx in range(x - MOVER_SWEEP, x1 + MOVER_SWEEP + 1)}
+                    x = x1 + 1
+                    continue
+                if ch in 'OQ':
+                    for j in range(-COG_RING, COG_RING + 1):
+                        for i in range(-COG_RING, COG_RING + 1):
+                            if COG_RING - 0.5 <= math.hypot(i, j) < COG_RING + 0.5:
+                                self.band.add((x + i, y + j))
+                x += 1
+        self.marks = {}
+        for y, r in enumerate(self.g):
+            for x, ch in enumerate(r):
+                if ch in 'PEXS' and ch not in self.marks:
+                    self.marks[ch] = (x, y)
+        self._route = None
+
+    # -- cells
+    def solid(self, x, y):
+        if x < 0 or x >= self.w:
+            return True
+        if y < 0 or y >= self.h:
+            return False
+        return self.cls[y][x] == 'solid' and self.g[y][x] not in BREAKABLE
+
+    def hazard(self, x, y):
+        if x < 0 or x >= self.w or y < 0 or y >= self.h:
+            return False
+        if self.g[y][x] in HAZARD_GLYPHS:
+            return True
+        return self.cls[y][x] == 'water' and y + 1 < self.h and self.cls[y + 1][x] == 'water'
+
+    def climb(self, x, y):
+        return 0 <= x < self.w and 0 <= y < self.h and self.cls[y][x] == 'climb'
+
+    def support(self, x, y):
+        if x < 0 or x >= self.w:
+            return True
+        if y < 0 or y >= self.h:
+            return False
+        return self.g[y][x] in WALK_SUPPORT or self.g[y][x] == '&' or (x, y) in self.band
+
+    def one_way(self, x, y):
+        """A floor he can drop through (a one-way top, a float, a mover)."""
+        return 0 <= x < self.w and 0 <= y < self.h and self.support(x, y) and self.cls[y][x] != 'solid'
+
+    def body(self, x, y):
+        """His body fits at (x, y): it and the cell over it clear, no hazard."""
+        return 0 <= y < self.h and not self.solid(x, y) and not self.solid(x, y - 1) \
+            and not self.hazard(x, y) and not self.hazard(x, y - 1)
+
+    def stand(self, x, y):
+        return self.body(x, y) and self.support(x, y + 1)
+
+    def breaks(self, x, y):
+        return 0 <= x < self.w and 0 <= y < self.h and self.g[y][x] in BREAKABLE
+
+    # -- moves
+    def falls(self, x, y):
+        """Where a fall from body cell (x, y) ends: [(state, ...)], the first
+        vine cell it passes (caught), then the floor (down held past it); []
+        a snuff."""
+        out = []
+        caught = False
+        yy = y
+        while yy < self.h:
+            if not self.body(x, yy):
+                return out
+            if not caught and self.climb(x, yy):
+                out.append(('C', x, yy))
+                caught = True
+            if self.support(x, yy + 1):
+                out.append(('S', x, yy))
+                return out
+            yy += 1
+        return out
+
+    def _arc(self, x, y, up, across, reach, out, base):
+        """A jump (or a leap) from (x, y): feet up k rows, then n columns at
+        that height, then a fall (a vine caught on the way); landing h rows
+        up at most reach(h) away."""
+        for k in range(0, up + 1):
+            if not self.body(x, y - k):
+                break
+            for d in (1, -1):
+                for n in range(0 if d == 1 and k else 1, across + 1):
+                    cx = x + d * n
+                    if n and not self.body(cx, y - k):
+                        break
+                    for st in self.falls(cx, y - k):
+                        hh = y - st[2]
+                        if n <= reach.get(hh, (reach['low'] if hh < 0 else -1)):
+                            out.append((st, n + max(hh, 0) + base, max(0, st[2] - y)))
+
+    def moves(self, s):
+        """[(state, cost, drop)] from state s, in the map's order (each state
+        once, at its cheapest: the drop from s to it is the same however he
+        gets there)."""
+        kind, x, y = s
+        out = []
+        if kind == 'S':
+            for d in (1, -1):
+                nx = x + d
+                if self.body(nx, y):
+                    cost = 3 if self.breaks(nx, y) or self.breaks(nx, y - 1) else 1
+                    for st in self.falls(nx, y):
+                        out.append((st, cost, st[2] - y))
+            if self.one_way(x, y + 1) or self.breaks(x, y + 1):
+                for st in self.falls(x, y + 1):
+                    out.append((st, 1 if self.one_way(x, y + 1) else 3, st[2] - y))
+            if self.climb(x, y):
+                out.append((('C', x, y), 1, 0))
+            if self.climb(x, y - 1) and self.body(x, y - 1):
+                out.append((('C', x, y - 1), 1, 0))
+            self._arc(x, y, JUMP_UP, JUMP_ACROSS, dict(JUMP_REACH, low=8), out, 1)
+        else:
+            if self.climb(x, y - 1) and self.body(x, y - 1):
+                out.append((('C', x, y - 1), 1, 0))
+            if self.climb(x, y + 1) and self.body(x, y + 1):
+                out.append((('C', x, y + 1), 1, 0))
+            if self.support(x, y + 1):
+                out.append((('S', x, y), 1, 0))
+            for d in (1, -1):
+                if self.body(x + d, y):
+                    for st in self.falls(x + d, y):
+                        out.append((st, 1, st[2] - y))
+            if not self.climb(x, y - 1) and self.body(x, y - 1):
+                for d in (1, -1):
+                    for m in range(1, MOUNT_REACH + 1):
+                        if not self.body(x + d * m, y - 1):
+                            break
+                        if self.stand(x + d * m, y - 1):
+                            out.append((('S', x + d * m, y - 1), m + 1, 0))
+            if not self.climb(x, y + 1) and not self.support(x, y + 1):
+                for st in self.falls(x, y + 1):
+                    out.append((st, 1, st[2] - y))
+            self._arc(x, y, LEAP_UP, LEAP_ACROSS, dict(LEAP_REACH, low=5), out, 1)
+        best = {}
+        for st, c, dr in out:
+            if st != s and (st not in best or c < best[st][0]):
+                best[st] = (c, dr)
+        seen = set()
+        moves = []
+        for st, _c, _dr in out:
+            if st in best and st not in seen:
+                seen.add(st)
+                moves.append((st,) + best[st])
+        return moves
+
+    def start(self):
+        p = self.marks.get('P')
+        return ('S', p[0], p[1]) if p and self.stand(*p) else None
+
+    def goal(self):
+        for ch in 'EXS':
+            if ch in self.marks:
+                return ('S',) + self.marks[ch]
+        return None
+
+    def touches(self, s, cells=None):
+        """s touches the goal (its cell, either side, or the two over it), or
+        one of cells."""
+        for g in (cells if cells is not None else [self.goal()]):
+            if g is not None and abs(s[1] - g[1]) <= 1 and 0 <= g[2] - s[2] <= 2:
+                return True
+        return False
+
+    def exits(self):
+        """Every way out: the bell, the boss, each silver bell (it clears the
+        level by its secret way: an attic needs no way back down)."""
+        return [('S', x, y) for y, r in enumerate(self.g) for x, ch in enumerate(r) if ch in 'EXS']
+
+    def route(self):
+        """The cheapest way from the start to the goal, [(kind, x, y)] (None:
+        there's none). Ties go to the state found first (the moves' order)."""
+        if self._route is not None:
+            return self._route or None
+        start, goal = self.start(), self.goal()
+        self._route = []
+        if start is None or goal is None:
+            return None
+        dist = {start: 0}
+        parent = {start: None}
+        pq = [(0, 0, start)]
+        n = 1
+        goal = None
+        while pq:
+            c, _i, s = heapq.heappop(pq)
+            if c > dist[s]:
+                continue
+            if self.touches(s):
+                goal = s
+                break
+            for t, cost, _drop in self.moves(s):
+                nc = c + cost
+                if t not in dist or nc < dist[t]:
+                    dist[t] = nc
+                    parent[t] = s
+                    heapq.heappush(pq, (nc, n, t))
+                    n += 1
+        if goal is None:
+            return None
+        path = [goal]
+        while parent[path[-1]] is not None:
+            path.append(parent[path[-1]])
+        self._route = path[::-1]
+        return self._route
+
+    def proj(self, cell):
+        """The index on the route nearest cell (columns, and rows twice over:
+        his own storey first); ties to the earlier."""
+        best, bi = None, 0
+        for i, (_k, x, y) in enumerate(self.route() or []):
+            d = abs(x - cell[0]) + 2 * abs(y - cell[1])
+            if best is None or d < best:
+                best, bi = d, i
+        return bi
+
+    def run_lengths(self):
+        """The route's length on foot to each of its states: columns walked
+        and rows climbed (a fall's rows are free)."""
+        out = [0]
+        path = self.route() or []
+        for a, b in zip(path, path[1:]):
+            out.append(out[-1] + abs(b[1] - a[1]) + max(0, a[2] - b[2]))
+        return out
+
+    def dir_at(self, i):
+        """Which way the route runs at index i (+1 right, -1 left): the
+        columns it covers over the next few states, else the last few."""
+        path = self.route() or []
+        for j0, j1 in ((i, min(i + 6, len(path) - 1)), (max(i - 6, 0), i)):
+            if j1 > j0 and path[j1][1] != path[j0][1]:
+                return 1 if path[j1][1] > path[j0][1] else -1
+        return 1
+
+    def reach(self, max_drop=None):
+        """Every state reachable from the start ({state: [(next, drop)]}), only
+        by falls of max_drop rows or less when it's given."""
+        start = self.start()
+        if start is None:
+            return {}
+        edges = {start: []}
+        todo = [start]
+        while todo:
+            s = todo.pop()
+            for t, _c, drop in self.moves(s):
+                if max_drop is not None and drop > max_drop:
+                    continue
+                edges[s].append((t, drop))
+                if t not in edges:
+                    edges[t] = []
+                    todo.append(t)
+        return edges
+
+
+def route_order(rows, cells, facing=1):
+    """cells in the order the route meets them: a strip's by x in its facing
+    (ties as given), a taller level's by the walk map's route (WalkMap.proj;
+    ties by x in its facing)."""
+    if len(rows) <= H:
+        return sorted(cells, key=lambda c: c[0] * facing)
+    wm = WalkMap(rows)
+    return sorted(cells, key=lambda c: (wm.proj(c), c[0] * facing))
+
+
+def parts_in_route_order(rows, facing=1):
+    """A level's parts [(section, x0, y0)] in the order the route meets them:
+    a strip's by x in its facing, a taller level's by where the walk map's
+    route first steps into each (one it never enters: its middle's nearest
+    index)."""
+    parts = list(getattr(rows, 'parts', ()))
+    if len(rows) <= H:
+        return sorted(parts, key=lambda p: p[1] * facing)
+    wm = WalkMap(rows)
+    path = wm.route() or []
+
+    def key(p):
+        b, x0, y0 = p
+        x1, y1 = x0 + len(b[0]) - 1, y0 + len(b) - 1
+        for i, (_k, x, y) in enumerate(path):
+            if x0 <= x <= x1 and y0 <= y <= y1:
+                return (i, x0 * facing)
+        return (wm.proj(((x0 + x1) // 2, (y0 + y1) // 2)), x0 * facing)
+    return sorted(parts, key=key)
+
+
+def first_half(rows, cells, facing=1):
+    """The cells in the first half of a level's route (a strip's first half
+    of its width, in its facing; a taller level's by the walk map's route)."""
+    width = max(len(r) for r in rows)
+    if len(rows) <= H:
+        return [c for c in cells if (c[0] if facing > 0 else width - 1 - c[0]) < width // 2]
+    wm = WalkMap(rows)
+    n = len(wm.route() or [])
+    return [c for c in cells if wm.proj(c) < n // 2]
+
+
+def facing_of(header):
+    """-1 for a 'facing: left' header, else 1."""
+    return -1 if str(dict(header).get('facing', '')).strip() == 'left' else 1
+
+
+# ---------------------------------------------------------------- the shape rules
+# What a level keeps whatever its shape (shape_problems, as it's written;
+# tests/level_rules.gd reads the file the same): H_MIN to H_MAX rows; no
+# goal under the HUD's top corners where the camera stops at the level's top
+# (hud_problems: the view and the HUD's corners in px, world.gd's camera and
+# hud.gd's layout). A level taller than H keeps the descent rules: its goal
+# reached with no fall over MAX_DROP rows (what he sees under his feet
+# standing: a required drop's landing is in view), and from every state the
+# walk map reaches, the goal still reached (every landing leads somewhere:
+# a fall inside a tall level isn't a snuff); and the catch rules: a fall
+# from a floor that gives way (a crumble, dawnglass, glass, a rotten vine)
+# lands within CATCH_ROWS rows (a catch floor, not the bottom of the climb)
+# or snuffs, and no monster stands within CATCH_CLEAR columns of where it
+# lands. A strip's falls are pits (a snuff), as before.
+MAX_DROP = 5
+CATCH_ROWS = 10
+CATCH_CLEAR = 3
+VIEW_W, VIEW_H = 844, 390
+FEET_LINE = 193          # world.gd feet_line(): his feet's view y, standing
+BELOW_PX = 160           # world.gd BELOW: the stone the camera shows under a level
+# The HUD's top corners in view px, with the phone's landscape safe-area
+# inset (47) taken on both sides: the left block (the badge, life, the
+# resource, the embers: hud.gd layout) and the right (the sigils, pause).
+HUD_LEFT = (0, 0, 237, 58)
+HUD_RIGHT = (672, 0, 844, 44)
+GIVE_WAY = set('%AG}')
+
+
+def goal_rects(rows):
+    """[(glyph, x, y, (x0, y0, x1, y1) px)]: each goal as drawn: a sigil its
+    cell, the bell its beam and bell over its floor (world.gd add_bell), a
+    silver bell its smaller one."""
+    out = []
+    for y, r in enumerate(rows):
+        for x, ch in enumerate(r):
+            fx, fy = x * 32 + 16, (y + 1) * 32
+            if ch in '123':
+                out.append((ch, x, y, (x * 32, y * 32, x * 32 + 32, y * 32 + 32)))
+            elif ch == 'E':
+                out.append((ch, x, y, (fx - 32, fy - 105, fx + 32, fy)))
+            elif ch == 'S':
+                out.append((ch, x, y, (fx - 16, fy - 70, fx + 16, fy)))
+    return out
+
+
+def hud_problems(rows):
+    """Each goal under the HUD's top corners where the camera stops: with
+    him at the goal (his feet on its floor), the camera holding his feet on
+    FEET_LINE but stopped at the level's top (and its bottom), and its x on
+    him (70 px ahead either way) but stopped at the level's sides."""
+    w, h = max(len(r) for r in rows) * 32, len(rows) * 32
+    out = []
+    for ch, x, y, (x0, y0, x1, y1) in goal_rects(rows):
+        top = min(max(0, y1 - FEET_LINE), max(0, h + BELOW_PX - VIEW_H))
+        for look in (-70, 70):
+            cx = (w - VIEW_W) / 2.0 if w <= VIEW_W else min(max((x0 + x1) / 2.0 - VIEW_W / 2.0 + look, 0), w - VIEW_W)
+            vr = (x0 - cx, y0 - top, x1 - cx, y1 - top)
+            for name, (a0, b0, a1, b1) in (('left', HUD_LEFT), ('right', HUD_RIGHT)):
+                if vr[0] < a1 and vr[2] > a0 and vr[1] < b1 and vr[3] > b0:
+                    out.append("the %s at %d,%d is under the HUD's top %s corner where the camera stops" % (
+                        {'E': 'bell', 'S': 'silver bell'}.get(ch, 'sigil ' + ch), x, y, name))
+                    break
+            else:
+                continue
+            break
+    return out
+
+
+def descent_problems(rows, wm=None):
+    """A tall level's descent rules (see above), as strings."""
+    wm = wm or WalkMap(rows)
+    start, goal = wm.start(), wm.goal()
+    if start is None or goal is None:
+        return ['no start on a floor, or no goal (bell, boss or silver bell)']
+    out = []
+    if not any(wm.touches(s) for s in wm.reach(MAX_DROP)):
+        out.append('the %s at %d,%d needs a drop of more than %d rows' % ('bell' if 'E' in wm.marks else 'goal', goal[1], goal[2], MAX_DROP))
+    edges = wm.reach()
+    exits = wm.exits()
+    ends = [s for s in edges if wm.touches(s, exits)]
+    if not ends:
+        return out + ['the walk map finds no way from the start to the goal']
+    back = {}
+    for s, ts in edges.items():
+        for t, _d in ts:
+            back.setdefault(t, []).append(s)
+    seen = set(ends)
+    todo = list(ends)
+    while todo:
+        t = todo.pop()
+        for s in back.get(t, ()):
+            if s not in seen:
+                seen.add(s)
+                todo.append(s)
+    stuck = sorted((s[1], s[2]) for s in edges if s not in seen and s[0] == 'S')
+    if stuck:
+        out.append('%d landings lead nowhere (no way out from them), e.g. %s' % (len(stuck), stuck[:6]))
+    return out
+
+
+def _landing(wm, x, y):
+    """The row a fall from just under (x, y) ends on (a floor, or a vine
+    caught), None for no fall or a snuff."""
+    yy = y + 1
+    while yy < wm.h:
+        if wm.solid(x, yy) or wm.hazard(x, yy):
+            return None
+        if wm.climb(x, yy) or wm.support(x, yy + 1):
+            return yy
+        yy += 1
+    return None
+
+
+def catch_problems(rows, wm=None):
+    """A tall level's catch rules (see above), as strings."""
+    wm = wm or WalkMap(rows)
+    mons = game()['monsters']
+    out = []
+    seen = set()
+    for y, r in enumerate(wm.g):
+        for x, ch in enumerate(r):
+            # A floor he stands on that gives way, or the foot of a rotten run.
+            if ch not in GIVE_WAY or (ch == '}' and wm.climb(x, y + 1)) or (ch != '}' and not wm.body(x, y - 1)):
+                continue
+            ly = _landing(wm, x, y)
+            if ly is None:
+                continue
+            if ly - y > CATCH_ROWS:
+                out.append('a fall through the %r at %d,%d lands %d rows down (a catch floor within %d)' % (ch, x, y, ly - y, CATCH_ROWS))
+            near = sorted((mx, my) for my in range(ly - 1, ly + 2) for mx in range(x - CATCH_CLEAR, x + CATCH_CLEAR + 1)
+                          if 0 <= my < wm.h and 0 <= mx < wm.w and wm.g[my][mx] in mons)
+            for c in near:
+                if c not in seen:
+                    seen.add(c)
+                    out.append('a monster at %d,%d waits where a fall through the %r at %d,%d lands' % (c[0], c[1], ch, x, y))
+    return out
+
+
+def shape_problems(name, rows, header=()):
+    """What breaks a level's shape rules (see above), as strings."""
+    out = []
+    if not H_MIN <= len(rows) <= H_MAX:
+        out.append('%d rows (%d-%d)' % (len(rows), H_MIN, H_MAX))
+    out += hud_problems(rows)
+    if len(rows) > H:
+        wm = WalkMap(rows)
+        out += descent_problems(rows, wm) + catch_problems(rows, wm)
+    hd = dict(header)
+    f = str(hd.get('facing', 'right')).strip()
+    if f not in ('left', 'right'):
+        out.append("facing %r (left or right)" % f)
+    elif f == 'left':
+        sx = [x for r in rows for x, ch in enumerate(r) if ch == 'P']
+        ex = [x for r in rows for x, ch in enumerate(r) if ch in 'EX']
+        if sx and ex and sx[0] < max(ex):
+            out.append('facing left, but it starts left of its bell (%d, %d)' % (sx[0], max(ex)))
+    return out
+
+
+def check_shape(name, rows, header=()):
+    """Asserts a level keeps its shape rules (shape_problems)."""
+    probs = shape_problems(name, rows, header)
+    assert not probs, '%s: %s' % (name, '; '.join(probs))
 
 
 # ================================================================ the toolkit
@@ -615,6 +1495,7 @@ ROLE_MARKS = (('P', 'S'), ('M', 'V'), ('D', 'D'), ('K', 'A'), ('E', 'B'), ('X', 
 ALTAR_NEAR = 8
 FODDER_CAPS = (0.85, 0.75, 0.65)
 SCREEN = 26
+SCREEN_ROWS = 12      # a taller level's screen (the view's rows; a strip's is its height)
 MIXED_KINDS = 3
 MIXED_SCREENS = 2
 AWAKE_MAX = 6
@@ -861,7 +1742,7 @@ def stamp(sec, name, dx, dy):
     cells = {}
     for sx, sy, ch in STAMPS[name]:
         x, y = dx + sx, dy + sy
-        assert 0 <= y < H and 0 <= x < len(sec[0]), \
+        assert 0 <= y < len(sec) and 0 <= x < len(sec[0]), \
             'stamp %s at (%d, %d): (%d, %d) is outside the section' % (name, dx, dy, x, y)
         assert sec[y][x] == '.' or (ch in CARRIERS and sec[y][x] in CLIMB), \
             'stamp %s at (%d, %d): (%d, %d) holds %r, not air (or a vine for a Creepbone)' % (name, dx, dy, x, y, sec[y][x])
@@ -876,7 +1757,7 @@ def stamp(sec, name, dx, dy):
 def level_stamps(rows):
     """[(name, x, y)]: every stamp drawn into a level's sections (rows: the
     joined Rows), absolute."""
-    return [(n, x0 + dx, dy) for sec, x0 in getattr(rows, 'parts', ()) for n, dx, dy in getattr(sec, 'stamps', ())]
+    return [(n, x0 + dx, y0 + dy) for sec, x0, y0 in getattr(rows, 'parts', ()) for n, dx, dy in getattr(sec, 'stamps', ())]
 
 
 # ---------------------------------------------------------------- range headers
@@ -891,7 +1772,8 @@ class Span(object):
 
     def cols(self, rows):
         dx1 = len(self.section[0]) - 1 if self.dx1 is None else self.dx1
-        return x_of(rows, self.section, self.dx0, self.n), x_of(rows, self.section, dx1, self.n)
+        a, b = x_of(rows, self.section, self.dx0, self.n), x_of(rows, self.section, dx1, self.n)
+        return min(a, b), max(a, b)
 
 
 def span(section, dx0=0, dx1=None, n=0):
@@ -969,7 +1851,8 @@ def omen_pool(kind, world, diff='dusk'):
 def anoint_header(rows, cells, world=0, level_id=''):
     """The anoint: header (its monsters are Anointed every run):
     'x,y[:Omen+Omen[:Name]]; x,y', from cells (section, dx, row[, omens[,
-    name]]) or (x, y[, ...]) absolute, omens 'Swift+Warded' or a list ('':
+    name]]: the row as the section's drawn, y_of) or (x, y[, ...]) absolute,
+    omens 'Swift+Warded' or a list ('':
     rolled as the World would, as 3-S's are). rows: the level's joined rows,
     or its sections. Checked as written (anoint_problems): each cell holds a
     kind elites.gd may anoint, each Omen is in its Dusk pool there
@@ -981,9 +1864,9 @@ def anoint_header(rows, cells, world=0, level_id=''):
     out = []
     for c in cells:
         if isinstance(c[0], int):
-            x, y, rest = c[0], c[1], list(c[2:])
+            x, y, rest = _place(rows, c[0]), c[1], list(c[2:])
         else:
-            x, y, rest = x_of(rows, c[0], c[1]), c[2], list(c[3:])
+            x, y, rest = x_of(rows, c[0], c[1]), y_of(rows, c[0], c[2]), list(c[3:])
         omens = rest[0] if rest else ''
         name = rest[1] if len(rest) > 1 else ''
         omens = [o for o in (omens.split('+') if isinstance(omens, str) else omens) if o]
@@ -1296,7 +2179,7 @@ def check_headers(name, rows, header, world=None):
     hd = dict(header)
     for k in hd:
         assert k not in SPEC_KEYS, '%s: a %r header: %s' % (name, k, SPEC_KEYS[k])
-    check_rooms(name, rows, hd.get('room', ''))
+    check_rooms(name, rows, hd.get('room', ''), facing_of(header))
     if hd.get('anoint', '').strip():
         probs = anoint_problems(rows, hd['anoint'], world, name)
         assert not probs, '%s: %s' % (name, '; '.join(probs))
@@ -1318,7 +2201,7 @@ def check_headers(name, rows, header, world=None):
     if hd.get('threat', '').strip():
         anoint = [(x, y) for x, y, _o, _n in anoint_cells(hd.get('anoint', ''))]
         check_threat(name, rows, float(hd['threat']), anoint, tw.lower(), world, roster.get('pack_leaders'))
-    parts = [sec for sec, _x in getattr(rows, 'parts', ())]
+    parts = [sec for sec, _x, _y in parts_in_route_order(rows, facing_of(header))]
     if hd.get('roles', '').strip() and parts:
         assert ' '.join(hd['roles'].split()) == roles_of(parts), \
             '%s declares roles %s but its sections hold %s' % (name, hd['roles'], roles_of(parts))
@@ -1346,42 +2229,96 @@ def landmarks_of(roles):
     return ' '.join(out)
 
 
+def checkpoint_gaps(rows):
+    """(marks, gaps): a level's checkpoints (start, altars, bell or boss) in
+    the route's order and how far apart they are on it: a strip's by x
+    (either way), a taller level's along the walk map's route (each
+    checkpoint at its nearest index, WalkMap.proj; the columns walked and
+    rows climbed between: run_lengths). marks: their x in a strip, their
+    distance along the route in a taller level."""
+    cells = [(x, y) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch in 'PKEX']
+    if len(rows) <= H:
+        marks = sorted(x for x, _y in cells)
+    else:
+        wm = WalkMap(rows)
+        if wm.route() is None:
+            return [], [10 ** 6]
+        run = wm.run_lengths()
+        marks = sorted(run[wm.proj(c)] for c in cells)
+    return marks, [b - a for a, b in zip(marks, marks[1:])]
+
+
 def checkpoint_problems(rows, header, max_gap, altar_band=ALTARS):
     """A regular level's checkpoints (start, altars, bell): at most max_gap
-    apart, altar_band altars (ALTARS; World 1-2's own, w1.py and w2.py), and
-    an altar at most DOOR_ALTAR tiles before every sealed room's door (the
-    left column of each room: room, rooms_of)."""
-    marks = sorted(x for r in rows for x, ch in enumerate(r) if ch in 'PKEX')
+    apart along its route (checkpoint_gaps: x in a strip), altar_band
+    altars (ALTARS; World 1-2's own, w1.py and w2.py), and an altar at most
+    DOOR_ALTAR tiles before every sealed room's door (the one the route
+    comes in by: room_entry; rooms_of)."""
+    marks, gaps = checkpoint_gaps(rows)
     altars = sorted(x for r in rows for x, ch in enumerate(r) if ch == 'K')
     out = []
-    worst = max([b - a for a, b in zip(marks, marks[1:])] or [0])
+    worst = max(gaps or [0])
     if worst > max_gap:
         out.append('checkpoints %d tiles apart (at most %d): %s' % (worst, max_gap, marks))
     if not altar_band[0] <= len(altars) <= altar_band[1]:
         out.append('%d altars (%d-%d)' % (len(altars), altar_band[0], altar_band[1]))
-    for kind, x0, _x1 in rooms_of(header.get('room', '')):
-        if not any(0 <= x0 - a <= DOOR_ALTAR for a in altars):
-            out.append('no altar within %d tiles of the %s door at %d (altars %s)' % (DOOR_ALTAR, kind, x0, altars))
+    for kind, x0, x1, y0, y1 in _room_boxes(rows, header.get('room', '')):
+        side = room_entry(rows, x0, x1, y0, y1, facing_of(header))
+        door = x0 if side < 0 else x1
+        if not any(0 <= (door - a) * -side <= DOOR_ALTAR for a in altars):
+            out.append('no altar within %d tiles of the %s door at %d (altars %s)' % (DOOR_ALTAR, kind, door, altars))
     return out
+
+
+def _room_boxes(rows, value):
+    """[(kind, x0, x1, y0, y1)] of a written room: header (its rows, else
+    the level's)."""
+    out = []
+    for part in str(value).split(';'):
+        bits = part.split()
+        if len(bits) < 2 or bits[0] not in ROOM_KINDS:
+            continue
+        ab = bits[1].split('-')
+        if len(ab) != 2 or not ab[0].isdigit() or not ab[1].isdigit():
+            continue
+        y0, y1 = 0, len(rows) - 1
+        if 'rows' in bits:
+            y0, y1 = (int(v) for v in bits[bits.index('rows') + 1].split('-'))
+        out.append((bits[0], int(ab[0]), int(ab[1]), y0, y1))
+    return out
+
+
+def screen_rows(rows):
+    """[(y0, y1)]: the rows a screen spans (inclusive): a strip's one screen
+    is its whole height (its camera shows it all as it goes); a taller
+    level's SCREEN_ROWS tall (the view), from every row."""
+    if len(rows) <= H:
+        return [(0, len(rows) - 1)]
+    return [(y0, y0 + SCREEN_ROWS - 1) for y0 in range(0, len(rows) - SCREEN_ROWS + 1)]
 
 
 def mixed_screens(rows):
     """How many screens (SCREEN tiles wide, none overlapping: the most such
-    a level holds) have MIXED_KINDS kinds or more of monster in them."""
+    a level holds; screen_rows tall) have MIXED_KINDS kinds or more of
+    monster in them."""
     mons = game()['monsters']
-    cols = {}
-    for r in rows:
+    at = {}
+    for y, r in enumerate(rows):
         for x, ch in enumerate(r):
             if ch in mons:
-                cols.setdefault(x, set()).add(mons[ch])
+                at.setdefault(x, []).append((y, mons[ch]))
     width = max(len(r) for r in rows)
+    bands = screen_rows(rows)
     n = 0
     x0 = 0
     while x0 < width:
-        kinds = set()
-        for x in range(x0, x0 + SCREEN):
-            kinds |= cols.get(x, set())
-        if len(kinds) >= MIXED_KINDS:
+        best = 0
+        for y0, y1 in bands:
+            kinds = set()
+            for x in range(x0, x0 + SCREEN):
+                kinds |= {k for y, k in at.get(x, ()) if y0 <= y <= y1}
+            best = max(best, len(kinds))
+        if best >= MIXED_KINDS:
             n += 1
             x0 += SCREEN
         else:
@@ -1390,17 +2327,18 @@ def mixed_screens(rows):
 
 
 def crowded_screens(rows, anoint=(), twist='', world=0, pack_leaders=None):
-    """[(x0, n)]: each screen (SCREEN tiles from x0) with more than
-    AWAKE_MAX bodies in play in it (in_play: packs at their size)."""
+    """[(x0, n)]: each screen (SCREEN tiles from x0, screen_rows tall) with
+    more than AWAKE_MAX bodies in play in it (in_play: packs at their size)."""
     at = {}
-    for x, _y, _k, n in in_play(rows, anoint, twist, world, pack_leaders):
-        at[x] = at.get(x, 0.0) + n
+    for x, y, _k, n in in_play(rows, anoint, twist, world, pack_leaders):
+        at.setdefault(x, []).append((y, n))
     width = max(len(r) for r in rows)
     out = []
     for x0 in range(0, max(width - SCREEN, 0) + 1):
-        n = sum(at.get(x, 0.0) for x in range(x0, x0 + SCREEN))
-        if n > AWAKE_MAX + 1e-9:
-            out.append((x0, n))
+        for y0, y1 in screen_rows(rows):
+            n = sum(m for x in range(x0, x0 + SCREEN) for y, m in at.get(x, ()) if y0 <= y <= y1)
+            if n > AWAKE_MAX + 1e-9:
+                out.append((x0, n))
     return out
 
 
@@ -1431,15 +2369,17 @@ def world_problems(entries, max_gap, ramp=None, altar_band=ALTARS):
         prev = (e['id'], float(t))
     info = {}
     for e in regular:
-        rows = join(*e['sections'])
+        rows = level_rows(e)
         hd = dict(header_of(e, rows))
+        facing = facing_of(hd)
         out += ['%s: %s' % (e['id'], p) for p in checkpoint_problems(rows, hd, max_gap, altar_band)]
-        seq = roles_of(e['sections'])
+        seq = roles_of([b for b, _x, _y in parts_in_route_order(rows, facing)])
         if 'roles' in e and ' '.join(e['roles'].split()) != seq:
             out.append('%s declares roles %s but its sections hold %s' % (e['id'], e['roles'], seq))
-        width = max(len(r) for r in rows)
         if level_no(e['id']) == 1:
-            early = [(n, x) for n, x, _y in level_stamps(rows) if x < width // 2]
+            stamps = level_stamps(rows)
+            half = first_half(rows, [(x, y) for _n, x, y in stamps], facing)
+            early = [(n, x) for n, x, y in stamps if (x, y) in half]
             if early:
                 out.append('%s: stamps in its first half %s (an X-1 teaches alone first)' % (e['id'], early))
         roster = e['roster'] if isinstance(e['roster'], dict) else roster_of(e['roster'])
@@ -1682,3 +2622,73 @@ def self_check():
         assert any(what in s for s in p), 'a re-cut world catches %s (%s)' % (what, p)
     assert any('first half' in s for s in world_problems([dict(rc[0], sections=[start, st, alt, plain, alt, vault, alt, bell], roster=dict(r1, stamps=['crossfire']))] + rc[1:], 78)), \
         'an X-1 keeps its stamps to its second half'
+    shapes_check()
+
+
+def shapes_check():
+    """The shape tools' own proof (self_check runs it): place, crop, stack,
+    seam and the ceiling; x_of and y_of through a placed, cropped or mirrored
+    copy; mirror_rows and mirror_phases; the walk map's route and the shape
+    rules, each passing what it should and catching what it shouldn't."""
+    flat = block('\n'.join(['.' * 12] * 13 + ['#' * 12] * 2))
+    pit = swap(flat, {(5, 13): '.', (5, 14): '.', (6, 13): ':', (6, 14): ':'})
+    # place: rock above, rock under rock, the pit and the pool carried down.
+    pl = place(stamp(pit, 'hound_and_mounds', 2, 12), 4, 24)
+    assert len(pl) == 24 and pl[0] == '#' * 12 and pl[23][5] == '.' and pl[23][6] == ':' and pl[23][0] == '#', 'place pads'
+    assert pl.dy == 4 and pl.stamps == [('hound_and_mounds', 2, 16)] and _fails(place, flat, 10, 24) and _fails(place, flat, 0, 37), 'place'
+    assert list(place(flat, 0, 15, '.')) == list(flat) and seam(4, 24)[17] == '##' and seam() is T_OPEN and floor_row(9) == 22, 'seam, floor_row'
+    assert _fails(join, flat, pl), 'join refuses sections of two heights'
+    # crop and stack: storeys of 12 rows; a cut row with a glyph fails.
+    up = crop(flat, 3)
+    assert len(up) == 12 and up.dy == -3 and _fails(crop, swap(flat, {(2, 1): 'o'}), 3), 'crop'
+    st2 = stack(join(up, crop(pit, 3)), join(crop(pit, 3), up))
+    assert len(st2) == 24 and len(st2.parts) == 4 and st2.parts[2][1:] == (0, 12) and _fails(stack, join(up), join(up, up)), 'stack'
+    lvl = join(place(flat, 9, 24), st2)
+    assert x_of(lvl, pit, 2, 1) == 14 and y_of(lvl, pit, 13, 1) == 22 and y_of(lvl, flat, 13) == 22 and y_of(lvl, pit, 13) == 10, 'x_of, y_of'
+    p4, p9 = place(flat, 4, 24), place(flat, 9, 24)
+    assert y_of(join(p9, p4), p4, 13) == 13 and y_of(join(p9, p4), flat, 13, 1) == 17 and x_of(mirror_rows(join(p9, p4)), flat, 0, 1) == 11, \
+        'a placed copy names itself; a mirror keeps the uses\' order'
+    assert ceiling(lvl)[0] == '#' * 36 and len(level_rows({'sections': [(flat, 9), (pit, 0)], 'height': 24})) == 24, 'ceiling, level_rows'
+    # mirror_rows: a section knows its source; a level its parts, flipped.
+    belt = swap(flat, {(1, 13): '>', (2, 13): '>', (9, 6): 'O', (3, 12): 's'})
+    mb = mirror_rows(belt)
+    assert mb[13][10] == '<' and mb[6][2] == 'Q' and mb.flip and mb.source is belt and x_of(join(flat, mb), belt, 9) == 14, 'mirror a section'
+    ml = mirror_rows(join(flat, belt))
+    assert ml.mirrored and x_of(ml, belt, 9) == 2 and x_of(ml, flat, 0) == 23 and _place(ml, 0) == 23 and mirror_rows(ml)[6] == join(flat, belt)[6], \
+        'mirror a level'
+    assert any('before its right door' in p for p in room_problems(ml, rooms_header(ml, [('duel', belt)]), -1)), 'a mirrored room is met by its right door'
+    # mirror_phases: every weight and swing written, half a swing on, at its
+    # mirrored column (a swing's first); a cog's 1 - turns at its mirror.
+    wt = swap(flat, {(2, 2): 'Y', (8, 2): 'Y', (4, 8): 'T', (5, 8): 'T', (6, 8): 'T'})
+    assert phases_of(wt, {8: 0.25}) == {2: 0.0, 8: 0.25, 4: 0.0}, phases_of(wt, {8: 0.25})
+    assert mirror_phases(wt, {8: 0.25}, {6: 0.125}) == ({9: 0.5, 3: 0.75, 5: 0.5}, {5: 0.875}), mirror_phases(wt, {8: 0.25}, {6: 0.125})
+    # The route: a strip's by x in its facing; a taller level's the walk
+    # map's (a sign up on the storey it comes back along comes after).
+    assert route_order(flat, [(9, 12), (2, 12), (5, 3)], -1) == [(9, 12), (5, 3), (2, 12)], 'route_order, a strip facing left'
+    lo = block('\n'.join(['.' * 20] * 3 + ['.' * 18 + '{.'] * 10 + ['#' * 20] * 2))
+    hi = block('\n'.join(['.' * 20] * 13 + ['.' * 6 + '#' * 12 + '{#'] * 2))
+    loop = stack(join(crop(swap(hi, {(8, 12): '@', (7, 12): 'E'}), 3)), join(crop(swap(lo, {(2, 12): 'P', (12, 12): '@'}), 3)))
+    wm = WalkMap(loop)
+    assert wm.route() is not None and route_order(loop, [(8, 9), (12, 21)]) == [(12, 21), (8, 9)], 'route_order, along a loop'
+    marks, gaps = checkpoint_gaps(loop)
+    assert gaps == [16 + 12 + 10], 'checkpoint_gaps along the route: 16 right, 12 up, 10 back (%s)' % (gaps,)
+    assert room_entry(loop, 9, 15, 0, 11) == 1 and room_entry(loop, 9, 15, 12, 23) == -1, 'room_entry from the route'
+    assert descent_problems(loop) == [] and catch_problems(loop) == [] and hud_problems(loop) == [], 'a loop keeps the shape rules'
+    # Descent: a 6-row drop the only way on; a landing with no way out.
+    drop = block('\n'.join(['#' * 24] * 6 + ['.' * 24] * 6 + ['#' * 8 + '.' * 16] + ['.' * 24] * 6 + ['#' * 24] * 2), 21)
+    drop = swap(drop, {(2, 11): 'P', (20, 18): 'E'})
+    assert any('drop of more than 5' in p for p in descent_problems(drop)), 'a 6-row drop is caught'
+    pocket = swap(drop, {(14, y): '#' for y in range(13, 19)})
+    pocket = swap(pocket, {(x, 12): '=' for x in range(8, 14)})
+    assert any('lead nowhere' in p for p in descent_problems(pocket)), 'a pocket with no way out is caught (%s)' % descent_problems(pocket)
+    # Catch: a crumble 12 rows over its floor; a monster where it lands.
+    tall = block('\n'.join(['.' * 20] * 4 + ['....%%%%............'] + ['.' * 20] * 13 + ['#' * 20] * 2), 20)
+    assert any('lands 13 rows down' in p for p in catch_problems(tall)), catch_problems(tall)
+    assert any('waits where' in p for p in catch_problems(swap(tall, {(7, 17): 's'}))), 'a monster at a catch floor is caught'
+    assert catch_problems(swap(tall, {(x, 12): '=' for x in range(3, 9)})) == [], 'a catch floor within 10 rows'
+    # The HUD: a sigil in the top right corner where the camera stops; the
+    # bell clear of it 6 tiles in; the height and the facing.
+    corner = swap(block('\n'.join(['.' * 40] * 13 + ['#' * 40] * 2)), {(38, 1): '1', (1, 12): 'P', (6, 12): 'E'})
+    assert any('top right corner' in p for p in hud_problems(corner)) and hud_problems(swap(corner, {(38, 1): '.'})) == [], 'the HUD rule'
+    assert shape_problems('x', ['.'] * 14) and shape_problems('x', corner, [('facing', 'left')]) and shape_problems('x', corner, [('facing', 'up')]), 'shape_problems'
+    assert screen_rows(flat) == [(0, 14)] and screen_rows(['.'] * 24)[-1] == (12, 23), 'screen_rows'

@@ -625,7 +625,7 @@ func _test_headers(levels: Dictionary) -> void:
 		var lv = levels[id]
 		_check(lv.errors.is_empty(), "%s parses cleanly %s" % [id, lv.errors])
 		_check(lv.title == names[id] and lv.area == areas[id] and lv.theme == themes[id] and lv.world == 3, "%s: its name, area, theme and world" % id)
-		_check(lv.width == int(widths.get(id, lv.width)) and lv.height == 15, "%s is %d x 15" % [id, widths.get(id, lv.width)])
+		_check(lv.width == int(widths.get(id, lv.width)) and Rules.height_ok(lv), "%s is %d wide, %d-%d rows (%d)" % [id, widths.get(id, lv.width), Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.height])
 		_check(str(lv.headers.get("music", "")) == "orchard", "%s plays the orchard" % id)
 		_check(str(lv.story.get("start", "")) == "beat_3_%s" % id.right(1), "%s opens on beat_3_%s" % [id, id.right(1)])
 		if dreads.has(id):
@@ -653,13 +653,14 @@ func _test_headers(levels: Dictionary) -> void:
 
 
 func _cols_of(lv: RefCounted) -> Dictionary:
-	## Per column: pit (no floor under row 12: rows 13-14 air or deep water),
-	## safe (a SAFE top with room), vine (any climbable cell), foot (anything
-	## to land on over the pit: stone, a ledge, a crumble).
+	## Per column: pit (no floor in the level's bottom two rows: air or deep
+	## water), safe (a SAFE top with room), vine (any climbable cell), foot
+	## (anything to land on over the pit: stone, a ledge, a crumble).
 	var out := {}
+	var b0: int = lv.height - 2
 	for x in lv.width:
-		var pit: bool = not LevelData.is_solid(lv.tile(x, 13)) and not LevelData.is_solid(lv.tile(x, 14)) \
-				and lv.tile(x, 13) != LevelData.SPIKES_UP
+		var pit: bool = not LevelData.is_solid(lv.tile(x, b0)) and not LevelData.is_solid(lv.tile(x, b0 + 1)) \
+				and lv.tile(x, b0) != LevelData.SPIKES_UP
 		var safe := false
 		for y in range(1, lv.height):
 			if LevelData.is_safe(lv.tile(x, y)) and not LevelData.is_solid(lv.tile(x, y - 1)) and not LevelData.is_floor(lv.tile(x, y - 1)):
@@ -669,7 +670,7 @@ func _cols_of(lv: RefCounted) -> Dictionary:
 		for y in lv.height:
 			if LevelData.is_climb(lv.tile(x, y)):
 				vine = true
-			if y < 13 and LevelData.is_floor(lv.tile(x, y)) and not LevelData.is_solid(lv.tile(x, y - 1)):
+			if y < b0 and LevelData.is_floor(lv.tile(x, y)) and not LevelData.is_solid(lv.tile(x, y - 1)):
 				foot = true
 		out[x] = {"pit": pit, "safe": safe, "vine": vine, "foot": foot}
 	return out
@@ -678,16 +679,10 @@ func _cols_of(lv: RefCounted) -> Dictionary:
 func _test_layout(levels: Dictionary) -> void:
 	for id in levels:
 		var lv = levels[id]
-		# Checkpoints: start, altars, bell (or the boss) at most 90 apart.
-		var marks := [lv.start.x]
-		for e in lv.entities:
-			if e["kind"] in ["altar", "bell", "boss"]:
-				marks.append(e["cell"].x)
-		marks.sort()
-		var worst := 0
-		for i in range(1, marks.size()):
-			worst = maxi(worst, marks[i] - marks[i - 1])
-		_check(worst <= MAX_GAP, "%s: checkpoints %d tiles apart at most (%s)" % [id, worst, marks])
+		# Checkpoints: start, altars, bell (or the boss) at most 90 apart
+		# along the route (x in a strip: Rules.checkpoint_gaps).
+		var cg := Rules.checkpoint_gaps(lv)
+		_check(int(cg["worst"]) <= MAX_GAP, "%s: checkpoints %d tiles apart at most (%s)" % [id, cg["worst"], cg["marks"]])
 		if lv.boss != "":
 			_check(lv.count("altar") == 2, "%s has 2 altars" % id)
 		else:
@@ -843,18 +838,19 @@ func _test_teaching(levels: Dictionary) -> void:
 
 
 func _test_screens(levels: Dictionary) -> void:
-	## Per 27-tile window (spec §3.1): pods <= 8, glowfruit <= 6, feature
-	## lights <= 14 (glowfruit and lanterns, and each pod's dim glow counted
-	## too), placed monsters <= 12. The live-cloud cap (5) is counted in play
-	## (_test_smoke).
+	## Per 27-tile window (spec §3.1; a taller level's 12 rows tall:
+	## Rules.screen_rows): pods <= 8, glowfruit <= 6, feature lights <= 14
+	## (glowfruit and lanterns, and each pod's dim glow counted too), placed
+	## monsters <= 12. The live-cloud cap (5) is counted in play (_test_smoke).
 	for id in levels:
 		var lv = levels[id]
 		var worst := {"pod": 0, "glowfruit": 0, "lights": 0, "monsters": 0}
-		for x0 in range(0, maxi(lv.width - 26, 1)):
+		for win in _windows(lv):
+			var x0: int = win.x
 			var n := {"pod": 0, "glowfruit": 0, "lights": 0, "monsters": 0}
 			for e in lv.entities:
 				var x: int = e["cell"].x
-				if x < x0 or x >= x0 + 27:
+				if x < x0 or x >= x0 + 27 or not Rules.in_rows(e["cell"], Vector2i(win.y, win.z)):
 					continue
 				var k := str(e["kind"])
 				if k == "pod" or k == "glowfruit":
@@ -867,6 +863,15 @@ func _test_screens(levels: Dictionary) -> void:
 				worst[k] = maxi(int(worst[k]), int(n[k]))
 		_check(worst["pod"] <= 8 and worst["glowfruit"] <= 6 and worst["lights"] <= 14 and worst["monsters"] <= 12,
 				"%s: per screen at most 8 pods, 6 glowfruit, 14 feature lights, 12 monsters (%s)" % [id, worst])
+
+
+func _windows(lv: RefCounted) -> Array:
+	## [Vector3i(x0, y0, y1)]: every 27-tile window, each screen_rows tall.
+	var out := []
+	for x0 in range(0, maxi(lv.width - 26, 1)):
+		for ys in Rules.screen_rows(lv):
+			out.append(Vector3i(x0, ys.x, ys.y))
+	return out
 
 
 func _test_arena(lv: RefCounted) -> void:

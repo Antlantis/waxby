@@ -781,7 +781,7 @@ func _test_headers() -> void:
 	for id in IDS:
 		var lv: RefCounted = _levels[id]
 		var sp: Dictionary = SPEC[id]
-		_check(lv.errors.is_empty() and lv.height == 15, "%s parses, 15 rows" % id)
+		_check(lv.errors.is_empty() and Rules.height_ok(lv), "%s parses, %d-%d rows (%d)" % [id, Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.height])
 		_check(lv.title == sp["name"] and lv.area == int(sp["area"]) and lv.theme == sp["theme"] and lv.music == "sanctum",
 				"%s: %s, area %d, theme %s, music sanctum (%s, %d, %s, %s)" % [id, sp["name"], sp["area"], sp["theme"], lv.title, lv.area, lv.theme, lv.music])
 		if sp.has("width"):
@@ -804,9 +804,8 @@ func _test_headers() -> void:
 			var boss := _entities(lv, "boss")
 			if not boss.is_empty():
 				marks.append(int(boss[0]["cell"].x))
-		var worst := 0
-		for i in range(1, marks.size()):
-			worst = maxi(worst, int(marks[i]) - int(marks[i - 1]))
+		# (Along the route: x in a strip, Rules.checkpoint_gaps.)
+		var worst: int = Rules.checkpoint_gaps(lv)["worst"]
 		_check(worst <= MAX_GAP, "%s: at most %d tiles between checkpoints (%d)" % [id, MAX_GAP, worst])
 		_check(lv.count("sigil") == 3, "%s has three sigils" % id)
 	var l3: RefCounted = _levels["5-3"]
@@ -919,28 +918,31 @@ func _test_layout() -> void:
 				else:
 					run = 0
 		_check(wide or id == "5-4", "%s has a stone island 11 wide" % id)
-		# Per 27-tile screen: glass 60, dawnglass 40, gust columns 24, lamps 14, monsters 12.
+		# Per 27-tile screen (a taller level's 12 rows tall: Rules.screen_rows;
+		# a gust zone is whole columns): glass 60, dawnglass 40, gust columns
+		# 24, lamps 14, monsters 12.
 		var worst := {"glass": 0, "dawn": 0, "gust": 0, "lamp": 0, "monster": 0}
 		for x0 in range(0, maxi(1, lv.width - 26)):
-			var n := {"glass": 0, "dawn": 0, "gust": 0, "lamp": 0, "monster": 0}
-			for x in range(x0, x0 + 27):
-				for y in lv.height:
-					var t: int = lv.tile(x, y)
-					if t == LevelData.GLASS:
-						n["glass"] += 1
-					elif t == LevelData.DAWNGLASS:
-						n["dawn"] += 1
-				for z in lv.gusts:
-					if x >= int(z["x0"]) and x <= int(z["x1"]):
-						n["gust"] += 1
-			for e in lv.entities:
-				if int(e["cell"].x) >= x0 and int(e["cell"].x) < x0 + 27:
-					if e["kind"] == "lantern":
-						n["lamp"] += 1
-					elif COST.has(e["kind"]) or e["kind"] == "dread":
-						n["monster"] += 1
-			for k in n:
-				worst[k] = maxi(int(worst[k]), int(n[k]))
+			for ys in Rules.screen_rows(lv):
+				var n := {"glass": 0, "dawn": 0, "gust": 0, "lamp": 0, "monster": 0}
+				for x in range(x0, x0 + 27):
+					for y in range(ys.x, ys.y + 1):
+						var t: int = lv.tile(x, y)
+						if t == LevelData.GLASS:
+							n["glass"] += 1
+						elif t == LevelData.DAWNGLASS:
+							n["dawn"] += 1
+					for z in lv.gusts:
+						if x >= int(z["x0"]) and x <= int(z["x1"]):
+							n["gust"] += 1
+				for e in lv.entities:
+					if int(e["cell"].x) >= x0 and int(e["cell"].x) < x0 + 27 and Rules.in_rows(e["cell"], ys):
+						if e["kind"] == "lantern":
+							n["lamp"] += 1
+						elif COST.has(e["kind"]) or e["kind"] == "dread":
+							n["monster"] += 1
+				for k in n:
+					worst[k] = maxi(int(worst[k]), int(n[k]))
 		_check(int(worst["glass"]) <= 60 and int(worst["dawn"]) <= 40 and int(worst["gust"]) <= 24 and int(worst["lamp"]) <= 14 and int(worst["monster"]) <= 12,
 				"%s: per screen at most 60 glass, 40 dawnglass, 24 gust columns, 14 lamps, 12 monsters (%s)" % [id, worst])
 		# Glass in the wind: no run of more than 4 panes without stone.

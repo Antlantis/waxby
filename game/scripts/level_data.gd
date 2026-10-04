@@ -54,7 +54,7 @@ extends RefCounted
 ## Headers: title, subtitle, music, theme, hints (a|b|c), area (area level),
 ## area_abs, boss, boss_music, dread, warden, story_start, story_boss,
 ## story_end, par, tick, secret, secret_prize, gusts, hush, chase, cog_phase,
-## weight_phase, rush. Every header, known or not, is also kept raw in
+## weight_phase, rush, facing. Every header, known or not, is also kept raw in
 ## `headers` (the modes' private keys: kind, tier, tags, deep, ...).
 ##
 ## Build 2's level-rule keys, raw only (tools/levels/common.py writes them
@@ -72,6 +72,11 @@ extends RefCounted
 ## (x0-x1=N, ...) by features/clockwork.gd; a level without them plays as before.
 ## Build 2's `room: duel 98-109 rows 3-7; ambush 200-229; hold 300-327 @20`
 ## (sealed fight rooms) is read raw by features/sealed.gd.
+## Build 2's shapes: a level is 15 to 36 rows (the rows there are), and
+## `facing: left` plays it right to left (tools/levels/common.py
+## mirror_rows): he starts facing left, its monsters face right, and its
+## route runs right to left (scripts/walk_map.gd: a taller level's route is
+## the walk map's).
 
 const TILE := 32
 
@@ -194,6 +199,7 @@ var chase: Array = []     # [{x0, x1}]: 6-3's tide ranges (start altar x, end al
 var cog_phase := {}       # hub x -> turns
 var weight_phase := {}    # anchor x -> turns
 var rush := false         # a Waxworks arena file
+var facing := 1           # `facing: left`: -1 (played right to left)
 var world := 0            # the id's first digit, or 0
 var headers := {}         # every header, raw (the modes read their private keys here)
 var width := 0
@@ -394,6 +400,8 @@ func _header(key: String, value: String) -> void:
 			weight_phase = _phases(value)
 		"rush":
 			rush = value.strip_edges() not in ["", "0", "false", "no"]
+		"facing":
+			facing = -1 if value.strip_edges().to_lower() == "left" else 1
 
 
 static func _named(value: String) -> Dictionary:

@@ -266,7 +266,9 @@ func _test_rules() -> void:
 	## room_problems, common.py check_rooms as it writes): a monster in each,
 	## a way in at an end, doorways of air or stone that never opens, no
 	## monster within DOOR_CLEAR columns of a door, an altar within
-	## ALTAR_REACH tiles before its door. Only the lab has any yet.
+	## ALTAR_REACH tiles before its door. Only labs have any yet (this one;
+	## lab-shapes and lab-mirror's, each met by its right door: Build 2's
+	## shapes).
 	var with_rooms := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if not f.ends_with(".txt"):
@@ -277,7 +279,8 @@ func _test_rules() -> void:
 		with_rooms.append(str(lv.id))
 		var rp := Rules.room_problems(lv)
 		_check(rp.is_empty(), "%s: its rooms keep their rules %s" % [lv.id, rp])
-	_check(with_rooms == [LAB], "only the lab has rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
+	_check(with_rooms.has(LAB) and with_rooms.all(func(id): return str(id).begins_with("lab-")),
+			"only labs have rooms yet (the levels' come with their redesigns): %s" % [with_rooms])
 	# What the rules catch, on the lab's ambush (62-89, its doorways rows
 	# 10-12 at each end): water, a vine or a ledge in a doorway (a body passes
 	# under the slab), brick (it breaks), a monster by the door.

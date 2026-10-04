@@ -12,7 +12,9 @@ extends SceneTree
 ## header_problems: an anoint: that reads and anoints, a twist: id twists.gd
 ## knows, a lesson: that fits, a roster: its rows keep, sealed rooms), and
 ## each world's regular levels their rules across them (world_problems:
-## World 1-2's too, once they declare their tables).
+## World 1-2's too, once they declare their tables). Build 2's shapes: every
+## level 15 to 36 rows and keeping the shape rules (Rules.shape_problems:
+## the HUD's corners, its facing; a taller level's descent and catch rules).
 ##
 ##     godot --headless --path game --script res://tests/test_core.gd
 
@@ -123,7 +125,7 @@ func _test_levels_parse() -> void:
 	for path in _all_level_files():
 		var lv = LevelData.load_file(path)
 		_check(lv.errors.is_empty(), "%s parses cleanly: %s" % [lv.id, ", ".join(lv.errors)])
-		_check(lv.height == 15, "%s is 15 rows" % lv.id)
+		_check(Rules.height_ok(lv), "%s is %d-%d rows (%d)" % [lv.id, Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.height])
 		_check(lv.title != "" and lv.subtitle != "", "%s has a title" % lv.id)
 		var start: Vector2i = lv.start
 		_check(LevelData.is_solid(lv.tile(start.x, start.y + 1)), "%s: Wick starts on the floor" % lv.id)
@@ -134,6 +136,8 @@ func _test_levels_parse() -> void:
 		# too long for the band would otherwise play on silently.
 		var hp := Rules.header_problems(lv)
 		_check(hp.is_empty(), "%s: its Build 2 headers keep their rules %s" % [lv.id, hp])
+		var sp := Rules.shape_problems(lv)
+		_check(sp.is_empty(), "%s keeps the shape rules %s" % [lv.id, sp])
 	# Each world's regular levels (not its boss level, not its secret) against
 	# their rules across them: the threat ramp, the roles, the variety.
 	for wn in range(1, 7):

@@ -57,7 +57,10 @@ extends "res://scripts/features/feature.gd"
 ## first_gear, first_pendulum, first_swing) fire at the teaching sign (or
 ## BARK_LEAD tiles before the feature where none stands), or on the next
 ## landing on stone, never mid-jump, never in a mode, and at most one every
-## BARK_GAP s (two due at once: the one whose spot he passed last).
+## BARK_GAP s (two due at once: the one whose spot he passed last). "First"
+## and "before" are along the route (scripts/walk_map.gd): a strip's left to
+## right (right to left facing left), a taller level's the walk map's, its
+## sign then on his storey (BARK_ROWS).
 ## Props from art/props (gear_l, cog_tooth, swing_ledge, belt_teeth,
 ## pendulum_bob, pendulum_pivot, icicle_hang/_crack/_fall) when they exist,
 ## code-drawn stand-ins until then. The ice, rime and belt bodies are the
@@ -65,6 +68,7 @@ extends "res://scripts/features/feature.gd"
 ## v2's themes: the feel lab) they're drawn here.
 
 const Movers := preload("res://scripts/movers.gd")
+const WalkMap := preload("res://scripts/walk_map.gd")
 const Arena := preload("res://scripts/boss_arena.gd")
 const Themes := preload("res://scripts/themes/loader.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
@@ -112,6 +116,7 @@ const BARKS := {"ice": "first_ice", "rime": "first_rime", "belt": "first_belt", 
 		"weight": "first_pendulum", "swing": "first_swing"}
 const SIGN_BEFORE := 12          # tiles: a sign this far before a feature's first cell teaches it...
 const BARK_LEAD := 6             # ...else its bark is said this far before it
+const BARK_ROWS := 6             # a taller level's: its sign within this many rows of the feature, him of the spot
 const STORY := "res://scripts/story.gd"
 const PIVOT_BOSSES := ["tinker"]  # a boss whose arena's Y is its own pendulum
 const PULSE := 0.18              # s a beat's pulse lasts
@@ -153,7 +158,7 @@ var _squeak := false
 var _beat := -1
 var _on_beat := false
 var _arena := {}
-var _bark_at := {}               # feature -> {first: x, sign: x (its sign's, or BARK_LEAD before first), done: bool}
+var _bark_at := {}               # feature -> {first: x, sign: x (its sign's, or BARK_LEAD before first), dir: the route's way there, row, done: bool}
 var _bark_t := -100.0
 var _tb := TriBatch.new()
 var _gb := TriBatch.new()
@@ -183,12 +188,12 @@ func build(w: Node, lv: RefCounted) -> void:
 			var c := Vector2i(x, y)
 			if t == LevelData.ICE or t == LevelData.FROST_LEDGE:
 				_ice.append(c)
-				_first(first, "ice", x)
+				_first(first, "ice", c)
 			elif LevelData.is_belt(t):
 				_belt.append(c)
-				_first(first, "belt", x)
+				_first(first, "belt", c)
 			elif t == LevelData.RIME:
-				_first(first, "rime", x)
+				_first(first, "rime", c)
 				if not _rime_of.has(c):
 					_flood_rime(c)
 			elif t == LevelData.CRUMBLE:
@@ -208,7 +213,7 @@ func build(w: Node, lv: RefCounted) -> void:
 					m.owner = self
 					w.add_mover(m)
 				cogs.append({"hub": hub, "dir": int(e.get("dir", 1)), "phase": ph, "teeth": teeth, "last_q": NO_Q})
-				_first(first, "cog", cell.x - 3)
+				_first(first, "cog", cell, 3)
 			"swing":
 				var n := int(e.get("length", 1))
 				var anchor := _anchor_above(cell, n)
@@ -218,7 +223,8 @@ func build(w: Node, lv: RefCounted) -> void:
 				m.owner = self
 				w.add_mover(m)
 				swings.append(m)
-				_first(first, "swing", cell.x - 3)
+				for k in n:
+					_first(first, "swing", cell + Vector2i(k, 0), 3)   # (met from either end)
 			"weight":
 				var top := Vector2((cell.x + 0.5) * TILE, cell.y * TILE)
 				var rod := _rod_of(cell)
@@ -229,7 +235,7 @@ func build(w: Node, lv: RefCounted) -> void:
 				n_weight += 1
 				var bob := top + Vector2(0, rod)
 				weights.append({"cell": cell, "anchor": top, "rod": rod, "phase": wph, "bob": bob, "prev": bob, "angle": 0.0})
-				_first(first, "weight", cell.x - 2)
+				_first(first, "weight", cell, 2)
 			"icicle":
 				var hang := Vector2((cell.x + 0.5) * TILE, cell.y * TILE)
 				icicles.append({"cell": cell, "hang": hang, "tip": hang, "state": "hang", "t": 0.0, "vy": 0.0, "safe": false})
@@ -247,25 +253,38 @@ func build(w: Node, lv: RefCounted) -> void:
 				if lv.tile(x, y) == LevelData.FALSE_STONE and not LevelData.is_solid(lv.tile(x, y + 1)):
 					vents.append({"cell": Vector2i(x, y), "p": Vector2((x + 0.5) * TILE, (y + 1) * TILE), "hiss": 0.0})
 	# The first-time barks: at the teaching sign before each feature's first
-	# cell, or BARK_LEAD tiles before it where no sign stands, else on the
-	# next stone landing past that. A feature met again in a later level is
-	# skipped by its bark heard already (_heard), not by a missing sign.
+	# cell on the route (WalkMap.first_of: in a strip its leftmost, facing
+	# left its rightmost), or BARK_LEAD tiles before it where no sign stands,
+	# else on the next stone landing past that. A feature met again in a later
+	# level is skipped by its bark heard already (_heard), not by a missing
+	# sign.
 	var signs := []
 	for e in lv.entities:
 		if e["kind"] == "sign":
-			signs.append(int(e["cell"].x))
+			signs.append(e["cell"])
+	var tall := not WalkMap.strip(lv)
 	for f in first:
-		var fx: int = first[f]
-		var best := -1
-		for sx in signs:
-			if sx <= fx + 2 and sx >= fx - SIGN_BEFORE and sx > best:
-				best = sx
-		_bark_at[f] = {"first": fx, "sign": best if best >= 0 else maxi(fx - BARK_LEAD, 0), "done": false}
+		var cands: Array = first[f]
+		var cells := cands.map(func(c): return c[0])
+		var i := WalkMap.first_of(lv, cells)
+		var cell: Vector2i = cells[i]
+		var d := WalkMap.dir_of(lv, cell)
+		var fx: int = clampi(cell.x - d * int(cands[i][1]), 0, lv.width - 1)
+		var best := Vector2i(-1, -1)
+		for sc in signs:
+			var a: int = (fx - sc.x) * d
+			if a >= -2 and a <= SIGN_BEFORE and (best.x < 0 or sc.x * d > best.x * d) and (not tall or absi(sc.y - cell.y) <= BARK_ROWS):
+				best = sc
+		var spot: int = best.x if best.x >= 0 else clampi(fx - d * BARK_LEAD, 0, lv.width - 1)
+		_bark_at[f] = {"first": fx, "sign": spot, "dir": d, "row": best.y if best.x >= 0 else cell.y, "done": false}
 
 
-func _first(d: Dictionary, what: String, x: int) -> void:
-	if not d.has(what) or x < int(d[what]):
-		d[what] = maxi(x, 0)
+func _first(d: Dictionary, what: String, cell: Vector2i, lead := 0) -> void:
+	## A cell of what (and how far before it its bark's spot is measured):
+	## the route's first of them is its first (build).
+	if not d.has(what):
+		d[what] = []
+	(d[what] as Array).append([cell, lead])
 
 
 func _flood_rime(start: Vector2i) -> void:
@@ -552,6 +571,8 @@ func _step_barks(pl: Node2D) -> void:
 	var px: float = pl.position.x
 	var under: int = level.tile(floori(px / TILE), floori((pl.position.y + 1.0) / TILE))
 	var stone := LevelData.is_safe(under) and not LevelData.is_slick(under)
+	var tall := not WalkMap.strip(level)
+	var row := floori((pl.position.y - 1.0) / TILE)
 	var pick := ""
 	for f in _bark_at:
 		var b: Dictionary = _bark_at[f]
@@ -561,21 +582,32 @@ func _step_barks(pl: Node2D) -> void:
 		if _heard(key):
 			b["done"] = true   # heard in an earlier level: nothing to wait for
 			continue
+		if tall and absi(row - int(b["row"])) > BARK_ROWS:
+			continue   # (another storey's spot)
+		# Along the route: x as it runs there (right to left: mirrored).
+		var d: int = int(b["dir"])
+		var u: float = px if d > 0 else level.width * TILE - px
+		var su: float = (_ux(int(b["sign"]), d) + 0.5) * TILE
 		# At its sign (where he reads it) or its BARK_LEAD spot, or else
 		# once the gap has passed.
-		var at_sign: bool = absf(px - (int(b["sign"]) + 0.5) * TILE) < 44.0
+		var at_sign: bool = absf(u - su) < 44.0
 		if not at_sign and since < BARK_GAP:
 			continue
 		# Passed the sign in the air: the next landing on stone past it.
-		var past: bool = stone and px > (int(b["sign"]) + 0.5) * TILE and px < (int(b["first"]) + 40) * TILE
+		var past: bool = stone and u > su and u < (_ux(int(b["first"]), d) + 40) * TILE
 		# Two due on one landing: the one whose spot he passed last (what's
 		# just ahead of him), not one he has already crossed.
-		if (at_sign or past) and (pick == "" or int(b["sign"]) > int(_bark_at[pick]["sign"])):
+		if (at_sign or past) and (pick == "" or _ux(int(b["sign"]), d) > _ux(int(_bark_at[pick]["sign"]), int(_bark_at[pick]["dir"]))):
 			pick = f
 	if pick != "":
 		_bark_at[pick]["done"] = true
 		_bark_t = ftime()
 		world.bark(BARKS[pick])
+
+
+func _ux(x: int, d: int) -> int:
+	## A column as the route counts it: x, or right to left its mirror.
+	return x if d > 0 else level.width - 1 - x
 
 
 func _heard(key: String) -> bool:

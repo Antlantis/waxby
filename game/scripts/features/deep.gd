@@ -54,6 +54,7 @@ extends "res://scripts/features/feature.gd"
 ## only in W6 (world 6, or a level with W6 things in it).
 
 const Movers := preload("res://scripts/movers.gd")
+const WalkMap := preload("res://scripts/walk_map.gd")
 const Reach := preload("res://scripts/reach.gd")
 const Progression := preload("res://scripts/progression.gd")
 const TriBatch := preload("res://scripts/tri_batch.gd")
@@ -97,6 +98,7 @@ const TIDE_INVULN := 1.0
 const TIDE_LEAVE := 1.5          # tiles past the start altar's cell: he has left it
 const TIDE_SEE := 14.0           # tiles off screen at which the vignette is at its narrowest
 const BARK_BEFORE := 10          # tiles before the first of a thing a stone landing barks
+const BARK_ROWS := 8             # a taller level's: his row within this many of the first's
 const EDGE_A := 0.30             # decisions.md: W6 floats, buoys and lips
 const ANCHOR_REACH := 150.0      # a lantern this near dawnglass feeds it (its light is 140)
 # Colours: the Hush's violet-white, drowned brass, old wax, the silver ripple
@@ -122,7 +124,7 @@ var grasps: Array = []           # {cell, x, y, state: idle|tell|up|cool, t}
 var candles_list: Array = []     # {cell, pos, lit, light, hush, paid, anchor, ring: [index] (a crown's), crown}
 var chases: Array = []           # {x0, x1, state: idle|on|done, x, hold, band, t}
 var _hush_on := false
-var _barks: Array = []           # {key, x0, x1, done}
+var _barks: Array = []           # {key, x0, x1, row (a taller level's: -1 any), done}
 var _tex := {}
 var _tb := TriBatch.new()
 var _stepped_hooked := false
@@ -600,27 +602,59 @@ func _tide_erase(x: float) -> void:
 
 func _plan_barks(lv: RefCounted) -> void:
 	## Hollin's how-tos in 6-1 and 6-2 only (ST: never in 6-3 or 6-4); each
-	## fires on stone within BARK_BEFORE tiles before the first of its thing.
+	## fires on stone within BARK_BEFORE tiles before the first of its thing,
+	## first and before along the route (scripts/walk_map.gd: in a strip left
+	## to right, facing left right to left; a taller level's the walk map's,
+	## and then on that thing's storey). A Hush zone is met at the edge the
+	## route comes in by.
 	var id := str(lv.id)
 	if id != "6-1" and id != "6-2":
 		return
-	var first := {}
+	var cands := {}
 	for e in lv.entities:
 		var k := str(e["kind"])
 		if k in ["float", "buoy", "grasp", "vigil"]:
-			var x: int = (e["cell"] as Vector2i).x
-			if not first.has(k) or x < int(first[k]):
-				first[k] = x
-	var zones: Array = lv.hush_cols.duplicate()
-	zones.sort_custom(func(a, b): return int(a["x0"]) < int(b["x0"]))
-	if not zones.is_empty():
-		first["hush"] = int(zones[0]["x0"])
-	if zones.size() > 1 and id == "6-1":
-		first["deepdark"] = int(zones[1]["x0"])
+			if not cands.has(k):
+				cands[k] = []
+			(cands[k] as Array).append(e["cell"])
+	var first := {}
+	for k in cands:
+		first[k] = cands[k][WalkMap.first_of(lv, cands[k])]
+	# The zones in the order the route comes to them: in a strip by the edge
+	# it meets (facing left, their right edges); a taller level's where its
+	# route first steps into each.
+	var f := int(lv.facing)
+	var tall := not WalkMap.strip(lv)
+	var edges := []
+	for z in lv.hush_cols:
+		var edge := Vector2i(int(z["x0"]) if f > 0 else int(z["x1"]), int(lv.start.y))
+		if tall:
+			var r: Array = WalkMap.of(lv).route()
+			for i in r.size():
+				var c: Vector2i = WalkMap.of(lv).cell_of(r[i])
+				if c.x >= int(z["x0"]) and c.x <= int(z["x1"]):
+					edge = c
+					break
+		edges.append(edge)
+	var order := range(edges.size())
+	order.sort_custom(func(a, b): return _zone_before(lv, edges[a], edges[b]))
+	if not order.is_empty():
+		first["hush"] = edges[order[0]]
+	if order.size() > 1 and id == "6-1":
+		first["deepdark"] = edges[order[1]]
 	var keys := {"float": "first_float", "buoy": "first_buoy", "grasp": "first_grasp", "vigil": "first_candle",
 			"hush": "first_hush_zone", "deepdark": "first_deepdark"}
 	for k in first:
-		_barks.append({"key": keys[k], "x0": int(first[k]) - BARK_BEFORE, "x1": int(first[k]) + 1, "done": false})
+		var c: Vector2i = first[k]
+		var d := WalkMap.dir_of(lv, c)
+		var x0: int = c.x - BARK_BEFORE if d > 0 else c.x - 1
+		var x1: int = c.x + 1 if d > 0 else c.x + BARK_BEFORE
+		_barks.append({"key": keys[k], "x0": x0, "x1": x1, "row": c.y if tall else -1, "done": false})
+
+
+static func _zone_before(lv: RefCounted, a: Vector2i, b: Vector2i) -> bool:
+	## a comes before b on the route (WalkMap.first_of of the two).
+	return a != b and WalkMap.first_of(lv, [a, b]) == 0
 
 
 func _step_barks(pl: Node2D) -> void:
@@ -630,7 +664,10 @@ func _step_barks(pl: Node2D) -> void:
 	var under: int = level.tile(x, floori((pl.position.y + 1.0) / TILE))
 	if not LevelData.is_safe(under):
 		return
+	var row := floori((pl.position.y - 1.0) / TILE)
 	for b in _barks:
+		if int(b["row"]) >= 0 and absi(row - int(b["row"])) > BARK_ROWS:
+			continue   # (a taller level's other storey)
 		if not b["done"] and x >= int(b["x0"]) and x <= int(b["x1"]):
 			b["done"] = true
 			_bark(str(b["key"]))

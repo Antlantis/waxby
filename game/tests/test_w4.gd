@@ -802,7 +802,7 @@ func _test_headers(ids: Array) -> void:
 	for id in ids:
 		var lv := _load(id)
 		_check(lv.errors.is_empty(), "%s parses: %s" % [id, lv.errors])
-		_check(lv.width == int(WIDTHS.get(id, lv.width)) and lv.height == 15, "%s is %d x 15 (%d x %d)" % [id, WIDTHS.get(id, lv.width), lv.width, lv.height])
+		_check(lv.width == int(WIDTHS.get(id, lv.width)) and Rules.height_ok(lv), "%s is %d wide, %d-%d rows (%d x %d)" % [id, WIDTHS.get(id, lv.width), Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.width, lv.height])
 		_check(lv.theme == THEMES[id] and lv.music == "carillon" and lv.area == int(AREAS[id]) and absf(lv.tick - 0.536) < 0.0001,
 				"%s: theme %s, carillon, area %d, tick 0.536" % [id, THEMES[id], AREAS[id]])
 		_check(lv.world == 4 and str(lv.story.get("start", "")) == "beat_%s" % id.replace("-", "_"), "%s opens with beat_%s" % [id, id.replace("-", "_")])
@@ -841,20 +841,16 @@ func _test_rules(ids: Array) -> void:
 	for id in ids:
 		var lv := _load(id)
 		var boss: bool = lv.boss != ""
-		# Checkpoints: start, altars, bell (or the arena door).
-		var marks := [lv.start.x]
+		# Checkpoints: start, altars, bell (or the arena door), along the route
+		# (x in a strip: Rules.checkpoint_gaps).
 		var altars := []
 		for e in lv.entities:
 			if e["kind"] == "altar":
 				altars.append(int(e["cell"].x))
-			elif e["kind"] == "bell" or e["kind"] == "boss":
-				marks.append(int(e["cell"].x))
 		altars.sort()
-		marks.append_array(altars)
-		marks.sort()
-		var worst := 0
-		for i in range(1, marks.size()):
-			worst = maxi(worst, int(marks[i]) - int(marks[i - 1]))
+		var cg := Rules.checkpoint_gaps(lv)
+		var marks: Array = cg["marks"]
+		var worst: int = cg["worst"]
 		if boss:
 			_check(altars.size() == 2, "%s has 2 altars (%d)" % [id, altars.size()])
 		else:
@@ -887,22 +883,24 @@ func _test_rules(ids: Array) -> void:
 					fy = y
 					break
 			_check(LevelData.is_solid(lv.tile(c.x, c.y - 1)) and fy > 0 and fy - c.y <= 7, "%s: the icicle at %s hangs within 7 rows of a floor" % [id, c])
-		# Per 27-tile screen: cogs <= 3, weights and swings <= 5.
+		# Per 27-tile screen (a taller level's 12 rows tall: Rules.screen_rows):
+		# cogs <= 3, weights and swings <= 5.
 		var cmax := 0
 		var wmax := 0
 		for x0 in range(0, lv.width - 26):
-			var nc := 0
-			var nw := 0
-			for e in lv.entities:
-				var ex: int = int(e["cell"].x)
-				if ex < x0 or ex >= x0 + 27:
-					continue
-				if e["kind"] == "cog":
-					nc += 1
-				elif e["kind"] == "weight" or e["kind"] == "swing":
-					nw += 1
-			cmax = maxi(cmax, nc)
-			wmax = maxi(wmax, nw)
+			for ys in Rules.screen_rows(lv):
+				var nc := 0
+				var nw := 0
+				for e in lv.entities:
+					var ex: int = int(e["cell"].x)
+					if ex < x0 or ex >= x0 + 27 or not Rules.in_rows(e["cell"], ys):
+						continue
+					if e["kind"] == "cog":
+						nc += 1
+					elif e["kind"] == "weight" or e["kind"] == "swing":
+						nw += 1
+				cmax = maxi(cmax, nc)
+				wmax = maxi(wmax, nw)
 		_check(cmax <= 3 and wmax <= 5, "%s: per screen at most 3 cogs (%d) and 5 weights and swings (%d)" % [id, cmax, wmax])
 		# Stone every 14 tiles over a pit: between the firm tops either side of
 		# every pit (a column open to the level's bottom), 14 tiles or less.
