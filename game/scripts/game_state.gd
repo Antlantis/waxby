@@ -58,12 +58,21 @@ extends Node
 ## version, the v1 migration too) or one holding junk there is Waxby.
 ##
 ## The Chandler by depth (spec §8.2): shop_depth = max(hero.deepest, level
-## - 1) sets the stock (4 wares below 13, 5 from 13, 6 from 28; the weakest
-## slot's pick is the best of 6 Rares from 18), the relic shelf (3, 4 from
-## 23; only worlds reached) and Waxley's Reserve (a Legendary, from 23,
-## restocked when a boss falls). The Draughts tab: Mother Yarrow's Second
-## Draught (a gift), the Rich Draught (after the Tinker, 1,600 embers) and
-## Rekindle (from World 5: a Legendary re-made at the hero's level).
+## - 1) sets the stock (5 wares below 13, 6 from 13; the last two are "For
+## your <slot>" picks for the two weakest slots, each the best of 6, Rares
+## from 18), the relic shelf (3, 4 from 23; only worlds reached) and Waxley's
+## Reserve (a Legendary, from 23, restocked when a boss falls). Fresh stock
+## (buy_fresh) restocks the wares at once for half a Rare's price at the
+## hero's level, doubling with each use until the next bell. The Draughts
+## tab: Mother Yarrow's Second Draught (a gift), the Rich Draught (after the
+## Tinker, 1,600 embers) and Rekindle (from World 5: a Legendary re-made at
+## the hero's level).
+##
+## Selling (the shop's Sell tab, the Sheet's Gear tab): Waxley pays
+## Items.sell_value, a quarter of his price (sell_item, sell_marked). A piece
+## sold can be bought back for what it fetched (buy_back) until the shop
+## forgets its sales (forget_sold, as it opens and closes); that list is
+## never saved.
 
 const Relics := preload("res://scripts/relics.gd")
 const Hero := preload("res://scripts/hero.gd")
@@ -78,7 +87,7 @@ const AUTOPLAY_SAVE := "user://autoplay_save.json"   # the bot's own (its slots 
 const VERSION := 3
 const SATCHEL_MAX := 16
 const VETERAN_EMBERS := 150
-const WARES := 4            # the Chandler's stock: 2 Blessed, 1 Rare, 1 for the weakest slot
+const WARES := 5            # the Chandler's stock below depth 13: 2 Blessed, 1 Rare, 1 each for the two weakest slots
 # The main levels, in order (contract §2.6); LEVELS holds those whose files
 # exist in this build. Ids are exact and case-sensitive.
 const ALL_LEVELS := [
@@ -149,16 +158,21 @@ const SIGIL_REWARD_EVERY := 6
 const MILESTONE_ALTERNATE := false
 const SLOTS := 3
 # The Chandler by shop depth (spec §8.2): from that depth, the wares' rarities
-# (at the hero's level, one slot each), the weakest-slot pick's rarity (the
-# best of 6), the relic shelf's size and whether Waxley's Reserve is stocked.
-# The first row is v2's shop exactly.
+# (at the hero's level, one slot each), the weakest-slot picks' rarity (each
+# the best of 6), the relic shelf's size and whether Waxley's Reserve is
+# stocked. The first row's first four wares are v2's shop exactly (the second
+# pick comes after them); from 28 the second pick takes a Rare's place, so
+# the shelf stays at six beside the Reserve (1 Blessed and 5 Rares, as ever).
 const SHOP_ROWS := [
 	{"from": 0, "wares": ["magic", "magic", "rare"], "weak": "magic", "shelf": 3, "reserve": false},
 	{"from": 13, "wares": ["magic", "magic", "rare", "rare"], "weak": "magic", "shelf": 3, "reserve": false},
 	{"from": 18, "wares": ["magic", "magic", "rare", "rare"], "weak": "rare", "shelf": 3, "reserve": false},
 	{"from": 23, "wares": ["magic", "magic", "rare", "rare"], "weak": "rare", "shelf": 4, "reserve": true},
-	{"from": 28, "wares": ["magic", "rare", "rare", "rare", "rare"], "weak": "rare", "shelf": 4, "reserve": true},
+	{"from": 28, "wares": ["magic", "rare", "rare", "rare"], "weak": "rare", "shelf": 4, "reserve": true},
 ]
+const WEAK_PICKS := 2          # the "For your <slot>" wares: one each for the two weakest slots
+const FRESH_SHARE := 0.5       # Fresh stock: half a Rare's price at the hero's level...
+const FRESH_MAX := 10          # ...doubling with each use until the next bell (counted up to here)
 const RESERVE_FROM := 23
 const RICH_PRICE := 1600       # the Rich Draught
 const RICH_AFTER := "4-4"      # sold once the Tinker of Hours has fallen (any difficulty)
@@ -205,6 +219,7 @@ var milestone_alternate := MILESTONE_ALTERNATE   # tests turn it on to check the
 var _prizes := {}          # a secret prize made this session: its uid -> [level id, difficulty] (paid when taken)
 var _prizes_paid := []     # "id|diff" of prizes taken since the last record_result
 var embers_spent := 0      # embers paid at the Chandler since the playlog's last line (playlog.gd; never saved)
+var _sold: Array = []      # pieces sold since the shop last forgot: {item, price, cls}, newest last (buy_back; never saved)
 
 
 func _init() -> void:
@@ -248,6 +263,7 @@ func reset() -> void:
 			"bosses": 0, "hero_name": Story.HERO_NAME}
 	_temp_hero = {}
 	_prizes_paid = []
+	_sold = []
 	reload_settings()
 
 
@@ -1820,25 +1836,121 @@ func _take_from_satchel(h: Dictionary, it: Dictionary) -> void:
 			h["satchel"].remove_at(i)
 
 
-func salvage(it: Dictionary) -> int:
-	## Melts a satchel item down for embers. Worn gear isn't salvaged.
+func sell_item(it: Dictionary) -> int:
+	## Sells a satchel piece to Waxley for Items.sell_value: the embers it
+	## fetched, or 0 when it isn't in the satchel (worn gear isn't sold; a
+	## borrowed hero sells nothing). buy_back can undo it, for the same, until
+	## the shop forgets its sales.
+	var v := _sell(it)
+	if v > 0:
+		save()
+	return v
+
+
+func sell_marked(items: Array) -> int:
+	## Sells every one of items that's in the satchel (sell_item), saving
+	## once: the embers in all.
+	var total := 0
+	for it in items:
+		if it is Dictionary:
+			total += _sell(it)
+	if total > 0:
+		save()
+	return total
+
+
+func _sell(it: Dictionary) -> int:
 	var h := hero()
-	for slot in h["equip"]:
-		var e = h["equip"][slot]
-		if e is Dictionary and e.get("uid", "") == it.get("uid", "-"):
-			return 0
-	var v := Items.salvage_value(it)
+	if not _borrowed.is_empty() or not _in_satchel(h, it):
+		return 0
+	var v := Items.sell_value(it)
 	_take_from_satchel(h, it)
 	add_embers(v)
-	save()
+	_sold.append({"item": it, "price": v, "cls": str(h["cls"])})
 	return v
+
+
+func _sold_at(it) -> int:
+	## Where it is in the sales buy_back can undo (this calling's), or -1.
+	if not (it is Dictionary) or not hero_made():
+		return -1
+	var uid := str(it.get("uid", "-"))
+	var cls := str(hero()["cls"])
+	for k in range(_sold.size() - 1, -1, -1):
+		if str(_sold[k]["cls"]) == cls and str((_sold[k]["item"] as Dictionary).get("uid", "")) == uid:
+			return k
+	return -1
+
+
+func sold_price(it) -> int:
+	## What it fetched, while it can still be bought back; else 0.
+	var k := _sold_at(it)
+	return int(_sold[k]["price"]) if k >= 0 else 0
+
+
+func buy_back_verdict(it) -> String:
+	## What buying a sold piece back would do: "satchel", or why not: "gone"
+	## (never sold, bought back already, or forgotten), "poor", "full".
+	var k := _sold_at(it)
+	if k < 0 or not _borrowed.is_empty():
+		return "gone"
+	if embers() < int(_sold[k]["price"]):
+		return "poor"
+	if (hero()["satchel"] as Array).size() >= SATCHEL_MAX:
+		return "full"
+	return "satchel"
+
+
+func buy_back(it) -> String:
+	## A piece sold since the shop last forgot, back into the satchel for
+	## exactly what it fetched (no profit either way): "satchel", or why not
+	## (buy_back_verdict). Once only.
+	var why := buy_back_verdict(it)
+	if why != "satchel":
+		return why
+	var k := _sold_at(it)
+	var row: Dictionary = _sold[k]
+	_sold.remove_at(k)
+	_pay(int(row["price"]))
+	(hero()["satchel"] as Array).append(row["item"])
+	save()
+	return "satchel"
+
+
+func forget_sold() -> void:
+	## The shop opens or closes: what was sold stays sold.
+	_sold = []
+
+
+func sell_look(it: Dictionary, h: Dictionary = {}) -> Dictionary:
+	## A satchel piece as the Sell tab shows it: {price (Items.sell_value),
+	## chips (Hero.compare against what's worn), mark, marked}. mark:
+	## "legendary", "open" (nothing worn in its slot), "better" (an upgrade),
+	## "worse" (both chips at or below zero) or "trade" (one up, one down).
+	## marked: whether it starts marked to sell: not a Legendary, something
+	## worn there, and DMG + LIFE at or below zero (the sum Waxley's "For your
+	## <slot>" picks rank by), so a trade-off that adds up to nothing goes too.
+	var hh := h if not h.is_empty() else hero()
+	var out := {"price": Items.sell_value(it), "chips": {"dmg": 0.0, "life": 0.0}, "mark": "open", "marked": false}
+	var slot := str(it.get("slot", ""))
+	var worn = hh.get("equip", {}).get(slot)
+	if worn is Dictionary:
+		var chips := Hero.compare(hh, slot, it, hh.get("belt", []), diff())
+		var d := float(chips["dmg"])
+		var l := float(chips["life"])
+		out["chips"] = chips
+		out["mark"] = "worse" if d <= 0.0 and l <= 0.0 else ("better" if Hero.is_upgrade(chips) else "trade")
+		out["marked"] = d + l <= 0.0
+	if str(it.get("rarity", "")) == "legendary":
+		out["mark"] = "legendary"
+		out["marked"] = false
+	return out
 
 
 func weaker_items() -> Array:
 	## The satchel items no better than what's worn in their slot (both chips
-	## at or below zero), never a Legendary (like a full satchel, salvage-all
-	## never melts one): what salvage_weaker() takes. The Sheet's Gear tab and
-	## the Chandler both show this list.
+	## at or below zero), never a Legendary (like a full satchel, the Sheet's
+	## Sell weaker never sells one): what sell_weaker() takes.
 	var h := hero()
 	var out: Array = []
 	for it in (h["satchel"] as Array):
@@ -1853,10 +1965,10 @@ func weaker_items() -> Array:
 
 
 func weaker_value() -> int:
-	## What salvage_weaker() would pay now.
+	## What sell_weaker() would pay now.
 	var total := 0
 	for it in weaker_items():
-		total += Items.salvage_value(it)
+		total += Items.sell_value(it)
 	return total
 
 
@@ -1864,16 +1976,9 @@ func satchel_full() -> bool:
 	return (hero()["satchel"] as Array).size() >= SATCHEL_MAX
 
 
-func salvage_weaker() -> int:
-	## Melts every item weaker_items() lists. Returns the embers.
-	var h := hero()
-	var total := 0
-	for it in weaker_items():
-		total += Items.salvage_value(it)
-		_take_from_satchel(h, it)
-	add_embers(total)
-	save()
-	return total
+func sell_weaker() -> int:
+	## Sells every item weaker_items() lists. Returns the embers.
+	return sell_marked(weaker_items())
 
 
 func weakest_slot(h: Dictionary = {}, slots: Array = []) -> String:
@@ -1895,11 +2000,12 @@ func weakest_slot(h: Dictionary = {}, slots: Array = []) -> String:
 
 func wares() -> Array:
 	## Waxley's stock for the hero being played, at the hero's level, by shop
-	## depth (SHOP_ROWS): below 13, v2's 4 (2 Blessed, 1 Rare, 1 for the
-	## weakest slot); 5 from 13 (2 Rares), the weakest slot's a Rare from 18;
-	## 6 from 28 (1 Blessed, 4 Rares and the weakest slot's Rare). The last
-	## one is always for the weakest slot. null where one was bought.
-	## Restocks after every bell rung (and when a new depth changes the row).
+	## depth (SHOP_ROWS): below 13, 5 (v2's 2 Blessed, 1 Rare and pick for the
+	## weakest slot, then a pick for the next weakest); 6 from 13 (2 Rares),
+	## the picks Rares from 18; from 28, 1 Blessed, 3 Rares and the two picks.
+	## The last WEAK_PICKS are always the picks (weakest first). null where
+	## one was bought. Restocks after every bell rung (and when a new depth
+	## changes the row), or at once for embers (buy_fresh).
 	var h := hero()
 	if int(h["wares_seed"]) != _wares_mark(h) or (h["wares"] as Array).size() != ware_count(h):
 		_restock(h)
@@ -1934,12 +2040,21 @@ func _shop_slots(h: Dictionary) -> Array:
 
 
 func _restock(h: Dictionary) -> void:
+	h["wares"] = _make_stock(h)
+	h["wares_seed"] = _wares_mark(h)
+
+
+func _make_stock(h: Dictionary) -> Array:
+	## A stock for the hero as he is now (it changes nothing: _restock keeps it).
 	var rng := RandomNumberGenerator.new()
 	var row := _shop_row(shop_depth(h))
 	var key := "%s|%d|%d|%d" % [h["cls"], bells(), int(h["level"]), int(data["run_counter"])]
 	# (A deeper row mixes its depth in, so reaching it mid-bell makes a new
-	# stock rather than the old one again; v2's row keeps v2's seed.)
+	# stock rather than the old one again; v2's row keeps v2's seed. A Fresh
+	# stock mixes in how many he's bought since the bell.)
 	rng.seed = hash(key) if int(row["from"]) == 0 else hash("%s|%d" % [key, int(row["from"])])
+	if fresh_uses(h) > 0:
+		rng.seed = hash("%s|fresh|%d|%d" % [key, int(row["from"]), fresh_uses(h)])
 	var lvl := int(h["level"])
 	var live: Array = _shop_slots(h)
 	var slots: Array = live.duplicate()
@@ -1954,21 +2069,101 @@ func _restock(h: Dictionary) -> void:
 	var rarities: Array = row["wares"]
 	for i in rarities.size():
 		stock.append(Items.make(slots[i % slots.size()], h["cls"], lvl, str(rarities[i]), rng))
-	# The one for the weakest slot: the best of a few rolls.
-	var weak := weakest_slot(h, live)
-	var weak_rarity := str(row["weak"])
-	var best = null
+	# The picks for the weakest slots, weakest first: each the best of a few
+	# rolls (the first one made just as v2 made its one).
+	var left: Array = live.duplicate()
+	for k in WEAK_PICKS:
+		var weak := weakest_slot(h, left)
+		left.erase(weak)
+		if left.is_empty():
+			left = live.duplicate()
+		stock.append(_best_of(h, weak, lvl, str(row["weak"]), rng))
+	return stock
+
+
+func _best_of(h: Dictionary, slot: String, lvl: int, rarity: String, rng: RandomNumberGenerator) -> Dictionary:
+	## The best of 6 rolls for slot, by DMG + LIFE against what's worn.
+	var best := {}
 	var best_score := -INF
 	for i in 6:
-		var it := Items.make(weak, h["cls"], lvl, weak_rarity, rng)
-		var chips := Hero.compare(h, weak, it, h.get("belt", []), diff())
+		var it := Items.make(slot, h["cls"], lvl, rarity, rng)
+		var chips := Hero.compare(h, slot, it, h.get("belt", []), diff())
 		var score := float(chips["dmg"]) + float(chips["life"])
 		if score > best_score:
 			best_score = score
 			best = it
-	stock.append(best)
-	h["wares"] = stock
-	h["wares_seed"] = _wares_mark(h)
+	return best
+
+
+func fresh_uses(h: Dictionary = {}) -> int:
+	## Fresh stocks bought since the last bell rang.
+	var hh := h if not h.is_empty() else hero()
+	if int(_num(hh.get("fresh_bell", -1))) != bells():
+		return 0
+	return clampi(int(_num(hh.get("fresh", 0))), 0, FRESH_MAX)
+
+
+func fresh_price(h: Dictionary = {}) -> int:
+	## What Fresh stock costs now: half a Rare's price at the hero's level,
+	## doubled for each one bought since the last bell (Items.price: a Rare is
+	## 90 + 20 x ilvl, so at level 20 it's 245, then 490, 980...).
+	var hh := h if not h.is_empty() else hero()
+	var rare := Items.price({"rarity": "rare", "ilvl": int(_num(hh.get("level", 1)))})
+	return roundi(float(rare) * FRESH_SHARE) * (1 << fresh_uses(hh))
+
+
+func fresh_verdict() -> String:
+	## Whether Fresh stock can be bought: "fresh", or why not: "nohero", "poor".
+	if not hero_made() or borrowing():
+		return "nohero"
+	return "fresh" if embers() >= fresh_price() else "poor"
+
+
+func buy_fresh() -> String:
+	## Waxley restocks the wares now (the Reserve stays as it is): "fresh",
+	## or why not (fresh_verdict).
+	var why := fresh_verdict()
+	if why != "fresh":
+		return why
+	var h := hero()
+	_pay(fresh_price(h))
+	h["fresh"] = fresh_uses(h) + 1
+	h["fresh_bell"] = bells()
+	_restock(h)
+	save()
+	return "fresh"
+
+
+func shop_badge() -> Dictionary:
+	## The mark on the Shop button (the map's, the results'): {kind: "full",
+	## text: "16/16"} while the satchel is full; else {kind: "up"} while a
+	## ware (or the Reserve) he can afford would be worn as an upgrade; else
+	## {kind: "new"} for a Reserve not yet seen (or one a boss has just
+	## restocked); else {}. It only looks: a stock not made yet is worked out
+	## and let go (the shop makes it as it opens), so a map looked at
+	## writes nothing.
+	if not hero_made() or borrowing():
+		return {}
+	var h := hero()
+	var n := (h["satchel"] as Array).size()
+	if n >= SATCHEL_MAX:
+		return {"kind": "full", "text": "%d/%d" % [n, SATCHEL_MAX]}
+	var current := int(h["wares_seed"]) == _wares_mark(h) and (h["wares"] as Array).size() == ware_count(h)
+	var offers: Array = (h["wares"] if current else _make_stock(h)).filter(func(it): return it is Dictionary)
+	var res_new := false
+	if bool(_shop_row(shop_depth(h))["reserve"]):
+		if int(_num(h.get("reserve_seed", -1))) == int(data["bosses"]) + 1 and h.has("reserve"):
+			if h["reserve"] is Dictionary:
+				offers.append(h["reserve"])
+				res_new = _flag(h.get("reserve_new", false))
+		else:
+			res_new = true   # a boss restocked it: made as the shop opens
+	for it in offers:
+		if Items.price(it) > embers():
+			continue
+		if h["equip"].get(it["slot"]) == null or Hero.is_upgrade(Hero.compare(h, it["slot"], it, h.get("belt", []), diff())):
+			return {"kind": "up"}
+	return {"kind": "new"} if res_new else {}
 
 
 func ware_price(it) -> int:
@@ -2282,9 +2477,10 @@ func note_area(a: int) -> void:
 
 
 func ware_count(h: Dictionary = {}) -> int:
-	## The Chandler's stock size by shop depth: 4 below 13, 5 from 13, 6 from 28.
+	## The Chandler's stock size by shop depth: 5 below 13, 6 from 13 (the
+	## row's wares and the WEAK_PICKS picks).
 	var hh := h if not h.is_empty() else hero()
-	return (_shop_row(shop_depth(hh))["wares"] as Array).size() + 1
+	return (_shop_row(shop_depth(hh))["wares"] as Array).size() + WEAK_PICKS
 
 
 # ---------------------------------------------------------------- v3: Waxley's Reserve

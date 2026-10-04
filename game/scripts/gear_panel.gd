@@ -3,8 +3,9 @@ extends Control
 ## (weapon, candle, coat; boots, charm). Tap a slot for the satchel's items
 ## that fit it, best first (by Items.power), each with its DMG and LIFE chips
 ## against what's worn (Hero.compare). Tap one to see the two side by side,
-## then Equip or Salvage it. "Salvage all below equipped" clears out every
-## item that would make nothing better (never a Legendary), after a second tap.
+## then Equip it or "Sell +N" (Waxley's price for it, Items.sell_value).
+## "Sell weaker +N" sells every item that would make nothing better (never a
+## Legendary), after a second tap. Both work mid-level, from the pause menu.
 ## v3: where boots and charms turn up only deeper down (Items.live_slots), an
 ## empty slot not yet in reach says where: "Turns up in World 3" (boots) or
 ## "World 4" (charms).
@@ -27,11 +28,12 @@ var _glow: Node2D
 var _scroll: ScrollContainer
 var _list: VBoxContainer
 var _equip_btn: Button
-var _salvage_btn: Button
+var _sell_btn: Button
 var _cancel_btn: Button
 var _bulk_btn: Button
 var _bulk_confirm := 0.0
-var _below_n := 0                 # how many items salvage-all would take (counted on rebuild)
+var _below_n := 0                 # how many items Sell weaker would take (counted on rebuild)
+var _below_v := 0                 # and what they'd fetch
 var _note := ""
 var _note_t := 0.0
 var _t := 0.0
@@ -49,10 +51,10 @@ func _ready() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_list)
 	_equip_btn = UI.make_button("Equip", true, func(): equip_picked(), "", 16)
-	_salvage_btn = UI.make_button("Salvage", false, func(): salvage_picked(), "", 15)
+	_sell_btn = UI.make_button("Sell", false, func(): sell_picked(), "", 15)
 	_cancel_btn = UI.make_button("Back", false, func(): pick(null), "back", 15)
-	_bulk_btn = UI.make_button("Salvage all below equipped", false, func(): _bulk_pressed(), "click", 13)
-	for b in [_equip_btn, _salvage_btn, _cancel_btn, _bulk_btn]:
+	_bulk_btn = UI.make_button("Sell weaker", false, func(): _bulk_pressed(), "click", 13)
+	for b in [_equip_btn, _sell_btn, _cancel_btn, _bulk_btn]:
 		UI.small_button(b, b.get_theme_font_size("font_size"))
 		b.custom_minimum_size = Vector2(0, UI.TAP_H)
 		add_child(b)
@@ -140,7 +142,7 @@ func waits_text(s: String) -> String:
 
 func below_equipped() -> Array:
 	## Satchel items that would make nothing better than what's worn (never a
-	## Legendary): Game.weaker_items(), the same list the Chandler melts.
+	## Legendary): Game.weaker_items(), what Sell weaker sells.
 	var g := _game()
 	return g.weaker_items() if g else []
 
@@ -169,28 +171,30 @@ func equip_picked() -> bool:
 	return true
 
 
-func salvage_picked() -> int:
+func sell_picked() -> int:
+	## Sell +N: the item picked, to Waxley (Game.sell_item), from anywhere,
+	## a level's pause too.
 	var g := _game()
 	if g == null or not (picked is Dictionary):
 		return 0
-	var v: int = g.salvage(picked)
-	_say("Salvaged for %d embers" % v)
+	var v: int = g.sell_item(picked)
+	_say("Sold for %d embers" % v)
 	picked = null
 	_sfx("salvage")
 	_changed()
 	return v
 
 
-func salvage_below() -> int:
-	## Salvages every item below what's worn; returns the embers.
+func sell_below() -> int:
+	## Sell weaker: every item below what's worn; returns the embers.
 	var g := _game()
 	if g == null:
 		return 0
 	var n := below_equipped().size()
-	var total: int = g.salvage_weaker()
+	var total: int = g.sell_weaker()
 	_bulk_confirm = 0.0
 	if n > 0:
-		_say("Salvaged %d item%s for %d embers" % [n, "" if n == 1 else "s", total])
+		_say("Sold %d item%s for %d embers" % [n, "" if n == 1 else "s", total])
 		_sfx("salvage")
 		_changed()
 	return total
@@ -198,7 +202,7 @@ func salvage_below() -> int:
 
 func _bulk_pressed() -> void:
 	if _bulk_confirm > 0.0:
-		salvage_below()
+		sell_below()
 	else:
 		_bulk_confirm = 3.0
 
@@ -250,7 +254,11 @@ func _rebuild() -> void:
 		var items := items_for(slot)
 		for it in items:
 			_list.add_child(_row(it))
-	_below_n = below_equipped().size()
+	var below := below_equipped()
+	_below_n = below.size()
+	_below_v = 0
+	for it in below:
+		_below_v += Items.sell_value(it)
 	_bulk_btn.visible = picked == null and _below_n > 0
 	queue_redraw()
 
@@ -323,19 +331,19 @@ func _process(dt: float) -> void:
 	for w in _list.get_children():
 		w.custom_minimum_size.x = _scroll.size.x - 8.0
 	var comparing := picked != null
-	for b in [_equip_btn, _salvage_btn, _cancel_btn]:
+	for b in [_equip_btn, _sell_btn, _cancel_btn]:
 		b.visible = comparing
 	if comparing:
 		_equip_btn.custom_minimum_size = Vector2(110, UI.TAP_H)
-		_salvage_btn.text = "Salvage  +%d" % Items.salvage_value(picked)
+		_sell_btn.text = "Sell  +%d" % Items.sell_value(picked)
 		var y := R.end.y - 48.0
 		_cancel_btn.reset_size()
 		_cancel_btn.position = Vector2(R.position.x + 12.0, y)
 		_equip_btn.reset_size()
 		_equip_btn.position = Vector2(R.end.x - _equip_btn.size.x - 12.0, y)
-		_salvage_btn.reset_size()
-		_salvage_btn.position = Vector2(_equip_btn.position.x - _salvage_btn.size.x - 10.0, y)
-	_bulk_btn.text = "Tap again: salvage %d" % _below_n if _bulk_confirm > 0.0 else "Salvage all below equipped"
+		_sell_btn.reset_size()
+		_sell_btn.position = Vector2(_equip_btn.position.x - _sell_btn.size.x - 10.0, y)
+	_bulk_btn.text = "Tap again: sell %d" % _below_n if _bulk_confirm > 0.0 else "Sell weaker  +%d" % _below_v
 	_bulk_btn.reset_size()
 	_bulk_btn.position = Vector2(R.end.x - _bulk_btn.size.x - 10.0, R.position.y + 10.0)
 	queue_redraw()

@@ -27,6 +27,11 @@ extends SceneTree
 ## when a world's tab opens. With the satchel full, a pickup is never lost
 ## and the satchel never grows past its cap (in a real level and at the
 ## Chandler), and the card's, Waxley's and the results pills' text fits.
+## The Shop (build 3's drops-and-shop plan): its Sell tab's squares, marks,
+## one-tap sales and their ghosts (bought back for what they fetched, until
+## the shop closes), Wear, the Sell link from Buy, Fresh stock; the results'
+## Shop button opening it over them and Back; the map's Shop and its mark;
+## the card after 1-1, Waxley's buy line and his full-satchel bark.
 ##
 ## v3 (SC): at every size, the six-world map (tabs, the Lv 30+ / 40+ chips,
 ## the secret medallions, the Challenges button, a one-time card), the HUD's
@@ -215,6 +220,10 @@ func _initialize() -> void:
 	_no_errors("touch_specials")
 	await _test_chandler()
 	_no_errors("chandler")
+	await _test_results_shop()
+	_no_errors("results_shop")
+	await _test_shop_tells()
+	_no_errors("shop_tells")
 	await _test_results_from_main()
 	_no_errors("results_from_main")
 	await _test_milestones()
@@ -2369,7 +2378,8 @@ func _test_gear() -> void:
 	var old: Dictionary = game.hero()["equip"]["weapon"]
 	p.pick(a)
 	p._process(0.01)
-	_check(p._equip_btn.visible and p._salvage_btn.visible, "picking one shows the comparison with Equip and Salvage")
+	_check(p._equip_btn.visible and p._sell_btn.visible and p._sell_btn.text == "Sell  +%d" % Items.sell_value(a),
+			"picking one shows the comparison with Equip and \"%s\"" % p._sell_btn.text)
 	p._equip_btn.pressed.emit()
 	_check(str(game.hero()["equip"]["weapon"]["uid"]) == str(a["uid"]), "Equip wears it")
 	_check((game.hero()["satchel"] as Array).any(func(x): return x["uid"] == old["uid"]), "the old one goes to the satchel")
@@ -2377,18 +2387,24 @@ func _test_gear() -> void:
 	var below: Array = p.below_equipped()
 	_check(below.any(func(x): return x["uid"] == junk["uid"]), "the junk counts as below equipped")
 	var embers := int(game.embers())
+	var worth := 0
+	for it in below:
+		worth += Items.sell_value(it)
+	p._process(0.01)
+	_check(p._bulk_btn.visible and p._bulk_btn.text == "Sell weaker  +%d" % worth, "the bulk button says what it fetches: \"%s\"" % p._bulk_btn.text)
 	p._bulk_pressed()
-	_check((game.hero()["satchel"] as Array).any(func(x): return x["uid"] == junk["uid"]), "salvage-all asks twice")
+	p._process(0.01)
+	_check((game.hero()["satchel"] as Array).any(func(x): return x["uid"] == junk["uid"]) and p._bulk_btn.text.begins_with("Tap again: sell"), "Sell weaker asks twice")
 	p._bulk_pressed()
-	_check(int(game.embers()) > embers, "salvage-all pays embers")
+	_check(int(game.embers()) == embers + worth, "Sell weaker pays a quarter of Waxley's price for each (+%d)" % worth)
 	_check(not (game.hero()["satchel"] as Array).any(func(x): return x["uid"] == junk["uid"]), "and the junk is gone")
 	var c = Items.make("coat", "knight", 6, "rare", rng)
 	game.add_item(c)
 	p.select_slot("coat")
 	p.pick(c)
 	var e2 := int(game.embers())
-	var v: int = p.salvage_picked()
-	_check(v > 0 and int(game.embers()) == e2 + v, "Salvage turns one item into embers")
+	var v: int = p.sell_picked()
+	_check(v == Items.sell_value(c) and int(game.embers()) == e2 + v, "Sell turns one item into embers: %d" % v)
 	_check(not (game.hero()["satchel"] as Array).any(func(x): return x["uid"] == c["uid"]), "and it's gone")
 	h.queue_free()
 	await _frames(2)
@@ -3159,38 +3175,43 @@ func _test_full_in_a_level() -> void:
 	var c = load("res://scripts/chandler_screen.gd").new()
 	root.add_child(c)
 	await _frames(2)
-	c.show_tab("wares")
+	_check(c.tab == "sell", "a full satchel: the shop opens on Sell (%s)" % c.tab)
+	c.show_tab("buy")
 	_check(game.ware_verdict(0) == "equipped", "the ware would be worn (%s)" % game.ware_verdict(0))
 	c._buy(0)
-	_check(c._line.contains("old one melts"), "the first tap says the old one melts: \"%s\"" % c._line)
+	_check(c._line.contains("I buy the old one"), "the first tap says Waxley buys the old one: \"%s\"" % c._line)
 	var e1: int = game.embers()
 	c._buy(0)
 	_check(str(h["equip"]["candle"]["uid"]) == str(ware["uid"]), "bought and worn")
 	_check((h["satchel"] as Array).size() == game.SATCHEL_MAX and not _holds(h, candle), "the satchel stays at %d, the old candle gone" % game.SATCHEL_MAX)
-	_check(game.embers() == e1 - Items.price(ware) + Items.salvage_value(candle), "paid, and the old candle melted back")
-	_check(c._line.contains("melted"), "Waxley says it melted: \"%s\"" % c._line)
-	_check(str(c._notes.get(0, {}).get("sub", "")).begins_with("Old one melted"), "and the shelf says so")
-	_check(str(c.wares_note()["text"]) == "Satchel full · %d / %d" % [game.SATCHEL_MAX, game.SATCHEL_MAX], "the note: \"%s\"" % c.wares_note()["text"])
-	# Every line Waxley can say on Wares fits beside the red note and Salvage
-	# weaker, on the narrowest screen. (On Relics and Unmake the small print
-	# is muted and gives way to a long line.)
+	_check(game.embers() == e1 - Items.price(ware) + Items.sell_value(candle), "paid, and the old candle sold back")
+	_check(c._line.contains("bought the old one"), "Waxley says he bought it: \"%s\"" % c._line)
+	_check(str(c._notes.get(0, {}).get("sub", "")).begins_with("Old one sold"), "and the shelf says so")
+	_check(c._full_btn.visible and c._full_btn.text.begins_with("Satchel full") and str(c.wares_note()["text"]) == "",
+			"the note is a link now: \"%s\"" % c._full_btn.text)
+	# Every line Waxley can say on Buy fits beside the Sell link and Fresh
+	# stock, and every line he says on Sell beside the red satchel note, on
+	# the narrowest screen. (On Relics the small print is muted and gives
+	# way to a long line.)
 	for i in 3:
 		h["satchel"][i] = _zero_implicit(Items.make("weapon", "knight", 1, "common", rng))
-	c._update_salvage()
 	await _set_view(Vector2i(780, 390), true)
-	c._layout()
-	for key in c.LINES:
-		if ["belt", "stowed", "bare", "ask_belt", "ask_stowed", "tab_relics", "arm", "unmade", "nothing", "tab_unmake"].has(key):
-			continue
-		for line in c.LINES[key]:
-			var extra := ""
-			match str(key):
-				"equipped_melt", "salvaged":
-					extra = " +999 embers."
-			c._line = str(line) + extra
-			c.queue_redraw()
-			await _frames(1)
-			_check(c.line_fits, "780 wide, satchel full: Waxley's \"%s\" fits" % c._line)
+	var on_sell := ["tab_sell", "sold_one", "sold_marked", "no_marks", "marked", "kept", "bought_back", "back_full", "worn", "empty", "full", "poor", "equipped"]
+	for where in ["buy", "sell"]:
+		c.show_tab(where)
+		c._layout()
+		for key in c.LINES:
+			if ["belt", "stowed", "bare", "ask_belt", "ask_stowed", "tab_relics"].has(key) or (where == "sell" and not on_sell.has(key)):
+				continue
+			for line in c.LINES[key]:
+				var extra := ""
+				match str(key):
+					"equipped_melt", "sold_marked":
+						extra = " +9999 embers."
+				c._line = str(line) + extra
+				c.queue_redraw()
+				await _frames(1)
+				_check(c.line_fits, "780 wide, satchel full, on %s: Waxley's \"%s\" fits" % [where, c._line])
 	await _set_view(Vector2i(847, 390), true)
 	c.queue_free()
 	await _frames(2)
@@ -3577,8 +3598,9 @@ func _zero_implicit(it: Dictionary) -> Dictionary:
 func _test_chandler() -> void:
 	## The Chandler's states read: every tab's buttons fit and are a thumb
 	## tall; too dear is refused at once with the purse in red; a full
-	## satchel is refused (the purse stays cream), the note says so, and
-	## Salvage weaker (two taps, never a Legendary) makes the room.
+	## satchel refuses a ware (the purse stays cream) and goes to Sell, where
+	## the satchel is a grid of 16 squares and the marked pieces sell in one
+	## tap, each leaving a ghost that buys it back for what it fetched.
 	_where = "chandler"
 	_fresh_hero(6, "runner")
 	game.mark_seen("meet_waxley")
@@ -3587,11 +3609,22 @@ func _test_chandler() -> void:
 	var c = load("res://scripts/chandler_screen.gd").new()
 	root.add_child(c)
 	await _frames(3)
-	for tab in ["wares", "relics", "unmake"]:
+	_check(c.tab == "buy" and c.tabs_shown() == ["buy", "sell", "relics"] and c._back_btn.text == "Map",
+			"an emptyish satchel: it opens on Buy; the tabs Buy, Sell, Relics (%s, %s)" % [c.tab, c.tabs_shown()])
+	for tab in ["buy", "sell", "relics"]:
 		c.show_tab(tab)
 		await _frames(2)
 		_buttons_ok(c, "chandler %s" % tab)
-	c.show_tab("wares")
+	c.show_tab("buy")
+	_check(c._fresh_btn.visible and not c._full_btn.visible, "Buy: Fresh stock, and no Sell link while there's room")
+	_check(c.is_pick(c._stock.size() - 1) and c.is_pick(c._stock.size() - 2) and not c.is_pick(c._stock.size() - 3),
+			"the last two wares are the \"For your <slot>\" picks")
+	c.tap_at((c._cards()[1] as Rect2).get_center())
+	var shown_it = c.detail_item()
+	var rows_txt: Array = c.detail_rows().map(func(r): return str(r["text"]))
+	_check(shown_it is Dictionary and rows_txt.any(func(t): return t.ends_with("sells back for %d" % Items.sell_value(shown_it))),
+			"a ware's sheet says what it would sell back for (%s)" % [rows_txt.filter(func(t): return t.contains("sells back"))])
+	c.close_detail()
 	game.data["embers"] = 0
 	c._refresh()
 	c._buy(0)
@@ -3606,26 +3639,261 @@ func _test_chandler() -> void:
 	var stock: Array = game.wares()
 	stock[0] = _zero_implicit(Items.make("weapon", "runner", 1, "magic", rng))
 	c._refresh()
+	_check(c._full_btn.visible and str(c.wares_note()["text"]) == "", "a full satchel: the note gives way to the Sell link")
+	_buttons_ok(c, "chandler buy, full")
 	_check(game.ware_verdict(0) == "full", "a ware that wouldn't be worn, with the satchel full: %s" % game.ware_verdict(0))
 	c._buy(0)
-	_check(c._deny_why == "full" and c._sale == -1, "a full satchel refuses the sale")
-	_check(str(c.wares_note()["text"]).begins_with("Satchel full"), "the note says the satchel is full")
-	_check(c._salv_btn.visible, "and Salvage weaker shows")
-	_buttons_ok(c, "chandler full")
-	_check(game.weaker_items().size() == game.SATCHEL_MAX - 1, "every weaker Common counts, the Legendary doesn't (%d)" % game.weaker_items().size())
+	_check(c._deny_why == "full" and c._sale == -1 and c.tab == "sell", "a full satchel refuses the sale and goes to Sell (%s)" % c.tab)
+	_check((c.LINES["full"] as Array).has(c._line) and c._line.contains("Sell"), "Waxley says why: \"%s\"" % c._line)
+	c.show_tab("buy")
+	c._full_btn.pressed.emit()
+	_check(c.tab == "sell", "the link goes to Sell too")
+	await _frames(2)
+	_buttons_ok(c, "chandler sell, full")
+	# The grid: 16 squares inside the safe area, apart, a thumb wide; the
+	# panel and Sell marked right of them.
+	var sq: Array = c.squares()
+	_check(sq.size() == game.SATCHEL_MAX, "16 squares (%d)" % sq.size())
+	for k in sq.size():
+		var r: Rect2 = sq[k]
+		_inside(r, "square %d" % k)
+		_check(r.size.x >= UI.TAP_H and r.size.y >= UI.TAP_H, "square %d is a thumb (%s)" % [k, r.size])
+		for j in range(k + 1, sq.size()):
+			_apart(r, sq[j], "squares %d and %d" % [k, j])
+		_apart(r, c.sell_panel_rect(), "square %d and the panel" % k)
+	_inside(c.sell_panel_rect(), "the Sell panel")
+	_inside(c.sell_all_rect(), "Sell marked")
+	# (and on the narrower phone and a Mac's plain margins, a piece shown)
+	c.tap_square(1)
+	for v in [[Vector2i(780, 390), true], [Vector2i(844, 390), false]]:
+		await _set_view(v[0], v[1])
+		c._layout()
+		await _frames(1)
+		_buttons_ok(c, "chandler sell %s" % _where)
+		for k in c.squares().size():
+			_inside(c.squares()[k], "square %d" % k)
+			_apart(c.squares()[k], c.sell_panel_rect(), "square %d and the panel" % k)
+		_inside(c.sell_panel_rect(), "the Sell panel")
+	await _set_view(Vector2i(847, 390), true)
+	_where = "chandler"
+	c._layout()
+	c.tap_square(1)   # (kept, then marked again: as it was)
+	c.tap_square(1)
+	_check(c.sell_note()["text"] == "Satchel full · 16 / 16" and c.sell_note()["col"] == c.DOWN, "the note: \"%s\", in red" % c.sell_note()["text"])
+	# Marks: every weak Common starts marked, never the Legendary.
+	var marked: Array = c.marked_items()
+	_check(marked.size() == game.SATCHEL_MAX - 1 and not marked.has(leg), "15 weak pieces marked, the Legendary not (%d)" % marked.size())
+	var lk := -1
+	for k in sq.size():
+		if str(c.grid_square(k).get("uid", "")) == str(leg["uid"]):
+			lk = k
+	_check(lk >= 0 and str(c._looks[str(leg["uid"])]["mark"]) == "legendary", "the Legendary has its square and its star")
+	# A tap shows a piece; a second marks or keeps it.
+	c.tap_square(lk)
+	_check(c.picked() == leg and c._wear_btn.visible and c._sell_btn.visible and c._sell_btn.text == "Sell  +%d" % Items.sell_value(leg),
+			"a tap shows it, with Wear and \"%s\"" % c._sell_btn.text)
+	_check(not c.is_marked(leg), "and marks nothing")
+	c.tap_square(lk)
+	_check(c.is_marked(leg) and c.marked_items().size() == game.SATCHEL_MAX, "a second tap marks it")
+	c.tap_square(lk)
+	_check(not c.is_marked(leg), "a third keeps it")
+	_buttons_ok(c, "chandler sell, a piece shown")
+	# Sell one: no question; its ghost buys it back for what it fetched.
+	var k0 := 0
+	var one = c.piece(str(c.grid_square(k0)["uid"]))
+	c.tap_square(k0)
 	var e0: int = game.embers()
-	var want: int = game.weaker_value()
-	c._salv_btn.pressed.emit()
-	_check((h["satchel"] as Array).size() == game.SATCHEL_MAX, "the first tap only asks")
-	c._salv_btn.pressed.emit()
-	_check((h["satchel"] as Array).size() == 1 and str(h["satchel"][0]["uid"]) == str(leg["uid"]), "the second melts them, never the Legendary")
-	_check(game.embers() == e0 + want and want > 0, "for their embers (+%d)" % want)
-	_check(not c._salv_btn.visible, "nothing left to melt: the button goes")
-	_check(game.ware_verdict(0) == "satchel", "and the sale can go through now")
-	c._buy(0)
-	c._buy(0)
-	_check((h["satchel"] as Array).size() == 2, "two taps buy it into the satchel")
+	var got: int = c.sell_picked()
+	_check(got == Items.sell_value(one) and game.embers() == e0 + got and not (h["satchel"] as Array).has(one), "Sell +%d: sold at once, no question" % got)
+	_check(c.grid_square(k0).has("ghost") and int(c.grid_square(k0)["price"]) == got, "its square holds its ghost: Buy back %d" % got)
+	c.tap_square(k0)
+	_check(game.embers() == e0 and (h["satchel"] as Array).has(one) and str(c.grid_square(k0).get("uid", "")) == str(one["uid"]),
+			"a tap on the ghost buys it back, into its own square, for the same: the purse as before")
+	_check(not c.is_marked(one), "bought back: kept")
+	# Sell everything marked.
+	var want := 0
+	for it in c.marked_items():
+		want += Items.sell_value(it)
+	var n_marked: int = c.marked_items().size()
+	_check(c._sell_all_btn.text == "Sell %d marked  +%d" % [n_marked, want] and not c._sell_all_btn.disabled, "the button says what it does: \"%s\"" % c._sell_all_btn.text)
+	var e1: int = game.embers()
+	c._sell_all_btn.pressed.emit()
+	_check(game.embers() == e1 + want and (h["satchel"] as Array).size() == game.SATCHEL_MAX - n_marked, "one tap sells them all (+%d)" % want)
+	var ghosts := 0
+	for k in sq.size():
+		if c.grid_square(k).has("ghost"):
+			ghosts += 1
+	_check(ghosts == n_marked and c._sell_all_btn.disabled and c._sell_all_btn.text == "Nothing marked", "each leaves its ghost (%d); nothing marked now" % ghosts)
+	await _frames(2)
+	_buttons_ok(c, "chandler sell, ghosts")
+	# Wear: the piece goes on, the old one takes its square.
+	var better = Items.make("weapon", "runner", 20, "rare", rng)
+	h["satchel"].append(better)
+	c._refresh()
+	var kb := -1
+	for k in sq.size():
+		if str(c.grid_square(k).get("uid", "")) == str(better["uid"]):
+			kb = k
+	_check(kb >= 0 and c.grid_square(kb).has("uid"), "a new piece takes an empty square, else the oldest ghost's (%d)" % kb)
+	var old: Dictionary = h["equip"]["weapon"]
+	c.tap_square(kb)
+	c._wear_btn.pressed.emit()
+	_check(str(h["equip"]["weapon"]["uid"]) == str(better["uid"]) and str(c.grid_square(kb).get("uid", "")) == str(old["uid"]) and c.picked() == old,
+			"Wear: it goes on, and the old one takes its square, shown")
+	# Leaving forgets the sales.
+	var gk := -1
+	for k in sq.size():
+		if c.grid_square(k).has("ghost"):
+			gk = k
+	var ghost: Dictionary = c.grid_square(gk)["ghost"]
+	_check(game.buy_back_verdict(ghost) == "satchel", "a ghost can be bought back while the shop is open")
+	c._back_btn.pressed.emit()
+	_check(game.buy_back_verdict(ghost) == "gone", "leaving: what was sold stays sold")
+	var sell_from: int = c.SELL_FROM
 	c.queue_free()
+	await _frames(2)
+	# Opens on Sell from 12 pieces.
+	h["satchel"].clear()
+	for i in sell_from:
+		h["satchel"].append(Items.make("candle", "runner", 1, "magic", rng))
+	c = load("res://scripts/chandler_screen.gd").new()
+	root.add_child(c)
+	await _frames(2)
+	_check(c.tab == "sell", "%d pieces in the satchel: it opens on Sell" % sell_from)
+	c.queue_free()
+	h["satchel"].pop_back()
+	c = load("res://scripts/chandler_screen.gd").new()
+	root.add_child(c)
+	await _frames(2)
+	_check(c.tab == "buy", "%d: on Buy" % (sell_from - 1))
+	# Fresh stock: two taps, the price doubling.
+	var price: int = game.fresh_price()
+	var before: Array = game.wares().map(func(it): return it["uid"] if it is Dictionary else "")
+	c._fresh_btn.pressed.emit()
+	_check(game.fresh_uses() == 0 and c._fresh_armed > 0.0 and (c.LINES["ask_fresh"] as Array).has(c._line), "Fresh stock: the first tap asks")
+	var e2: int = game.embers()
+	c._fresh_btn.pressed.emit()
+	_check(game.embers() == e2 - price and game.fresh_price() == price * 2 and not c._stock.any(func(it): return it is Dictionary and before.has(it["uid"])),
+			"the second restocks for %d; the next costs %d" % [price, game.fresh_price()])
+	game.data["embers"] = 0
+	c._fresh_btn.pressed.emit()
+	_check(c._deny_why == "poor" and c._fresh_armed <= 0.0, "too dear: refused on the first tap")
+	c.queue_free()
+	await _frames(2)
+
+
+func _test_results_shop() -> void:
+	## After every bell: Onward · Shop · Replay · Map. Shop opens the shop
+	## over the results (Back, not Map), Back returns to them; the button
+	## wears the map's mark.
+	_where = "results shop"
+	_fresh_hero(4)
+	game.mark_seen("meet_waxley")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 12
+	var h: Dictionary = game.hero()
+	for i in game.SATCHEL_MAX:
+		h["satchel"].append(_zero_implicit(Items.make("candle", "knight", 1, "common", rng)))
+	var r = load("res://scripts/results_screen.gd").new()
+	r.result = {"level": "1-1", "cleared": true, "embers": 12, "embers_total": 40, "sigils": [true, false, false], "time": 90.0,
+			"relics": [], "items": [], "xp": 60, "levels": 0, "diff": "dusk"}
+	root.add_child(r)
+	r._t = 10.0
+	await _frames(3)
+	var words: Array = r._btns.map(func(b): return b.text)
+	_check(words == ["Onward", "Shop", "Replay", "Map"], "the buttons: %s" % [words])
+	_buttons_ok(r, "results with Shop")
+	_check(r._shop_badge == {"kind": "full", "text": "16/16"}, "Shop wears the full satchel's mark (%s)" % r._shop_badge)
+	var heard := {"next": 0, "replay": 0, "to_map": 0}
+	for sig in heard:
+		r.connect(sig, func(): heard[sig] += 1)
+	r.shop_btn.pressed.emit()
+	await _frames(2)
+	_check(r.shop_open() and r.shop.get_parent() == r and r.shop.tab == "sell" and r.shop._back_btn.text == "Back",
+			"Shop opens the shop over the results, on Sell with the satchel full, its way out \"Back\"")
+	_check(heard == {"next": 0, "replay": 0, "to_map": 0}, "and leaves the results where they are")
+	_buttons_ok(r.shop, "the shop over the results")
+	var t0: float = r._t
+	r._process(1.0)
+	_check(is_equal_approx(r._t, t0), "the results wait under the shop")
+	r.shop.sell_marked()
+	r.shop._back_btn.pressed.emit()
+	await _frames(2)
+	_check(not r.shop_open() and is_instance_valid(r) and r.is_inside_tree(), "Back closes it: the results again")
+	_check(r._shop_badge.get("kind", "") != "full", "the mark follows what was sold (%s)" % r._shop_badge)
+	_check(heard == {"next": 0, "replay": 0, "to_map": 0}, "nothing went on without him")
+	r._btns[0].pressed.emit()
+	_check(heard["next"] == 1, "and Onward goes on")
+	r.queue_free()
+	await _frames(2)
+
+
+func _test_shop_tells() -> void:
+	## How he learns of the Shop: the map's button says "Shop" with its mark;
+	## main.gd's one-time card once 1-1 is cleared; Waxley's first meeting
+	## says he buys; his bark the first time the satchel fills (once a save).
+	_where = "shop tells"
+	var Map = load("res://scripts/map_screen.gd")
+	_fresh_hero(3)
+	var m = Map.new()
+	root.add_child(m)
+	await _frames(2)
+	_check(m._chandler_btn.text == "Shop" and m.shop_badge.is_empty(), "the map's button says Shop, no mark yet (%s)" % m.shop_badge)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	while (game.hero()["satchel"] as Array).size() < game.SATCHEL_MAX:
+		game.hero()["satchel"].append(Items.make("coat", "knight", 1, "magic", rng))
+	m._refresh()
+	_check(m.shop_badge == {"kind": "full", "text": "16/16"}, "a full satchel: the red 16/16 (%s)" % m.shop_badge)
+	_buttons_ok(m, "map with the Shop's mark", false)
+	m.queue_free()
+	await _frames(1)
+	# main.gd's card.
+	var M = load("res://scripts/main.gd")
+	var mm: Node = M.new()
+	_fresh_hero(1)
+	_check(not mm._card_due("shop_open"), "no Shop card before 1-1 is cleared")
+	game.data["unlocked"]["dusk"] = 2
+	_check(mm._card_due("shop_open"), "once it is, the card's owed")
+	var card: Array = (mm.CARDS as Array).filter(func(cc): return cc[0] == "shop_open")[0]
+	_check(str(card[1]).contains("Shop") and str(card[2]).contains("buys back") and str(card[2]).contains("Shop"), "it says the Shop buys as well as sells: \"%s\"" % card[2])
+	game.notice("shop_open")
+	_check(not mm._card_due("shop_open") or (game.data["notices"] as Array).has("shop_open"), "seen once")
+	mm.free()
+	# Waxley's first meeting.
+	var Story = load("res://scripts/story.gd")
+	var beats: Array = Story.scene("meet_waxley")["shots"][0]["beats"]
+	var says := beats.filter(func(b): return Story.is_line(b) and str(b[0]).begins_with("waxley") and str(b[1]).contains("buy"))
+	_check(says.size() == 1 and str(says[0][1]).length() <= Story.MAX_LINE and str(says[0][1]).contains("quarter"),
+			"Waxley's first meeting says he buys, at a quarter of his price, in %d: %s" % [Story.MAX_LINE, says])
+	var bark: Array = Story.BARKS.get("satchel_full", [])
+	_check(bark.size() == 2 and str(bark[0]).begins_with("waxley") and str(bark[1]).contains("Shop") and str(bark[1]).length() <= Story.MAX_LINE
+			and not Story.bark_every("satchel_full"), "his once-a-save bark for a full satchel names the Shop: \"%s\"" % (bark[1] if bark.size() > 1 else ""))
+	# The bark fires the first time the satchel fills, not before.
+	_fresh_hero(3)
+	var lv = LevelData.load_file("res://levels/1-1.txt")
+	var w = WorldScript.new()
+	w.setup(lv, true)
+	root.add_child(w)
+	await _frames(1)
+	var hud = HudScript.new()
+	hud.world = w
+	w.hud = hud
+	w.add_child(hud)
+	await _frames(2)
+	game.set_setting("auto_equip", false)
+	var h: Dictionary = game.hero()
+	# (Upgrades, worn by hand: auto-equip is off, so they go to the satchel.)
+	w._take_item(Items.make("coat", "knight", 30, "rare", rng))
+	_check(not game.seen("bark:satchel_full"), "a satchel with room: no bark")
+	while (h["satchel"] as Array).size() < game.SATCHEL_MAX - 1:
+		h["satchel"].append(_zero_implicit(Items.make("coat", "knight", 1, "magic", rng)))
+	w._take_item(Items.make("coat", "knight", 30, "rare", rng))
+	_check((h["satchel"] as Array).size() == game.SATCHEL_MAX and game.seen("bark:satchel_full"), "the pickup that fills it: Waxley's bark")
+	var queued: bool = hud._msgs.any(func(q): return str(q.get("key", "")) == "bark:satchel_full") or str(hud._msg.get("key", "")) == "bark:satchel_full"
+	_check(queued, "in the message slot")
+	game.set_setting("auto_equip", true)
+	w.queue_free()
 	await _frames(2)
 
 

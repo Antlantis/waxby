@@ -1,6 +1,6 @@
 extends RefCounted
 ## Gear: the five slots, rarities, the affix table, rolling a new item, its
-## name, its stat changes, what it costs and what it sells for. Static.
+## name, its stat changes, what it costs and what Waxley pays for it. Static.
 ## Items are plain Dictionaries so they save as JSON:
 ##
 ##   {uid, slot, base, cls, ilvl, tier, rarity, name, implicit: {id, v, ...},
@@ -438,15 +438,17 @@ static func power(it) -> int:
 
 
 static func sell_value(it) -> int:
-	## What a piece sells for: a quarter of Waxley's price (price / 4).
+	## What Waxley pays for it: a quarter of his own price (price), so a Rare
+	## at ilvl 20 sells for 123 (Blessed 48, Legendary 275). The Sell tab, a
+	## find sold on touch and a melt for room all pay this.
 	if not (it is Dictionary) or it.is_empty():
 		return 0
 	return roundi(float(price(it)) / 4.0)
 
 
 static func salvage_value(it) -> int:
-	## The old name for sell_value: a piece melted (a full satchel, the
-	## Sheet's Salvage) pays what it sells for.
+	## The old name for sell_value: an item melted for room (a full satchel,
+	## an upgrade worn into one) pays what a sale would.
 	return sell_value(it)
 
 

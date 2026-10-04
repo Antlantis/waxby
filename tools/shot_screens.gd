@@ -219,6 +219,25 @@ func _set_map() -> void:
 	await _wait(0.333)
 	await _shot("map_w2")
 	await _clear()
+	# The Shop's marks: a full satchel; an upgrade he can afford.
+	var sat: Array = game.hero()["satchel"]
+	while sat.size() < game.SATCHEL_MAX:
+		sat.append(_item(["boots", "charm"][sat.size() % 2], "common", "", 2))
+	m = load("res://scripts/map_screen.gd").new()
+	m.focus = 5
+	root.add_child(m)
+	await _wait(0.333)
+	await _shot("map_shop_full")
+	await _clear()
+	sat.resize(4)
+	game.hero()["equip"]["coat"] = null
+	game.data["embers"] = 5000
+	m = load("res://scripts/map_screen.gd").new()
+	m.focus = 5
+	root.add_child(m)
+	await _wait(0.333)
+	await _shot("map_shop_upgrade")
+	await _clear()
 
 
 func _set_sheet() -> void:
@@ -253,7 +272,7 @@ func _set_sheet() -> void:
 			await _shot("sheet_knight_stats_full")
 			while sat.size() > 6:
 				sat.pop_back()
-			# Junk below what's worn: "Salvage all below equipped" shows.
+			# Junk below what's worn: "Sell weaker +N" shows.
 			for i in 3:
 				var junk: Dictionary = Items.make("weapon", cls, 1, "common", _rng)
 				for k in junk["implicit"]:
@@ -262,11 +281,44 @@ func _set_sheet() -> void:
 				game.hero()["satchel"].append(junk)
 			h.open_tab("gear")
 			await _wait(0.3)
-			await _shot("sheet_knight_gear_salvage")
+			await _shot("sheet_knight_gear_sell")
 			h.panel._bulk_pressed()
 			await _wait(0.2)
-			await _shot("sheet_knight_gear_salvage_ask")
+			await _shot("sheet_knight_gear_sell_ask")
+			h.panel.pick(game.hero()["satchel"][0])
+			await _wait(0.2)
+			await _shot("sheet_knight_gear_sell_one")
 	await _clear()
+
+
+func _sell_satchel(h: Dictionary, n: int) -> void:
+	## A satchel for the Sell tab: weak pieces (marked), trade-offs, a
+	## Legendary, an upgrade, all for slots he wears.
+	var cls := str(h["cls"])
+	var lvl := int(h["level"])
+	h["satchel"].clear()
+	for i in n:
+		var slot: String = ["weapon", "candle", "coat"][i % 3]
+		var it: Dictionary
+		match i % 7:
+			3:
+				it = _item(slot, "legendary", cls, maxi(lvl - 2, 1))
+			5:
+				it = Items.make(slot, cls, lvl + 4, "rare", _rng)
+			_:
+				it = Items.make(slot, cls, maxi(lvl - 6 + i % 4, 1), ["magic", "rare", "magic", "", "magic", "", "rare"][i % 7], _rng)
+		h["satchel"].append(it)
+	# A trade-off: the worn coat with its own stat gone and damage instead.
+	var worn = h["equip"].get("coat")
+	if worn is Dictionary and n > 1:
+		var trade: Dictionary = worn.duplicate(true)
+		trade["uid"] = "shot-trade"
+		trade["name"] = "Keen " + str(worn["base"])
+		for k in trade["implicit"]:
+			if k != "id":
+				trade["implicit"][k] = 0.0
+		trade["affixes"] = [{"id": "keen", "t": 1, "v": 12.0}]
+		h["satchel"][1] = trade
 
 
 func _set_chandler() -> void:
@@ -283,64 +335,90 @@ func _set_chandler() -> void:
 	c = load("res://scripts/chandler_screen.gd").new()
 	root.add_child(c)
 	await _wait(0.200)
-	await _shot("chandler_wares")
+	await _shot("chandler_buy")
 	# The first tap asks.
 	c._buy(0)
 	await _wait(0.25)
-	await _shot("chandler_wares_ask")
+	await _shot("chandler_buy_ask")
 	c._buy(0)
 	await _wait(0.25)
-	await _shot("chandler_wares_bought")
+	await _shot("chandler_buy_bought")
+	# A ware's sheet: what it would sell back for.
+	c.tap_at((c._cards()[1] as Rect2).get_center())
+	await _wait(0.25)
+	await _shot("chandler_buy_sheet")
+	c.close_detail()
+	# Fresh stock asks first.
+	c._fresh_pressed()
+	await _wait(0.25)
+	await _shot("chandler_buy_fresh_ask")
+	c._fresh_pressed()
+	await _wait(0.25)
+	await _shot("chandler_buy_fresh")
 	# Poor.
 	game.data["embers"] = 12
 	c._refresh()
 	c._buy(1)
 	await _wait(0.25)
-	await _shot("chandler_wares_poor")
-	# Full: a satchel of 16 weaker things.
+	await _shot("chandler_buy_poor")
+	# Full: a satchel of 16, a ware that's no upgrade. The note is a link to
+	# Sell, and a sale refused for it goes there.
 	game.data["embers"] = 900
 	var h: Dictionary = game.hero()
-	h["satchel"].clear()
-	for i in 16:
-		h["satchel"].append(Items.make(["weapon", "candle", "coat"][i % 3], "runner", 1, "common", _rng))
-	# A ware that's no upgrade, so it would go to the satchel.
+	_sell_satchel(h, 16)
 	var stock: Array = game.wares()
 	for i in stock.size():
-		if stock[i] is Dictionary:
-			var eq = h["equip"].get(stock[i]["slot"])
-			if eq is Dictionary:
-				var weak: Dictionary = Items.make(stock[i]["slot"], "runner", 1, "magic", _rng)
-				stock[i] = weak
+		if stock[i] is Dictionary and h["equip"].get(stock[i]["slot"]) is Dictionary:
+			stock[i] = Items.make(stock[i]["slot"], "runner", 1, "magic", _rng)
+	c.show_tab("buy")
 	c._refresh()
-	var full_i := -1
+	await _wait(0.25)
+	await _shot("chandler_buy_full")
 	for i in stock.size():
 		if game.ware_verdict(i) == "full":
-			full_i = i
-	if full_i >= 0:
-		c._buy(full_i)
-	await _wait(0.25)
-	await _shot("chandler_wares_full")
-	# An upgrade for a worn slot, into the full satchel: the old one melts.
-	for i in stock.size():
-		if stock[i] is Dictionary and h["equip"].get(stock[i]["slot"]) is Dictionary:
-			stock[i] = Items.make(stock[i]["slot"], "runner", 14, "rare", _rng)
-			c._refresh()
 			c._buy(i)
-			await _wait(0.25)
-			await _shot("chandler_wares_full_ask_melt")
-			c._buy(i)
-			await _wait(0.25)
-			await _shot("chandler_wares_full_bought_melt")
 			break
+	await _wait(0.25)
+	await _shot("chandler_sell_full")
+	# Sell: a piece shown, then marked ones sold, their ghosts.
+	var sq: Array = c.squares()
+	c.tap_square(0)
+	await _wait(0.25)
+	await _shot("chandler_sell_piece")
+	for k in sq.size():
+		var cell: Dictionary = c.grid_square(k)
+		if cell.has("uid") and str(c._looks.get(str(cell["uid"]), {}).get("mark", "")) == "legendary":
+			c.tap_square(k)
+			break
+	await _wait(0.25)
+	await _shot("chandler_sell_legendary")
+	c.sell_marked()
+	await _wait(0.25)
+	await _shot("chandler_sell_ghosts")
+	await _wait(1.0)
+	await _shot("chandler_sell_ghosts_settled")
 	c.show_tab("relics")
 	await _wait(0.25)
 	await _shot("chandler_relics")
 	c._buy(0)
 	await _wait(0.25)
 	await _shot("chandler_relics_ask")
-	c.show_tab("unmake")
+	await _clear()
+	# Deeper: six wares and the Reserve; Draughts; an emptier satchel's Sell tab.
+	_hero("knight", 26, 4)
+	game.hero()["deepest"] = 25
+	game.data["unlocked"]["dusk"] = 18
+	game.data["embers"] = 4200
+	c = load("res://scripts/chandler_screen.gd").new()
+	root.add_child(c)
+	await _wait(0.3)
+	await _shot("chandler_buy_deep")
+	c.show_tab("sell")
 	await _wait(0.25)
-	await _shot("chandler_unmake")
+	await _shot("chandler_sell_help")
+	c.show_tab("draughts")
+	await _wait(0.25)
+	await _shot("chandler_draughts")
 	await _clear()
 
 
@@ -390,6 +468,16 @@ func _set_results() -> void:
 	await _shot("results_levelup")
 	await _wait(3.333)
 	await _shot("results")
+	# The Shop over the results (a near-full satchel: it opens on Sell), and
+	# back.
+	_sell_satchel(h, 13)
+	r.close_shop()
+	r.open_shop()
+	await _wait(0.4)
+	await _shot("results_shop")
+	r.shop._close()
+	await _wait(0.25)
+	await _shot("results_after_shop")
 	await _clear()
 	# A snuffed run: nothing found.
 	r = load("res://scripts/results_screen.gd").new()

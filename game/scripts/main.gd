@@ -1,7 +1,7 @@
 extends Node
 ## The root: switches between the title, the saves, the story's scenes, the
-## map and the screens it opens (Callings, Sheet, Chandler), a level and its
-## results.
+## map and the screens it opens (Callings, Sheet, the Shop: the Chandler), a
+## level and its results.
 ##
 ## The way through: a title tap opens the saves (three slots). A filled one
 ## plays on where it was (the map); an empty one, or one started over, is a
@@ -28,7 +28,9 @@ extends Node
 ## mode's level (its finish goes to mode.finished, never Game.record_result);
 ## show_modes(screen) opens the Challenges hub; a finale whose scene says
 ## "resume": true runs the player's choice after it; the map shows one
-## one-time card a visit (v3_update, new points, the Gauntlet, Nightfall);
+## one-time card a visit (v3_update, new points, Waxley's Shop once 1-1 is
+## cleared, the Gauntlet, Nightfall); the results' Shop opens the shop over
+## them itself (results_screen.gd);
 ## the map carries a "Feel lab" button (lab-1) until the lab is signed off.
 ## --autoplay=<level id> | lab-1 | descent:<d> | rush:<boss id> |
 ## trial:<trial id> | scene:<scene id> | screens, and --soak=<seconds>.
@@ -893,6 +895,7 @@ const CARDS := [
 	["v3_update", "The bells below have woken", "Below the Tallow Deep lie four new worlds, and the Hush at the bottom. Your hero, gear and records came with you."],
 	["new_points", "New skills", "%d points to spend. The skill trees grew deeper, and your Vigil ranks came back as points: spend them on the Sheet."],
 	["nightfall_waits", "Nightfall waits", "Nightfall now waits beneath the Hush. Your Nightfall clears are kept."],
+	["shop_open", "Waxley's Shop", "Waxley sells gear for your level, and buys back what you don't wear. Tap Shop here on the map, or after any bell."],
 	["gauntlet", "The Gauntlet", "Every boss, one after another: the Waxworks' Gauntlet is open."],
 	["nightfall_open", "Nightfall", "The Hush sleeps. Nightfall is open: the same halls, deeper, darker, angrier."],
 ]
@@ -926,6 +929,10 @@ func _card_due(id: String) -> bool:
 			return Classes.deep and not Game.heroes().is_empty() and Game.has_method("points_back") and int(Game.points_back()) > 0
 		"nightfall_waits":
 			return Game.has_method("relock_card") and not (Game.relock_card() as Dictionary).is_empty()
+		"shop_open":
+			# Once 1-1 is cleared (1-2 open): from then on he has embers to
+			# spend and finds to sell.
+			return Game.hero_made() and Game.unlocked_count("dusk") > 1
 		"gauntlet", "nightfall_open":
 			return Game.seen("homecoming")
 	return false

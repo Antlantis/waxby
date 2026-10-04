@@ -15,6 +15,9 @@ extends Control
 ## The "skill points to spend" line under the XP is a button: it opens the
 ## Altar Rites' choice card (rites.gd, choice_card.gd) over the screen, a
 ## skill learned with each pick until Later or the points run out.
+## The buttons: Onward · Shop · Replay · Map. Shop opens Waxley's shop
+## (chandler_screen.gd) over the results, its back button "Back" to them
+## (the results wait meanwhile); it wears the map's mark (Game.shop_badge).
 
 signal next
 signal replay
@@ -27,6 +30,7 @@ const Progression := preload("res://scripts/progression.gd")
 const Combat := preload("res://scripts/combat.gd")
 const Rites := preload("res://scripts/rites.gd")
 const ChoiceCard := preload("res://scripts/choice_card.gd")
+const Chandler := preload("res://scripts/chandler_screen.gd")
 
 const XP_START := 1.3             # when the XP bar starts filling
 const XP_TIME := 1.6
@@ -55,6 +59,9 @@ var _marks_seen := 0
 var lost_rect := Rect2()          # where the Lost Wick's card drew (tests)
 var spend_rect := Rect2()         # the "skill points to spend" pill when last drawn ({} while it isn't)
 var choice: Control = null        # choice_card.gd: the Rites over the screen (made the first time)
+var shop: Control = null          # chandler_screen.gd over the results while it's open
+var shop_btn: Button
+var _shop_badge := {}             # its mark (Game.shop_badge), asked as the screen opens and as the shop closes
 var _spend: Button                # an invisible button over the pill
 const LOST_WICKS := {1: "The Lamplighter", 2: "The Old Chandler", 3: "The Gardener's Boy", 4: "Brother Rook",
 		5: "Sister Solder", 6: "The Iron Abbess"}
@@ -65,13 +72,17 @@ func _ready() -> void:
 	UI.warm()
 	var last := index >= Game.LEVELS.size() - 1
 	var b1 := UI.make_button("Onward" if not last else "To the map", true, func(): next.emit(), "select", 18)
+	shop_btn = UI.make_button("Shop", false, func(): open_shop(), "click", 18)
+	shop_btn.name = "Shop"
+	shop_btn.draw.connect(func(): Chandler.draw_badge(shop_btn, _shop_badge, _t))
 	var b2 := UI.make_button("Replay", false, func(): replay.emit(), "click", 18)
 	var b3 := UI.make_button("Map", false, func(): to_map.emit(), "click", 18)
-	for b in [b1, b2, b3]:
+	for b in [b1, shop_btn, b2, b3]:
 		b.custom_minimum_size = Vector2(140, 44)
 		b.modulate.a = 0.0
 		add_child(b)
 		_btns.append(b)
+	_shop_badge = Game.shop_badge() if Game.hero_made() else {}
 	_spend = Button.new()
 	_spend.flat = true
 	_spend.focus_mode = Control.FOCUS_NONE
@@ -167,6 +178,8 @@ func xp_shown() -> int:
 
 
 func _process(dt: float) -> void:
+	if shop_open():
+		return   # the count waits under the shop
 	_t += dt
 	var target: int = result.get("embers", 0)
 	if _t > 0.6 and _shown_embers < target:
@@ -206,7 +219,33 @@ func _process(dt: float) -> void:
 	if _spend.visible:
 		_spend.position = Vector2(spend_rect.position.x, spend_rect.get_center().y - UI.TAP_H * 0.5)
 		_spend.size = Vector2(spend_rect.size.x, UI.TAP_H)
+	if str(_shop_badge.get("kind", "")) == "new":
+		shop_btn.queue_redraw()   # its dot breathes
 	queue_redraw()
+
+
+func open_shop() -> Control:
+	## Waxley's shop over the results (opening on Sell with the satchel near
+	## full, like the map's); its Back comes back here.
+	if shop_open():
+		return shop
+	shop = Chandler.new()
+	shop.back_text = "Back"
+	shop.back.connect(close_shop)
+	add_child(shop)
+	return shop
+
+
+func close_shop() -> void:
+	if shop_open():
+		shop.queue_free()
+	shop = null
+	_shop_badge = Game.shop_badge() if Game.hero_made() else {}
+	shop_btn.queue_redraw()
+
+
+func shop_open() -> bool:
+	return shop != null and is_instance_valid(shop) and not shop.is_queued_for_deletion()
 
 
 func open_rites() -> bool:
