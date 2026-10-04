@@ -1,16 +1,34 @@
 """World 1, the Sunken Cathedral: 1-1 to 1-4 (v1's layouts with the v2
-retrofit). Kept byte for byte by tools/make_levels.py; see common.py for the
-format. WLS owns this file after Phase 0 (the 1-3 secret exit)."""
+retrofit, re-cut in Build 2); see common.py for the format. WLS owns this
+file after Phase 0 (the 1-3 secret exit).
+
+Build 2 gives each regular level its own shape and personality (the spec's
+approved design): 1-1 the flat nave, the tutorial (its back half the Choir
+Stalls); 1-2 a stair down into the crypt, 24 rows, with the Restless twist
+and the Verger; 1-3 a climb, 24 rows, up the burning choir to the roof, with
+the crossfire, Barbs' Loft (a sealed duel he may climb into) and Cantor Ash.
+W1 reads flat, down, up. The Descent lifts sections from here by name
+(tools/make_rooms.py): those are never edited (a level that changes one
+draws a copy: B_THORNS_13, B_ORGAN_13), so its rooms come out byte for byte.
+1-4 (the boss) keeps its strip."""
 import common
 from common import block, T_OPEN
 
 # Build 2's tables (common.world_tables, at the end; w3.py says what a row
-# holds): each regular level's roster and threat, written into its explicit
-# header list (common.header_of) and checked as it's written, with the
-# world's rules across them. Empty until the World 1 redesign fills them:
-# the levels are written as before.
-ROSTER = {}
-THREAT = {}
+# holds): each regular level's roster and threat (per 100 tiles of its
+# route; a forced Anointed at x2.5), written as its roster: and threat:
+# headers and checked as it's written, with the world's rules across them
+# (the ramp X-1 < X-2 < X-3; World 1 is gentle: common.GENTLE_WORLDS, only
+# its X-3's fodder falls). A Rattle is never a headline (rattle_max holds
+# them), so 1-1's headline is its Flits. Each level's roles: (its sections'
+# roles in route order) is in its entry.
+ROSTER = {
+    '1-1': {'headline': ['bat'], 'rattle_max': 8, 'fodder_max': 0.91, 'count': 11},
+    '1-2': {'headline': ['dripkin', 'bat'], 'support': ['bonebow'], 'rattle_max': 7, 'fodder_max': 0.95, 'count': 17},
+    '1-3': {'headline': ['thornback', 'hollow_helm'], 'support': ['bonebow', 'gutterwing', 'bat'],
+            'rattle_max': 1, 'fodder_max': 0.46, 'count': 11},
+}
+THREAT = {'1-1': 4.7, '1-2': 9.1, '1-3': 10.4}
 MAX_GAP = 165                 # tiles between checkpoints (1-1's 162 between its one altar and the start; its altars 1-3)
 ALTAR_BAND = (1, 3)
 
@@ -191,6 +209,11 @@ N_SPIKES = block('''
 14|##################################
 ''')
 
+# Build 2: the Choir Stalls (x 220-229) before it. One Rattle paces the
+# floor, one a stall two rows up, one a stall two rows over that, 3-4 tiles
+# apart: stomp the first and the bounce carries you onto the next, the
+# game's first "Chain x3" (Taper's "Stomp them. Gently." paid off). The
+# floor runs on beside the stalls, so it's never required.
 N_SECRET = block('''
  0|..........................
  1|..........................
@@ -200,11 +223,11 @@ N_SECRET = block('''
  5|..........................
  6|..........................
  7|..........................
- 8|...........o.o.o..........
- 9|...........#######........
-10|...........B..2..#........
-11|...........B....M#........
-12|...s.....###########...s..
+ 8|.......s...o.o.o..........
+ 9|......====.#######........
+10|...s.......B..2..#........
+11|..====.....B....M#........
+12|s........###########......
 13|##########################
 14|##########################
 ''')
@@ -224,7 +247,7 @@ N_BELL = block('''
  9|..........#####.....c.........
 10|.........######...............
 11|........#######...............
-12|....s..########.......E.......
+12|.......########.......E.......
 13|##############################
 14|##############################
 ''')
@@ -237,7 +260,8 @@ LEVELS.append({'id': '1-1', 'header': [
               '|{special_tip}'
               '|Attack cracked stone to break through'
               '|Hurt? Hold the flask to drink. Altars refill it'),
-], 'sections': [N_START, N_STEPS, N_STOMP, N_BLOCKS, N_PITS, N_SWORD, N_LEDGES, N_ALTAR, N_SPIKES, N_SECRET, N_BELL]})
+], 'roles': 'S C C C C C C DA C V B',
+    'sections': [N_START, N_STEPS, N_STOMP, N_BLOCKS, N_PITS, N_SWORD, N_LEDGES, N_ALTAR, N_SPIKES, N_SECRET, N_BELL]})
 
 
 # ============================================================ 1-2 The Crypt Stair
@@ -261,7 +285,7 @@ C_START = block('''
  9|........................
 10|....c...........c.......
 11|........................
-12|..P........@.o.o.o......
+12|..P........@.o.o.o...s..
 13|########################
 14|########################
 ''')
@@ -279,7 +303,7 @@ C_LOW = block('''
  9|..vvvv.k..vvvvvv........
 10|........................
 11|........................
-12|........s...o.o.o....a..
+12|........s...o.s.o....a..
 13|########################
 14|########################
 ''')
@@ -334,7 +358,7 @@ C_BATS = block('''
  9|........b.................
 10|...c.......c.........c....
 11|..........=====...........
-12|...K..............s.......
+12|...K......................
 13|##########################
 14|##########################
 ''')
@@ -349,7 +373,7 @@ C_DROP = block('''
  6|..............................
  7|..........o.a.o.......o.o.....
  8|..........=====...%%%%........
- 9|.......................b......
+ 9|..............................
 10|..............................
 11|......====.................c..
 12|...........s..................
@@ -372,7 +396,7 @@ C_SECRET = block('''
  9|........######......===...
 10|........#....#......=.....
 11|........#.3..B............
-12|...s..###..M.B.....K......
+12|......###..M.B............
 13|##########################
 14|##########################
 ''')
@@ -386,7 +410,7 @@ C_BELL = block('''
  5|..........................
  6|..........................
  7|..........................
- 8|...........b..............
+ 8|..........................
  9|..........................
 10|.....c............c.......
 11|..........................
@@ -395,12 +419,47 @@ C_BELL = block('''
 14|##########################
 ''')
 
-LEVELS.append({'id': '1-2', 'header': [
-    ('title', 'The Crypt Stair'), ('subtitle', '1-2'), ('music', 'chapel'), ('theme', 'crypt'), ('area', '3'),
-    ('dread', 'Sootwing|bat|Swift,Burning'),
-    ('story_start', 'beat_1_2'),
-    ('hints', 'Drips that twitch are alive'),
-], 'sections': [C_START, C_LOW, C_CRUMBLE, C_MOVER, C_BATS, C_DROP, C_SECRET, C_BELL]})
+# Build 2: the Verger's Nave, on the crypt floor. The second altar at its
+# door, then the Verger (a forced Anointed Rattle, Warded: his three candle
+# motes stop a swing till a stomp breaks them) pacing 13 tiles on between
+# two restless Rattles, and a Dripkin under the low arch at its far end.
+C_VERGER = block('''
+ 0|############################
+ 1|############################
+ 2|.......................#####
+ 3|.......................#####
+ 4|.......................#####
+ 5|.......................#####
+ 6|.........................k..
+ 7|............................
+ 8|............................
+ 9|.....c.......c.......c......
+10|............................
+11|............................
+12|..K......s.....s......s.....
+13|############################
+14|############################
+''')
+
+# Build 2: the crypt stair, 24 rows. From the nave's floor (row 13) it goes
+# down to the right in flights of a row (C_LOW's spiked vault, the
+# crumbling slabs, the moving ledge, the bat vault with the star route, the
+# drop), then one step of 4 rows at C_DROP's end to the crypt floor (row 22),
+# flat for the last third: the Verger's Nave, the Lidlurk room under
+# Sootwing's roost, the bell. Every drop on the way is 4 rows or less (max_drop),
+# its landing in view before he steps off. Restless: a stomped Rattle rises
+# once, on the step above him, unless he strikes its bones.
+LEVELS.append({'id': '1-2', 'name': 'The Crypt Stair', 'music': 'chapel', 'theme': 'crypt', 'area': 3,
+               'dread': 'Sootwing|bat|Swift,Burning',
+               'story_start': 'beat_1_2',
+               'max_drop': 4,
+               'twist': 'restless',
+               'anoint': [(C_VERGER, 15, 12, 'Warded', 'The Verger')],
+               'roles': 'S C C C A C A VD B',
+               'hints': ['Drips that twitch are alive'],
+               'height': 24,
+               'sections': [(C_START, 0), (C_LOW, 1), (C_CRUMBLE, 2), (C_MOVER, 3), (C_BATS, 4), (C_DROP, 5),
+                            (C_VERGER, 9), (C_SECRET, 9), (C_BELL, 9)]})
 
 
 # ============================================================ 1-3 The Burning Choir
@@ -408,7 +467,10 @@ LEVELS.append({'id': '1-2', 'header': [
 # Bonebow on the far bank of the rising ledge, a moth by the altar, Brother
 # Barbs' lair up over the Thornbacks, a second altar before the organ loft,
 # a Hollow Helm past it, a Lidlurk in the loft room, one more Rattle, and
-# the star-coin: a lone post high over the lava, sigil 1 above it.
+# the star-coin: a lone post high over the lava, sigil 1 above it. Build 2
+# (below): the crossfire, Barbs' Loft sealed, Cantor Ash on the roof, a Flit
+# over the bell's lava, the bell 5 tiles in from the level's end (clear of
+# the HUD's corner at the top of the climb).
 
 B_START = block('''
  0|........................
@@ -459,7 +521,7 @@ B_RISE = block('''
  9|..........................
 10|......|||........==.......
 11|..........................
-12|.......................a..
+12|..........................
 13|####~~~~~~~~~~~~~~~~~#####
 14|####~~~~~~~~~~~~~~~~~#####
 ''')
@@ -519,13 +581,13 @@ B_ORGAN = block('''
 ''')
 
 # v3 (WLS): the secret exit to 1-S, inserted before B_BELL so everything
-# before it keeps its x (the star route's post at (69, 5), both altars).
+# before it keeps its x (the star route's post at x 69, both altars).
 # Ledges climb to a false-stone patch in the ceiling with moonlight through
 # its crack (features/secrets.gd draws the light, the glint and the hum);
 # the silver bell hangs in the attic's arch right over it, so one jump up
 # into the broken crack rings it. Secret-gated: until Game.SECRET_LEVELS
 # holds 1-S (its file in the build) the bell and arch aren't spawned and
-# the attic is an empty nook. No monsters (1-3 keeps v2's ten).
+# the attic is an empty nook. Build 2: Cantor Ash paces the roof under it.
 B_ROOF = block('''
  0|##############################
  1|##########.......#############
@@ -539,7 +601,7 @@ B_ROOF = block('''
  9|..............................
 10|......===.............c.......
 11|..............................
-12|..............................
+12|..................h...........
 13|##############################
 14|##############################
 ''')
@@ -552,24 +614,58 @@ B_BELL = block('''
  4|................................
  5|....................===.........
  6|................................
- 7|................................
+ 7|.........b......................
  8|...............===..............
  9|................................
 10|..........===.............c.....
 11|.......==.......................
-12|....s.......................E...
+12|....s.....................E.....
 13|######~~~~~~~~~~~~~~~~##########
 14|######~~~~~~~~~~~~~~~~##########
 ''')
 
-LEVELS.append({'id': '1-3', 'header': [
-    ('title', 'The Burning Choir'), ('subtitle', '1-3'), ('music', 'chapel'), ('theme', 'choir'), ('area', '5'),
-    ('dread', 'Brother Barbs|thornback|Warded,Vengeful'),
-    ('secret', '1-S'),
-    ('story_start', 'beat_1_3'),
-    ('hints', 'Moths latch onto your flame. Attack to shake them off'
-              '|Hollow Helms block in front. Hit from behind or stomp'),
-], 'sections': [B_START, B_LAVA, B_RISE, B_THORNS, B_GLIDE, B_ORGAN, B_ROOF, B_BELL]})
+# Build 2: copies of the two the Descent lifts (it keeps the originals).
+# The crossfire at the loft's foot: a Thornback braced 6 tiles off the lava
+# bank, a Bonebow on the low ledge behind it shooting over it; the altar
+# moves to the loft's foot, 5 tiles before its gap; Brother Barbs waits
+# clear of the loft's ends (a sealed room's foe stands 4+ columns in).
+B_THORNS_13 = common.swap(B_THORNS, {(9, 12): '.', (6, 12): 't', (9, 9): 'a', (2, 12): '.', (13, 12): 'K',
+                                     (26, 5): '.', (24, 5): 'D'})
+# The organ floor's Thornback retired.
+B_ORGAN_13 = common.swap(B_ORGAN, {(6, 12): '.'})
+
+
+def _on_rock(sec, dy, h):
+    """sec placed at dy in an h-row level (common.place), its lava pools
+    lying on the cathedral's rock: place() carries a pit's air down, and
+    lava's too."""
+    out = common.place(sec, dy, h)
+    for y in range(dy + len(sec), h):
+        out[y] = ''.join('#' if ch == '~' else out[y][x] for x, ch in enumerate(sec[-1]))
+    return out
+
+
+# Build 2: the climb, 24 rows. From the choir floor by the lava (row 22) up
+# a storey to the crossfire's landing (a 3-row step at the lava's far bank),
+# and on up two rows at a time: the gliding ledges, the organ loft, a door
+# onto the roof (row 13), where Cantor Ash (a forced Anointed Hollow Helm,
+# Burning) paces under the hidden 1-S attic, and the bell by the tower door.
+# Barbs' Loft hangs a storey over the crossfire: climb in by its gap and it
+# seals with his bar (room: rows 3-7 of the loft); walk under it and it never
+# does (twist: duel, its card "Barbs' Loft").
+LEVELS.append({'id': '1-3', 'name': 'The Burning Choir', 'music': 'chapel', 'theme': 'choir', 'area': 5,
+               'dread': 'Brother Barbs|thornback|Warded,Vengeful',
+               'secret': '1-S',
+               'story_start': 'beat_1_3',
+               'anoint': [(B_ROOF, 18, 12, 'Burning', 'Cantor Ash')],
+               'twist': 'duel',
+               'roles': 'S C C DA C VA C B',
+               'room': [('duel', ((B_THORNS_13, 18), (B_THORNS_13, 29)), {'rows': (3, 7)})],
+               'hints': ['Moths latch onto your flame. Attack to shake them off',
+                         'Hollow Helms block in front. Hit from behind or stomp'],
+               'height': 24,
+               'sections': [_on_rock(B_START, 9, 24), _on_rock(B_LAVA, 9, 24), _on_rock(B_RISE, 9, 24), (B_THORNS_13, 6),
+                            _on_rock(B_GLIDE, 4, 24), (B_ORGAN_13, 2), (B_ROOF, 0), _on_rock(B_BELL, 0, 24)]})
 
 
 # ============================================================ 1-4 The Bell Tower

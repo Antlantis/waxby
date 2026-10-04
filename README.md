@@ -166,7 +166,7 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           their own height; and the shape review's: split roads, a switchback,
                           waxfall terraces, islands in the wind, the works' turn, a 36-row
                           rootvault tower); each
-                          W3-W6 module's ROSTER and THREAT tables are its regular levels' cast
+                          W1-W6 module's ROSTER and THREAT tables are its regular levels' cast
                           and threat, written as their roster: and threat: headers;
                           common.py's Build 2 toolkit: swap, stamp, span, anoint_header,
                           rooms_header, the world's rules: the ramp, landmarks and altars

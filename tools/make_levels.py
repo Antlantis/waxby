@@ -12,10 +12,11 @@ engine's shape labs, drawn on grids of their own height) writes its levels
 itself and returns their ids. A module that isn't
 there yet is skipped, so a partial build still writes what it has.
 
-World 1 (the Sunken Cathedral) keeps its v1 layouts with the v2 retrofit;
-World 2 (the Tallow Deep) its four v2 levels: both are written byte for byte
-as v2 wrote them, less the signs the sign cut took (tests/test_export.gd
-holds their checksums).
+World 1 (the Sunken Cathedral) and World 2 (the Tallow Deep) keep their
+bosses (1-4, 2-4) byte for byte as v2 wrote them, less the signs the sign
+cut took (tests/test_export.gd holds their checksums); Build 2 re-cut their
+regular levels to shapes of their own (w1.py, w2.py say which), and the
+Descent's rooms lifted from their sections come out byte for byte.
 The reachability bot in tests/test_core.gd must reach every sigil and bell;
 tests/test_content.gd runs it again with the waxfalls on.
 
