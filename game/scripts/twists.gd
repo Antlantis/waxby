@@ -336,8 +336,9 @@ func _step_remains(dt: float) -> void:
 		r["tell"] = float(r["tell"]) + dt
 		if float(r["tell"]) >= RISE_TELL and playing and pl.center().distance_to(rr.get_center()) >= RISE_CLEAR:
 			r["up"] = true
+	if not struck.is_empty():
+		remains = remains.filter(func(r): return not struck.any(func(s): return is_same(s, r)))
 	for r in struck:
-		remains.erase(r)
 		laid += 1
 		var c := remains_rect(r).get_center()
 		world.dust_at(Vector2(c.x, r["pos"].y))
@@ -345,9 +346,10 @@ func _step_remains(dt: float) -> void:
 			world.glow.burst(c, 10, Color(SOUL, 0.8), 90.0, 0.4, -40.0, 2.0)
 		world._sfx("bones", 1.25)
 		world.floaters.add(c + Vector2(0, -18), 0.0, "text", 0, "At rest")
-	for r in remains.duplicate():
-		if r.get("up", false):
-			remains.erase(r)
+	var up: Array = remains.filter(func(r): return r.get("up", false))
+	if not up.is_empty():
+		remains = remains.filter(func(r): return not r.get("up", false))
+		for r in up:
 			_rise(r)
 
 

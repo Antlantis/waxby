@@ -449,7 +449,7 @@ func step(dt: float) -> void:
 			r["done"] = true
 			# Two flips of the same run cancel (a belt_flip's list stays short).
 			for o in belts_rev:
-				if o != r and o["done"] and not o.get("gone", false) and int(o["x0"]) == int(r["x0"]) and int(o["x1"]) == int(r["x1"]):
+				if not is_same(o, r) and o["done"] and not o.get("gone", false) and int(o["x0"]) == int(r["x0"]) and int(o["x1"]) == int(r["x1"]):
 					o["gone"] = true
 					r["gone"] = true
 					cancel = true
