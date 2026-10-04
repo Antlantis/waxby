@@ -1139,7 +1139,7 @@ func _test_build2() -> void:
 	_check(l3.height > LevelData.STRIP_ROWS and Twists.id_in(l3) == "omens" and str(l3.headers.get("roads", "")).split(";", false).size() == 2,
 			"5-3: the double deck, %d rows, the omens twist, two roads (%s)" % [l3.height, l3.headers.get("roads", "")])
 	_check(rooms.size() == 1 and str(rooms[0]["kind"]) == "hold" and absf(float(rooms[0]["secs"]) - 15.0) < 0.01,
-			"5-3: one sealed room, Hold the Glass, 15 s (%s)" % [rooms])
+			"5-3: one sealed room, Hold the Glass, 15 s (the retune's, provisional: the author's call) (%s)" % [rooms])
 	if rooms.size() == 1:
 		var r: Dictionary = rooms[0]
 		var em: Vector2i = (named.get("Sister Ember", {}) as Dictionary).get("cell", Vector2i(-1, -1))
@@ -1153,6 +1153,22 @@ func _test_build2() -> void:
 				"5-3: Sister Ember and the three Paneguards hold the room")
 		_check(not opens.is_empty() and opens[-1] - opens[0] >= 3 and int((r["rows"] as Array).size()) == 0,
 				"5-3: the room is as tall as the level, in by one doorway and out by another lower (doorway rows %s)" % [opens])
+		# No refuge to wait the hold out on: inside it, no spot he can stand
+		# is more than a row over the knights' floor (the review's: altar 3's
+		# stone ran 4 tiles in, 3 rows up, and the hold was waited out there).
+		var knights := 99
+		for e in _entities(l3, "paneguard"):
+			knights = mini(knights, int(e["cell"].y))
+		var stands := {}
+		for x in range(int(r["x0"]) + 1, int(r["x1"])):
+			for y in range(1, l3.height - 1):
+				var under: int = l3.tile(x, y + 1)
+				if not LevelData.is_solid(l3.tile(x, y)) and not LevelData.is_solid(l3.tile(x, y - 1)) and (LevelData.is_solid(under) or LevelData.is_ledge(under)):
+					stands[y] = true
+		var ys: Array = stands.keys()
+		ys.sort()
+		_check(knights < 99 and ys.size() >= 1 and int(ys[0]) >= knights - 1,
+				"5-3: Hold the Glass has no spot up out of the knights' reach (standing rows %s, the knights on %d)" % [ys, knights])
 	var low := 999
 	for e in _entities(l3, "gutterwing") + _entities(l3, "bonebow"):
 		low = mini(low, int(e["cell"].y))

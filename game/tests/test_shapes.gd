@@ -246,6 +246,15 @@ func _test_rules() -> void:
 	var caught := tall.duplicate()
 	_put(caught, 3, 12, "======")
 	_check(Rules.catch_problems(_rows(caught)).is_empty(), "a catch floor 7 rows down passes")
+	# A catch that gives way itself (a lily over a pool) drops him on: a
+	# Brinejaw in the pool's second row under it is where he lands too.
+	var pond := tall.duplicate()
+	_put(pond, 3, 12, "%%%%%%")
+	_put(pond, 2, 18, "::::::::")
+	_put(pond, 2, 19, "::::::::")
+	_check(Rules.catch_problems(_rows(pond)).is_empty(), "a lily over a pool catches %s" % [Rules.catch_problems(_rows(pond))])
+	_put(pond, 6, 19, "f")
+	_check(str(Rules.catch_problems(_rows(pond))).contains("waits where"), "a Brinejaw under the lily it lands on is caught %s" % [Rules.catch_problems(_rows(pond))])
 	# A tall level's screens are 12 rows: four Rattles on each of two storeys
 	# 12 rows apart crowd no screen; eight on one do.
 	var two := _blank(30, 24)
@@ -361,13 +370,30 @@ func _test_review_rules() -> void:
 	_check(str(Rules.shape_problems(_rows(dr, _hd({"lit_drops": 3})))).contains("lit_drops 3"), "lit_drops: a 5-row drop is too far")
 	var lit := dr.duplicate()
 	_put(lit, 18, 19, "======")
+	_put(lit, 15, 16, "L")             # posts he passes (and lights) before each drop
 	_put(lit, 23, 18, "L")
-	_put(lit, 26, 20, "L")
 	_check(not str(Rules.shape_problems(_rows(lit, _hd({"lit_drops": 3})))).contains("descent"), "lit_drops: lit 3- and 2-row drops pass %s" % [Rules.shape_problems(_rows(lit, _hd({"lit_drops": 3})))])
 	var dark := lit.duplicate()
+	_put(dark, 15, 16, ".")
 	_put(dark, 23, 18, ".")
-	_put(dark, 26, 20, ".")
 	_check(str(Rules.shape_problems(_rows(dark, _hd({"lit_drops": 3})))).contains("lit_drops 3"), "lit_drops: the same in the dark fails")
+	# A post at the landing isn't lit till he gets there; a sconce is.
+	var late := dark.duplicate()
+	_put(late, 19, 18, "L")
+	_put(late, 26, 21, "L")
+	_check(str(Rules.shape_problems(_rows(late, _hd({"lit_drops": 3})))).contains("lit_drops 3"), "lit_drops: posts at the landings are dark when he lands")
+	var sconce := dark.duplicate()
+	_put(sconce, 19, 17, "c")
+	_put(sconce, 25, 20, "c")
+	_check(not str(Rules.shape_problems(_rows(sconce, _hd({"lit_drops": 3})))).contains("descent"), "lit_drops: sconces over the landings pass %s" % [Rules.shape_problems(_rows(sconce, _hd({"lit_drops": 3})))])
+	_check(str(Rules.shape_problems(_rows(sconce, _hd({"lit_drops": 3, "theme": "stillshore"})))).contains("lit_drops 3"), "lit_drops: W6's dead sconces light nothing")
+	# Lit posts (lit_posts:) burn from the start: the posts at the landings
+	# light them; a lit post names a lantern post (common.py agrees).
+	var steady: Array = Rules.shape_problems(_rows(late, _hd({"lit_drops": 3, "lit_posts": "19,18; 26,21"})))
+	_check(not str(steady).contains("descent") and not str(steady).contains("lit_posts"), "lit_posts: posts lit from the start light their landings %s" % [steady])
+	var nopost: Array = Rules.shape_problems(_rows(late, _hd({"lit_drops": 3, "lit_posts": "5,5"})))
+	var noread: Array = Rules.shape_problems(_rows(late, _hd({"lit_drops": 3, "lit_posts": "x"})))
+	_check(str(nopost).contains("no lantern post") and noread.any(func(p): return str(p).begins_with("lit_posts 'x'")), "a lit post names a lantern post %s %s" % [nopost, noread])
 	_check(str(Rules.shape_problems(_rows(lit, _hd({"landing": "0/0"})))).contains("landing 0/0")
 			and not str(Rules.shape_problems(_rows(lit, _hd({"landing": "1/0"})))).contains("descent")
 			and Rules.shape_problems(_rows(lit, _hd({"landing": "x"}))).any(func(p): return str(p).begins_with("landing 'x'")), "landing: walk-offs land a column ahead; one that doesn't read")
@@ -475,6 +501,20 @@ func _test_review_rules() -> void:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
 		_check(lv.errors.is_empty() and Rules.shape_problems(lv).is_empty() and Rules.header_problems(lv).is_empty(),
 				"%s keeps the shape and header rules %s %s" % [id, Rules.shape_problems(lv), Rules.header_problems(lv)])
+	# A lamplit level's lilies: a run by a post held whole (three cells from
+	# it), one run on past its reach caught, a far run soft and fine; and no
+	# rule without the twist (common.lamp_problems agrees).
+	var lamp := _blank(40, 15)
+	_put(lamp, 9, 11, "%%%")
+	_put(lamp, 30, 11, "%%%%")
+	_put(lamp, 1, 12, "P")
+	_put(lamp, 8, 12, "L")
+	_put(lamp, 38, 12, "E")
+	_fill(lamp, 0, 39, 13, 14)
+	_check(Rules.lamp_problems(_rows(lamp, _hd({"twist": "lamplit"}))).is_empty(), "a run three cells from its post is held whole %s" % [Rules.lamp_problems(_rows(lamp, _hd({"twist": "lamplit"})))])
+	_put(lamp, 12, 11, "%%%")
+	_check(str(Rules.lamp_problems(_rows(lamp, _hd({"twist": "lamplit"})))).contains("[12, 13, 14]") and Rules.lamp_problems(_rows(lamp)).is_empty(),
+			"a run on past its post's reach is caught %s" % [Rules.lamp_problems(_rows(lamp, _hd({"twist": "lamplit"})))])
 	# A deck's gusts on its rows.
 	var gl := _level(_hd({"gusts": "4-7:L:A:0-11, 20-23:R:B"}) + "---\n" + "\n".join(loop))
 	_check(gl.gusts.size() == 2 and int(gl.gusts[0]["y0"]) == 0 and int(gl.gusts[0]["y1"]) == 11 and not (gl.gusts[1] as Dictionary).has("y0"),

@@ -7,7 +7,7 @@
 	},
 	"hero_level": 3,
 	"level": "4-3",
-	"note": "recorded by route_dfs.gd (a live search on the real modules: the weights, swings and the cog cloned from the World as they move; no foothold a weight sweeps), by way of the clock wall's landings (--touch), at Build 2's re-cut: right to left, through the Grindstone's hall (open with no monsters)",
+	"note": "recorded by route_dfs.gd (a live search on the real modules: the weights, swings and the cog cloned from the World as they move; no foothold a weight sweeps), by way of the clock wall's landings (--touch), at Build 2's re-cut: right to left, through the Owl Hall's belt and the Grindstone's hall (open with no monsters)",
 	"runs": [
 		[
 			0,
@@ -851,31 +851,15 @@
 		],
 		[
 			1,
-			39
+			7
 		],
 		[
 			17,
-			46
+			72
 		],
 		[
-			0,
-			1
-		],
-		[
-			17,
-			46
-		],
-		[
-			0,
-			1
-		],
-		[
-			17,
-			46
-		],
-		[
-			0,
-			1
+			1,
+			33
 		],
 		[
 			17,
@@ -884,6 +868,14 @@
 		[
 			1,
 			21
+		],
+		[
+			17,
+			65
+		],
+		[
+			0,
+			1
 		],
 		[
 			17,
@@ -994,5 +986,5 @@
 			420
 		]
 	],
-	"ticks": 10840
+	"ticks": 10838
 }

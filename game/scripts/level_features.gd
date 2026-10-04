@@ -21,7 +21,9 @@ extends RefCounted
 ##   waxfall !      2.0 s on, 1.2 s off, with a 0.4 s gurgle before it starts;
 ##                  while on it pushes down at 300 px/s and douses
 ##   lantern L      a slash or a touch lights it: r 140 for 25 s, guttering
-##                  (flickering) for the last 3 s. Inside a boss arena an L is
+##                  (flickering) for the last 3 s; one the header's lit_posts
+##                  names burns from the start and never burns down (a
+##                  steady flame: 6-2's landing lights). Inside a boss arena an L is
 ##                  a brazier instead: r 130, lit until snuffed, tagged
 ##                  "brazier" in world.add_light (the Snuffer reads them).
 ##                  The fight starts with the floor braziers lit and the
@@ -164,6 +166,19 @@ func build(w: Node, lv: RefCounted) -> void:
 						"cocoon": top + Vector2(0, NEST_COCOON), "tell": -1.0, "cool": 0.0,
 						"wings": [], "out": 0.0, "spawned": 0})
 	reset_braziers()
+	# A level's lit posts (`lit_posts: x,y; x,y`: 6-2's landing lights in the
+	# dark): lit from the start, a steady flame that never burns down (they
+	# go out only as any post does: a drip, a Stillmaw), so a drop onto one
+	# is never blind (tools/levels/common.py lit_cells counts them lit).
+	for part in str(lv.headers.get("lit_posts", "")).split(";", false):
+		var xy := part.strip_edges().split(",")
+		if xy.size() != 2:
+			continue
+		var c := Vector2i(int(xy[0]), int(xy[1]))
+		for l in lanterns:
+			if l["cell"] == c and not l["brazier"]:
+				l["steady"] = true
+				light(l, true)
 	for name in MODULE_ORDER:
 		var path: String = MODULES[name]
 		if not ResourceLoader.exists(path):
@@ -232,14 +247,15 @@ func step(dt: float) -> void:
 	for l in lanterns:
 		if not l["lit"]:
 			continue
-		if not l["brazier"]:
+		var steady: bool = l["brazier"] or bool(l.get("steady", false))
+		if not steady:
 			l["t"] = float(l["t"]) - dt
 			if l["t"] <= 0.0:
 				_put_out(l)
 				continue
 		var r := BRAZIER_R if l["brazier"] else LANTERN_R
 		var fl := 1.0 + 0.04 * sin(_t * 11.0 + l["pos"].x)
-		if not l["brazier"] and float(l["t"]) < LANTERN_GUTTER:
+		if not steady and float(l["t"]) < LANTERN_GUTTER:
 			fl = 0.7 + 0.3 * absf(sin(_t * 9.0 + sin(_t * 23.0) * 2.0))
 		if int(l["id"]) >= 0:
 			world.move_light(int(l["id"]), l["flame"], r * fl)
@@ -905,7 +921,7 @@ func draw_glow(glow: Node2D) -> void:
 		if not view.has_point(l["flame"]):
 			continue
 		if l["lit"]:
-			var gut: bool = not l["brazier"] and float(l["t"]) < LANTERN_GUTTER
+			var gut: bool = not l["brazier"] and not bool(l.get("steady", false)) and float(l["t"]) < LANTERN_GUTTER
 			if l["brazier"]:
 				# A live flame on the coals.
 				glow.flame(l["flame"] + Vector2(0, 2), 16.0, l["pos"].x, true)

@@ -121,7 +121,8 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           niches, girders, shelves; backdrop_layer.gd for v2's cathedral and cavern); the
                           rootvault at 30 rows and more is 3-2's tower: roots, the ossuary, the canopy
   scripts/level_data.gd   the ASCII level format and its legend (read this before editing a level)
-  scripts/level_features.gd  braziers, lanterns, waxfalls, drip spouts, false stone
+  scripts/level_features.gd  braziers, lanterns (a `lit_posts:` header's burn from the start,
+                          a steady flame), waxfalls, drip spouts, false stone
   scripts/twists.gd       Build 2's level twists, from an optional `twist:` header (none: the
                           level plays as before): the registry (a name and a line per world,
                           shown as "4-2 · On the Hour" on the title card, then the line in the
@@ -131,7 +132,8 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           pays nothing, a respawn never rises; restless raises Rattles in
                           Worlds 1-2, every floor kind from 3), dark, omens, dry (frost altars),
                           packs, toll (a bell every 16 beats of the W4 tick quickens what's in
-                          view) and lamplit. The belts' `belt_flip:` header is clockwork.gd's
+                          view; no Anointed rolls Swift under it) and lamplit. The belts'
+                          `belt_flip:` header is clockwork.gd's
   scripts/story.gd        every story scene as data; cutscene.gd plays them, cutscene_stage.gd draws
   scripts/name_entry.gd   the hero's name, asked for at the oath (the choose_name cue) and by the
                           Sheet's Rename: the field, the phone's keyboard, the rules (Story.clean_name)
@@ -275,7 +277,16 @@ tools/
   difficulty_probe.gd     the retune's measure: the --autoplay bot on Dusk with a first run's hero
                           plays level files (an old cut's copy or a variant too), every calling and
                           seed, and logs each run's snuffs and the life lost by cause and altar
-                          stretch (a debug bot: read a level against its own world and old cut)
+                          stretch (a debug bot: read a level against its own world and old cut).
+                          What it can't measure: 4-1 (the bot slides off its first screen's ice
+                          into the 2-wide pits at x 26-27 and 37-38 and never gets past column 40;
+                          4-1 has no weights) and most of 4-3 (W4's weights: 7% of its runs ring
+                          the bell), so World 4's X-1 < X-2 < X-3 rests on its threat: headers;
+                          and an Unwick (the bot stands still to plan and swings without a break,
+                          so its echo walks into it: 6.9 of its 7.4 monster lives in 6-2, which
+                          its runs mostly time out of). 5-3's Hold the Glass at 15 s is its call
+                          and provisional (the author's to make: 15 s with three Paneguards, 20 s
+                          with two, or the spec's 20 s)
   art/                    the art generators, contact sheets, the icon renderer
   audio/                  the music: music.py (v2's eight) merging tracks_worlds.py and
                           tracks_bosses.py (v3's, on instruments_v3.py); check_music.py (files,

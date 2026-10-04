@@ -91,6 +91,7 @@ const HEAD_EASE := 900.0         # px/s that stop moves down the glass when he g
 # account), so the tell isn't off the top of the glass. Flits and nests
 # tell only in plain view, so one too high even for that waits.
 const LOOK_UP_MAX := 52.0
+const DUEL_BAR := 58.0           # px of the view's top a sealed duel's bar and name take (hud.gd boss_rect: 44 + 10 + 4)
 # Spec §4.1 rule 3 (nothing knocks Wick into a pit without a tell), from
 # World 5 on, where the floor is gone (the rev5 review: a Glassmite's touch
 # on 2-wide glass sent him into the void): a contact knock that would carry
@@ -4594,11 +4595,12 @@ func look_up() -> float:
 	## would be over its top edge: a drip spout's nozzle with its glint, a
 	## Dripkin still hanging, a Bonebow up on a ledge, a Flit's roost with
 	## its bob and the rise of its wind-up (bat.gd reach_rect), a Gutterwing
-	## nest. One too high to show whole even so still gets the full lean if
-	## that shows some of it (never less of it than the old line showed);
-	## one that wouldn't show at all gets none. Either way their own rules
-	## keep them fair: a Bonebow looses, a Flit winds up and a nest breeds
-	## only in plain view.
+	## nest; and a sealed duel's awake foe over him, under its bar. One too
+	## high to show whole even so still gets the full lean if that shows
+	## some of it (never less of it than the old line showed); one that
+	## wouldn't show at all gets none. Either way their own rules keep them
+	## fair: a Bonebow looses, a Flit winds up and a nest breeds only in
+	## plain view.
 	var v := _view_size()
 	var x0 := cam.x - v.x * 0.5
 	var x1 := cam.x + v.x * 0.5
@@ -4624,6 +4626,21 @@ func look_up() -> float:
 				if (st == "hang" or st == "tell" or st == "grow") and hang.x > x0 and hang.x < x1 and hang.y < feet \
 						and (tall_cam == null or tall_cam.icicle_near(feet, hang)):
 					need = _lean(need, feet - hang.y + 4.0, line, 30.0)
+		# A sealed duel's foe awake over him (4-3's Grindstone rolling over his
+		# box): shown under the duel's bar (DUEL_BAR), as far as the lean goes
+		# (the shapes review: from the hall's floor 40% of his round was off
+		# the top). Leaned for whenever it shows more of him.
+		var sm: Object = features.module("sealed") if features.has_method("module") else null
+		if sm != null:
+			for r in sm.get("rooms"):
+				var nf = r.get("named")
+				if str(r.get("phase", "")) != "fight" or nf == null or not is_instance_valid(nf) or not nf.alive:
+					continue
+				var nr: Rect2 = nf.rect()
+				if nr.end.x > x0 and nr.position.x < x1 and nr.position.y < feet:
+					var more: float = feet - nr.position.y + DUEL_BAR - line
+					if more > 0.0:
+						need = maxf(need, minf(more, LOOK_UP_MAX))
 	for e in enemies:
 		if not e.alive or e.gone:
 			continue

@@ -1117,6 +1117,8 @@ static func roll_omens(k: String, diff_id: String, world_n: int, r: RandomNumber
 	## in a story level; a mode's v3 rows, W5 35%, W6 50%).
 	## A fixed count takes no roll, and W1-W2 take no second-Omen roll, so a
 	## seed picks the same Omens there as ever. Never more than MAX_OMENS.
+	## rules.omens_ban: Omens never rolled here (the toll's twist: no Swift,
+	## so its x1.3 never stacks on Swift's x1.4; Twists.elite_rules).
 	var span := omen_span(diff_id)
 	var most := span.y
 	var least := span.x
@@ -1131,7 +1133,8 @@ static func roll_omens(k: String, diff_id: String, world_n: int, r: RandomNumber
 		if second > 0.0 and r.randf() < second:
 			n += 1
 	n = mini(n, MAX_OMENS)
-	var pool := omen_pool(k, diff_id, world_n)
+	var ban: Array = rules.get("omens_ban", [])
+	var pool := omen_pool(k, diff_id, world_n).filter(func(o): return not ban.has(o))
 	var out := []
 	while out.size() < n and pool.size() > 0:
 		var i := r.randi_range(0, pool.size() - 1)
@@ -1170,9 +1173,10 @@ static func forced_omens(k: String, chosen: Array, diff_id: String, world_n: int
 	## A header's Anointed's Omens: the chosen ones its kind may carry here
 	## (omen_pool: not NEVER_ON, the world's, Vengeful and W4's Echoing only
 	## where they're allowed), then topped up from the pool to the
-	## difficulty's least (Witching's 2), never more than MAX_OMENS. None
-	## chosen, or none that fit: roll_omens, as the World would (so 3-S's
-	## plain cells roll what they always rolled).
+	## difficulty's least (Witching's 2; never an Omen rules.omens_ban
+	## holds), never more than MAX_OMENS. None chosen, or none that fit:
+	## roll_omens, as the World would (so 3-S's plain cells roll what they
+	## always rolled).
 	var pool := omen_pool(k, diff_id, world_n)
 	var out := []
 	for o in chosen:
@@ -1183,7 +1187,8 @@ static func forced_omens(k: String, chosen: Array, diff_id: String, world_n: int
 	var least := omen_span(diff_id).x
 	if rules.has("omens_min"):
 		least = maxi(least, int(rules["omens_min"]))
-	var rest := pool.filter(func(o): return not out.has(o))
+	var ban: Array = rules.get("omens_ban", [])
+	var rest := pool.filter(func(o): return not out.has(o) and not ban.has(o))
 	while out.size() < mini(least, MAX_OMENS) and rest.size() > 0:
 		var i := r.randi_range(0, rest.size() - 1)
 		out.append(rest[i])

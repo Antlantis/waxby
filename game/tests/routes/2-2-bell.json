@@ -3,11 +3,11 @@
 	"diff": "dusk",
 	"end": {
 		"state": "clear",
-		"x": 9032
+		"x": 9025
 	},
 	"hero_level": 1,
 	"level": "2-2",
-	"note": "2-2 to its bell by the low road (Build 2's split roads, in the dark): the rafts, the cellar, down into the black water (the pillars, the raft, the shallows), the Empty Helm's hall, the shelves, the lantern passage, the Lantern Stones",
+	"note": "2-2 to its bell by the low road (Build 2's split roads, in the dark): the rafts, the cellar, down into the black water (the pillars, the raft, the shallows), the Empty Helm's hall, the shelves, the lantern passage, the Lantern Stones (the jaws' channels and the ford between them)",
 	"runs": [
 		[
 			0,
@@ -599,15 +599,31 @@
 		],
 		[
 			2,
-			57
+			21
 		],
 		[
 			18,
-			73
+			72
 		],
 		[
 			2,
-			43
+			27
+		],
+		[
+			18,
+			72
+		],
+		[
+			2,
+			15
+		],
+		[
+			18,
+			72
+		],
+		[
+			2,
+			44
 		],
 		[
 			18,
@@ -627,24 +643,12 @@
 		],
 		[
 			18,
-			72
-		],
-		[
-			2,
-			21
-		],
-		[
-			18,
-			72
-		],
-		[
-			2,
-			6
+			17
 		],
 		[
 			0,
 			420
 		]
 	],
-	"ticks": 8065
+	"ticks": 8061
 }

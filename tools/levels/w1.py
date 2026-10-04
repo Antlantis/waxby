@@ -9,7 +9,7 @@ and the Verger; 1-3 a climb, 24 rows, up the burning choir to the roof, with
 the crossfire, Barbs' Loft (a sealed duel he may climb into) and Cantor Ash.
 W1 reads flat, down, up. The Descent lifts sections from here by name
 (tools/make_rooms.py): those are never edited (a level that changes one
-draws a copy: B_THORNS_13, B_ORGAN_13), so its rooms come out byte for byte.
+draws a copy: B_THORNS_13), so its rooms come out byte for byte.
 1-4 (the boss) keeps its strip."""
 import common
 from common import block, T_OPEN
@@ -26,9 +26,9 @@ ROSTER = {
     '1-1': {'headline': ['bat'], 'rattle_max': 8, 'fodder_max': 0.91, 'count': 11},
     '1-2': {'headline': ['dripkin', 'bat'], 'support': ['bonebow'], 'rattle_max': 7, 'fodder_max': 0.95, 'count': 17},
     '1-3': {'headline': ['thornback', 'hollow_helm'], 'support': ['bonebow', 'gutterwing', 'bat'],
-            'rattle_max': 1, 'fodder_max': 0.46, 'count': 11},
+            'rattle_max': 1, 'fodder_max': 0.46, 'count': 12},
 }
-THREAT = {'1-1': 4.7, '1-2': 9.1, '1-3': 10.4}
+THREAT = {'1-1': 4.7, '1-2': 9.1, '1-3': 10.8}
 MAX_GAP = 165                 # tiles between checkpoints (1-1's 162 between its one altar and the start; its altars 1-3)
 ALTAR_BAND = (1, 3)
 
@@ -442,13 +442,15 @@ C_VERGER = block('''
 ''')
 
 # Build 2: the crypt stair, 24 rows. From the nave's floor (row 13) it goes
-# down to the right in flights of a row (C_LOW's spiked vault, the
-# crumbling slabs, the moving ledge, the bat vault with the star route, the
-# drop), then one step of 4 rows at C_DROP's end to the crypt floor (row 22),
-# flat for the last third: the Verger's Nave, the Lidlurk room under
-# Sootwing's roost, the bell. Every drop on the way is 4 rows or less (max_drop),
-# its landing in view before he steps off. Restless: a stomped Rattle rises
-# once, on the step above him, unless he strikes its bones.
+# down to the right in flights of one and two rows (a row to C_LOW's spiked
+# vault, where the Ossuary's risen Rattle stands on the step above him, a
+# row to the crumbling slabs, a row to the moving ledge, two to the bat
+# vault with the star route, two to the drop), then a step of 2 rows at
+# C_DROP's end to the crypt floor (row 22), flat for the last third:
+# the Verger's Nave, the Lidlurk room under Sootwing's roost, the bell. Every
+# drop on the way is 4 rows or less (max_drop), its landing in view before
+# he steps off. Restless: a stomped Rattle rises once, on the step above
+# him, unless he strikes its bones.
 LEVELS.append({'id': '1-2', 'name': 'The Crypt Stair', 'music': 'chapel', 'theme': 'crypt', 'area': 3,
                'dread': 'Sootwing|bat|Swift,Burning',
                'story_start': 'beat_1_2',
@@ -458,7 +460,7 @@ LEVELS.append({'id': '1-2', 'name': 'The Crypt Stair', 'music': 'chapel', 'theme
                'roles': 'S C C C A C A VD B',
                'hints': ['Drips that twitch are alive'],
                'height': 24,
-               'sections': [(C_START, 0), (C_LOW, 1), (C_CRUMBLE, 2), (C_MOVER, 3), (C_BATS, 4), (C_DROP, 5),
+               'sections': [(C_START, 0), (C_LOW, 1), (C_CRUMBLE, 2), (C_MOVER, 3), (C_BATS, 5), (C_DROP, 7),
                             (C_VERGER, 9), (C_SECRET, 9), (C_BELL, 9)]})
 
 
@@ -587,21 +589,24 @@ B_ORGAN = block('''
 # the silver bell hangs in the attic's arch right over it, so one jump up
 # into the broken crack rings it. Secret-gated: until Game.SECRET_LEVELS
 # holds 1-S (its file in the build) the bell and arch aren't spawned and
-# the attic is an empty nook. Build 2: Cantor Ash paces the roof under it.
+# the attic is an empty nook. Build 2: past it the roof runs into the tower
+# door, a passage a step up and two rows high, too low to jump a foe in,
+# where Cantor Ash paces (his bash baited, his opening struck: he must be
+# fought, his Burning trail on the only way to the bell).
 B_ROOF = block('''
  0|##############################
  1|##########.......#############
  2|##########.......#############
  3|##########...S...#############
  4|############FF################
- 5|..............................
- 6|..............................
- 7|..........====................
- 8|..............................
- 9|..............................
+ 5|...................###########
+ 6|...................###########
+ 7|..........====.....###########
+ 8|...................###########
+ 9|...................###########
 10|......===.............c.......
-11|..............................
-12|..................h...........
+11|........................h.....
+12|...................###########
 13|##############################
 14|##############################
 ''')
@@ -624,15 +629,16 @@ B_BELL = block('''
 14|######~~~~~~~~~~~~~~~~##########
 ''')
 
-# Build 2: copies of the two the Descent lifts (it keeps the originals).
+# Build 2: a copy of one the Descent lifts (it keeps the original).
 # The crossfire at the loft's foot: a Thornback braced 6 tiles off the lava
 # bank, a Bonebow on the low ledge behind it shooting over it; the altar
 # moves to the loft's foot, 5 tiles before its gap; Brother Barbs waits
 # clear of the loft's ends (a sealed room's foe stands 4+ columns in).
 B_THORNS_13 = common.swap(B_THORNS, {(9, 12): '.', (6, 12): 't', (9, 9): 'a', (2, 12): '.', (13, 12): 'K',
                                      (26, 5): '.', (24, 5): 'D'})
-# The organ floor's Thornback retired.
-B_ORGAN_13 = common.swap(B_ORGAN, {(6, 12): '.'})
+# (The organ floor keeps its Thornback: the spec retired it, the review's
+# probe put it back, with Cantor Ash in the tower door, to bring the exam's
+# cost back to the old 1-3's: about 1.5 of the bot's lives a run.)
 
 
 def _on_rock(sec, dy, h):
@@ -647,9 +653,10 @@ def _on_rock(sec, dy, h):
 
 # Build 2: the climb, 24 rows. From the choir floor by the lava (row 22) up
 # a storey to the crossfire's landing (a 3-row step at the lava's far bank),
-# and on up two rows at a time: the gliding ledges, the organ loft, a door
-# onto the roof (row 13), where Cantor Ash (a forced Anointed Hollow Helm,
-# Burning) paces under the hidden 1-S attic, and the bell by the tower door.
+# and on up two rows at a time: the gliding ledges, the organ loft (its
+# Thornback on the floor), a door onto the roof (row 13) under the hidden
+# 1-S attic, the tower door where Cantor Ash (a forced Anointed Hollow Helm,
+# Burning) paces a passage too low to jump him, and the bell past it.
 # Barbs' Loft hangs a storey over the crossfire: climb in by its gap and it
 # seals with his bar (room: rows 3-7 of the loft); walk under it and it never
 # does (twist: duel, its card "Barbs' Loft").
@@ -657,7 +664,7 @@ LEVELS.append({'id': '1-3', 'name': 'The Burning Choir', 'music': 'chapel', 'the
                'dread': 'Brother Barbs|thornback|Warded,Vengeful',
                'secret': '1-S',
                'story_start': 'beat_1_3',
-               'anoint': [(B_ROOF, 18, 12, 'Burning', 'Cantor Ash')],
+               'anoint': [(B_ROOF, 24, 11, 'Burning', 'Cantor Ash')],
                'twist': 'duel',
                'roles': 'S C C DA C VA C B',
                'room': [('duel', ((B_THORNS_13, 18), (B_THORNS_13, 29)), {'rows': (3, 7)})],
@@ -665,7 +672,7 @@ LEVELS.append({'id': '1-3', 'name': 'The Burning Choir', 'music': 'chapel', 'the
                          'Hollow Helms block in front. Hit from behind or stomp'],
                'height': 24,
                'sections': [_on_rock(B_START, 9, 24), _on_rock(B_LAVA, 9, 24), _on_rock(B_RISE, 9, 24), (B_THORNS_13, 6),
-                            _on_rock(B_GLIDE, 4, 24), (B_ORGAN_13, 2), (B_ROOF, 0), _on_rock(B_BELL, 0, 24)]})
+                            _on_rock(B_GLIDE, 4, 24), (B_ORGAN, 2), (B_ROOF, 0), _on_rock(B_BELL, 0, 24)]})
 
 
 # ============================================================ 1-4 The Bell Tower

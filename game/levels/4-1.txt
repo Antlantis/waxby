@@ -7,7 +7,7 @@ dread: Sergeant Sprocket|tickwind|Swift,Twinned
 tick: 0.536
 story_start: beat_4_1
 lesson: First Frost|Ice carries you. Walls stop what slides.
-roster: headline=tickwind; support=hoarowl,spurwheel,bonebow,bat; guest=rootling; rattle_max=2; fodder_max=0.85
+roster: headline=tickwind; support=hoarowl,spurwheel,bonebow,bat; guest=rootling; rattle_max=2; fodder_max=0.85; count=22
 threat: 10
 roles: S C A C C A C V A C D A B
 hints: Wind at eleven. Oil at half past. NEVER be late. — T.

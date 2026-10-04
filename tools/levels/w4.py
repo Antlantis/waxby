@@ -70,11 +70,11 @@ SECRET_4S = os.path.exists(os.path.join(common.OUT, '4-S.txt')) or os.environ.ge
 # 4-3's two named Anointed counted at x2.5), the fodder ceiling falls.
 ROSTER = {
     '4-1': {'headline': ['tickwind'], 'support': ['hoarowl', 'spurwheel', 'bonebow', 'bat'], 'guest': ['rootling'],
-            'rattle_max': 2, 'fodder_max': 0.85},
+            'rattle_max': 2, 'fodder_max': 0.85, 'count': 22},
     '4-2': {'headline': ['frostbuckle', 'spurwheel'], 'support': ['tickwind', 'hoarowl', 'bat'], 'guest': ['rattlehound'],
-            'rattle_max': 1, 'fodder_max': 0.75, 'stamps': ['buckle_on_belts']},
+            'rattle_max': 1, 'fodder_max': 0.75, 'count': 17, 'stamps': ['buckle_on_belts']},
     '4-3': {'headline': ['hoarowl', 'frostbuckle', 'tickwind'], 'support': ['spurwheel', 'bonebow', 'bat'],
-            'guest': ['rattlehound', 'hollow_helm'], 'rattle_max': 1, 'fodder_max': 0.65, 'stamps': ['owl_watch']},
+            'guest': ['rattlehound', 'hollow_helm'], 'rattle_max': 1, 'fodder_max': 0.65, 'count': 20, 'stamps': ['owl_watch']},
 }
 THREAT = {'4-1': 10.0, '4-2': 11.5, '4-3': 13.0}
 MAX_GAP = 85                 # tiles between checkpoints (spec 3.1, World 4)
@@ -430,8 +430,9 @@ LEVELS.append({
 # 4-S vent) under a Hoarowl. The upper storey, going left: the walkway over
 # Sir Hoarfrost's hall (optional), the Great Works (a Frostbuckle between
 # the belts, sigil 1 on a cog's ring) and altar 3, the train (cog, belt,
-# cog over pits: a fall drops you back to the lower storey), the mainspring
-# floor (a Rattlehound, a Spurwheel's box), the bell.
+# cog over pits: a fall is a ducking in the quench troughs under them, back
+# on the last stone), the mainspring floor (a Rattlehound, a Spurwheel's
+# box), the bell.
 #
 # Each storey is drawn in 15-row sections cropped to its 12 rows (crop: the
 # rows cut bare), the upper one's sections as the player meets them, facing
@@ -499,14 +500,16 @@ ES_BELTS2 = block('''
 # reaches 128 px). The pair turns in phase (both 0), not 45 degrees apart as
 # spec 3.2 lays neighbours out: this is the teaching pair, and in phase their
 # side teeth meet level, end to end, for the step across. Nothing else
-# within 8 tiles (the Flit roosts over the loft).
+# within 8 tiles (the Flit roosts over the loft). Overhead at its right end
+# the first of the train's quench troughs (ES_VAULT_K) hangs, 165 px from
+# the second hub.
 ES_COG = block('''
  0|############################
  1|############################
  2|............................
- 3|............................
- 4|..........o.o.....o.o.......
- 5|............................
+ 3|........................#:::
+ 4|..........o.o.....o.o...#:::
+ 5|........................####
  6|............................
  7|............................
  8|...........O.......O........
@@ -520,16 +523,20 @@ ES_COG = block('''
 
 # The loft: the first cogs' walkway runs on as the roof of a gear housing,
 # and its far face is false stone; inside, a Lidlurk and sigil 2. A Flit
-# roosts over it. Altar 1 on the floor past it.
+# roosts over it. Altar 1 on the floor past it. Overhead, under the train's
+# two pits (the upper storey's), the works' quench troughs: cold water a
+# fall from the train lands in (a ducking, a share of life, and back on the
+# train's last stone, as a strip's pit), walled and floored so the lower
+# storey never climbs into them.
 ES_VAULT_K = block('''
  0|##################
  1|##################
  2|..................
- 3|..................
- 4|..................
- 5|.......o.o.o......
+ 3|::::::###::::::::#
+ 4|::::::###::::::::#
+ 5|##################
  6|..b...............
- 7|..................
+ 7|.......o.o.o......
  8|..................
  9|##########........
 10|#...2....F........
@@ -642,8 +649,10 @@ ES_WORKS2 = common.stamp(ES_WORKS0, 'buckle_on_belts', 12, 12)
 # top onto the belt on the middle pillar (it carries you onto its stone end),
 # time the second cog from there, and the last belt feeds onto a 3-tile ice
 # landing, so you slide off its end with its speed (down onto stone). Its
-# pits open on the lower storey: a fall lands you back down there, the long
-# way round again. Every solid stands 144 px or more from a hub.
+# pits drop into the quench troughs under them (ES_VAULT_K): a fall is a
+# ducking, a share of life and back on the last stone, as a strip's pit,
+# never the long way round again (the review's: a fall cost 150-200 tiles
+# on foot). Every solid stands 144 px or more from a hub.
 ES_TRAIN2 = block('''
  0|##################################
  1|##################################
@@ -910,10 +919,13 @@ WT_VAULT2 = block('''
 
 # The Owl Hall (the owl_watch stamp: a Hoarowl on its bracket over two
 # Tickwinds, 3 rows down): Brother Clapper, an Anointed Hoarowl (Twinned),
-# on a bracket of ledge sweeps a long ice hall hung with icicles, a ledge
-# over him to stomp him from, and a third Tickwind by the far wall. Spotted,
-# his alarm drops icicles and the squad charges, alerted: on the ice every
-# charge ends at a wall (the step down in, the far wall).
+# on a bracket of ledge sweeps a long stone hall hung with icicles, a ledge
+# over him to stomp him from, and its far half a belt (the works' floor,
+# 4-2's) that carries its three Tickwinds to the far wall. Spotted, his
+# alarm drops icicles and the squad charges, alerted, against the belt that
+# carries him at them: the exam mixes the stair's owl and icicles with the
+# escapement's belts (the review: a walled ice rink was 4-1's Three on the
+# Ice again).
 WT_OWLHALL0 = block('''
  0|################################
  1|################################
@@ -929,7 +941,7 @@ WT_OWLHALL0 = block('''
 11|..............===............###
 12|.............................###
 13|###....................j.....###
-14|###IIIIIIIIIIIIIIIIIIIIIIIIII###
+14|################>>>>>>>>>>>>>###
 ''')
 WT_OWLHALL = common.stamp(WT_OWLHALL0, 'owl_watch', 15, 10)
 
@@ -1092,21 +1104,23 @@ WT_DOOR_K = block('''
 
 # The Grindstone's hall, a duel (room: features/sealed.gd): walled at both
 # ends down to doorways on the floor, which seal once he's inside and open
-# when the Grindstone falls. His 7 x 5 box hangs free (spec 4.6), so he
-# rolls round it and never off it; catch him at the corners (the ledges
-# beside it reach its sides, the high one on the left its top). The way on
-# walks under it: his wheel on the underside clears a standing Waxby by 30
-# px. Sigil 3's tight route runs over his box: from its top to a lone block,
-# then up to the sigil by the far wall.
+# when the Grindstone falls. His 7 x 2 box hangs free (spec 4.6), low enough
+# that his whole round is on the glass from the hall's floor (the camera
+# leans up for a duel's foe, under its bar: world.gd look_up), so he rolls
+# round it and never off it; catch him at the corners (the ledges beside it
+# reach its sides, the high one on the left its top). The way on walks under
+# it: his wheel on the underside clears a standing Waxby by 30 px. Sigil 3's
+# tight route runs over his box: from its top to a lone block, then up to
+# the sigil by the far wall.
 WT_DREAD2 = block('''
  0|##############################
  1|##############################
  2|##..........................##
  3|##.......................3..##
- 4|##...........D..............##
- 5|##..........#######.........##
- 6|##..........#######..#......##
- 7|##......==..#######.........##
+ 4|##..........................##
+ 5|##..........................##
+ 6|##...................#......##
+ 7|##......==...D..............##
  8|##..........#######.........##
  9|##..........#######.........##
 10|.........==.........==........

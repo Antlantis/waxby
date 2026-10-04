@@ -76,7 +76,7 @@ const STAR_ROUTES := {
 	"4-1": {"route": [Vector2i(307, 7)], "from": Vector2i(293, 8), "what": "a run-up on the ice shelf to a lone ice block"},
 	"4-2": {"route": [Vector2i(128, 14)], "from": Vector2i(113, 21),
 			"what": "over the flip floor, the cog's top to a lone block, then across to the sigil"},
-	"4-3": {"route": [Vector2i(60, 6)], "from": Vector2i(65, 4),
+	"4-3": {"route": [Vector2i(60, 6)], "from": Vector2i(65, 7),
 			"what": "in the Grindstone's hall, his box's top to a lone block, then up to the sigil"},
 }
 
@@ -1437,6 +1437,24 @@ func _test_duel(ids: Array) -> void:
 				and shut.any(func(c): return c.x == x0) and shut.any(func(c): return c.x == x1),
 				"%s: in, the doors shut at both ends (%d cells)" % [id, shut.size()])
 		_check(w.enemies.has(foe) and foe.active, "%s: and %s wakes" % [id, dd["foe"]])
+		# His whole round on the glass from the hall's floor, under the duel's
+		# bar (the shapes review: off its top 40% of a lap): his box hangs low
+		# and the camera leans up for him (world.gd look_up).
+		_stand(w, Vector2i((x0 + x1) / 2, 12))
+		var seen := 0
+		var n := 0
+		var hi := INF
+		for i in int(13.0 / DT):
+			pl.invuln = 1000.0
+			_ticks(w, 1)
+			if i > int(1.5 / DT) and i % 6 == 0 and foe.alive:
+				var vr: Rect2 = w.view_rect()
+				var fr: Rect2 = foe.rect()
+				n += 1
+				hi = minf(hi, fr.position.y - vr.position.y)
+				if fr.position.y >= vr.position.y + WorldScript.DUEL_BAR - 4.0 and fr.end.y <= vr.end.y:
+					seen += 1
+		_check(n > 0 and seen >= n * 0.95, "%s: from the hall's floor %s's whole round is on the glass under the bar (%d of %d; his highest %.0f px under the view's top)" % [id, dd["foe"], seen, n, hi])
 		foe.hp = 0.0
 		foe._kill({"how": "slash", "from_x": foe.position.x - 20.0})
 		for i in int(1.0 / DT):

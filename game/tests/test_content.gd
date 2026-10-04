@@ -2165,7 +2165,7 @@ func _test_hang_heights() -> void:
 const STAR_ROUTES := {
 	"1-1": {"sigil": 3, "route": [Vector2i(264, 7), Vector2i(268, 5)], "from": Vector2i(241, 12),
 			"what": "two lone stones past the bell stair"},
-	"1-2": {"sigil": 2, "route": [Vector2i(110, 11), Vector2i(111, 11), Vector2i(116, 11), Vector2i(117, 11), Vector2i(121, 11), Vector2i(122, 11)],
+	"1-2": {"sigil": 2, "route": [Vector2i(110, 12), Vector2i(111, 12), Vector2i(116, 12), Vector2i(117, 12), Vector2i(121, 12), Vector2i(122, 12)],
 			"from": Vector2i(101, 15), "what": "crumbling slabs under a spiked ceiling"},
 	"1-3": {"sigil": 1, "route": [Vector2i(69, 14)], "from": Vector2i(55, 21), "what": "a lone post high over the lava"},
 	"1-4": {"sigil": 1, "route": [Vector2i(18, 7), Vector2i(22, 5)], "from": Vector2i(3, 12),

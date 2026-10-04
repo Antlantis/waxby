@@ -63,6 +63,8 @@ const Elites := preload("res://scripts/elites.gd")
 const Sealed := preload("res://scripts/features/sealed.gd")
 const Twists := preload("res://scripts/twists.gd")
 const WalkMap := preload("res://scripts/walk_map.gd")
+const LevelFeatures := preload("res://scripts/level_features.gd")
+const Themes := preload("res://scripts/themes/loader.gd")
 # common.py's numbers (THREAT_SLACK, RAMP_STEP, RECUT_RAMP, RAMP_TOL, the
 # pack tables, ALTARS, DOOR_ALTAR, HOME, HEADLINE_RETURN, the variety rules'
 # numbers, DOOR_SOLID): the generator's checks and these are one rule.
@@ -116,6 +118,8 @@ const DESCENT_KEYS := ["max_drop", "landing", "lit_drops"]
 # height over the cell's floor]; a sconce's flame hangs 7 px under its
 # cell's top (world.gd).
 const LIGHTS := {"lantern": [140.0, 33.0], "altar": [150.0, 30.0], "vigil": [90.0, 30.0], "sconce": [110.0, 25.0]}
+const LAMP_NEAR := 64.0            # px past a lantern's reach: a lily run this near one is by it (common.LAMP_NEAR)
+const LIGHT_TOUCH := 2             # a light the route passes this near (WalkMap.near) is lit as he goes (common.LIGHT_TOUCH)
 const ONE_WAY_TILES := [LevelData.LEDGE, LevelData.CRUMBLE, LevelData.FROST_LEDGE, LevelData.DAWNGLASS]
 const STOREY_ROWS := 6             # a taller level's belt_flip: its belts within these rows (common.STOREY_ROWS)
 # A doorway's cells: air, or what never opens (stone, a reliquary or a spent
@@ -1087,12 +1091,34 @@ static func _landing(m: RefCounted, x: int, y: int) -> int:
 	return -1
 
 
+static func _catch_rows(lv: RefCounted, m: RefCounted, x: int, ly: int) -> Array:
+	## [Vector2i(y0, y1)]: the rows a catch at (x, ly) can set him down in:
+	## ly's, a row either side; on a floor that gives way itself, the next
+	## landing's too, and so on; one that ends in water or a hazard, its rows
+	## (both of a pool's: a Brinejaw lies in them; common._catch_rows).
+	var out := [Vector2i(ly - 1, ly + 1)]
+	while ly + 1 < lv.height and GIVE_WAY.has(lv.tile(x, ly + 1)):
+		var nxt := _landing(m, x, ly + 1)
+		if nxt >= 0:
+			ly = nxt
+			out.append(Vector2i(ly - 1, ly + 1))
+			continue
+		var yy := ly + 2
+		while yy < lv.height and not m.solid(x, yy) and not m.hazard(x, yy):
+			yy += 1
+		if yy < lv.height and m.hazard(x, yy):
+			out.append(Vector2i(yy - 1, yy + 1))
+		break
+	return out
+
+
 static func catch_problems(lv: RefCounted) -> Array:
 	## A taller level's catch rules: a fall from a floor that gives way (a
 	## crumble, dawnglass, glass, the foot of a rotten run) lands within
 	## CATCH_ROWS rows (a catch floor, not the bottom of the climb) or snuffs,
-	## and no monster stands within CATCH_CLEAR columns of where it lands
-	## (common.catch_problems).
+	## and no monster stands within CATCH_CLEAR columns of where it lands, nor,
+	## when that landing gives way too, of the next catch or the water it
+	## ends in (_catch_rows; common.catch_problems).
 	var m = WalkMap.of(lv)
 	var mons := {}
 	for e in lv.entities:
@@ -1112,12 +1138,13 @@ static func catch_problems(lv: RefCounted) -> Array:
 				continue
 			if ly - y > CATCH_ROWS:
 				out.append("a fall through %d,%d lands %d rows down (a catch floor within %d)" % [x, y, ly - y, CATCH_ROWS])
-			for my in range(ly - 1, ly + 2):
-				for mx in range(x - CATCH_CLEAR, x + CATCH_CLEAR + 1):
-					var c := Vector2i(mx, my)
-					if mons.has(c) and not seen.has(c):
-						seen[c] = true
-						out.append("a monster at %s waits where a fall through %d,%d lands" % [c, x, y])
+			for span in _catch_rows(lv, m, x, ly):
+				for my in range(span.x, span.y + 1):
+					for mx in range(x - CATCH_CLEAR, x + CATCH_CLEAR + 1):
+						var c := Vector2i(mx, my)
+						if mons.has(c) and not seen.has(c):
+							seen[c] = true
+							out.append("a monster at %s waits where a fall through %d,%d lands" % [c, x, y])
 	return out
 
 
@@ -1145,32 +1172,66 @@ static func descent_limits(lv: RefCounted) -> Dictionary:
 	return out
 
 
+static func lit_posts_of(lv: RefCounted) -> Array:
+	## [Vector2i]: the level's lit posts (`lit_posts: x,y; x,y`: lantern posts
+	## lit from the start that never burn down, level_features.gd); a part
+	## that doesn't read is left out (common.lit_posts_of names it).
+	var out := []
+	for part in str(lv.headers.get("lit_posts", "")).split(";", false):
+		var xy := part.strip_edges().split(",")
+		if xy.size() == 2 and xy[0].strip_edges().is_valid_int() and xy[1].strip_edges().is_valid_int():
+			out.append(Vector2i(int(xy[0]), int(xy[1])))
+	return out
+
+
 static func lit_cells(lv: RefCounted) -> Dictionary:
-	## {Vector2i: true}: the cells where his middle, standing in them, is in
-	## a light's reach (LIGHTS; common.lit_cells).
+	## {Vector2i: int}: the cells where his middle, standing in them, is in a
+	## light's reach (LIGHTS) once it burns, and the route index from which
+	## the first light on it burns: a sconce (where the theme's sconces give
+	## light: not W6's, world.gd) and a lit post (lit_posts_of) from the
+	## start (-1); a lantern, an altar or a Vigil candle (none lit till he
+	## touches it) once the route has passed it (proj, when the route comes
+	## within LIGHT_TOUCH of it: one it never nears is never lit;
+	## common.lit_cells).
+	var m = WalkMap.of(lv)
+	var path: Array = m.route()
+	var steady := lit_posts_of(lv)
+	var th := str(lv.theme)
+	var sconces: bool = not Themes.has_theme(th) or bool(Themes.theme(th).get("sconce_light", true))
 	var srcs := []
 	for e in lv.entities:
 		var k := str(e["kind"])
 		if LIGHTS.has(k):
 			var c: Vector2i = e["cell"]
 			var cy: float = c.y * 32.0 + 7.0 if k == "sconce" else (c.y + 1) * 32.0 - float(LIGHTS[k][1])
-			srcs.append([Vector2(c.x * 32.0 + 16.0, cy), float(LIGHTS[k][0])])
+			var i := -1
+			if k == "sconce":
+				if not sconces:
+					continue
+			elif not (k == "lantern" and steady.has(c)):
+				if path.is_empty() or m.near(path, c) > LIGHT_TOUCH:
+					continue
+				i = m.proj(c)
+			srcs.append([Vector2(c.x * 32.0 + 16.0, cy), float(LIGHTS[k][0]), i])
 	var out := {}
 	for y in lv.height:
 		for x in lv.width:
 			var p := Vector2(x * 32.0 + 16.0, (y + 1) * 32.0 - 22.0)
 			for sr in srcs:
 				if p.distance_squared_to(sr[0]) <= float(sr[1]) * float(sr[1]):
-					out[Vector2i(x, y)] = true
-					break
+					var c := Vector2i(x, y)
+					out[c] = mini(int(out.get(c, 1 << 30)), int(sr[2]))
 	return out
 
 
 static func limit_allow(m: RefCounted, lim: Dictionary, lit: Dictionary) -> Callable:
 	## allow(from, to, drop) for WalkMap.reach: the landing and lit_drops
-	## rules (descent_limits; common.limit_allow).
+	## rules (descent_limits; common.limit_allow): a lit landing is lit
+	## before he gets there, by a sconce or a light the route passed by the
+	## state he falls from (lit_cells).
 	var ld: Vector2i = lim["landing"]
 	var ln: int = int(lim["lit_drops"])
+	var at := {}
 	return func(s: int, t: int, drop: int) -> bool:
 		if drop <= 0:
 			return true
@@ -1179,7 +1240,9 @@ static func limit_allow(m: RefCounted, lim: Dictionary, lit: Dictionary) -> Call
 		if ld.x >= 0 and absi(b.x - a.x) > ld.x and drop > ld.y:
 			return false
 		if ln >= 0 and not m.on_vine(t) and not m.band_at(b.x, b.y + 1):
-			return drop <= ln and lit.has(b)
+			if not at.has(s):
+				at[s] = m.proj(a)
+			return drop <= ln and lit.has(b) and int(lit[b]) <= int(at[s])
 		return true
 
 
@@ -1191,6 +1254,13 @@ static func own_descent_problems(lv: RefCounted) -> Array:
 	var out: Array = (lim["problems"] as Array).duplicate()
 	var m = WalkMap.of(lv)
 	var g: Vector2i = m.goal()
+	for part in str(lv.headers.get("lit_posts", "")).split(";", false):
+		var xy := part.strip_edges().split(",")
+		if xy.size() != 2 or not xy[0].strip_edges().is_valid_int() or not xy[1].strip_edges().is_valid_int():
+			out.append("lit_posts '%s' (x,y; x,y)" % part.strip_edges())
+	for c in lit_posts_of(lv):
+		if not lv.entities.any(func(e): return str(e["kind"]) == "lantern" and e["cell"] == c):
+			out.append("lit_posts %d,%d is no lantern post" % [c.x, c.y])
 	if out.is_empty() and (int(lim["max_drop"]) >= 0 or (lim["landing"] as Vector2i).x >= 0 or int(lim["lit_drops"]) >= 0):
 		var lit := lit_cells(lv) if int(lim["lit_drops"]) >= 0 else {}
 		var fair: Dictionary = m.reach(int(lim["max_drop"]), limit_allow(m, lim, lit))
@@ -1304,6 +1374,44 @@ static func light_problems(lv: RefCounted) -> Array:
 	return out
 
 
+static func lamp_problems(lv: RefCounted) -> Array:
+	## A lamplit level's lilies kept in their lanterns' reach: each run of
+	## soft wax by a lantern (a cell within Twists.LAMP_R + LAMP_NEAR px of
+	## its flame) held whole, every cell within LAMP_R of some lantern's
+	## flame (twists.gd _find_lamp_cells; common.lamp_problems).
+	if Twists.id_in(lv) != "lamplit":
+		return []
+	var flames := []
+	for e in lv.entities:
+		if str(e["kind"]) == "lantern":
+			flames.append(LevelData.cell_floor(e["cell"]) - Vector2(0, LevelFeatures.LANTERN_FLAME))
+	var out := []
+	for y in lv.height:
+		var x := 0
+		while x < lv.width:
+			if lv.tile(x, y) != LevelData.CRUMBLE:
+				x += 1
+				continue
+			var x1 := x
+			while x1 + 1 < lv.width and lv.tile(x1 + 1, y) == LevelData.CRUMBLE:
+				x1 += 1
+			var by := false
+			var dark := []
+			for cx in range(x, x1 + 1):
+				var mid := LevelData.cell_center(Vector2i(cx, y))
+				var held := false
+				for f in flames:
+					var d: float = (f as Vector2).distance_to(mid)
+					by = by or d <= Twists.LAMP_R + LAMP_NEAR
+					held = held or d <= Twists.LAMP_R
+				if not held:
+					dark.append(cx)
+			if by and not dark.is_empty():
+				out.append("the lily run at %d-%d,%d is by a lantern, but its cells at %s are out of every lantern's reach" % [x, x1, y, dark])
+			x = x1 + 1
+	return out
+
+
 static func shape_problems(lv: RefCounted) -> Array:
 	## A level's shape rules, whatever its shape (common.shape_problems): its
 	## height, the HUD's corners, its facing; a taller level's descent and
@@ -1311,7 +1419,7 @@ static func shape_problems(lv: RefCounted) -> Array:
 	var out := []
 	if not height_ok(lv):
 		out.append("%s: %d rows (%d-%d%s)" % [lv.id, lv.height, HEIGHT_MIN, HEIGHT_MAX, "; a boss or secret level stays a strip" if strip_only(str(lv.id)) else ""])
-	out += hud_problems(lv)
+	out += hud_problems(lv) + lamp_problems(lv)
 	if not WalkMap.strip(lv):
 		out += descent_problems(lv) + catch_problems(lv) + own_descent_problems(lv) + waxfall_problems(lv) + light_problems(lv)
 		var m = WalkMap.of(lv)

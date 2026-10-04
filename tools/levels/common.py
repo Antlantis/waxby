@@ -57,7 +57,8 @@ A shaped level's entry may add 'drops': 'yes' (its route drops through a
 one-way ledge: the bots drop through then too, by down + jump), 'roads' (two
 ways through, each by the cells it passes: its threat, gaps and screens are
 each road's), and its own descent rules ('max_drop': 4, 'landing': '6/2',
-'lit_drops': 3): see the shape rules below.
+'lit_drops': 3, with 'lit_posts': [(section, dx, row)], lantern posts lit
+from the start): see the shape rules below.
 
 or, for the v2 levels (kept byte for byte), an explicit ordered 'header'
 list of (key, value) pairs. Header values holding x (cog_phase,
@@ -160,10 +161,10 @@ SIGN_BUDGET = True
 # asks for it where the walk map's route does), roads (its two ways
 # through, each by the cells it passes: 'high 120,10 200,10; low 120,21',
 # WalkMap.roads) and its own descent rules (max_drop, landing, lit_drops:
-# descent_limits).
+# descent_limits; lit_posts, the posts lit from the start: lit_posts_of).
 HEADER_ORDER = ['title', 'subtitle', 'music', 'theme', 'area', 'area_abs', 'facing', 'boss', 'boss_music', 'dread', 'warden',
                 'secret', 'secret_prize', 'tick', 'story_start', 'story_boss', 'story_end', 'par', 'rush',
-                'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'drops', 'roads', 'max_drop', 'landing', 'lit_drops',
+                'cog_phase', 'weight_phase', 'chase', 'gusts', 'hush', 'drops', 'roads', 'max_drop', 'landing', 'lit_drops', 'lit_posts',
                 'warden_room', 'elite_behave', 'anoint', 'twist',
                 'lesson', 'roster', 'threat', 'roles', 'room', 'belt_flip', 'hints']
 
@@ -701,6 +702,8 @@ def _header_value(k, v, rows, entry):
         v = _num(v)
     elif k == 'anoint' and not isinstance(v, str):
         v = anoint_header(rows, v, entry_world(entry), entry['id'])
+    elif k == 'lit_posts' and not isinstance(v, str):
+        v = '; '.join('%d,%d' % (x_of(rows, sec, dx), y_of(rows, sec, dy)) for sec, dx, dy in v)
     elif _has_span(v):
         v = spans_header(rows, v, SPAN_SEP.get(k, '@'))
     return str(v)
@@ -1441,7 +1444,9 @@ def facing_of(header):
 # from a floor that gives way (a crumble, dawnglass, glass, a rotten vine)
 # lands within CATCH_ROWS rows (a catch floor, not the bottom of the climb)
 # or snuffs, and no monster stands within CATCH_CLEAR columns of where it
-# lands. A strip's falls are pits (a snuff), as before.
+# lands (nor, where the landing gives way too, a lily over a pool, of the
+# next catch or the water it ends in: _catch_rows). A strip's falls are pits
+# (a snuff), as before.
 #
 # A level may hold itself to more (its header; descent_limits, and
 # tests/level_rules.gd reads the same keys back):
@@ -1451,11 +1456,19 @@ def facing_of(header):
 #                   than 2 rows lower (5-2's wind jumps: further and lower is
 #                   under the right thumb's buttons; 6-1's 5/0: in view ahead)
 #   lit_drops: 3    ...and every fall onto a floor (a vine or a lift is no
-#                   fall) at most 3 rows, onto a lit landing: in a lantern's,
-#                   an altar's, a Vigil candle's or a sconce's light (LIGHTS;
-#                   6-2: no blind drops)
+#                   fall) at most 3 rows, onto a landing lit before he gets
+#                   there: in a sconce's light (where the theme's sconces
+#                   give light: not W6's), a lit post's, or a lantern's, an
+#                   altar's or a Vigil candle's that the route has passed
+#                   (they burn only once touched: lit_cells; LIGHTS; 6-2: no
+#                   blind drops)
+#   lit_posts: x,y  lantern posts lit from the start that never burn down
+#                   (level_features.gd: a steady flame; 6-2's landing lights)
 #   drops: yes      the bots drop through one-way ledges (reach.gd drops_of):
 #                   a taller level whose route drops through one must say so
+# A lamplit level (twist: lamplit) keeps its lilies in its lanterns' reach
+# (lamp_problems): a run of soft wax by a lantern is held whole when it
+# burns (a far run may stay soft, as the lab's does).
 # A taller level with waxfalls ('!', level_features.gd: on FALL_ON s, off
 # FALL_OFF) keeps its drops clear of them (waxfall_problems): its goal
 # reached with no fall landing in a douse column (one never covers the only
@@ -1563,6 +1576,28 @@ def _landing(wm, x, y):
     return None
 
 
+def _catch_rows(wm, x, ly):
+    """[(y0, y1)]: the rows a catch at (x, ly) can set him down in: ly's, a
+    row either side; on a floor that gives way itself (a crumble on a
+    crumble, a lily over a pool), the next landing's too, and so on; one
+    that ends in water or a hazard, its rows (both of a pool's: a Brinejaw
+    lies in them)."""
+    out = [(ly - 1, ly + 1)]
+    while 0 <= ly + 1 < wm.h and wm.t[ly + 1][x] in GIVE_WAY:
+        nxt = _landing(wm, x, ly + 1)
+        if nxt is not None:
+            ly = nxt
+            out.append((ly - 1, ly + 1))
+            continue
+        yy = ly + 2
+        while yy < wm.h and not wm.solid(x, yy) and not wm.hazard(x, yy):
+            yy += 1
+        if yy < wm.h and wm.hazard(x, yy):
+            out.append((yy - 1, yy + 1))
+        break
+    return out
+
+
 def catch_problems(rows, wm=None):
     """A tall level's catch rules (see above), as strings."""
     wm = wm or WalkMap(rows)
@@ -1579,8 +1614,11 @@ def catch_problems(rows, wm=None):
                 continue
             if ly - y > CATCH_ROWS:
                 out.append('a fall through the %r at %d,%d lands %d rows down (a catch floor within %d)' % (ch, x, y, ly - y, CATCH_ROWS))
-            near = sorted((mx, my) for my in range(ly - 1, ly + 2) for mx in range(x - CATCH_CLEAR, x + CATCH_CLEAR + 1)
-                          if 0 <= my < wm.h and 0 <= mx < wm.w and wm.g[my][mx] in mons)
+            # A landing that gives way itself drops him on: the next catch
+            # (or the water it ends in) is where he lands too.
+            near = sorted({(mx, my) for y0, y1 in _catch_rows(wm, x, ly) for my in range(y0, y1 + 1)
+                           for mx in range(x - CATCH_CLEAR, x + CATCH_CLEAR + 1)
+                           if 0 <= my < wm.h and 0 <= mx < wm.w and wm.g[my][mx] in mons})
             for c in near:
                 if c not in seen:
                     seen.add(c)
@@ -1625,31 +1663,90 @@ def descent_limits(header):
     return md, ld, lit, out
 
 
-def lit_cells(wm):
-    """{(x, y)}: the cells where his middle, standing in them, is in a
-    light's reach (LIGHTS)."""
+LIGHT_TOUCH = 2       # a lantern, an altar or a candle he passes this near (WalkMap.near) is lit as he goes
+
+
+def lit_posts_of(header):
+    """([(x, y)], problems): a header's lit posts (`lit_posts: x,y; x,y`:
+    lantern posts lit from the start that never burn down, level_features.gd;
+    6-2's landing lights in the dark), and what doesn't read, as strings."""
+    out, bad = [], []
+    for part in str(dict(header).get('lit_posts', '')).split(';'):
+        part = part.strip()
+        if not part:
+            continue
+        xy = part.split(',')
+        if len(xy) == 2 and xy[0].strip().isdigit() and xy[1].strip().isdigit():
+            out.append((int(xy[0]), int(xy[1])))
+        else:
+            bad.append('lit_posts %r (x,y; x,y)' % part)
+    return out, bad
+
+
+@functools.lru_cache(maxsize=None)
+def dead_sconce_themes():
+    """{theme}: the themes whose `c` gives no light (themes/*.gd
+    "sconce_light": false: W6's dead sconces, world.gd)."""
+    out = set()
+    d = os.path.join(GAME, 'themes')
+    for f in sorted(os.listdir(d)):
+        if not f.endswith('.gd'):
+            continue
+        cur = None
+        for line in open(os.path.join(d, f)):
+            m = re.match(r'^\t"(\w+)": \{', line)
+            if m:
+                cur = m.group(1)
+            if cur and '"sconce_light": false' in line:
+                out.add(cur)
+    return out
+
+
+def lit_cells(wm, steady=(), sconces=True):
+    """{(x, y): i}: the cells where his middle, standing in them, is in a
+    light's reach (LIGHTS) once it burns, and the route index from which the
+    first light on it burns: a sconce (in a theme whose sconces give light)
+    and a lit post (steady: a lit_posts: cell) from the start (-1); a
+    lantern, an altar or a Vigil candle (none of them lit till he touches it)
+    once the route has passed it (WalkMap.proj, when the route comes within
+    LIGHT_TOUCH of it: one it never nears is never lit)."""
+    path = wm.route() or []
     srcs = []
     for y, r in enumerate(wm.g):
         for x, ch in enumerate(r):
             if ch in LIGHTS:
                 rad, up = LIGHTS[ch]
                 cy = y * 32 + 7 if ch == 'c' else (y + 1) * 32 - up
-                srcs.append((x * 32 + 16, cy, rad))
-    out = set()
+                if ch == 'c':
+                    if not sconces:
+                        continue
+                    i = -1
+                elif ch == 'L' and (x, y) in steady:
+                    i = -1
+                elif path and WalkMap.near(path, (x, y)) <= LIGHT_TOUCH:
+                    i = wm.proj((x, y))
+                else:
+                    continue
+                srcs.append((x * 32 + 16, cy, rad, i))
+    out = {}
     for y in range(wm.h):
         for x in range(wm.w):
             px, py = x * 32 + 16, (y + 1) * 32 - 22
-            if any((px - sx) ** 2 + (py - sy) ** 2 <= rad * rad for sx, sy, rad in srcs):
-                out.add((x, y))
+            on = [i for sx, sy, rad, i in srcs if (px - sx) ** 2 + (py - sy) ** 2 <= rad * rad]
+            if on:
+                out[(x, y)] = min(on)
     return out
 
 
-def limit_allow(wm, landing=None, lit_drops=None):
+def limit_allow(wm, landing=None, lit_drops=None, steady=(), sconces=True):
     """allow(from, to, drop) for WalkMap.reach: a level's landing and
-    lit_drops rules (descent_limits); None with neither."""
+    lit_drops rules (descent_limits); None with neither. A lit landing is lit
+    before he gets there: by a sconce or a lit post, or by a light the route
+    passed by the state he falls from (lit_cells)."""
     if landing is None and lit_drops is None:
         return None
-    lit = lit_cells(wm) if lit_drops is not None else set()
+    lit = lit_cells(wm, set(steady), sconces) if lit_drops is not None else {}
+    at = {}
 
     def allow(s, t, drop):
         if drop <= 0:
@@ -1657,7 +1754,9 @@ def limit_allow(wm, landing=None, lit_drops=None):
         if landing is not None and abs(t[1] - s[1]) > landing[0] and drop > landing[1]:
             return False
         if lit_drops is not None and t[0] == 'S' and (t[1], t[2] + 1) not in wm.band:
-            return drop <= lit_drops and (t[1], t[2]) in lit
+            if s not in at:
+                at[s] = wm.proj((s[1], s[2]))
+            return drop <= lit_drops and (t[1], t[2]) in lit and lit[(t[1], t[2])] <= at[s]
         return True
     return allow
 
@@ -1667,9 +1766,13 @@ def own_descent_problems(rows, header, wm):
     falls within them; and a taller level whose route drops through a
     one-way ledge says drops: (the bots drop through only then)."""
     md, ld, lit, out = descent_limits(header)
+    posts, bad = lit_posts_of(header)
+    out = out + bad + ['lit_posts %d,%d is no lantern post' % c for c in posts
+                       if not (0 <= c[1] < wm.h and 0 <= c[0] < wm.w and wm.g[c[1]][c[0]] == 'L')]
+    sconces = str(dict(header).get('theme', '')).strip() not in dead_sconce_themes()
     if out or (md, ld, lit) == (None, None, None):
         pass
-    elif not any(wm.touches(s) for s in wm.reach(md, limit_allow(wm, ld, lit))):
+    elif not any(wm.touches(s) for s in wm.reach(md, limit_allow(wm, ld, lit, posts, sconces))):
         keys = ', '.join('%s %s' % (k, dict(header)[k]) for k in DESCENT_KEYS if str(dict(header).get(k, '')).strip())
         out.append('its goal needs a fall past its own descent rules (%s)' % keys)
     hd = dict(header)
@@ -1756,6 +1859,41 @@ def light_problems(wm, header):
     return out
 
 
+LAMP_NEAR = 64        # px past a lantern's reach: a lily run this near one is by it (lamp_problems)
+
+
+def lamp_problems(rows, header=()):
+    """A lamplit level's lilies kept in their lanterns' reach (see above):
+    each run of soft wax by a lantern (a cell within twists.gd LAMP_R +
+    LAMP_NEAR px of its flame) is held whole, every cell of it within LAMP_R
+    of some lantern's flame (twists.gd _find_lamp_cells: the cell's middle)."""
+    if str(dict(header).get('twist', '')).strip() != 'lamplit':
+        return []
+    reach = float(_gd_const('twists.gd', 'LAMP_R'))
+    up = float(_gd_const('level_features.gd', 'LANTERN_FLAME'))
+    flames = [(x * 32 + 16, (y + 1) * 32 - up) for y, r in enumerate(rows) for x, ch in enumerate(r) if ch == 'L']
+
+    def far(c, f):
+        return math.hypot(c[0] * 32 + 16 - f[0], c[1] * 32 + 16 - f[1])
+    out = []
+    for y, r in enumerate(rows):
+        x = 0
+        while x < len(r):
+            if r[x] != '%':
+                x += 1
+                continue
+            x1 = x
+            while x1 + 1 < len(r) and r[x1 + 1] == '%':
+                x1 += 1
+            cells = [(cx, y) for cx in range(x, x1 + 1)]
+            if any(far(c, f) <= reach + LAMP_NEAR for c in cells for f in flames):
+                dark = [c[0] for c in cells if not any(far(c, f) <= reach for f in flames)]
+                if dark:
+                    out.append("the lily run at %d-%d,%d is by a lantern, but its cells at %s are out of every lantern's reach" % (x, x1, y, dark))
+            x = x1 + 1
+    return out
+
+
 def shape_problems(name, rows, header=()):
     """What breaks a level's shape rules (see above), as strings."""
     out = []
@@ -1763,7 +1901,7 @@ def shape_problems(name, rows, header=()):
         out.append('%d rows (%d-%d)' % (len(rows), H_MIN, H_MAX))
     if STRIP_ONLY.match(name) and len(rows) != H:
         out.append('%d rows: a boss or secret level stays a strip (%d)' % (len(rows), H))
-    out += hud_problems(rows)
+    out += hud_problems(rows) + lamp_problems(rows, header)
     hd = dict(header)
     if len(rows) > H:
         wm = WalkMap(rows, hd.get('roads', ''))
@@ -3164,6 +3302,11 @@ def shapes_check():
     assert any('lands 13 rows down' in p for p in catch_problems(tall)), catch_problems(tall)
     assert any('waits where' in p for p in catch_problems(swap(tall, {(7, 17): 's'}))), 'a monster at a catch floor is caught'
     assert catch_problems(swap(tall, {(x, 12): '=' for x in range(3, 9)})) == [], 'a catch floor within 10 rows'
+    # A catch that gives way itself (a lily over a pool) drops him on: a
+    # Brinejaw in the pool's second row under it is where he lands too.
+    pond = swap(tall, dict([((x, 12), '%') for x in range(3, 9)] + [((x, y), ':') for x in range(2, 10) for y in (18, 19)]))
+    assert catch_problems(pond) == [], 'a lily over a pool catches (%s)' % catch_problems(pond)
+    assert any('waits where' in p for p in catch_problems(swap(pond, {(6, 19): 'f'}))), 'a Brinejaw under the lily it lands on is caught'
     # The HUD: a sigil in the top right corner where the camera stops; the
     # bell clear of it 6 tiles in; the height and the facing.
     corner = swap(block('\n'.join(['.' * 40] * 13 + ['#' * 40] * 2)), {(38, 1): '1', (1, 12): 'P', (6, 12): 'E'})
@@ -3280,13 +3423,27 @@ def review_check():
     assert any('own descent rules (lit_drops 3)' in p for p in shape_problems('lab-x', dr, [('lit_drops', '3')])), 'lit_drops: a 5-row drop is too far'
     g2 = [list(r) for r in dr]
     for x in range(18, 24):
-        g2[19][x] = '='                    # a ledge 3 rows down, then 2 more to the floor
+        g2[19][x] = '='                    # a ledge 2 rows down, then 3 more to the floor
+    g2[16][15] = 'L'                       # posts he passes (and lights) before each drop
     g2[18][23] = 'L'
-    g2[20][26] = 'L'
     lit = [''.join(r) for r in g2]
     assert not [p for p in shape_problems('lab-x', lit, [('lit_drops', '3')]) if 'descent' in p], 'lit_drops: lit 3- and 2-row drops pass'
     dark = [r.replace('L', '.') for r in lit]
     assert any('lit_drops 3' in p for p in shape_problems('lab-x', dark, [('lit_drops', '3')])), 'lit_drops: the same in the dark fails'
+    # A post at the landing isn't lit till he gets there; a sconce is.
+    late = swap(dark, {(19, 18): 'L', (26, 21): 'L'})
+    assert any('lit_drops 3' in p for p in shape_problems('lab-x', late, [('lit_drops', '3')])), 'lit_drops: posts at the landings are dark when he lands'
+    sconce = swap(dark, {(19, 17): 'c', (25, 20): 'c'})
+    assert not [p for p in shape_problems('lab-x', sconce, [('lit_drops', '3')]) if 'descent' in p], 'lit_drops: sconces over the landings pass'
+    assert any('lit_drops 3' in p for p in shape_problems('lab-x', sconce, [('lit_drops', '3'), ('theme', 'stillshore')])), \
+        "lit_drops: W6's dead sconces light nothing"
+    # Lit posts (lit_posts:) burn from the start: the posts at the landings
+    # light them; a lit post names a lantern post.
+    steady = [('lit_drops', '3'), ('lit_posts', '19,18; 26,21')]
+    assert not [p for p in shape_problems('lab-x', late, steady) if 'descent' in p or 'lit_posts' in p], \
+        'lit_posts: posts lit from the start light their landings (%s)' % shape_problems('lab-x', late, steady)
+    assert any('no lantern post' in p for p in shape_problems('lab-x', late, [('lit_drops', '3'), ('lit_posts', '5,5')])) and \
+        any("lit_posts 'x'" in p for p in shape_problems('lab-x', late, [('lit_drops', '3'), ('lit_posts', 'x')])), 'a lit post names a lantern post'
     assert any('landing 0/0' in p for p in shape_problems('lab-x', lit, [('landing', '0/0')])) and \
         not [p for p in shape_problems('lab-x', lit, [('landing', '1/0')]) if 'descent' in p], 'landing: walk-offs land a column ahead'
     g3 = [list(r) for r in lit]
@@ -3409,3 +3566,12 @@ def review_check():
     st2 = stack(join(crop(windy, 3)), join(crop(calm, 3)))
     assert level_gusts_header(st2) == '4-7:L:A:0-11' and level_gusts_header(join(windy)) == '4-7:L:A', \
         'a deck\'s gusts on its rows (%s)' % level_gusts_header(st2)
+    # A lamplit level's lilies: a run by a post held whole (three cells from
+    # it), one run on past its reach caught, a far run soft and fine; and no
+    # rule without the twist.
+    lamp = block('\n'.join(['.' * 40] * 11 + ['.........%%%..................%%%%......', '.P......L.............................E.'] + ['#' * 40] * 2))
+    lit = [('twist', 'lamplit')]
+    assert lamp_problems(lamp, lit) == [], 'a run three cells from its post is held whole (%s)' % lamp_problems(lamp, lit)
+    long = swap(lamp, {(x, 11): '%' for x in range(12, 15)})
+    assert any("12, 13, 14" in p for p in lamp_problems(long, lit)) and lamp_problems(long) == [], \
+        'a run on past its post\'s reach (%s)' % lamp_problems(long, lit)

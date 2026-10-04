@@ -51,7 +51,8 @@ extends RefCounted
 ##             stops with stop_time); every monster in plain view runs x1.3
 ##             (elites.gd alert: speed only, never a tell) for TOLL_RUN beats.
 ##             The beat before, a ring closes on each of them and the clock
-##             tocks (the warning, on the glow layer for a muted phone)
+##             tocks (the warning, on the glow layer for a muted phone). No
+##             Anointed rolls Swift under it (TOLL_BANS: elite_rules)
 ##   lamplit   a crumbling ledge cell within LAMP_R px of a lit lantern holds
 ##             firm when stood on (world.gd stood_on), with a warm glint on
 ##             its top; when the lantern gutters (its 3 s flicker is the tell)
@@ -106,6 +107,7 @@ const REMAINS_W := 28.0          # the remains' rect a strike must touch (px, on
 const REMAINS_H := 18.0
 const TOLL_EVERY := 16           # toll: beats between tolls (on beat 16 of 16)
 const TOLL_RUN := 4              # beats the tolled run x1.3 (elites.gd ALERT_SPEED)
+const TOLL_BANS := ["Swift"]     # toll: Omens no Anointed rolls (elites.gd roll_omens' omens_ban)
 const LAMP_R := 100.0            # lamplit: px from a lit lantern's flame to a ledge cell's middle (about 3 tiles)
 const SOUL := Color("7ef0c8")    # the remains' wisp (the monsters' eye glow)
 const RISEN_TINT := Color(0.78, 1.0, 0.9)   # a risen one's sprite (it pays nothing: it looks it)
@@ -194,7 +196,12 @@ static func heal_mult(twist_id: String) -> float:
 static func elite_rules(twist_id: String, rules: Dictionary) -> Dictionary:
 	## omens: the Anointed chance x OMEN_CHANCE, the max unchanged, and a
 	## second Omen gets two rolls (1 - (1 - s)^2: World 3's 0.2 is 0.36,
-	## World 5's 0.5 is 0.75). Changes rules in place, and returns it.
+	## World 5's 0.5 is 0.75). toll: no Anointed rolls Swift (omens_ban:
+	## TOLL_BANS; the toll's x1.3 on Swift's x1.4 would be x2.09, so 4-2
+	## has none). Changes rules in place, and returns it.
+	if rule_of(twist_id) == "toll":
+		rules["omens_ban"] = TOLL_BANS.duplicate()
+		return rules
 	if rule_of(twist_id) != "omens":
 		return rules
 	rules["anoint"] = minf(float(rules.get("anoint", 0.0)) * OMEN_CHANCE, 1.0)

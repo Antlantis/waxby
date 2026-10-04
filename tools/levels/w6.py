@@ -42,10 +42,10 @@ from common import block, join, x_of, T_OPEN
 # (each level declares its roles:): 6-1 teaches with a lesson card and no
 # rule, 6-2 is the Drowned Dark, 6-3 Hunted. Pack size ramps 2-3 (Dusk,
 # 6-1), one Anointed 3-5 pack (6-2's Old Lullaby), every pack 3-5 (6-3's
-# packs twist); the fodder share falls 81 / 61 / 53%; Rattles 2 / 1 / 1.
+# packs twist); the fodder share falls 76 / 61 / 53%; Rattles 2 / 1 / 1.
 ROSTER = {
     '6-1': {'headline': ['hushling', 'brinejaw', 'stillmaw'], 'support': ['dripkin', 'gutterwing', 'bonebow', 'creepbone'],
-            'guest': ['hollow_helm'], 'rattle_max': 2, 'fodder_max': 0.85, 'count': 21},
+            'guest': ['hollow_helm'], 'rattle_max': 2, 'fodder_max': 0.85, 'count': 17},
     '6-2': {'headline': ['unwick', 'stillmaw', 'lurecoil'], 'support': ['hushling', 'brinejaw', 'bonebow'],
             'guest': ['spurwheel', 'hollow_helm'], 'rattle_max': 1, 'fodder_max': 0.75, 'count': 18},
     '6-3': {'headline': ['hushling', 'unwick', 'stillmaw', 'brinejaw'],
@@ -56,8 +56,8 @@ ROSTER = {
 # foot): Hushlings with the pack each placed one brings (Dusk's 2-3 at its
 # mean; 4 behind 6-2's Anointed Old Lullaby; 4 a pack under 6-3's packs
 # twist, and each Unwick its pair), forced Anointed at x2.5. 6-3 reads 14.5,
-# not the spec's 13: the same cast, with the Unwick's pair counted (the
-# toolkit's packs rule; the spec's sum left it out).
+# not the spec's 13, approved-equivalent: the same cast, with the Unwick's
+# pair counted (the toolkit's packs rule; the spec's sum left it out).
 THREAT = {'6-1': 10.0, '6-2': 11.5, '6-3': 14.5}
 MAX_GAP = 78                 # tiles between checkpoints (World 6)
 
@@ -230,8 +230,9 @@ BS_CANDLES = block('''
 14|######:::##:::##:::##:::################
 ''')
 
-# The jaws: floats between stone posts, a Brinejaw in every gap. Bait a
-# jaw from stone, cross in its cooldown. Hushlings wait on the far stone.
+# The jaws: floats between stone posts, a Brinejaw in every other gap (the
+# first and the last: the lesson met twice, never three in a row). Bait a
+# jaw from stone, cross in its cooldown; the far stone is quiet.
 BS_JAWS = block('''
  0|################################
  1|################################
@@ -245,8 +246,8 @@ BS_JAWS = block('''
  9|................................
 10|......o.......o........o........
 11|................................
-12|.............................n.n
-13|##:f:&&::##::f&&:&:f##:f:&&:####
+12|................................
+13|##:f:&&::##:::&&:&::##:f:&&:####
 14|##:::::::##:::::::::##::::::####
 ''')
 
@@ -370,8 +371,11 @@ LEVELS[-1]['vigil_crown'] = crown_header(common.level_rows(LEVELS[-1]), BS_CANDL
 # The bells are drowned, so he goes down to them: from the rim (its floor on
 # row 13) by short drops onto lit landings into the sunken belfry, a long
 # flat bottom (row 22), and up by the 6-S tower to the far rim. Every way
-# down is a drop of 3 rows or less onto a landing in a lantern's or an
-# altar's light (lit_drops: 3: no blind drops in the dark).
+# down is a drop of 3 rows or less onto a landing lit before he drops
+# (lit_drops: 3: no blind drops in the dark): the posts at the belfry's two
+# landings and the chapel's door burn from the start, a steady flame that
+# never burns down (lit_posts), so from the rim the valley shows its way
+# down, the black water dark between them.
 #
 # The rim: the opening buoy over deep water (ring to see: its toll stills the
 # pool and lights the screen); twelve tiles of it stilled by one toll (a
@@ -510,12 +514,15 @@ DR_UNWICK = block('''
 14|####################
 ''')
 
-# The sunken belfry (placed 3 rows down: a lantern lights where he lands): a
-# Hollow Helm by one cog turning over the black water (ride a tooth up the
-# rising side, off at the top), a Bonebow on a ledge; the Unwick again on the
-# far stone, and high on the right a shelf of embers only a grave step
-# reaches. (Its Spurwheel rolls round the frame, the box over the floor: wave
-# 3's rule. Drawn down to the rock under its pool.)
+# The sunken belfry (placed 3 rows down: a lit post burns where he lands):
+# one cog turning over the black water (ride a tooth up the rising side, off
+# at the top) to the far stone, its own lit post where he lands; the Unwick
+# again past a Bonebow on a ledge, and a Hollow Helm at the stone's far end,
+# seven tiles from the pool's edge (the review: on the near stone by the
+# pool his shove drowned you in the dark), and high on the right a shelf of
+# embers only a grave step reaches. (Its Spurwheel rolls round the frame,
+# the box over the floor: wave 3's rule. Drawn down to the rock under its
+# pool.)
 DR_BELFRY = block('''
  0|############################
  1|############################
@@ -529,7 +536,7 @@ DR_BELFRY = block('''
  9|............O........a......
 10|....................===.....
 11|............................
-12|.L..h..............L....6...
+12|.L.................L...6..h.
 13|######:::::::::::::#########
 14|######:::::::::::::#########
 15|######:::::::::::::#########
@@ -541,7 +548,8 @@ DR_BELFRY = block('''
 ''', H62 - 3)
 
 # The drowned chapel (placed 6 rows down: its roof is the belfry's floor):
-# over its roof, a lit drop to its door, false stone (a Lidlurk, sigil 2).
+# over its roof, a drop to its door by a lit post (its light on the drop
+# after it, to altar 2, too), false stone (a Lidlurk, sigil 2).
 DR_VAULT = block('''
  0|################
  1|################
@@ -555,7 +563,7 @@ DR_VAULT = block('''
  9|................
 10|#############...
 11|#.....2.....F...
-12|#.M.........FL..
+12|#.M.........F.L.
 13|################
 14|################
 15|################
@@ -769,6 +777,7 @@ LEVELS.append({
     'id': '6-2', 'name': 'The Drowned Bells', 'area': 29, 'theme': 'drownbell', 'music': 'hushdeep',
     'dread': 'The Stitched Choir|stillmaw|Warded,Hushed', 'secret': '6-S', 'story_start': 'beat_6_2',
     'lit_drops': 3,
+    'lit_posts': [(DR_BELFRY, 1, 12), (DR_BELFRY, 19, 12), (DR_VAULT, 14, 12)],
     'roles': 'S C C A C C V A C C A C D A C B',
     'twist': 'dark',
     'anoint': [(DR_CHAIN, 27, 12, 'Swift', 'Old Lullaby'), (DR_THIEF, 10, 6, 'Burning', 'The Sexton')],
@@ -784,10 +793,14 @@ LEVELS.append({
 # ============================================================ 6-3 The Long Quiet
 # Area 30. Hunted (the packs twist: every Hushling pack 3-5 strong, every
 # Unwick a pair). Build 2 keeps the strip, its width, its four altars and both
-# chases byte for byte (the tide's to the second): a lantern post where 6-1's
-# candle stood, and a buoy in a shallow pool; a pack round a lantern inside
-# the first Hush zone, a bridge over one-tile floats beyond them (sigil 3
-# under it, a Brinejaw below); then the two chases (`chase:` from altar 1 to
+# chases byte for byte (the tide's to the second). Hunted from the start: he
+# wakes by a lantern post inside the first Hush zone with a pack circling at
+# its light's edge (no buoy pool, no candle on a rock: 6-1's opening is its
+# own); floats over a deep pool beyond them (a jaw in it), a post on the
+# stone after, and the buoy met before the tide needs it, in deep water at a
+# pool's near end (toll it and walk its still water, a jaw held under; its
+# one-tile floats the hard way), sigil 3 high over that jaw; then
+# the two chases (`chase:` from altar 1 to
 # altar 2 and from altar 3 to altar 4): the Hush tide rises 10 tiles behind
 # as he leaves the altar and rubber-bands. Each chase is laid out for the
 # human runner (0.85x speed, 0.9 s a jump, 1 s at each obstacle new in the
@@ -801,12 +814,13 @@ LEVELS.append({
 # down (a chimney only a cling climbs stays); false stone (sigil 2); after,
 # the Long Shadow's loop loft over a pool with a jaw in it, Sir Pale (an
 # Anointed Paneguard) on the stone between glass over black water, and the
-# last stand at the lake: an Unwick pair on the near stone, a pack at the
-# bell's foot in the Hush zone, a Stillmaw drifting in past it.
+# last stand at the lake: a Stillmaw drifting in over Sir Pale's water, an
+# Unwick pair on the near stone, a pack at the bell's foot in the Hush zone.
 
-# The calm before it: a lantern post on a rock, and a buoy in a shallow pool.
-# Toll it and the lake goes still, too still (the tide's chases use both;
-# here nothing is behind him yet).
+# Hunted from the start: he wakes inside the first Hush zone (the post's
+# light there half its radius) by a lantern post he lights stepping off, a
+# pack (3-5) circling at its edge; the inscription past the zone, where it's
+# quiet.
 LQ_START = block('''
  0|########################
  1|########################
@@ -819,17 +833,21 @@ LQ_START = block('''
  8|........................
  9|........................
 10|........................
-11|..........L.............
-12|..P......###....@.J:::::
+11|........................
+12|..P.L......n.n......@...
 13|########################
 14|########################
+ Z|;;;;;;;;;;;;;;;;;.......
 ''')
 
-# Floats over a deep pool (a jaw in it), then a lantern post on the stone with
-# a pack at its light's edge (in a Hush zone the post burns at half its
-# radius), then the star pool: a bridge over one-tile floats between two
-# posts, a Brinejaw under them, sigil 3 under the bridge over the middle
-# float (the star route: only standing on that float reaches it).
+# A lantern post at the near edge of a deep pool beyond the pack (light to
+# light: the haven they won't enter before the hop), floats over the pool (a
+# jaw in its middle), a post on the stone after; then a buoy in deep water at a pool's near end,
+# met before the chases need it: walk into it from the stone and its toll
+# stills the pool (a jaw held under the still water), or hop its one-tile
+# floats. Sigil 3 hangs high over the jaw between them (the star route: a
+# jump from a float, or from the still water while it lasts; no bridge, as
+# 6-1's bell has).
 LQ_DARK = block('''
  0|################################
  1|################################
@@ -839,14 +857,13 @@ LQ_DARK = block('''
  5|................................
  6|................................
  7|................................
- 8|................................
- 9|.........................o......
-10|.......o.....o.......==========.
-11|..........................3.....
-12|................L..n.n..........
-13|#####::&&:f:&&::######:&f:&::&:#
+ 8|...........................3....
+ 9|................................
+10|.......o.....o.........o.o.o....
+11|................................
+12|...L............L...............
+13|#####::&&:f:&&::######J::&:f:&:#
 14|#####:::::::::::######:::::::::#
- Z|..............;;;;;;;;;;;;;;;;;;
 ''')
 
 LQ_ALTAR = block('''
@@ -1040,7 +1057,9 @@ LQ_DREAD = block('''
 ''')
 
 # The far shallows: glass over black water (the Sanctum's verb), Sir Pale
-# (an Anointed Paneguard, Swift) on the stone between, a Refractor over it.
+# (an Anointed Paneguard, Swift) on the stone between, a Refractor over it,
+# and the last stand's Stillmaw drifting in over the first glass, eating the
+# light he brings (6-1 taught it by the bell; here it comes for him).
 LQ_SHALLOWS = block('''
  0|##################
  1|##################
@@ -1049,7 +1068,7 @@ LQ_SHALLOWS = block('''
  4|..................
  5|..................
  6|..................
- 7|..................
+ 7|......5...........
  8|............y.....
  9|..................
 10|..................
@@ -1060,8 +1079,9 @@ LQ_SHALLOWS = block('''
 ''')
 
 # The last stand at the lake's edge: an Unwick on the near stone (the twist
-# pairs it), a bridge over a pool of one-tile floats, a pack at the bell's
-# foot in the Hush zone, and a Stillmaw past the bell drifting in.
+# pairs it), a bridge over a pool of one-tile floats, and a pack at the
+# bell's foot in the Hush zone (the screen's six: its Stillmaw drifts in
+# earlier, over Sir Pale's water, not by the bell as 6-1's does).
 LQ_BELL = block('''
  0|################################
  1|################################
@@ -1071,7 +1091,7 @@ LQ_BELL = block('''
  5|................................
  6|................................
  7|................................
- 8|.............................5..
+ 8|................................
  9|................................
 10|.....============...............
 11|................................

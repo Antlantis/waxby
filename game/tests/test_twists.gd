@@ -110,6 +110,7 @@ func _initialize() -> void:
 	await _test_toll()
 	await _test_belt_flip()
 	await _test_lamplit()
+	await _test_lamplit_garden()
 	for suffix in ["", ".bak", ".tmp"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE + suffix))
 	print("test_twists: %d passed, %d failed" % [_passed, _failed])
@@ -224,6 +225,9 @@ func _test_registry() -> void:
 			and is_equal_approx(float(o["second_omen"]), 0.36), "omens: World 3's 12%% is 24%%, the max 3 kept, a second Omen 36%% (%s)" % [o])
 	var o5 := Twists.elite_rules("omens", {"anoint": 0.16, "max_anoint": 3, "omens": 1, "second_omen": 0.5})
 	_check(is_equal_approx(float(o5["anoint"]), 0.32) and is_equal_approx(float(o5["second_omen"]), 0.75), "omens: World 5's 16% is 32%, a second Omen 75%")
+	var tr := Twists.elite_rules("toll", w3.duplicate())
+	_check(str(tr.get("omens_ban", [])) == str(["Swift"]) and is_equal_approx(float(tr["anoint"]), 0.12) and int(tr["max_anoint"]) == 3,
+			"toll: no Anointed rolls Swift (the toll's x1.3 on Swift's x1.4), the chance and the max kept (%s)" % [tr])
 	_check(Twists.elite_rules("dry", w3.duplicate()) == w3 and Twists.elite_rules("", w3.duplicate()) == w3, "no other twist touches the elite rules")
 
 
@@ -826,8 +830,13 @@ func _test_restless_stair() -> void:
 	_ticks(w, 30)
 	_stomp(w, r0)
 	_check(tw.remains.size() == 1, "1-2: the stomped Rattle's bones lie on the landing")
-	# Down the stair, out of sight: the bones wait, however long.
-	_stand(w, 112.5 * TILE, land + 4)
+	# Down the stair, out of sight: the bones wait, however long (the bat
+	# vault's floor, two flights down).
+	var vault := land
+	while vault < lv.height and not LevelData.is_solid(lv.tile(112, vault)):
+		vault += 1
+	_check(vault - land >= 4, "1-2: the bat vault is a stair of flights below the landing (%d rows)" % (vault - land))
+	_stand(w, 112.5 * TILE, vault)
 	_secs(w, Twists.RISE_WAIT + Twists.RISE_TELL + 2.0)
 	var seen: bool = not tw.remains.is_empty() and w.in_plain_view(tw.remains_rect(tw.remains[0]))
 	_check(tw.remains.size() == 1 and tw.risen == 0 and not seen, "1-2: down the stair, off the glass, they wait (rose %d)" % tw.risen)
@@ -876,6 +885,34 @@ func _test_toll() -> void:
 	_check(tw.tolls == 2, "and it tolls once the clock runs again")
 	_check(tw.log_extra() == {"twist": "toll", "tolls": 2}, "the playlog line counts the tolls (%s)" % [tw.log_extra()])
 	await _done(w)
+	# No Swift under the toll: the rolls skip it (a Tickwind's pool has it),
+	# and 4-2's random Anointed never carry it, seed after seed.
+	var r := RandomNumberGenerator.new()
+	var swift := [0, 0]
+	for i in 300:
+		r.seed = i
+		swift[0] += 1 if Elites.roll_omens("tickwind", "witching", 4, r, {"omens": 2}).has("Swift") else 0
+		r.seed = i
+		swift[1] += 1 if Elites.roll_omens("tickwind", "witching", 4, r, {"omens": 2, "omens_ban": Twists.TOLL_BANS}).has("Swift") else 0
+	_check(swift[0] > 0 and swift[1] == 0, "a banned Omen is never rolled (%d of 300 Tickwinds Swift without the ban, %d with it)" % swift)
+	var lv42 = LevelData.load_file("res://levels/4-2.txt")
+	var elites := 0
+	var swifts := []
+	for diff in ["dusk", "witching"]:
+		for run in 6:
+			game.reset()
+			game.new_hero("knight")
+			game.data["run_counter"] = run
+			var w42 := _world(lv42, diff, true, false)
+			await process_frame
+			for e in w42.enemies:
+				if e.tier == "anointed":
+					elites += 1
+					if e.has_omen("Swift"):
+						swifts.append([diff, run, e.kind, e.spawn.get("cell")])
+			await _done(w42)
+	_check(Twists.id_in(lv42) == "toll" and elites > 0 and swifts.is_empty(),
+			"4-2 (the toll): %d Anointed over 12 seeds, none Swift %s" % [elites, swifts])
 
 
 # ---------------------------------------------------------------- belt_flip
@@ -957,4 +994,60 @@ func _test_lamplit() -> void:
 	await process_frame
 	w.features.light(w.features.lanterns[0])
 	_check(_on_wax(w, 10) != "idle", "without the twist a lit lantern holds nothing")
+	await _done(w)
+
+
+func _test_lamplit_garden() -> void:
+	## 2-3 (Lamplit): every lily in the garden is in a lantern's reach (all
+	## its lanterns lit, every crumble cell holds), the set pieces' runs among
+	## them (the Lily Pond's two, the Gardener's bridge, the Moth Gate's ring
+	## under sigil 3); and drips put lanterns out there: a spout over a post
+	## in the Pond and the Gate, its drop on the lit flame.
+	var lv = LevelData.load_file("res://levels/2-3.txt")
+	if Twists.id_in(lv) != "lamplit":
+		return
+	var w := _world(lv, "dusk", false)
+	await process_frame
+	_ticks(w, 1)
+	for l in w.features.lanterns:
+		w.features.light(l, true)
+	var soft := []
+	for cell in w.crumbles:
+		if not w.twists.holds_crumble(cell):
+			soft.append(cell)
+	_check(w.crumbles.size() >= 40 and soft.is_empty(), "2-3: its lanterns lit, every lily holds (%d lilies; soft %s)" % [w.crumbles.size(), soft])
+	var runs := {"the Lily Pond": [Vector2i(70, 21), Vector2i(86, 21)], "the Gardener's bridge": [Vector2i(89, 14), Vector2i(107, 14)],
+			"the Moth Gate's ring": [Vector2i(92, 5), Vector2i(97, 5)]}
+	for name in runs:
+		var a: Vector2i = runs[name][0]
+		var b: Vector2i = runs[name][1]
+		var n := 0
+		for cell in w.crumbles:
+			if cell.y == a.y and cell.x >= a.x and cell.x <= b.x:
+				n += 1
+		_check(n >= 6, "2-3: %s's lilies are there, every one held lit (%d)" % [name, n])
+	var sigil: Array = lv.entities.filter(func(e): return e["kind"] == "sigil" and int(e.get("index", -1)) == 2)
+	_check(sigil.size() == 1 and absi(int(sigil[0]["cell"].x) - 95) <= 3 and int(sigil[0]["cell"].y) < 5,
+			"2-3: sigil 3 over the Gate's ring (%s)" % [sigil.map(func(e): return e["cell"])])
+	# Drips put lanterns out: a spout over a post, its drop on the flame.
+	var under := []
+	for sp in w.features.spouts:
+		var c: Vector2i = sp["cell"]
+		var y := c.y + 1
+		while y < lv.height and not LevelData.is_solid(lv.tile(c.x, y)):
+			y += 1
+		for l in w.features.lanterns:
+			if (l["cell"] as Vector2i).x == c.x and int(l["cell"].y) > c.y and int(l["cell"].y) < y:
+				under.append(l)
+	_check(under.size() >= 2 and under.any(func(l): return int(l["cell"].y) > 15) and under.any(func(l): return int(l["cell"].y) < 8),
+			"2-3: a drip over a post in the Pond and in the Gate (%s)" % [under.map(func(l): return l["cell"])])
+	var outs := 0
+	for l in under:
+		w.features.light(l, true)
+		var t := 0.0
+		while bool(l["lit"]) and t < 4.0:
+			_ticks(w, 6)
+			t += 6 * DT
+		outs += 0 if bool(l["lit"]) else 1
+	_check(outs == under.size(), "2-3: each drip puts its post out within a spout's beat (%d of %d)" % [outs, under.size()])
 	await _done(w)

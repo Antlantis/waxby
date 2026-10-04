@@ -95,13 +95,13 @@ LEVELS = []
 # first time, to altar 3 on the bank (BG_TRELLIS_K); the root cellar's vault
 # with Mister Mandrake's lair over it (BG_CELLAR_D); the skull lantern's two
 # Weepcaps and the bell on its knoll with the star route above (BG_BELL).
-# Hardly a Rattle (one at the gate): it plays as the Bone Orchard from the
-# first screen.
+# Hardly a Rattle (one, a guest in the dark grove past the Mound Bed): it
+# plays as the Bone Orchard from the first screen.
 
 # The orchard gate: a 4-high bone wall (a held jump clears 3) with a vine in
 # front of it, as tall as the wall. Catch it, climb to its top, and holding
 # jump toward the wall hauls you up onto it (the mount); a leap off it lands
-# there too. A glowfruit hangs over the gate; one Rattle waits past it.
+# there too. A glowfruit hangs over the gate, and nothing waits past it.
 BG_START = block('''
  0|######################
  1|######################
@@ -115,7 +115,7 @@ BG_START = block('''
  9|............{.####....
 10|....c.......{.####....
 11|............{.####....
-12|..P....@....{.####..s.
+12|..P....@....{.####....
 13|######################
 14|######################
 ''')
@@ -229,7 +229,8 @@ BG_WEEP = block('''
 # The dark grove: no sconces, dark by design (no twist). Four glowfruit
 # hang under low roots (a jump knocks one down: it lies lit for 30 s), the
 # only light. A Dripkin under a root, a Bonebow on a stump shooting from the
-# dark over a strip of Rootlings. Sigil 1 on a vine-top shelf.
+# dark over a strip of Rootlings, and past the stump the level's one Rattle
+# (a guest from World 1). Sigil 1 on a vine-top shelf.
 BG_GROVE = block('''
  0|####################################
  1|####################################
@@ -243,7 +244,7 @@ BG_GROVE = block('''
  9|...{................................
 10|...{.........................a......
 11|...{.........................##.....
-12|...{................r...r....##.....
+12|...{................r...r....##..s..
 13|####################################
 14|####################################
 ''')
@@ -518,10 +519,12 @@ HO_DOOR_K = block('''
 14|##############
 ''')
 
-# The Long Ossuary: 30 flat tiles of bone floor to the foot of the wall,
-# three Rattles in its niches and Brother Clatter at its far end (the
+# The Long Ossuary: 30 tiles of bone floor to the foot of the wall, three
+# burial niches in its wall (a one-tile alcove framed in bone over a bier a
+# row high), a Rattle on each bier, and Brother Clatter at its far end (the
 # anoint: Sporebound; he bursts into spores when he falls). Stomp the
-# Rattles and they get up behind you while he pounces: strike the remains.
+# Rattles and they get up out of their niches behind you while he pounces:
+# strike the remains.
 HO_GALLERY = block('''
  0|################################
  1|################################
@@ -529,13 +532,13 @@ HO_GALLERY = block('''
  3|################################
  4|################################
  5|################################
- 6|................................
- 7|................................
- 8|................................
+ 6|..###.....###.....###...........
+ 7|..#.#.....#.#.....#.#...........
+ 8|..#.#.....#.#.....#.#...........
  9|................................
 10|....c.........c.........c.......
-11|................................
-12|...s.....s.....s..........m.....
+11|...s.......s.......s............
+12|..###.....###.....###.....m.....
 13|################################
 14|################################
 ''')
