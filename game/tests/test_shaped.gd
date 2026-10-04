@@ -45,7 +45,15 @@ extends SceneTree
 ##   the shapes keeps its left door;
 ## - the mirror's duel, entered from the right, seals both doors and opens
 ##   when won; the decks' ambush, two decks tall, seals its lower door and
-##   its upper one, drops foes on both decks, and the bot clears it.
+##   its upper one, drops foes on both decks, and the bot clears it;
+##   lab-shapes' duel, on the upper storey of a 24-row level, met by its
+##   right door as its route comes, seals both and opens when won.
+## The three together (the tools' labs, the tall camera, 16 x 16 tile
+## chunks: the rendering's E4):
+## - down the tower's shaft the camera looks ahead and never shows past what
+##   the chunks draw (the level and the bedrock), meeting all 3 rows of them;
+## - a crumble on lab-shapes giving way, and its duel's doors sealing,
+##   redraw their own chunks only, never the row of chunks under them.
 ##
 ##     godot --headless --path game --script res://tests/test_shaped.gd
 
@@ -115,6 +123,8 @@ func _initialize() -> void:
 	await _test_arena_sides()
 	await _test_room_from_right()
 	await _test_room_two_decks()
+	await _test_room_tall_lab()
+	await _test_tall_chunks()
 	for p in [game.save_path, game.settings_path]:
 		for suffix in ["", ".bak", ".tmp"]:
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(p + suffix))
@@ -800,3 +810,127 @@ func _test_room_two_decks() -> void:
 	_check(decks.has(true) and decks.has(false), "foes on both decks (%s)" % [decks.keys()])
 	await _done(w)
 
+
+# ---------------------------------------------------------------- the three together
+
+func _drawn_chunks(w: Node) -> Dictionary:
+	## Counts each tile chunk's draws (chunk index -> draws) from now on.
+	var n := {}
+	for k in w.chunks.size():
+		n[k] = 0
+		w.chunks[k].draw.connect(func(): n[k] += 1)
+	return n
+
+
+func _frames(n: int) -> void:
+	## n frames, for the chunks' queued draws to run.
+	for i in n:
+		await process_frame
+
+
+func _view_rect(w: Node) -> Rect2:
+	var v: Vector2 = w._view_size()
+	return Rect2(w.cam - v * 0.5, v)
+
+
+func _chunk_rect(tv: Node) -> Rect2:
+	return Rect2(tv.col0 * TILE, tv.row0 * TILE, 16 * TILE, 16 * TILE)
+
+
+func _test_tall_chunks() -> void:
+	## The tall camera over 16 x 16 tile chunks (world.gd's grid, the
+	## rendering's E4): down the tower's shaft, 30 rows, the camera looking
+	## ahead, the view never leaves what the chunks draw (the level and the
+	## bedrock under it) and meets every row of them on the way; on
+	## lab-shapes (24 rows, two chunk rows) a crumble shaking and falling
+	## under him redraws its own chunks only, never the row under it.
+	var tw = await _world(_lab("lab-shape-tower"))
+	var cols: int = ceili(tw.level.width / 16.0)
+	_check(tw.chunk_rows == 3 and tw.chunks.size() == cols * 3, "the tower: 3 rows of chunks (%d chunks)" % tw.chunks.size())
+	_stand(tw, 25, 3)
+	var all_rect := Rect2(0, 0, tw.level.width * TILE, tw.level.height * TILE + 160.0)
+	var inside := true
+	var met := {}
+	var gone := false
+	var looked := false
+	for i in 400:
+		gone = gone or not tw.player.on_floor
+		_ticks(tw, DT, {"right": not gone})
+		looked = looked or str(tw.tall_cam.looking) == "fall"
+		var vr := _view_rect(tw)
+		inside = inside and all_rect.encloses(vr.grow(-0.5))
+		for tv in tw.chunks:
+			if _chunk_rect(tv).intersects(vr):
+				met[int(tv.row0) / 16] = true
+		if gone and tw.player.on_floor:
+			break
+	_check(looked and inside and met.size() == 3, "down the shaft the camera looks ahead, never shows past the chunks and the bedrock, and meets all 3 rows of them (%s, %s, %s)" % [looked, inside, met.keys()])
+	await _done(tw)
+	# lab-shapes' crumble (row 8, columns 44-47: chunk row 0), its catch floor 4 rows under it.
+	var w = await _world(_lab("lab-shapes"))
+	_check(w.chunk_rows == 2, "lab-shapes: 2 rows of chunks")
+	var n: Dictionary = _drawn_chunks(w)
+	w.player.reset_at(Vector2(45 * TILE + 16, 8 * TILE))
+	w.player.velocity = Vector2.ZERO
+	await _frames(2)
+	for k in n:
+		n[k] = 0
+	var fell := false
+	for i in 600:
+		_ticks(w, DT)
+		if w.player.position.y > 10 * TILE and w.player.on_floor:
+			fell = true
+			break
+	await _frames(2)
+	var hit := []
+	for k in n:
+		if int(n[k]) > 0:
+			hit.append(k)
+	var want: Array = w.chunks_at(44, 8) + w.chunks_at(47, 8)
+	var low := hit.filter(func(k): return int(w.chunks[k].row0) > 0)
+	_check(fell and not hit.is_empty() and hit.all(func(k): return want.has(k)) and low.is_empty(),
+			"lab-shapes: the crumble gives way under him and redraws its own chunks only (%s of %s; the lower row %s)" % [hit, want, low])
+	await _done(w)
+
+
+func _test_room_tall_lab() -> void:
+	## Sealed rooms in a tall level: lab-shapes' duel, on its upper storey
+	## (rows 1-10), walked into from its right door as its route comes: both
+	## doors seal (their chunks redrawn, the lower row of chunks not), the
+	## tall camera on him; its foe falls and the doors open.
+	var w = await _world(_lab("lab-shapes"))
+	var m = w.features.module("sealed")
+	_ticks(w, 0.5)
+	var r: Dictionary = m.rooms[0]
+	var n: Dictionary = _drawn_chunks(w)
+	_stand(w, 93, 9)
+	await _frames(2)
+	for k in n:
+		n[k] = 0
+	var phase := ""
+	for i in 480:
+		_ticks(w, DT, {"left": w.player.position.x > 86 * TILE})
+		if str(r["phase"]) == "fight":
+			phase = "fight"
+			break
+	await _frames(2)
+	var doors := {}
+	for c in r["sealed"]:
+		doors[(c as Vector2i).x] = true
+	var ks := doors.keys()
+	ks.sort()
+	_check(phase == "fight" and ks == [76, 89], "lab-shapes: in by its right door, the upper storey's duel shuts at both ends (%s, %s)" % [r["phase"], ks])
+	var hit := []
+	for k in n:
+		if int(n[k]) > 0:
+			hit.append(k)
+	var want: Array = w.chunks_at(76, 8) + w.chunks_at(89, 8)
+	_check(not hit.is_empty() and hit.all(func(k): return want.has(k) and int(w.chunks[k].row0) == 0),
+			"its doors redraw their own chunks, in the upper row (%s of %s)" % [hit, want])
+	_check(w.tall_cam != null and _feet(w) <= _special_top(w), "the tall camera keeps him over the Special in the room (feet %.0f)" % _feet(w))
+	for e in m.counted(r):
+		e.hp = 0.0
+		e._kill({"how": "slash", "from_x": e.position.x - 20.0})
+	_ticks(w, 0.5)
+	_check(str(r["phase"]) == "won" and (r["sealed"] as Array).is_empty(), "its foe falls and the doors open (%s)" % r["phase"])
+	await _done(w)

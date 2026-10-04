@@ -234,8 +234,10 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           and barks along the route, gaps on foot, mirrored phases, facing,
                           and each shape rule (the HUD's corners, the descent and catch rules)
                           catching what it should), test_shaped (Build 2's shapes, the engine's
-                          side, on the shape labs: the tall camera, the bots by route, arenas
-                          and sealed rooms entered from either side, two decks)
+                          side, on both streams' shape labs: the tall camera, the bots by route,
+                          arenas and sealed rooms entered from either side, two decks; the
+                          camera over 16 x 16 tile chunks, a 24-row lab's crumble and duel
+                          doors redrawing only their own chunks)
   tests/routes/*.json     the golden routes (tools/record_route.gd; test_routes.gd replays them:
                           3-1 ... 4-3 to the bell, 3-4_approach, 3-4_approach_witch and
                           4-4-approach to the arena door; W3's are the Taperwitch's but
