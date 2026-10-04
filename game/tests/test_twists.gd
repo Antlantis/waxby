@@ -63,6 +63,12 @@ const DT := 1.0 / 120.0
 const SAVE := "user://test_twists_save.json"
 const LABS := {"lab-restless": "restless", "lab-restless-all": "restless_all", "lab-toll": "toll", "lab-dark": "dark",
 		"lab-omens": "omens", "lab-dry": "dry", "lab-packs": "packs", "lab-lamplit": "lamplit", "lab-lesson": ""}
+# The levels on the path re-cut with their twist headers (Build 2's
+# redesigns, they declare their roles:): what each carries (the keys) and its
+# twist id. A re-cut level not listed (1-1, 2-1) carries none.
+const RECUT := {"1-2": {"twist": "restless"}, "1-3": {"twist": "duel"}, "2-2": {"twist": "dark"}, "2-3": {"twist": "lamplit"},
+		"3-1": {"lesson": true}, "3-2": {"twist": "restless"}, "3-3": {"twist": "omens"},
+		"4-1": {"lesson": true}, "4-2": {"twist": "toll", "belt_flip": true}, "4-3": {"twist": "dry"}}
 
 var WorldScript: GDScript
 var game: Node
@@ -243,6 +249,10 @@ func _test_labs() -> void:
 # ---------------------------------------------------------------- today's levels
 
 func _test_unchanged() -> void:
+	## Only a re-cut level (Build 2's redesign: it declares its roles:)
+	## carries a twist, lesson or belt_flip header, each RECUT's own, and its
+	## World plays it (_test_recut); a World for every level without one has
+	## no twist and plays exactly as before.
 	var ids := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if f.ends_with(".txt") and not f.begins_with("lab-"):
@@ -250,18 +260,28 @@ func _test_unchanged() -> void:
 	ids.sort()
 	var bare := true
 	var plain := []
+	var recut := []
 	for id in ids:
 		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		var mine: Dictionary = RECUT.get(id, {})
 		var twisted := false
 		for k in ["twist", "lesson", "belt_flip"]:
-			if lv.headers.has(k):
-				twisted = true
-				if str(lv.headers.get("roles", "")).strip_edges() == "":
-					bare = false
-					print("  %s has a %s header but isn't re-cut (no roles:)" % [id, k])
+			twisted = twisted or lv.headers.has(k)
+			if lv.headers.has(k) != mine.has(k):
+				bare = false
+				print("  %s %s a %s header" % [id, "has" if lv.headers.has(k) else "lacks", k])
+		if mine.has("twist") and Twists.id_in(lv) != str(mine["twist"]):
+			bare = false
+			print("  %s's twist is '%s', not '%s'" % [id, Twists.id_in(lv), mine["twist"]])
+		if lv.headers.has("roles"):
+			recut.append(id)
+		elif twisted:
+			bare = false
+			print("  %s has a twist header but isn't re-cut (no roles:)" % id)
 		if not twisted:
 			plain.append(id)
-	_check(bare and ids.size() >= 30, "only a re-cut level on the path carries a twist, lesson or belt_flip header (%d levels, %d without)" % [ids.size(), plain.size()])
+	_check(bare and ids.size() >= 30, "only the re-cut levels carry a twist, lesson or belt_flip header, each its own (%s; %d levels, %d without)" % [RECUT.keys(), ids.size(), plain.size()])
+	await _test_recut(recut)
 	var same := 0
 	for id in plain:
 		var w := _world(LevelData.load_file("res://levels/%s.txt" % id))
@@ -287,6 +307,29 @@ func _test_unchanged() -> void:
 	_check(w.twist_id() == "" and not w.twist("dark") and w.title_sub() == "3-9" and w.twist_heal() == 1.0, "in a mode the twist is off: no rule, no card")
 	w.mode = null
 	await _done(w)
+
+
+func _test_recut(ids: Array) -> void:
+	## A re-cut level's World carries the twist its header names (its rule on,
+	## every other off; its card's title line), or none, and its lesson card;
+	## a belt_flip only in World 4, and its belts flip.
+	for id in ids:
+		var lv = LevelData.load_file("res://levels/%s.txt" % id)
+		var tid := Twists.id_in(lv)
+		_check(str(lv.headers.get("twist", "")).strip_edges() == tid, "%s: its twist header names a twist (%s)" % [id, tid])
+		var w := _world(lv)
+		await process_frame
+		var rule := Twists.rule_of(tid)
+		var ok: bool = w.twist_id() == tid
+		for r in ["restless", "dark", "omens", "dry", "packs", "toll", "lamplit"]:
+			ok = ok and w.twist(r) == (r == rule)
+		var c := Twists.card_of(tid, int(lv.world), id)
+		ok = ok and w.title_sub() == (lv.subtitle if c.is_empty() else "%s · %s" % [lv.subtitle, c[0]])
+		ok = ok and w.twist_cards().size() == int(not c.is_empty()) + int(not Twists.lesson_in(lv).is_empty())
+		if lv.headers.has("belt_flip"):
+			ok = ok and int(lv.world) == 4 and not (w.features.module("clockwork").flips as Array).is_empty()
+		_check(ok, "%s (re-cut): its World carries twist '%s' (rule '%s'), its cards %s and nothing else" % [id, tid, rule, w.twist_cards()])
+		await _done(w)
 
 
 # ---------------------------------------------------------------- the cards

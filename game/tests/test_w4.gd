@@ -30,8 +30,10 @@ extends SceneTree
 ## tooth passes through the level over its whole arc or turn; no weight knock
 ## on Dusk leaves him over a pit (played at every cell near an edge); every
 ## Spurwheel keeps to its own box (40 s rolling, away from altars, bells and
-## the arena); each Dread's lair is off the main path (its floor as lava, the
-## bot still gets past); each keeper nook only its quirk reaches (the others
+## the arena); 4-1's and 4-2's Dread lairs are off the main path (its floor
+## as lava, the bot still gets past), 4-3's Grindstone is on it, a sealed duel
+## entered by the door the route comes in by, altar 5 by it (shut once he's
+## in, open when he falls, never with no monsters); each keeper nook only its quirk reaches (the others
 ## brute-forced, and the bot), and he gets back down; the first cogs, swings
 ## and the bridge weights over floors, not pits; stone every 14 tiles over a
 ## pit (the level checks shown to fail on a made-up level first); icicles
@@ -55,6 +57,8 @@ const Movers := preload("res://scripts/movers.gd")
 const PlayerScript := preload("res://scripts/player.gd")
 const Route := preload("res://scripts/route.gd")
 const Arena := preload("res://scripts/boss_arena.gd")
+const WalkMap := preload("res://scripts/walk_map.gd")
+const Sealed := preload("res://scripts/features/sealed.gd")
 const CLOCKWORK := "res://scripts/features/clockwork.gd"
 const TILE := 32
 const DT := 1.0 / 120.0
@@ -69,11 +73,11 @@ const APPROACH := "res://tests/routes/4-4-approach.json"
 # ice block, a lone block, a one-tile frosted ledge; a cog's tooth is a
 # mover) and a floor cell to start the bot from before them.
 const STAR_ROUTES := {
-	"4-1": {"route": [Vector2i(361, 7)], "from": Vector2i(345, 8), "what": "a run-up on the ice shelf to a lone ice block"},
-	"4-2": {"route": [Vector2i(358, 5), Vector2i(362, 6)], "from": Vector2i(346, 12),
-			"what": "a cog's top to a lone block, then a lone ice block"},
-	"4-3": {"route": [Vector2i(356, 8), Vector2i(360, 7)], "from": Vector2i(345, 10),
-			"what": "a swing's far end to a lone block, then a lone frosted ledge"},
+	"4-1": {"route": [Vector2i(307, 7)], "from": Vector2i(293, 8), "what": "a run-up on the ice shelf to a lone ice block"},
+	"4-2": {"route": [Vector2i(128, 14)], "from": Vector2i(113, 21),
+			"what": "over the flip floor, the cog's top to a lone block, then across to the sigil"},
+	"4-3": {"route": [Vector2i(60, 6)], "from": Vector2i(65, 4),
+			"what": "in the Grindstone's hall, his box's top to a lone block, then up to the sigil"},
 }
 
 var WorldScript: GDScript
@@ -134,6 +138,7 @@ func _initialize() -> void:
 		# belfry, 6-4's Carillon memory: the track B merge, wave 3's rule)
 		await _test_wheels(have + ["4-S", "6-2", "6-4"].filter(func(v): return FileAccess.file_exists("res://levels/%s.txt" % v)))
 		_test_lairs(have)
+		await _test_duel(have)
 		await _test_nooks(have)
 		_test_safe_first(have)
 		_test_star_routes(have)
@@ -1244,6 +1249,16 @@ func _test_wheels(ids: Array) -> void:
 			w.paused = true
 			root.add_child(w)
 			await process_frame
+			# One asleep in a sealed room (4-3's Grindstone, its duel's foe):
+			# woken as the doors would, so it's in the World's list and rolls.
+			var sm = w.features.module("sealed")
+			if sm != null:
+				sm._take_roster()
+				for r in sm.rooms:
+					if c.x >= int(r["x0"]) and c.x <= int(r["x1"]) and str(r["phase"]) == "wait":
+						r["phase"] = "fight"
+						r["sealed_at"] = w.ftime
+						sm._wake(r, w.player)
 			var wheel = null
 			for e in w.enemies:
 				if e.kind == "spurwheel" and (wheel == null or e.position.distance_to(LevelData.cell_floor(c)) < wheel.position.distance_to(LevelData.cell_floor(c))):
@@ -1280,11 +1295,15 @@ func _test_wheels(ids: Array) -> void:
 			var in_arena: bool = not arena.is_empty() and hi > float(arena["left"]) and lo < float(arena["right"])
 			var roam := maxf(x0 - lo, hi - x0) / TILE
 			for hb in hubs:
-				# The landing zone of a jump off the cog's leading (right) tooth:
-				# 3 to COG_CLEAR tiles past the hub, from 2 rows over the hub to
-				# 2 under it (the tooth's height: a box hung lower, like 4-2's
-				# over its landing's floor, is walked under).
-				var zone := Rect2((float(hb.x) + 3.0) * TILE, (float(hb.y) - 2.0) * TILE, (COG_CLEAR - 3.0) * TILE, 4.0 * TILE)
+				# The landing zone of a jump off the cog's leading tooth (the
+				# route's way on past it: right in a strip, left in 4-3 and on
+				# 4-2's upper storey: WalkMap.dir_of): 3 to COG_CLEAR tiles past
+				# the hub, from 2 rows over the hub to 2 under it (the tooth's
+				# height: a box hung lower, like 4-2's over its landing's floor,
+				# is walked under).
+				var way := WalkMap.dir_of(lv, hb)
+				var zx: float = (float(hb.x) + 3.0) * TILE if way > 0 else (float(hb.x) - COG_CLEAR + 1.0) * TILE
+				var zone := Rect2(zx, (float(hb.y) - 2.0) * TILE, (COG_CLEAR - 3.0) * TILE, 4.0 * TILE)
 				var round_r := Rect2(lo - TILE * 0.5, float(c.y) * TILE, hi - lo + TILE, 2.0 * TILE)
 				_check(not zone.intersects(round_r), "%s: the Spurwheel at %s rolls clear of the landing off the cog at %s (x %.1f to %.1f)" % [id, c, hb, lo / TILE, hi / TILE])
 			_check(alive and roam <= WHEEL_ROAM and near.is_empty() and not in_arena,
@@ -1293,13 +1312,16 @@ func _test_wheels(ids: Array) -> void:
 			await _done(w)
 
 
-# The Dread lairs (spec 3.1, 4.6: "a side lair ... off the main path"): the
-# floor each Dread fights on, as cells (x0, x1, rows y0-y1), a cell before
-# it and a column past it. With that floor made lava, the bot still gets past.
+# The Dread lairs (spec 3.1, 4.6: "a side lair ... off the main path", 4-1's
+# and 4-2's): the floor each Dread fights on, as cells (x0, x1, rows y0-y1),
+# a cell before it and a column past it (either way along the route: 4-2's
+# upper storey runs left), and the rows "past" counts in (rows: a storey's,
+# so the way round by the other storey isn't a way past). With that floor
+# made lava, the bot still gets past. 4-3's Dread is on the path, a sealed
+# duel (DUELS, _test_duel).
 const LAIRS := {
-	"4-1": {"cells": [274, 295, 10, 12], "from": Vector2i(270, 7), "past": 305},
-	"4-2": {"cells": [322, 343, 10, 12], "from": Vector2i(314, 12), "past": 350},
-	"4-3": {"cells": [289, 297, 4, 10], "from": Vector2i(280, 12), "past": 302},
+	"4-1": {"cells": [254, 275, 10, 12], "from": Vector2i(250, 7), "past": 285},
+	"4-2": {"cells": [118, 139, 7, 9], "from": Vector2i(143, 9), "past": 114, "rows": [0, 11]},
 }
 
 
@@ -1317,15 +1339,18 @@ func _test_lairs(ids: Array) -> void:
 		_check(dread.x >= int(cz[0]) - 1 and dread.x <= int(cz[1]) + 1 and dread.y >= int(cz[2]) - 1 and dread.y <= int(cz[3]) + 1,
 				"%s: the Dread (%s) is in its lair" % [id, dread])
 		var from: Vector2i = lair["from"]
-		var x0 := from.x - 4
-		var crop = _crop(lv, x0, int(lair["past"]) + 4, from)
+		var past: int = lair["past"]
+		var x0 := mini(from.x, past) - 4
+		var crop = _crop(lv, x0, maxi(from.x, past) + 5, from)
 		var copy = Reach.static_copy(crop)
 		for y in range(int(cz[2]), int(cz[3]) + 1):
 			for x in range(int(cz[0]), int(cz[1]) + 1):
 				if copy.tile(x - x0, y) == LevelData.AIR:
 					copy.set_tile(x - x0, y, LevelData.LAVA)
-		var px: float = (int(lair["past"]) - x0) * TILE
-		var goal := {"what": "past", "p": Vector2(px, 0), "rope": true, "rect": Rect2(px, 0, TILE, lv.height * TILE)}
+		var px: float = (past - x0) * TILE
+		var rows: Array = lair.get("rows", [0, lv.height - 1])
+		var goal := {"what": "past", "p": Vector2(px, 0), "rope": true,
+				"rect": Rect2(px, int(rows[0]) * TILE, TILE, (int(rows[1]) - int(rows[0]) + 1) * TILE)}
 		var s = ReachSearch.new()
 		s.setup(copy, LevelData.cell_floor(copy.start), {"goals": [goal]})
 		s.run()
@@ -1333,7 +1358,7 @@ func _test_lairs(ids: Array) -> void:
 		s.free_player()
 		# (The search can fail: lava the lair's columns from the roof down and
 		# nothing gets past.)
-		for y in range(2, lv.height - 2):
+		for y in range(int(rows[0]) + 2 if lair.has("rows") else 2, mini(int(rows[1]) + 1, lv.height - 2)):
 			for x in range(int(cz[0]), int(cz[1]) + 1):
 				if copy.tile(x - x0, y) == LevelData.AIR:
 					copy.set_tile(x - x0, y, LevelData.LAVA)
@@ -1342,6 +1367,97 @@ func _test_lairs(ids: Array) -> void:
 		s2.run()
 		_check(not s2.found.has("past"), "%s: and with the lair's columns lava from the roof down, it can't" % id)
 		s2.free_player()
+
+
+# 4-3's Dread is on the path (the X-3 rule: its world's test): the
+# Grindstone's hall is a sealed duel (room:, features/sealed.gd), entered by
+# the door the route comes in by (the right one: 4-3 runs right to left),
+# altar 5 by it. With no monsters (the golden route) it never seals.
+const DUELS := {"4-3": {"foe": "The Grindstone", "kind": "spurwheel"}}
+
+
+func _test_duel(ids: Array) -> void:
+	for id in ids:
+		if not DUELS.has(id):
+			continue
+		var dd: Dictionary = DUELS[id]
+		var lv := _load(id)
+		var specs: Array = Sealed.parse(str(lv.headers.get("room", "")))
+		_check(specs.size() == 1 and str(specs[0]["kind"]) == "duel", "%s: one sealed room, a duel (%s)" % [id, specs])
+		if specs.size() != 1:
+			continue
+		var x0: int = specs[0]["x0"]
+		var x1: int = specs[0]["x1"]
+		var dread := Vector2i(-1, -1)
+		for e in lv.entities:
+			if e["kind"] == "dread":
+				dread = e["cell"]
+		_check(dread.x > x0 + Sealed.DOOR_CLEAR and dread.x < x1 - Sealed.DOOR_CLEAR,
+				"%s: the Dread (%s) is in the duel's hall (%d-%d), on the path" % [id, dread, x0, x1])
+		var side := -int(lv.facing)
+		var door := x1 if side > 0 else x0
+		var alt := -1
+		for e in lv.entities:
+			var ax := int(e["cell"].x)
+			if e["kind"] == "altar" and (ax - door) * side > 0 and absi(ax - door) <= Sealed.ALTAR_REACH:
+				alt = ax
+		_check(alt >= 0, "%s: an altar within %d tiles before the door he comes in by (x %d: %s)" % [id, Sealed.ALTAR_REACH, door, alt])
+		# In a World: the Grindstone asleep at his post; at the altar the doors
+		# stay open; in, they grind shut and he wakes, his bar up; his fall
+		# opens them.
+		game.reset()
+		game.new_hero("knight")
+		game.data["difficulty"] = "dusk"
+		var w: Node2D = WorldScript.new()
+		w.setup(lv, true)
+		w.paused = true
+		root.add_child(w)
+		await process_frame
+		_ticks(w, 2)
+		var sm = w.features.module("sealed")
+		var r: Dictionary = sm.rooms[0] if sm != null and sm.rooms.size() == 1 else {}
+		var foe = r.get("named")
+		_check(foe != null and str(foe.tier) == "dread" and str(foe.kind) == str(dd["kind"]) and str(foe.elite_name) == str(dd["foe"])
+				and not w.enemies.has(foe) and str(r.get("phase", "")) == "wait",
+				"%s: its named foe is %s, asleep at his post (%s)" % [id, dd["foe"], r.get("phase", "?")])
+		if foe == null:
+			await _done(w)
+			continue
+		var pl: Node2D = w.player
+		pl.invuln = 1000.0
+		_stand(w, Vector2i(alt, 12))
+		_ticks(w, int(1.0 / DT))
+		_check(str(r["phase"]) == "wait", "%s: at the door altar the doors stay open" % id)
+		_stand(w, Vector2i(door - side * 6, 12))
+		for i in int((Sealed.SEAL_TELL + 0.4) / DT):
+			pl.invuln = 1000.0
+			_ticks(w, 1)
+		var shut: Array = r["sealed"]
+		_check(str(r["phase"]) == "fight" and not shut.is_empty() and shut.all(func(c): return w.level.tile(c.x, c.y) == LevelData.STONE)
+				and shut.any(func(c): return c.x == x0) and shut.any(func(c): return c.x == x1),
+				"%s: in, the doors shut at both ends (%d cells)" % [id, shut.size()])
+		_check(w.enemies.has(foe) and foe.active, "%s: and %s wakes" % [id, dd["foe"]])
+		foe.hp = 0.0
+		foe._kill({"how": "slash", "from_x": foe.position.x - 20.0})
+		for i in int(1.0 / DT):
+			pl.invuln = 1000.0
+			_ticks(w, 1)
+			if str(r["phase"]) == "won":
+				break
+		_check(str(r["phase"]) == "won" and shut.all(func(c): return w.level.tile(c.x, c.y) == LevelData.AIR),
+				"%s: his fall opens the doors (%s)" % [id, r["phase"]])
+		await _done(w)
+		# No monsters (the golden route): open from the start, never seals.
+		var w2 := _world(lv)
+		await process_frame
+		_ticks(w2, 2)
+		var sm2 = w2.features.module("sealed")
+		var r2: Dictionary = sm2.rooms[0] if sm2 != null and sm2.rooms.size() == 1 else {}
+		_stand(w2, Vector2i(door - side * 6, 12))
+		_ticks(w2, int(1.0 / DT))
+		_check(str(r2.get("phase", "")) == "won" and (r2.get("sealed", []) as Array).is_empty(),
+				"%s: with no monsters the hall never seals (%s)" % [id, r2.get("phase", "?")])
+		await _done(w2)
 
 
 # ---------------------------------------------------------------- keeper nooks
@@ -1354,20 +1470,20 @@ func _test_lairs(ids: Array) -> void:
 # ("no": starts on cells x0-x1 of a row, or -1 for the floor under each
 # column; held way before the jump, steer after, jump tick range, hold).
 const NOOKS := {
-	"4-1": {"quirk": "stampede", "x0": 230, "x1": 231, "floor": 7, "embers": 2,
+	"4-1": {"quirk": "stampede", "x0": 214, "x1": 215, "floor": 7, "embers": 2,
 			"what": "a shelf by altar 3, a row up and 6 tiles past the end of the vault's roof: a Bellfounder in her stride jumps it",
-			"go": {"from": [Vector2i(213, 7)], "pre": [1], "dir": [1], "edge": [224, -30, 12], "hold": [40, 90]},
-			"no": [{"cells": [213, 217, 7], "pre": [1], "dir": [1, 0], "edge": [224, -30, 30], "hold": [40, 90]},
-				{"cells": [222, 236, -1], "pre": [-1, 1], "dir": [-1, 1], "k": [0, 48, 8], "hold": [40, 90]}]},
-	"4-2": {"quirk": "grave_step", "calling": "sexton", "x0": 136, "x1": 137, "floor": 8, "embers": 2,
+			"go": {"from": [Vector2i(197, 7)], "pre": [1], "dir": [1], "edge": [208, -30, 12], "hold": [40, 90]},
+			"no": [{"cells": [197, 201, 7], "pre": [1], "dir": [1, 0], "edge": [208, -30, 30], "hold": [40, 90]},
+				{"cells": [206, 220, -1], "pre": [-1, 1], "dir": [-1, 1], "k": [0, 48, 8], "hold": [40, 90]}]},
+	"4-2": {"quirk": "grave_step", "calling": "sexton", "x0": 84, "x1": 85, "floor": 17, "embers": 2,
 			"what": "a gear housing hung 5 rows over ES_GUARD's floor: the Sexton's bone ledge lifts him to it",
-			"world": {"from": [Vector2i(134, 12), Vector2i(133, 12), Vector2i(139, 12), Vector2i(140, 12)]},
-			"no": [{"cells": [128, 146, -1], "pre": [-1, 1], "dir": [-1, 1], "k": [0, 48, 8], "hold": [40, 90]}]},
-	"4-3": {"quirk": "ledge_grab", "x0": 210, "x1": 211, "floor": 9, "embers": 2,
-			"what": "WT_VAULT's shelf by the weight's slot: a jump from the step bonks the lip and stops 6 px short",
-			"go": {"from": [Vector2i(209, 11)], "pre": [0, 1, -1], "dir": [1, -1], "k": [0, 24, 4], "hold": [20, 60]},
-			"no": [{"cells": [204, 216, -1], "pre": [-1, 1], "dir": [-1, 1], "k": [0, 48, 6], "hold": [40, 90]},
-				{"cells": [209, 209, 11], "pre": [-1, 1], "dir": [-1, 0, 1], "k": [0, 48, 4], "hold": [10, 40, 90]}]},
+			"world": {"from": [Vector2i(82, 21), Vector2i(81, 21), Vector2i(87, 21), Vector2i(88, 21)]},
+			"no": [{"cells": [76, 94, -1], "pre": [-1, 1], "dir": [-1, 1], "k": [0, 48, 8], "hold": [40, 90]}]},
+	"4-3": {"quirk": "ledge_grab", "x0": 302, "x1": 303, "floor": 9, "embers": 2,
+			"what": "WT_VAULT2's shelf by the weight's slot (4-3 runs right to left): a jump from the step bonks the lip and stops 6 px short",
+			"go": {"from": [Vector2i(304, 11)], "pre": [0, 1, -1], "dir": [1, -1], "k": [0, 24, 4], "hold": [20, 60]},
+			"no": [{"cells": [296, 308, -1], "pre": [-1, 1], "dir": [-1, 1], "k": [0, 48, 6], "hold": [40, 90]},
+				{"cells": [304, 304, 11], "pre": [-1, 1], "dir": [-1, 0, 1], "k": [0, 48, 4], "hold": [10, 40, 90]}]},
 }
 
 
@@ -1573,6 +1689,20 @@ func _by_x(list: Array) -> Array:
 	return out
 
 
+func _by_route(lv: RefCounted, list: Array) -> Array:
+	## In the order the route meets them (WalkMap: a strip's by x in its
+	## facing, 4-3's right to left; a taller level's along the walk map's
+	## route: 4-2's lower storey first).
+	var out := list.duplicate()
+	if WalkMap.strip(lv):
+		var f := int(lv.facing)
+		out.sort_custom(func(a, b): return int(a["cell"].x) * f < int(b["cell"].x) * f)
+		return out
+	var m = WalkMap.of(lv)
+	out.sort_custom(func(a, b): return m.proj(a["cell"]) < m.proj(b["cell"]))
+	return out
+
+
 func _floor_under(lv: RefCounted, x: int) -> bool:
 	## Something to land on under this column (a floor, or a thorn bed on
 	## one), not a pit: the stone roof over it doesn't count.
@@ -1588,7 +1718,7 @@ func _test_safe_first(ids: Array) -> void:
 	## cut: _test_bark_lead and the routes' bark checks.)
 	if ids.has("4-2"):
 		var lv := _load("4-2")
-		var cogs: Array = _by_x(lv.of_kind("cog"))
+		var cogs: Array = _by_route(lv, lv.of_kind("cog"))
 		var pit := []
 		for i in mini(2, cogs.size()):
 			for x in range(cogs[i]["cell"].x - 4, cogs[i]["cell"].x + 5):
@@ -1597,8 +1727,8 @@ func _test_safe_first(ids: Array) -> void:
 		_check(pit.is_empty() and cogs.size() >= 2, "4-2: the first cogs turn over a sunken floor, not a pit %s" % [pit])
 	if ids.has("4-3"):
 		var lv := _load("4-3")
-		var swings: Array = _by_x(lv.of_kind("swing"))
-		var weights: Array = _by_x(lv.of_kind("weight"))
+		var swings: Array = _by_route(lv, lv.of_kind("swing"))
+		var weights: Array = _by_route(lv, lv.of_kind("weight"))
 		var pit := []
 		for i in mini(2, swings.size()):
 			for x in range(swings[i]["cell"].x - 3, swings[i]["cell"].x + int(swings[i]["length"]) + 3):
@@ -1610,7 +1740,9 @@ func _test_safe_first(ids: Array) -> void:
 					pit.append(x)
 		_check(pit.is_empty(), "4-3: the first swings and the bridge's weights over thorn beds, not pits %s" % [pit])
 		var thorns := 0
-		for x in range(swings[0]["cell"].x, swings[1]["cell"].x + 3):
+		var sx0 := mini(swings[0]["cell"].x, swings[1]["cell"].x)
+		var sx1 := maxi(swings[0]["cell"].x, swings[1]["cell"].x)
+		for x in range(sx0, sx1 + 3):
 			for y in lv.height:
 				if lv.tile(x, y) == LevelData.SPIKES_UP:
 					thorns += 1
@@ -1761,8 +1893,8 @@ func _critical(id: String) -> Array:
 	## The movers on 4-x's critical path the route must ride (by the first
 	## cell of the cog hub or swing): measured with the bot (take one's ring
 	## or arc away and the bell or the arena is out of reach).
-	return {"4-1": [], "4-2": ["cog 73", "cog 104", "cog 116", "lift 276", "lift 286"],
-			"4-3": ["swing 62", "swing 72", "swing 102", "swing 119", "cog 178", "swing 189"],
+	return {"4-1": [], "4-2": ["cog 43", "cog 51", "lift 146", "cog 150", "cog 73", "cog 61"],
+			"4-3": ["swing 333", "swing 323", "swing 233", "swing 216", "cog 157", "swing 144"],
 			"4-4": ["cog 18", "cog 90", "swing 101"]}.get(id, [])
 
 

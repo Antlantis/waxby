@@ -161,6 +161,14 @@ const LABS := ["lab-shape-tower", "lab-shape-climb", "lab-shape-bowl", "lab-shap
 # 24 rows, placed and stacked storeys, its upper storey's duel met by its right
 # door; lab-mirror a clockwork strip mirrored whole (facing: left).
 const TOOL_LABS := ["lab-shapes", "lab-mirror"]
+# The levels on the path re-cut into shapes (Build 2's redesigns: tools/levels'
+# world modules): {id: tall}. 1-2's stair down and 1-3's climb, 2-1's
+# terraces, 2-2's split roads and 2-3's switchback, 3-2's 36-row tower and
+# 3-3's bowl, 4-1's stair and 4-2's loop are taller than a strip; 4-3 is a
+# strip played right to left. Each goes by route; 1-1, 3-1 and the other
+# strips keep v2's way.
+const SHAPED_LEVELS := {"1-2": true, "1-3": true, "2-1": true, "2-2": true, "2-3": true, "3-2": true, "3-3": true,
+		"4-1": true, "4-2": true, "4-3": false}
 
 
 func _lab(id: String) -> RefCounted:
@@ -259,22 +267,26 @@ func _done(w: Node) -> void:
 # ---------------------------------------------------------------- the camera
 
 func _test_strip_heights() -> void:
-	## Every level file but the shape labs (both streams') and the levels
-	## Build 2's redesign re-cut to a shape (they declare their roles:) is a
-	## strip (not tall), so no camera or bot rule of the shapes touches it.
+	## Every level file but the shape labs (both streams') and the re-cut
+	## levels drawn tall (SHAPED_LEVELS: Build 2's redesigns, they declare
+	## their roles:) is a strip (not tall), so no camera or bot rule of the
+	## shapes touches it; a boss or secret level is never re-cut to a shape.
 	var tall := []
-	var recut := []
 	for f in DirAccess.get_files_at("res://levels"):
 		if f.ends_with(".txt"):
 			var lv = LevelData.load_file("res://levels/" + f)
 			if lv.tall():
 				tall.append(lv.id)
-				if str(lv.headers.get("roles", "")).strip_edges() != "":
-					recut.append(lv.id)
 	tall.sort()
-	var want := (LABS + TOOL_LABS).filter(func(id): return _lab(id).height > LevelData.STRIP_ROWS) + recut
+	var want := (LABS + TOOL_LABS).filter(func(id): return _lab(id).height > LevelData.STRIP_ROWS)
+	for id in SHAPED_LEVELS:
+		if bool(SHAPED_LEVELS[id]):
+			want.append(id)
 	want.sort()
 	_check(tall == want, "the tall level files are the shape labs' and the re-cut levels' (%s)" % ", ".join(tall))
+	var regular := RegEx.create_from_string("^[1-6]-[123]$")
+	_check(SHAPED_LEVELS.keys().all(func(id): return regular.search(str(id)) != null and _lab(id).headers.has("roles")),
+			"the shaped levels are re-cut regular levels (X-1 to X-3, roles: declared), never a boss or secret level")
 	_check(_lab("lab-shape-tower").height == 36 and _lab("lab-shape-mirror").height == 15, "the tower is 36 rows (3-2's), the mirror a strip")
 
 
@@ -679,12 +691,12 @@ func _test_autoplay() -> void:
 
 func _test_route_pad() -> void:
 	## By route only in a shaped level: every strip on the path, its goal to
-	## the right, keeps v2's way (a re-cut level's shape goes by route). With no plan the fallback pad heads the way
-	## there: right round the loop (its bell is overhead), left in the mirror,
-	## right up the tower's ledges; a strip's holds right as v2's did; done,
-	## it heads for the goal the same way.
+	## the right, keeps v2's way (the re-cut shaped ones, SHAPED_LEVELS, go by
+	## route). With no plan the fallback pad heads the way there: right round
+	## the loop (its bell is overhead), left in the mirror, right up the
+	## tower's ledges; a strip's holds right as v2's did; done, it heads for
+	## the goal the same way.
 	var by := []
-	var odd := []
 	for info in game.LEVELS:
 		var lv = LevelData.load_file(str(info["path"]))
 		var g := _goal(lv)
@@ -692,9 +704,10 @@ func _test_route_pad() -> void:
 			g = _goal(lv, "boss arena")
 		if not g.is_empty() and AutoBot.shaped(lv, g):
 			by.append(lv.id)
-			if not lv.tall() and int(lv.facing) > 0:
-				odd.append(lv.id)
-	_check(odd.is_empty(), "no strip on the path with its goal to the right goes by route (by route: %s)" % ", ".join(by))
+	var shaped := SHAPED_LEVELS.keys().filter(func(id): return FileAccess.file_exists("res://levels/%s.txt" % id))
+	by.sort()
+	shaped.sort()
+	_check(by == shaped, "no level on the path goes by route but the re-cut shaped ones (%s)" % ", ".join(by))
 	for id in LABS + TOOL_LABS:
 		_check(AutoBot.shaped(_lab(id), _goal(_lab(id))), "%s goes by route" % id)
 	for spot in [["lab-shape-loop", 1], ["lab-shape-mirror", -1], ["lab-shape-tower", 1], ["lab-mirror", -1], ["lab-shapes", 1], ["1-1", 1]]:
