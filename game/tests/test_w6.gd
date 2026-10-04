@@ -903,7 +903,7 @@ func _test_layout(lv: RefCounted) -> void:
 	var id: String = lv.id
 	var sp: Dictionary = SPEC[id]
 	_check(lv.errors.is_empty(), "%s parses (%s)" % [id, lv.errors])
-	_check(lv.height == 15, "%s is 15 rows" % id)
+	_check(Rules.height_ok(lv), "%s is %d-%d rows (%d)" % [id, Rules.HEIGHT_MIN, Rules.HEIGHT_MAX, lv.height])
 	if sp.has("width"):
 		_check(lv.width == int(sp["width"]), "%s is %d tiles (%d)" % [id, sp["width"], lv.width])
 	_check(lv.world == 6 and lv.theme == sp["theme"] and lv.area == int(sp["area"]) and lv.music == "hushdeep", "%s: world 6, theme %s, area %d, music hushdeep" % [id, sp["theme"], sp["area"]])
@@ -924,12 +924,10 @@ func _test_layout(lv: RefCounted) -> void:
 		var rp := Rules.roster_problems(lv)
 		_check(not Rules.roster_of(lv).is_empty() and rp.is_empty(), "%s holds the cast its roster: declares %s" % [id, rp])
 		_check(Rules.declared_threat(lv) > 0.0, "%s declares its threat (%.1f per 100 tiles)" % [id, Rules.threat_of(lv)])
-	var marks: Array = [lv.start.x] + altars
-	if bell_x >= 0:
-		marks.append(bell_x)
-	var worst := 0
-	for i in range(1, marks.size()):
-		worst = maxi(worst, int(marks[i]) - int(marks[i - 1]))
+	# (Along the route: x in a strip, Rules.checkpoint_gaps.)
+	var cg := Rules.checkpoint_gaps(lv)
+	var marks: Array = cg["marks"]
+	var worst: int = cg["worst"]
 	_check(worst <= MAX_GAP, "%s: at most %d tiles between checkpoints (%s, worst %d)" % [id, MAX_GAP, marks, worst])
 	# Headers.
 	_check(str(lv.story.get("start", "")) == "beat_%s" % id.replace("-", "_"), "%s: its story beat" % id)
@@ -958,12 +956,18 @@ func _test_layout(lv: RefCounted) -> void:
 	_check(lv.count("sconce") == 0, "%s: no wall sconces (in W6 `c` gives no light)" % id)
 	_check(lv.count("sign") == hints.size(), "%s: a sign for every hint" % id)
 	# Every Hollin how-to the level fires exists (the barks are story.gd's).
-	# The caps per 27-tile window.
+	# The caps per 27-tile window (a taller level's 12 rows tall:
+	# Rules.screen_rows).
+	var windows := []
 	for x0 in range(0, maxi(lv.width - 26, 1)):
+		for ys in Rules.screen_rows(lv):
+			windows.append(Vector3i(x0, ys.x, ys.y))
+	for win in windows:
+		var x0: int = win.x
 		var n := {"float": 0, "buoy": 0, "grasp": 0, "light": 0, "awake": 0}
 		for e in lv.entities:
 			var ex: int = (e["cell"] as Vector2i).x
-			if ex < x0 or ex >= x0 + 27:
+			if ex < x0 or ex >= x0 + 27 or not Rules.in_rows(e["cell"], Vector2i(win.y, win.z)):
 				continue
 			var k := str(e["kind"])
 			if n.has(k):
