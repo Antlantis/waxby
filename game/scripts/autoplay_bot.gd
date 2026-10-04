@@ -11,11 +11,23 @@ extends RefCounted
 ## foe the same way till the doors open (_room_pad). It plans a few sims a tick,
 ## so a route never stalls a frame; while it plans it stands still.
 ##
+## A shaped level (Build 2's shapes: taller than a strip, or its goal behind
+## the start: a level played right to left) goes by route (by_route): the
+## goal's route field (route_field.gd, the way there in moves) orders its
+## plans and sets their horizon (HORIZON_MOVES nearer, not HORIZON further
+## right), measures its progress (STUCK), times a jump onto a lift, and
+## points its fallback pad (_route_pad, where v2's held right); a step
+## still falling past its sims' time runs on (Reach.fall_extra). In a room
+## two decks tall a foe on the other deck is planned to as a goal, on the
+## level as it is (the doors shut). A strip whose goal lies right (every
+## level before the shapes, and every mode's room) plays exactly as before.
+##
 ## v2's bot only held right and jumped every second: it stood forever at the
 ## 4-tile wall at x 406 on 2-4 (the owner saw it on the phone).
 
 const Reach := preload("res://scripts/reach.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
+const RouteField := preload("res://scripts/route_field.gd")
 const Movers := preload("res://scripts/movers.gd")
 const LevelData := preload("res://scripts/level_data.gd")
 const TILE := 32
@@ -30,6 +42,8 @@ const PLAN_BUDGET_US := 1500
 const PLAN_CAP := 6000
 const STUCK := 4.0               # s without progress along the plan: plan again
 const HORIZON := 20.0 * TILE     # plan this far on at a time (then plan again)
+const HORIZON_MOVES := 20        # by route: plan till this many moves nearer the goal (route_field.gd)
+const DECK := 4.5 * TILE         # a room's foe this far over or under him is on the other deck (planned to)
 
 var world: Node
 var goal := {}                   # {what, p, rope, rect}
@@ -47,6 +61,12 @@ var _prev := {}
 var _i := 0
 var _progress_t := 0.0
 var _best_x := -INF
+var by_route := false            # a shaped level: the route field measures the way (use_route)
+var field: RefCounted = null     # route_field.gd toward goal (by route)
+var _best_d := RouteField.FAR    # by route: the fewest moves from the goal since the plan
+var _level_goal := {}            # the goal a room's other-deck foe stood in for (_room_plan)
+var _level_field: RefCounted = null
+var _room_static: RefCounted = null   # the level as it is, its doors shut (a room goal's plans)
 var plans := 0                   # routes planned (the tests read it)
 var _final := {}                 # a mode's room: the goal after its altars (the landing's first, as a human walks into it)
 var _altar_t := 0.0              # s spent going for the altar in goal (past ALTAR_GIVE_UP: on without it)
@@ -74,6 +94,8 @@ func setup(w: Node) -> void:
 			goal = g
 	if goal.is_empty() and not goals.is_empty():
 		goal = goals[goals.size() - 1]
+	if w.get("mode") == null and not goal.is_empty() and shaped(w.level, goal):
+		use_route()
 	if w.get("mode") != null and not goal.is_empty():
 		# A mode's room (a Descent depth): an altar within a plan's reach of
 		# where he stands (the landing's), first, so the run lights it (its
@@ -81,6 +103,23 @@ func setup(w: Node) -> void:
 		# passes the others. The story's levels keep v2's route.
 		_final = goal
 		_to_altar()
+
+
+static func shaped(lv: RefCounted, g: Dictionary) -> bool:
+	## A shaped level goes by route: taller than a strip, or its goal left of
+	## where it starts him (a level played right to left: `facing: left`,
+	## whose bell the shape rules keep left of its start).
+	return lv.tall() or (g["p"] as Vector2).x < LevelData.cell_floor(lv.start).x
+
+
+func use_route(on := true) -> void:
+	## Go by route (see the header): the goal's route field, built on the
+	## static copy (the tests turn it on for a strip too).
+	by_route = on
+	field = RouteField.new().build(_static, goal, Reach.drops_of(world.level)) if on and not goal.is_empty() else null
+	_search = null
+	_route = []
+	state = "plan" if state != "done" else state
 
 
 func _to_altar() -> void:
@@ -114,7 +153,7 @@ func pad(dt: float) -> Dictionary:
 		state = "plan" if state != "done" else state
 		return {}
 	if goal.is_empty():
-		return _v2_pad()
+		return _v2_pad(pl)
 	var wp := _room_pad(pl)
 	if not wp.is_empty():
 		return wp
@@ -134,6 +173,10 @@ func pad(dt: float) -> Dictionary:
 		"fight":
 			return _fight_pad(pl)
 		"done":
+			# On toward the goal (v2 held right; a shaped level's way, by route).
+			if by_route:
+				var hd := _heading(pl)
+				return {"right": hd.x > 0, "left": hd.x < 0}
 			return {"right": true}
 		"plan":
 			return _plan(pl)
@@ -159,8 +202,20 @@ func _plan(pl: Node2D) -> Dictionary:
 	if _search == null:
 		_search = ReachSearch.new()
 		var dir := signf(goal["p"].x - pl.position.x)
-		_search.setup(_static, pl.position, {"mode": "greedy", "target": goal["p"], "stop_on": goal["what"],
-				"goals": [goal], "cap": PLAN_CAP, "start_climb": pl.climbing, "stop_x": pl.position.x + dir * HORIZON})
+		var opts := {"mode": "greedy", "target": goal["p"], "stop_on": goal["what"],
+				"goals": [goal], "cap": PLAN_CAP, "start_climb": pl.climbing, "stop_x": pl.position.x + dir * HORIZON}
+		if field != null:
+			# By route: ordered by the way there, till HORIZON_MOVES nearer.
+			opts.erase("stop_x")
+			opts["field"] = field
+			opts["stop_d"] = maxi(int(field.at(pl.position)) - HORIZON_MOVES, 0)
+		if goal.get("room", false):
+			# A room's other deck: till he stands on it (a touch from below
+			# beside its edge isn't there), so no goal to touch, only the field.
+			opts["goals"] = []
+			opts["stop_on"] = ""
+			opts["stop_d"] = 0
+		_search.setup(_room_static if goal.get("room", false) else _static, pl.position, opts)
 		if pl.climbing:
 			_search.nodes[0]["col"] = pl.climb_col
 	var in_window: bool = not bool(world.get("headless"))
@@ -197,10 +252,10 @@ func _plan(pl: Node2D) -> Dictionary:
 		state = "follow"
 		_route = []
 		_progress_t = 0.0
-		return _v2_pad()
+		return _v2_pad(pl)
 	var path: Array = s.path_to(end_node)
 	if debug:
-		print("  bot: plan %d from %s: %s, %d states, route %d" % [plans, pl.position, "goal" if not hit.is_empty() else "best", s.seen.size(), path.size() - 1])
+		print("  bot: plan %d from %s: %s, %d states, route %d (to the %s)" % [plans, pl.position, "goal" if not hit.is_empty() else "best", s.seen.size(), path.size() - 1, goal["what"]])
 	_route = []
 	for k in range(1, path.size()):
 		var n: Dictionary = s.nodes[path[k]]
@@ -212,6 +267,7 @@ func _plan(pl: Node2D) -> Dictionary:
 	state = "follow"
 	_progress_t = 0.0
 	_best_x = pl.position.x
+	_best_d = int(field.at(pl.position)) if field != null else RouteField.FAR
 	return _next(pl)
 
 
@@ -239,9 +295,12 @@ func _follow(pl: Node2D, dt: float) -> Dictionary:
 		_progress_t += dt
 		if _progress_t > STUCK and (pl.on_floor or pl.climbing):
 			state = "plan"
-		return _v2_pad()
-	if pl.position.x > _best_x + 8.0 or _wait > 0.0:
+		return _v2_pad(pl)
+	# Progress: further right (v2's), or by route a move nearer the goal.
+	var d: int = int(field.at(pl.position)) if field != null else 0
+	if (pl.position.x > _best_x + 8.0 if field == null else d < _best_d) or _wait > 0.0:
 		_best_x = maxf(_best_x, pl.position.x)
+		_best_d = mini(_best_d, d)
 		_progress_t = 0.0   # (waiting for a moving ledge is progress)
 	else:
 		_progress_t += dt
@@ -258,7 +317,9 @@ func _follow(pl: Node2D, dt: float) -> Dictionary:
 	if _t > 0.0:
 		var landed: bool = pl.on_floor and (_st.get("left", false) or (not started_climb and not _act.get("jump", false) and _t >= float(_act.get("walk", 0.0))))
 		var caught: bool = pl.climbing and (_st.get("left", false) or not started_climb)
-		if landed or caught or _t >= t_end:
+		# (a tall level's fall runs on past t_end while he's still falling, as its sims did)
+		var falling: bool = Reach.still_falling(pl) and _t < t_end + Reach.fall_extra(world.level)
+		if landed or caught or (_t >= t_end and not falling):
 			var want = _route[_step]["to"]
 			var got := Reach.key_of(pl.position, pl.climbing)
 			if want != null and (absi(got.x - want.x) > 1 or got.y != want.y or got.z != want.z):
@@ -342,7 +403,10 @@ func _timed_ok(pl: Node2D) -> bool:
 	if absi(got.x - want.x) <= 1 and got.y == want.y and got.z == want.z:
 		return true
 	# Onto (or off) a moving ledge: any safe landing that gets on is good
-	# enough (it plans again from there).
+	# enough (it plans again from there): two tiles on toward the goal, by
+	# route two moves nearer it (a lift's ride up a tower).
+	if field != null:
+		return (r["riding"] or pl.riding != null) and int(field.at(r["pos"])) <= int(field.at(pl.position)) - 2
 	var dir := signf(goal["p"].x - pl.position.x)
 	return (r["riding"] or pl.riding != null) and (r["pos"].x - pl.position.x) * dir >= 2.0 * TILE
 
@@ -408,6 +472,9 @@ func _room_pad(pl: Node2D) -> Dictionary:
 	## wait while they drop in). Toward it, swinging, hopping its blows; once
 	## the room opens the plan goes on from where he stands (to the silver
 	## bell rising at a secret level's S, or the level's bell). {} otherwise.
+	## In a tall level a foe on the room's other deck (DECK or more over or
+	## under him) is planned to instead (_room_plan: {} while the planner
+	## drives).
 	var f = world.get("features")
 	var mods = f.get("modules") if f != null else null
 	if not (mods is Array):
@@ -419,8 +486,17 @@ func _room_pad(pl: Node2D) -> Dictionary:
 			if target != null:
 				break
 	if target == null:
+		if goal.get("room", false):
+			_end_room_goal()
 		return {}
 	var at: Vector2 = (target as Node2D).position if target is Node2D else target
+	# (planning to a deck goes on till he stands on it: mid-jump under it the
+	# foe is near enough, but the crude pad would only steer him under it)
+	var going: bool = goal.get("room", false) and not (pl.on_floor and absf(pl.position.y - (goal["p"] as Vector2).y) < TILE)
+	if world.level.tall() and (absf(at.y - pl.position.y) > DECK or going):
+		return _room_plan(at)
+	if goal.get("room", false):
+		_end_room_goal()
 	_search = null
 	_route = []
 	state = "plan"
@@ -435,5 +511,82 @@ func _room_pad(pl: Node2D) -> Dictionary:
 	return pd
 
 
-func _v2_pad() -> Dictionary:
+func _room_plan(at: Vector2) -> Dictionary:
+	## A shut room's foe on the other deck: the floor under it as the goal
+	## (the level's goal kept for after), planned on the level as it is, its
+	## doors shut (a static copy of it now: the plan never leaves the room by
+	## a door that's stone), by its own route field. Again when the foe has
+	## gone to another floor, or, between routes, walked off along this one.
+	## {}: the planner drives (pad's plan and follow).
+	var foot := _floor_under(at)
+	var moved: bool = not goal.get("room", false) or absf((goal["p"] as Vector2).y - foot.y) > 1.0 \
+			or (state == "plan" and (goal["p"] as Vector2).distance_to(foot) > 3.0 * TILE)
+	if moved:
+		if not goal.get("room", false):
+			_level_goal = goal
+			_level_field = field
+		_room_static = Reach.static_copy(world.level)
+		goal = {"what": "room foe", "p": foot, "rope": true, "rect": Rect2(foot.x - 48.0, foot.y - 8.0, 96.0, 8.0), "room": true}
+		field = RouteField.new().build(_room_static, goal, Reach.drops_of(world.level))
+		_search = null
+		_route = []
+		state = "plan"
+	return {}
+
+
+func _end_room_goal() -> void:
+	## Back to the level's goal (the room opened, or its foe came to his deck).
+	goal = _level_goal
+	field = _level_field
+	_level_goal = {}
+	_level_field = null
+	_room_static = null
+	_search = null
+	_route = []
+	state = "plan"
+
+
+func _floor_under(at: Vector2) -> Vector2:
+	## The first floor at or under a point (its top, mid-cell): where to stand under it.
+	var lv: RefCounted = world.level
+	var cx := floori(at.x / TILE)
+	for y in range(maxi(floori((at.y - 1.0) / TILE), 0), lv.height):
+		if not LevelData.is_solid(lv.tile(cx, y)) and LevelData.is_floor(lv.tile(cx, y + 1)):
+			return LevelData.cell_floor(Vector2i(cx, y))
+	return at
+
+
+func _v2_pad(pl: Node2D = null) -> Dictionary:
+	if by_route and field != null and pl != null:
+		return _route_pad(pl)
 	return {"right": true, "jump": (_i / 60) % 3 == 0, "attack": (_i / 20) % 2 == 0, "special": (_i / 90) % 4 == 0}
+
+
+func _heading(pl: Node2D) -> Vector2i:
+	## Which way the goal lies by the way there (route_field.gd heading); with
+	## no way from here, toward it as the crow flies.
+	var hd: Vector2i = field.heading(pl.position) if field != null else Vector2i.ZERO
+	if hd == Vector2i.ZERO and not goal.is_empty():
+		var dp: Vector2 = (goal["p"] as Vector2) - pl.position
+		hd = Vector2i(int(signf(dp.x)) if absf(dp.x) > 8.0 else 0, int(signf(dp.y)) if absf(dp.y) > 16.0 else 0)
+	return hd
+
+
+func _route_pad(pl: Node2D) -> Dictionary:
+	## v2's fallback pad down the route field (by route): toward where the
+	## way to the goal goes, jumping now and then (often, while the way goes
+	## up), climbing a vine while it goes up, sliding while it goes down,
+	## and dropping through a ledge where the way goes straight down.
+	var hd := _heading(pl)
+	var pd := {"attack": (_i / 20) % 2 == 0, "special": (_i / 90) % 4 == 0}
+	if hd.x != 0:
+		pd["right" if hd.x > 0 else "left"] = true
+	if pl.climbing:
+		pd["up" if hd.y < 0 else "down"] = hd.y != 0
+		pd["jump"] = hd.y >= 0 and hd.x != 0 and (_i / 30) % 2 == 0   # (a leap off, the way it goes)
+		return pd
+	pd["jump"] = (_i / (20 if hd.y < 0 else 60)) % 3 == 0
+	if hd.x == 0 and hd.y > 0 and pl.on_floor:
+		pd["down"] = true   # (pure down: through a one-way ledge)
+		pd["jump"] = false
+	return pd

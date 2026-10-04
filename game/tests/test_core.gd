@@ -30,7 +30,13 @@ const Reach := preload("res://scripts/reach.gd")
 const Movers := preload("res://scripts/movers.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
 const Rules := preload("res://tests/level_rules.gd")
-const LAB_LEVELS := ["res://levels/lab-0.txt", "res://levels/lab-1.txt"]
+const LAB_LEVELS := ["res://levels/lab-0.txt", "res://levels/lab-1.txt",
+		# Build 2's shape labs (tools/levels/lab_shaped.py: a 36-row tower, 24-row
+		# levels, a mirrored strip; lab_shapes.py: the shape tools' 24-row lab and
+		# a clockwork strip mirrored whole): the bot proves the shapes on them.
+		"res://levels/lab-shape-tower.txt", "res://levels/lab-shape-climb.txt", "res://levels/lab-shape-bowl.txt",
+		"res://levels/lab-shape-loop.txt", "res://levels/lab-shape-mirror.txt", "res://levels/lab-shape-decks.txt",
+		"res://levels/lab-shapes.txt", "res://levels/lab-mirror.txt"]
 const TILE := 32
 const DT := 1.0 / 120.0
 

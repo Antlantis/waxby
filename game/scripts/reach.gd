@@ -24,6 +24,15 @@ extends RefCounted
 ## Along the winning path to each goal it also keeps, per timed surface
 ## (rotten vine, glass, float, still water, dawnglass), the longest stay on
 ## one: the dwell rule (at most 60% of that surface's Dusk life).
+##
+## A level taller than a strip (LevelData.tall(): Build 2's shapes) adds a
+## long climb (TALL_CLIMB s, a storey's vine to its top in one go) to the
+## vine actions, and a sim there runs on while he's still falling, up to a
+## fall the level's whole height (fall_extra), so a tower's long fall back
+## down is a state too. A level whose routes drop through one-way ledges
+## (header `drops`, drops_of: down a ledge stack, or a lift laid out as one)
+## adds pure down held DROP_HOLD s (player.gd's DROP_HOLD is 0.15 s) to the
+## floor actions. A strip has none of them, so it searches exactly as before.
 
 const LevelData := preload("res://scripts/level_data.gd")
 const PlayerScript := preload("res://scripts/player.gd")
@@ -35,6 +44,8 @@ const GUST_PUSH := 120.0
 const ROTTEN_HOLD := 1.2
 const STILL_REACH := 6              # tiles of still water either side of a buoy
 const SIM_TIME := 2.2
+const TALL_CLIMB := 3.0             # s: a tall level's long climb (12 rows at CLIMB_SPEED)
+const DROP_HOLD := 0.3              # s of pure down: a drop through a one-way ledge (drops_of)
 # The timed surfaces' Dusk lives (s) for the dwell rule: the fallbacks; the
 # rule reads life(k), from the feature modules' own DIFF_KNOBS (WL5's, WL6's
 # and WLS's requests, the track B merge): glass 1.09 s after one landing,
@@ -119,6 +130,7 @@ static func static_copy(lv: RefCounted, opts := {}) -> RefCounted:
 	c.gusts = lv.gusts
 	c.hush_cols = lv.hush_cols
 	c.movers = lv.movers
+	c.headers = lv.headers
 	for m in (lv.movers if opts.get("movers", true) else []):
 		var cell: Vector2i = m["cell"]
 		var n: int = m["length"]
@@ -235,7 +247,8 @@ static func goals_of(lv: RefCounted) -> Array:
 
 # ---------------------------------------------------------------- actions
 
-static func floor_actions() -> Array:
+static func floor_actions(drops := false) -> Array:
+	## drops (drops_of): a drop through a one-way ledge too, last.
 	var out := []
 	for dir in [-1, 1]:
 		out.append({"walk": 0.22, "dir": dir, "jump": false})
@@ -243,16 +256,37 @@ static func floor_actions() -> Array:
 			for hold in [0.12, 0.6]:
 				out.append({"walk": run, "dir": dir, "jump": true, "hold": hold})
 	out.append({"walk": 0.0, "dir": 0, "jump": true, "hold": 0.6})
+	if drops:
+		out.append({"walk": DROP_HOLD, "dir": 0, "jump": false, "drop": true})
 	return out
 
 
-static func vine_actions() -> Array:
+static func vine_actions(tall := false) -> Array:
+	## tall (a level taller than a strip): a TALL_CLIMB climb either way too.
 	var out := []
 	for dir in [-1, 1]:
-		for t in [0.0, 0.35, 0.8, 1.5]:
+		for t in ([0.0, 0.35, 0.8, 1.5, TALL_CLIMB] if tall else [0.0, 0.35, 0.8, 1.5]):
 			out.append({"vine": true, "mode": "climb", "t": t, "dir": dir})
 		out.append({"vine": true, "mode": "slide", "t": 0.5, "dir": dir})
 	return out
+
+
+static func drops_of(lv: RefCounted) -> bool:
+	## The level's routes drop through one-way ledges (header `drops`).
+	var hd = lv.get("headers")
+	return hd is Dictionary and str((hd as Dictionary).get("drops", "")).strip_edges().to_lower() not in ["", "0", "no", "false"]
+
+
+static func fall_extra(lv: RefCounted) -> float:
+	## How much longer than SIM_TIME a sim (and the bot's step) runs on while
+	## he's still falling: in a tall level, a fall its whole height at full
+	## speed; in a strip, none.
+	return float(lv.height * TILE) / PlayerScript.MAX_FALL if lv.tall() else 0.0
+
+
+static func still_falling(p: Node2D) -> bool:
+	## In the air and on the way down (a sim past SIM_TIME runs on while so).
+	return not p.on_floor and not p.climbing and p.ledge_t < 0.0 and float(p.velocity.y) > 0.0
 
 
 static func action_pad(a: Dictionary, t: float, st: Dictionary) -> Dictionary:
@@ -279,6 +313,9 @@ static func action_pad(a: Dictionary, t: float, st: Dictionary) -> Dictionary:
 		if not st.has("leap_t"):
 			st["leap_t"] = maxf(t, PlayerScript.LEAP_AFTER + DT) + DT
 		pd["jump"] = t >= float(st["leap_t"]) and t - float(st["leap_t"]) < 0.6
+		return pd
+	if a.get("drop", false):
+		pd["down"] = t < float(a["walk"])   # pure down: through the ledge he stands on
 		return pd
 	if dir < 0:
 		pd["left"] = true

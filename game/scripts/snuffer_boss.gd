@@ -122,6 +122,7 @@ var phase := 1
 var arena_left := 0.0
 var arena_right := 0.0
 var door: Array[Vector2i] = []
+var door_side := -1                # the door's wall: -1 left, 1 right (boss_arena.gd find)
 var home := Vector2.ZERO
 var floor_y := 0.0
 var boss_id := "snuffer"
@@ -184,6 +185,7 @@ func _ready() -> void:
 	arena_left = a["left"]
 	arena_right = a["right"]
 	door.assign(a["door"])
+	door_side = int(a["side"])
 
 
 # ---------------------------------------------------------------- the boss interface
@@ -484,7 +486,7 @@ func think(dt: float, player: Node2D) -> void:
 		"sleep":
 			_hover(dt)
 			show_frame("snuffer_idle")
-			if player.alive and player.position.x > arena_left + 48.0 and absf(dx) < 560.0:
+			if player.alive and Arena.past_door(door_side, arena_left, arena_right, player.position.x, 48.0) and absf(dx) < 560.0:
 				state = "roar"
 				timer = 1.3
 				Arena.seal(world, level, door)

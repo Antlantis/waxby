@@ -267,7 +267,8 @@ func _test_rules() -> void:
 	## a way in at an end, doorways of air or stone that never opens, no
 	## monster within DOOR_CLEAR columns of a door, an altar within
 	## ALTAR_REACH tiles before its door. Only labs have any yet (this one;
-	## lab-shapes and lab-mirror's, each met by its right door: Build 2's
+	## lab-shapes and lab-mirror's, each met by its right door, and
+	## lab-shape-mirror's and lab-shape-decks', test_shaped.gd's: Build 2's
 	## shapes).
 	var with_rooms := []
 	for f in DirAccess.get_files_at("res://levels"):

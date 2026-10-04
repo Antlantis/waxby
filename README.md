@@ -64,6 +64,12 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
   scripts/main.gd         the flow: title -> story -> map -> level -> results; debug --autoplay bot
   scripts/world.gd        one level being played: builds it from LevelData, runs the step, damage
                           (deal / hurt_player), hazards, shots, lights, loot drops, XP, the pool
+  scripts/tall_cam.gd     the camera's rules in a level taller than a strip (Build 2's shapes): a
+                          fall or a vine slide looks ahead, a lift carries the camera, a look down,
+                          the top band's HUD rule (goal_hits); a strip never has one
+  scripts/reach.gd  reach_search.gd  route_field.gd  autoplay_bot.gd   the bots: the reachability
+                          engine (Wick's own physics), its search, the way to a goal by moves (a
+                          shaped level's measure) and the --autoplay bot that plays a route
   scripts/combat.gd       the numbers: difficulty table, scaling, damage rolls, light radius
   scripts/classes.gd      the five callings and their skill trees
   scripts/kits/*.gd       each calling's Special, resource and quirk (kit.gd is the base)
@@ -143,10 +149,12 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           are tools/levels/w1.py ... w6.py and secrets.py, 1-S ... 6-S; the
                           feel labs lab.py; the Build 2 labs lab_elites.py, lab_twists.py
                           (lab-restless ... lab-lesson), lab_rooms.py (lab-rooms, the sealed
-                          rooms) and lab_shapes.py (lab-shapes, 24 rows; lab-mirror, played
-                          right to left); each W3-W6 module's ROSTER and THREAT tables are its
-                          regular levels' cast and threat, written as their roster: and threat:
-                          headers;
+                          rooms), lab_shapes.py (lab-shapes, 24 rows; lab-mirror, played
+                          right to left) and lab_shaped.py (lab-shape-tower ... lab-shape-decks:
+                          the engine's, a 36-row tower, a climb, a bowl, a loop, a mirrored
+                          strip, rooms two decks tall, drawn on grids of their own height); each
+                          W3-W6 module's ROSTER and THREAT tables are its regular levels' cast
+                          and threat, written as their roster: and threat: headers;
                           common.py's Build 2 toolkit: swap, stamp, span, anoint_header,
                           rooms_header, the world's rules: the ramp, landmarks and altars
                           apart, once re-cut the variety rules; check_headers holds every
@@ -211,7 +219,9 @@ game/                     Godot 4.7 project (landscape 844x390, mobile renderer,
                           shapes on lab-shapes and lab-mirror: placed and stacked rows, hints
                           and barks along the route, gaps on foot, mirrored phases, facing,
                           and each shape rule (the HUD's corners, the descent and catch rules)
-                          catching what it should)
+                          catching what it should), test_shaped (Build 2's shapes, the engine's
+                          side, on the shape labs: the tall camera, the bots by route, arenas
+                          and sealed rooms entered from either side, two decks)
   tests/routes/*.json     the golden routes (tools/record_route.gd; test_routes.gd replays them:
                           3-1 ... 4-3 to the bell, 3-4_approach, 3-4_approach_witch and
                           4-4-approach to the arena door; W3's are the Taperwitch's but
@@ -264,6 +274,11 @@ HUD's corner blocks (a level's first and last tiles, where the camera stops at
 the edge), a jump takes the camera up with him sooner, so his flame never goes
 behind them; the boss bar, a title or level-up card or a message he jumps up
 behind goes see-through. `tools/shot_floor.gd` measures and shoots all of it.
+In a level taller than a strip (the shapes; scripts/tall_cam.gd) a fall looks
+ahead once he's dropped below the floor he left (his feet held high on the
+glass, 5 rows or more showing under him), as does a slide down a vine; a lift
+carries the camera; Down held standing on stone looks down; at a tower's top
+no goal may sit behind the HUD's top band. `tools/shot_tall_cam.gd` shoots it.
 
 On a Mac: arrows or A/D to move (Down or S held on a ledge drops through it;
 the Up arrow climbs a vine), Space/Z/W to jump, X/J to attack, C/L/E for the
