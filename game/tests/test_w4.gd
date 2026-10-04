@@ -18,9 +18,11 @@ extends SceneTree
 ## when the header is absent too) and stops with stop_time; a Y in a boss
 ## arena is the boss's own pivot.
 ##
-## Levels (when 4-*.txt exist): the headers and registry; altars and
-## checkpoint gaps (<= 85); sigils, the Dread, monsters (24-31) and the
-## threat cost (11 per 100 tiles, within 15%); no Gutterwings; each level's
+## Levels (when 4-*.txt exist): the headers and registry; altars (3-5 in a
+## regular level, an altar by every sealed room's door) and checkpoint gaps
+## (<= 85); sigils, the Dread, the cast its roster: header declares and the
+## threat its threat: header does, ramping 4-1 to 4-3 (tests/level_rules.gd,
+## since Build 2: no fixed widths, counts or density); no Gutterwings; each level's
 ## inscription (one at most) on a sign; required ice landings >= 3
 ## tiles in 4-1 / 4-2 and >= 2 from 4-3 (lone ice blocks only on the star
 ## routes); rime never a required floor (the bot reaches every goal with rime
@@ -46,6 +48,7 @@ extends SceneTree
 ##     godot --headless --path game --script res://tests/test_w4.gd
 
 const LevelData := preload("res://scripts/level_data.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const Reach := preload("res://scripts/reach.gd")
 const ReachSearch := preload("res://scripts/reach_search.gd")
 const Movers := preload("res://scripts/movers.gd")
@@ -56,12 +59,11 @@ const CLOCKWORK := "res://scripts/features/clockwork.gd"
 const TILE := 32
 const DT := 1.0 / 120.0
 const IDS := ["4-1", "4-2", "4-3", "4-4"]
-const WIDTHS := {"4-1": 378, "4-2": 376, "4-3": 380, "4-4": 170}
+const WIDTHS := {"4-4": 170}     # (the regular levels' widths are their own since Build 2)
 const THEMES := {"4-1": "clockface", "4-2": "gearworks", "4-3": "icebells", "4-4": "escapement"}
 const AREAS := {"4-1": 18, "4-2": 19, "4-3": 21, "4-4": 22}
 const ICE_STOP := 134.0          # px from a run (decisions.md, feel lab round 2)
 const MAX_GAP := 85              # tiles between checkpoints (spec 3.1, World 4)
-const THREAT := 11.0             # per 100 tiles (spec 3.1, World 4), within 15%
 const APPROACH := "res://tests/routes/4-4-approach.json"
 # Sigil 3's star route in each regular level: its tight landings (a lone
 # ice block, a lone block, a one-tile frosted ledge; a cog's tooth is a
@@ -800,7 +802,7 @@ func _test_headers(ids: Array) -> void:
 	for id in ids:
 		var lv := _load(id)
 		_check(lv.errors.is_empty(), "%s parses: %s" % [id, lv.errors])
-		_check(lv.width == int(WIDTHS[id]) and lv.height == 15, "%s is %d x 15 (spec 3.5.3) (%d x %d)" % [id, WIDTHS[id], lv.width, lv.height])
+		_check(lv.width == int(WIDTHS.get(id, lv.width)) and lv.height == 15, "%s is %d x 15 (%d x %d)" % [id, WIDTHS.get(id, lv.width), lv.width, lv.height])
 		_check(lv.theme == THEMES[id] and lv.music == "carillon" and lv.area == int(AREAS[id]) and absf(lv.tick - 0.536) < 0.0001,
 				"%s: theme %s, carillon, area %d, tick 0.536" % [id, THEMES[id], AREAS[id]])
 		_check(lv.world == 4 and str(lv.story.get("start", "")) == "beat_%s" % id.replace("-", "_"), "%s opens with beat_%s" % [id, id.replace("-", "_")])
@@ -835,7 +837,7 @@ func _test_headers(ids: Array) -> void:
 
 
 func _test_rules(ids: Array) -> void:
-	var EK = load("res://scripts/enemy_kinds.gd")
+	var regular := []
 	for id in ids:
 		var lv := _load(id)
 		var boss: bool = lv.boss != ""
@@ -853,7 +855,11 @@ func _test_rules(ids: Array) -> void:
 		var worst := 0
 		for i in range(1, marks.size()):
 			worst = maxi(worst, int(marks[i]) - int(marks[i - 1]))
-		_check(altars.size() == (2 if boss else 4), "%s has %d altars (%d)" % [id, 2 if boss else 4, altars.size()])
+		if boss:
+			_check(altars.size() == 2, "%s has 2 altars (%d)" % [id, altars.size()])
+		else:
+			var cp := Rules.checkpoint_problems(lv, MAX_GAP)
+			_check(cp.is_empty(), "%s: 3-5 altars, an altar by every sealed door %s" % [id, cp])
 		_check(worst <= MAX_GAP, "%s: checkpoints at most %d tiles apart (%s)" % [id, MAX_GAP, marks])
 		if boss:
 			var bx := 0
@@ -862,21 +868,16 @@ func _test_rules(ids: Array) -> void:
 					bx = int(e["cell"].x)
 			var a := Arena.find(lv, LevelData.cell_floor(Vector2i(bx, 12)))
 			_check(int(a["left"]) / TILE - int(altars[altars.size() - 1]) <= 8, "%s: an altar at the arena door" % id)
-		# Monsters and the threat cost (spec 3.1, 3.5.3: the Dread aside).
-		var n := 0
-		var cost := 0.0
+		# The cast and the threat (the Dread aside): what the level's roster:
+		# and threat: headers declare (Build 2), checked below for 4-1 to 4-3.
 		for e in lv.entities:
 			var k: String = e["kind"]
-			if EK.KINDS.has(k) or (EK.has_method("known") and EK.known(k) and k != "boss"):
-				if k == "boss" or k == "dread":
-					continue
-				n += 1
-				cost += EK.cost(k)
 			_check(k != "gutterwing" and k != "nest", "%s: no Gutterwings in World 4 (%s at %s)" % [id, k, e["cell"]])
 		if not boss:
-			_check(n >= 24 and n <= 31, "%s: 24-31 monsters (%d)" % [id, n])
-			var per := cost * 100.0 / float(lv.width)
-			_check(absf(per - THREAT) <= THREAT * 0.15, "%s: threat %.1f per 100 tiles (11 +- 15%%)" % [id, per])
+			regular.append(lv)
+			var rp := Rules.roster_problems(lv)
+			_check(not Rules.roster_of(lv).is_empty() and rp.is_empty(), "%s holds the cast its roster: declares %s" % [id, rp])
+			_check(Rules.declared_threat(lv) > 0.0, "%s declares its threat (%.1f per 100 tiles)" % [id, Rules.threat_of(lv)])
 		# Icicles hang from a ceiling at most 7 rows over a floor.
 		for e in lv.of_kind("icicle"):
 			var c: Vector2i = e["cell"]
@@ -907,6 +908,9 @@ func _test_rules(ids: Array) -> void:
 		# every pit (a column open to the level's bottom), 14 tiles or less.
 		var bad := _stone_gaps(lv)
 		_check(bad.is_empty(), "%s: stone every 14 tiles over its pits %s" % [id, bad])
+	if not regular.is_empty():
+		var tp := Rules.threat_problems(regular)
+		_check(tp.is_empty(), "4-1 to 4-3: each threat as declared (within 10%%), ramping %s" % [tp])
 
 
 func _pit_col(lv: RefCounted, x: int) -> bool:

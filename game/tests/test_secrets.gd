@@ -359,28 +359,37 @@ func _test_registry() -> void:
 # ---------------------------------------------------------------- the retrofits
 
 func _test_retrofits() -> void:
+	## 1-3's and 2-2's retrofits keep v2's columns byte for byte until Build 2
+	## redraws the level (a roster: header: then its own rules hold it, and
+	## only the silver bell's rules here).
 	var r13 := _rows(_path("1-3"))
 	var l13 = LevelData.load_file(_path("1-3"))
-	_check(l13.width == 236, "1-3 is 236 wide (v2's 206 and B_ROOF's 30): %d" % l13.width)
-	_check(_sha_cols(r13, 0, 174) == V2_13_BEFORE, "1-3: every column before B_ROOF is v2's, byte for byte")
-	var bell_ok := _sha_cols(r13, 204, 236) == V2_13_BELL
-	if not bell_ok:
-		print("  (1-3's B_BELL hash now: %s)" % _sha_cols(r13, 204, 236))
-	_check(bell_ok, "1-3: B_BELL is v2's, 30 columns on")
+	if l13.headers.has("roster"):
+		print("  1-3 declares its roster (Build 2): its v2 columns no longer pinned")
+	else:
+		_check(l13.width == 236, "1-3 is 236 wide (v2's 206 and B_ROOF's 30): %d" % l13.width)
+		_check(_sha_cols(r13, 0, 174) == V2_13_BEFORE, "1-3: every column before B_ROOF is v2's, byte for byte")
+		var bell_ok := _sha_cols(r13, 204, 236) == V2_13_BELL
+		if not bell_ok:
+			print("  (1-3's B_BELL hash now: %s)" % _sha_cols(r13, 204, 236))
+		_check(bell_ok, "1-3: B_BELL is v2's, 30 columns on")
 	_check(l13.tile(69, 5) == LevelData.STONE, "1-3's star route post (69, 5) stands")
 	_check(_ents(l13, "silver_bell").size() == 1 and l13.tile(_ents(l13, "silver_bell")[0]["cell"].x, _ents(l13, "silver_bell")[0]["cell"].y + 1) == LevelData.FALSE_STONE,
 			"1-3: the silver bell hangs right over its false stone")
 	var r22 := _rows(_path("2-2"))
 	var l22 = LevelData.load_file(_path("2-2"))
-	_check(l22.width == 304, "2-2 keeps its width (%d)" % l22.width)
-	var masked := []
-	for r in r22:
-		var s := str(r)
-		var chars := PackedStringArray()
-		for x in s.length():
-			chars.append("?" if x == 203 or (x >= 206 and x <= 217) else s[x])
-		masked.append("".join(chars))
-	_check("\n".join(masked).sha256_text() == V2_22_MASKED, "2-2: all but C2_LANTERNS' columns 26-37 and its new sign are v2's")
+	if l22.headers.has("roster"):
+		print("  2-2 declares its roster (Build 2): its v2 columns no longer pinned")
+	else:
+		_check(l22.width == 304, "2-2 keeps its width (%d)" % l22.width)
+		var masked := []
+		for r in r22:
+			var s := str(r)
+			var chars := PackedStringArray()
+			for x in s.length():
+				chars.append("?" if x == 203 or (x >= 206 and x <= 217) else s[x])
+			masked.append("".join(chars))
+		_check("\n".join(masked).sha256_text() == V2_22_MASKED, "2-2: all but C2_LANTERNS' columns 26-37 and its new sign are v2's")
 	_check(_ents(l22, "silver_bell").size() == 1 and l22.tile(_ents(l22, "silver_bell")[0]["cell"].x, _ents(l22, "silver_bell")[0]["cell"].y + 1) == LevelData.FALSE_STONE,
 			"2-2: the silver bell hangs right over its false stone")
 	# 2-2's bell hangs over the third lantern post of the dark passage.

@@ -30,7 +30,8 @@ The numbers (the push, the tell, the strain) are features/glass.gd's
 DIFF_KNOBS; the layouts are proven by tests/test_w5.gd and the bot in
 tests/test_core.gd (calm and under a constant 120 px/s push).
 """
-from common import block, T_OPEN, Section
+import common
+from common import block, swap, T_OPEN
 
 # 5-3's three Paneguards (spec §3.6.3) wait on the share-cap scan
 # (tests/test_progression.gd): it judges every eligible kind a level holds
@@ -43,15 +44,20 @@ from common import block, T_OPEN, Section
 # the track B merge, so the Paneguards stand (False brings the stand-ins back).
 PANEGUARDS_5_3 = True    # the track B merge: the scan knows placement now (all three spots never anointed)
 
-
-def swap(sec, cells):
-    """A copy of sec with cells {(x, y): glyph} changed (its overlay kept)."""
-    rows = [list(r) for r in sec]
-    for (x, y), ch in cells.items():
-        rows[y][x] = ch
-    out = Section(''.join(r) for r in rows)
-    out.overlay = getattr(sec, 'overlay', None)
-    return out
+# Build 2's tables (common.world_tables, at the end; w3.py says what a row
+# holds): written as each regular level's roster: and threat: headers,
+# checked as it's written and held by tests/test_w5.gd. Today's values: a
+# redesign edits these, not the tests.
+ROSTER = {
+    '5-1': {'headline': ['glassmite', 'gustling'], 'support': ['bat', 'bonebow'], 'guest': ['tickwind', 'thornback'],
+            'rattle_max': 7, 'fodder_max': 0.94, 'count': 30},
+    '5-2': {'headline': ['refractor', 'paneguard'], 'support': ['gustling', 'glassmite', 'bat', 'gutterwing', 'bonebow'],
+            'rattle_max': 5, 'fodder_max': 0.86, 'count': 28},
+    '5-3': {'headline': ['paneguard', 'refractor'], 'support': ['glassmite', 'gustling', 'gutterwing', 'bat', 'bonebow'],
+            'guest': ['rattlehound', 'thornback'], 'rattle_max': 2, 'fodder_max': 0.6, 'count': 22},
+}
+THREAT = {'5-1': 10.8, '5-2': 11.5, '5-3': 12.4}
+MAX_GAP = 72                 # tiles between checkpoints (spec §3.1, World 5)
 
 LEVELS = []
 
@@ -1188,3 +1194,7 @@ LEVELS.append({
               'When her light locks, get behind a mirror'],
     'sections': [LW_START, LW_DESCENT, LW_ALTAR, LW_GAUNTLET, LW_DOOR, T_OPEN, P_ARENA],
 })
+
+# Build 2: each regular level's ROSTER and THREAT rows, and the world's rules
+# across them (the ramp, the checkpoints, the section roles).
+common.world_tables(LEVELS, ROSTER, THREAT, MAX_GAP)

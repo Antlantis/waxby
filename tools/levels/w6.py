@@ -22,7 +22,24 @@ grasps and candles teach themselves by deep.gd's first-time barks), and each
 level's one inscription (story.gd INSCRIPTIONS, the Hush's whisper) where
 it's quiet.
 """
+import common
 from common import block, join, x_of, T_OPEN
+
+# Build 2's tables (common.world_tables, at the end; w3.py says what a row
+# holds): written as each regular level's roster: and threat: headers,
+# checked as it's written and held by tests/test_w6.gd. Today's values: a
+# redesign edits these, not the tests.
+ROSTER = {
+    '6-1': {'headline': ['hushling', 'stillmaw'], 'support': ['brinejaw', 'gutterwing', 'dripkin', 'bonebow'],
+            'guest': ['hollow_helm', 'creepbone'], 'rattle_max': 11, 'fodder_max': 0.89, 'count': 34},
+    '6-2': {'headline': ['unwick', 'lurecoil', 'hushling'], 'support': ['stillmaw', 'brinejaw', 'bonebow'],
+            'guest': ['spurwheel', 'hollow_helm'], 'rattle_max': 4, 'fodder_max': 0.79, 'count': 28},
+    '6-3': {'headline': ['hushling', 'unwick'], 'support': ['stillmaw', 'brinejaw'],
+            'guest': ['refractor', 'rattlehound', 'frostbuckle', 'hollow_helm', 'paneguard'],
+            'rattle_max': 3, 'fodder_max': 0.68, 'count': 25},
+}
+THREAT = {'6-1': 11.0, '6-2': 10.9, '6-3': 11.0}
+MAX_GAP = 78                 # tiles between checkpoints (World 6)
 
 LEVELS = []
 
@@ -1118,3 +1135,7 @@ LEVELS.append({
               'Ring a sunken bell. Its peal lets you hit the Hush'],
     'sections': [HH_ORCHARD, HH_CARILLON, HH_ALTAR, HH_SANCTUM, HH_DEEP, HH_DOOR, T_OPEN, Z_ARENA],
 })
+
+# Build 2: each regular level's ROSTER and THREAT rows, and the world's rules
+# across them (the ramp, the checkpoints, the section roles).
+common.world_tables(LEVELS, ROSTER, THREAT, MAX_GAP)

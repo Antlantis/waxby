@@ -50,6 +50,21 @@ from common import block, T_OPEN
 # WAXBY_W4_SECRET=1 writes them anyway.
 SECRET_4S = os.path.exists(os.path.join(common.OUT, '4-S.txt')) or os.environ.get('WAXBY_W4_SECRET') == '1'
 
+# Build 2's tables (common.world_tables, at the end; w3.py says what a row
+# holds): written as each regular level's roster: and threat: headers,
+# checked as it's written and held by tests/test_w4.gd. Today's values: a
+# redesign edits these, not the tests.
+ROSTER = {
+    '4-1': {'headline': ['tickwind', 'spurwheel'], 'support': ['bonebow', 'bat'], 'guest': ['rootling'],
+            'rattle_max': 15, 'fodder_max': 0.94, 'count': 31},
+    '4-2': {'headline': ['frostbuckle', 'hoarowl'], 'support': ['tickwind', 'spurwheel', 'bat'], 'guest': ['hollow_helm'],
+            'rattle_max': 6, 'fodder_max': 0.71, 'count': 24},
+    '4-3': {'headline': ['tickwind', 'hoarowl'], 'support': ['frostbuckle', 'spurwheel', 'bat', 'bonebow'],
+            'guest': ['hollow_helm', 'thornback', 'rattlehound'], 'rattle_max': 8, 'fodder_max': 0.68, 'count': 25},
+}
+THREAT = {'4-1': 10.4, '4-2': 11.3, '4-3': 11.2}
+MAX_GAP = 85                 # tiles between checkpoints (spec 3.1, World 4)
+
 LEVELS = []
 
 INSCRIPTIONS = {
@@ -1236,3 +1251,7 @@ LEVELS.append({
               'Ring the bell the clock shows. Then hit his spring'],
     'sections': [HC_START, HC_CLIMB, HC_ALTAR, HC_GEARS, HC_DOOR, T_OPEN, K_ARENA],
 })
+
+# Build 2: each regular level's ROSTER and THREAT rows, and the world's rules
+# across them (the ramp, the checkpoints, the section roles).
+common.world_tables(LEVELS, ROSTER, THREAT, MAX_GAP)

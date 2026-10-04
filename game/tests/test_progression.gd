@@ -31,6 +31,7 @@ const Relics := preload("res://scripts/relics.gd")
 const Classes := preload("res://scripts/classes.gd")
 const Combat := preload("res://scripts/combat.gd")
 const LevelData := preload("res://scripts/level_data.gd")
+const Rules := preload("res://tests/level_rules.gd")
 const SettingsLib := preload("res://scripts/settings.gd")
 
 const SAVE := "user://test_progression_save.json"
@@ -55,6 +56,9 @@ const FODDER := ["skeleton", "bat", "bonebow", "gutterwing", "dripkin", "brineja
 # Wardens, bosses, altars): it stands in for a level file, a kind's script
 # or a boss's script until that lands (tools: PR's scratch generator).
 const V3_FIXTURE := "res://tests/fixtures/v3_balance.json"
+# Build 2's toolkit fixture (tools/levels/toolkit.py): a made-up World 6 level
+# with three forced Anointed (anoint:), on ground pick_elites would refuse.
+const TOOLKIT_FIXTURE := "res://tests/fixtures/toolkit-cast.txt"
 const BOSS_SCRIPTS := {"rootmother": "res://scripts/rootmother_boss.gd", "tinker": "res://scripts/tinker_boss.gd",
 		"saint": "res://scripts/saint_boss.gd", "hush": "res://scripts/hush_boss.gd"}
 const DESCENT := "res://scripts/modes/descent.gd"
@@ -92,6 +96,7 @@ func _initialize() -> void:
 	_test_bands_v3()
 	_test_defence_guards()
 	_test_share_caps()
+	_test_forced_anointed()
 	_test_combat_v3()
 	_test_xp_v3()
 	_test_item_rolls()
@@ -208,12 +213,14 @@ func _test_curve() -> void:
 func _first_run_events(lv: RefCounted) -> Array:
 	## Everything that pays XP on a first Dusk clear, as [x, what, kind, share]
 	## in the order a hero running right meets it: every monster, the Dread,
-	## half an Anointed (none in 1-1), 2 of the 3 sigils, altars, reliquaries,
-	## and the first-clear bell.
+	## half an Anointed (none in 1-1), every forced Anointed (its anoint:
+	## cell, Build 2) in full, 2 of the 3 sigils, altars, reliquaries, and the
+	## first-clear bell.
 	var ev := []
 	var sigils := []
 	var dread_x := -1
 	var kinds := {}
+	var forced := Rules.forced_cells(lv)
 	for e in lv.entities:
 		var k: String = e["kind"]
 		var x: int = e["cell"].x
@@ -221,6 +228,8 @@ func _first_run_events(lv: RefCounted) -> Array:
 			ev.append([x, "kill", lv.boss if lv.boss != "" else "tollgrave", 1.0])
 		elif Progression.BASE_XP.has(k):
 			ev.append([x, "kill", k, 1.0])
+			if forced.has(e["cell"]):
+				ev.append([x, "anointed", k, 1.0])
 			if FODDER.has(k):
 				kinds[k] = int(kinds.get(k, 0)) + 1
 		elif k == "dread":
@@ -310,6 +319,35 @@ func _test_xp_budget() -> void:
 				% [", ".join(missing), missing.size(), ", ".join(model_rows)])
 		if pure_model:
 			_check(model_off.is_empty(), "the spec's model of W3-W6 (§3.10's monsters, today's BASE_XP) lands every exit within +-%.1f (%s)" % [EXIT_SLACK_DEEP, model_off])
+
+
+func _test_forced_anointed() -> void:
+	## Build 2's forced Anointed (anoint: cells) in the two level walks, on
+	## the toolkit's fixture: the XP walk pays each in full (on top of the
+	## random half an Anointed), and the share-cap scan judges each as
+	## Anointed whatever its ground (its Bonebow on a one-tile post and its
+	## Stillmaw over the open floor, where safe_for says no).
+	if not FileAccess.file_exists(TOOLKIT_FIXTURE):
+		_check(false, "the toolkit fixture %s is written (tools/levels/toolkit.py)" % TOOLKIT_FIXTURE)
+		return
+	var lv: RefCounted = LevelData.load_file(TOOLKIT_FIXTURE)
+	var bare: RefCounted = LevelData.load_file(TOOLKIT_FIXTURE)
+	bare.headers.erase("anoint")
+	var forced := []
+	for e in _first_run_events(lv):
+		if e[1] == "anointed" and float(e[3]) == 1.0:
+			forced.append("%s@%d" % [e[2], e[0]])
+	forced.sort()
+	_check(forced == ["bonebow@33", "stillmaw@72", "thornback@37"], "the XP walk pays each forced Anointed in full (%s)" % [forced])
+	var halves := _first_run_events(bare).filter(func(e): return e[1] == "anointed")
+	_check(halves.size() == 1 and float(halves[0][3]) == 0.5, "and still half a random one, as a level with none forced (%s)" % [halves])
+	_check(_play(lv, 0) > _play(bare, 0), "so a level's forced Anointed raise its first-run XP (%d > %d)" % [_play(lv, 0), _play(bare, 0)])
+	var el = load("res://scripts/elites.gd")
+	var cast := _level_cast({"id": "toolkit-cast", "path": TOOLKIT_FIXTURE}, _fixture())
+	_check(not bool(el.safe_for(lv, Vector2i(33, 9), "bonebow", false)) and not bool(el.safe_for(lv, Vector2i(72, 5), "stillmaw", true)),
+			"(the fixture's Bonebow and Stillmaw stand where pick_elites would never anoint them)")
+	_check((cast["safe"] as Dictionary).has("bonebow") and (cast["safe"] as Dictionary).has("stillmaw"),
+			"the share-cap scan judges forced Anointed as Anointed whatever their ground (%s)" % [cast["safe"].keys()])
 
 
 func _fixture() -> Dictionary:
@@ -640,6 +678,7 @@ func _level_cast(info: Dictionary, fx: Dictionary) -> Dictionary:
 		out["real"] = true
 		var el = load("res://scripts/elites.gd")
 		var ek = load("res://scripts/enemy_kinds.gd")
+		var forced := Rules.forced_cells(lv)
 		for e in lv.entities:
 			var k := str(e["kind"])
 			if k == "boss":
@@ -648,8 +687,10 @@ func _level_cast(info: Dictionary, fx: Dictionary) -> Dictionary:
 				out["kinds"][k] = int(out["kinds"].get(k, 0)) + 1
 				# Could this one be anointed where it stands (elites.gd
 				# pick_elites' own test: safe_for)? PR's placement-aware row.
+				# A forced one (its anoint: cell, Build 2) is, whatever its
+				# ground.
 				var flier: bool = str((ek.info(k) as Dictionary).get("spawn", "floor")) == "center"
-				if el != null and bool(el.safe_for(lv, e["cell"], k, flier)):
+				if forced.has(e["cell"]) or (el != null and bool(el.safe_for(lv, e["cell"], k, flier))):
 					out["safe"][k] = true
 		out["dread"] = str(lv.dread.get("kind", "")) if lv.dread is Dictionary else ""
 		var wd = lv.get("warden")
@@ -700,7 +741,8 @@ func _test_share_caps() -> void:
 	## appears in (Worlds 3-6 and the secret levels, Dusk), after Depth, the
 	## world trim, the elite multipliers and DR, as a share of the reference
 	## knight's life where it's met (_arrival): fodder <= 30%, heavies and
-	## brutes <= 36%, Anointed (x1.2) <= 40%, Dreads (x1.4) and Wardens
+	## brutes <= 36%, Anointed (x1.2: where the game could anoint one, and
+	## every forced anoint: cell whatever its ground) <= 40%, Dreads (x1.4) and Wardens
 	## (x1.25) <= 45%, a boss's biggest blow <= 34% and its touch <= 25%.
 	## A failure only where both the level's file and the kind's (or boss's)
 	## script are built: the game as it is. Where either is still the spec's

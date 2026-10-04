@@ -56,6 +56,12 @@ extends RefCounted
 ## story_end, par, tick, secret, secret_prize, gusts, hush, chase, cog_phase,
 ## weight_phase, rush. Every header, known or not, is also kept raw in
 ## `headers` (the modes' private keys: kind, tier, tags, deep, ...).
+##
+## Build 2's level-rule keys, raw only (tools/levels/common.py writes them
+## from each world's tables; tests/level_rules.gd holds the file to them; the
+## game plays the same without them): roster (the cast it declares:
+## headline=..; support=..; guest=..; rattle_max=n; fodder_max=f; count=a-b),
+## threat (its cost per 100 tiles), roles (a re-cut level's section roles).
 
 const TILE := 32
 

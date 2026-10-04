@@ -6,6 +6,8 @@ area: 16
 dread: Old Tatterjaw|rattlehound|Swift,Burning
 secret: 3-S
 story_start: beat_3_3
+roster: headline=creepbone,weepcap; support=rootling,rattlehound,bonebow,gutterwing; guest=thornback; rattle_max=5; fodder_max=0.71; count=24
+threat: 11.2
 hints: Knock a glowfruit onto spores to burn them away|Here lies nobody yet. Mother Yarrow is patient.
 ---
 ##############################################################################################################################################################################################################################################################################################################################################

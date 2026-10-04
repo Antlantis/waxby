@@ -1,8 +1,9 @@
 """Writes game/levels/*.txt from the level modules in tools/levels/.
 
-Each module (w1.py ... w6.py, secrets.py, lab.py) exports LEVELS, a list of
-entries whose sections are drawn side by side with common.block(); see
-tools/levels/common.py for the format, the overlay row and the header
+Each module (w1.py ... w6.py, secrets.py, lab.py, and toolkit.py: Build 2's
+toolkit proven, its fixture written to game/tests/fixtures) exports LEVELS,
+a list of entries whose sections are drawn side by side with common.block();
+see tools/levels/common.py for the format, the overlay row and the header
 writers, and game/scripts/level_data.gd for the legend. A module that isn't
 there yet is skipped, so a partial build still writes what it has.
 
@@ -29,7 +30,7 @@ import common  # noqa: E402
 # secrets before w3/w4: 3-3's and 4-2's set pieces are written only once 3-S.txt
 # and 4-S.txt exist (w3.py SECRET_3S, w4.py SECRET_4S), so one pass from a clean
 # tree writes them too.
-MODULES = ['w1', 'w2', 'secrets', 'w3', 'w4', 'w5', 'w6', 'lab']
+MODULES = ['w1', 'w2', 'secrets', 'w3', 'w4', 'w5', 'w6', 'lab', 'toolkit']
 
 
 def main(names):

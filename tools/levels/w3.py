@@ -3,10 +3,11 @@ The verb is climbing: vines ({), rotten vines (}: a run of at most 3 that
 snaps 1.4 s after the first catch on Dusk), spore pods (*: a cloud that
 dims you) and glowfruit (8: lamplight you knock down; fire for the spores).
 
-Section widths and x are the spec's (the altars and checkpoints are binding);
+Section widths and x are the spec's; since Build 2 the rules bind, not the
+spec's x (each level's cast and threat are its rows of ROSTER and THREAT);
 the drawing inside each section is this file's. The rules every section
 keeps (tests/test_w3.gd checks them):
-  - checkpoints (start, altars, bell) at most 90 tiles apart;
+  - checkpoints (start, altars, bell) at most 90 tiles apart, 3-5 altars;
   - over a pit, stone (a tile last_safe records) at least every 14 tiles,
     and a root knot after at most 4 vines;
   - vine columns 3-5 apart on a chain; a rotten run at most 3 tall; no
@@ -18,7 +19,8 @@ keeps (tests/test_w3.gd checks them):
   - every monster appears first in the section that teaches it (Rootling
     BG_MOUNDS, Weepcap BG_BELL, Rattlehound HO_HOUND, Creepbone SW_CREEP),
     rotten vines first in HO_ROTTEN, pods first in HO_SPORES;
-  - a threat cost of about 10 per 100 tiles (within 15%);
+  - each level's threat cost within 10% of its THREAT row (about 10 per
+    100 tiles today), its cast what its ROSTER row declares;
   - sigil 3 of 3-1 ... 3-3 behind its star route (test_w3 STAR_ROUTES);
   - no blind jumps: every required landing in view before take-off (the
     camera shows about 4.7 rows under a standing hero's feet: a required
@@ -49,6 +51,23 @@ from common import block, T_OPEN
 # stays, empty; features/orchard.gd shows its updraft on the same rule).
 # WAXBY_W3_SECRET=1 writes them anyway (the bot's proof of the attic).
 SECRET_3S = os.path.exists(os.path.join(common.OUT, '3-S.txt')) or os.environ.get('WAXBY_W3_SECRET') == '1'
+
+# Build 2's tables (common.world_tables, at the end): each regular level's
+# cast (headline kinds placed and the world's own, support, guests from
+# earlier worlds, a Rattle cap, the fodder share's ceiling, the count) and
+# its threat per 100 tiles (within 10%; X-1 to X-3 ramping), written as its
+# roster: and threat: headers, checked as it's written and held by
+# tests/test_w3.gd. Today's values: a redesign edits these, not the tests.
+ROSTER = {
+    '3-1': {'headline': ['rootling', 'weepcap'], 'support': ['bat', 'bonebow', 'dripkin'],
+            'rattle_max': 14, 'fodder_max': 0.94, 'count': 29},
+    '3-2': {'headline': ['rattlehound', 'weepcap'], 'support': ['rootling', 'bat', 'gutterwing'], 'guest': ['hollow_helm'],
+            'rattle_max': 6, 'fodder_max': 0.70, 'count': 23},
+    '3-3': {'headline': ['creepbone', 'weepcap'], 'support': ['rootling', 'rattlehound', 'bonebow', 'gutterwing'],
+            'guest': ['thornback'], 'rattle_max': 5, 'fodder_max': 0.71, 'count': 24},
+}
+THREAT = {'3-1': 9.9, '3-2': 9.9, '3-3': 11.2}
+MAX_GAP = 90                 # tiles between checkpoints (spec §3.1, World 3)
 
 LEVELS = []
 
@@ -1031,3 +1050,7 @@ LEVELS.append({
               'Follow her heart. Hit it where it blooms'],
     'sections': [HW_START, HW_CLIMB, HW_ALTAR, HW_GAUNTLET, HW_DOOR, T_OPEN, R_ARENA],
 })
+
+# Build 2: each regular level's ROSTER and THREAT rows, and the world's rules
+# across them (the ramp, the checkpoints, the section roles).
+common.world_tables(LEVELS, ROSTER, THREAT, MAX_GAP)

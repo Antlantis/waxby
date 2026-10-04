@@ -5,6 +5,8 @@ theme: rosewind
 area: 24
 dread: Glintwatch|refractor|Warded,Echoing
 story_start: beat_5_2
+roster: headline=refractor,paneguard; support=gustling,glassmite,bat,gutterwing,bonebow; rattle_max=5; fodder_max=0.86; count=28
+threat: 11.5
 gusts: 6-17:L:A, 26-45:L:A, 50-67:L:B, 89-98:L:A, 99-109:R:A, 115-135:L:A, 230-238:L:A, 239-247:L:B, 328-339:R:B
 hints: She went anyway, with a song and no one to sing it to.|Glass knights block face-on. Strike after they lunge
 ---

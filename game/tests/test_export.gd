@@ -7,7 +7,8 @@ extends SceneTree
 ##     byte for byte as its id (the iOS PCK is case-sensitive, the Mac isn't);
 ##   - every script under scripts/ parses (a file that fails to parse fails);
 ##   - the v2 level files nobody retrofits are still v2's, byte for byte, but
-##     for the signs the sign cut took;
+##     for the signs the sign cut took, until Build 2 redraws one (a level
+##     that declares its own cast, roster:, is held to that instead);
 ##   - no draw_circle / draw_colored_polygon / draw_polyline in the v3 drawing
 ##     code (feature modules, painters, backdrop styles, ambient, edge lines);
 ##   - both iOS presets open Documents to the Files app (the playlog), and the
@@ -181,8 +182,14 @@ func _test_scripts() -> void:
 
 
 func _test_v2_levels() -> void:
+	var LevelData = load("res://scripts/level_data.gd")
 	for id in V2_SHA:
 		var path := "res://levels/%s.txt" % id
+		if LevelData.load_file(path).headers.has("roster"):
+			# Build 2 redrew it: test_w* and tests/level_rules.gd hold it to
+			# its own roster: and threat: now, not to v2's bytes.
+			print("  %s declares its roster (Build 2): no longer v2's, so not pinned" % id)
+			continue
 		var sha := FileAccess.get_sha256(path)
 		_check(sha == V2_SHA[id], "%s is still v2's, byte for byte" % id)
 

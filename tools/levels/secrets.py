@@ -33,15 +33,13 @@ def _room(rows, section):
 def _entry(entry):
     """Adds the private headers computed from the joined rows: warden_room
     and anoint (from anoint_at: (section, dx, row), each a placed monster's
-    cell; tests/test_secrets.gd checks each spawns Anointed)."""
-    from common import join
+    cell, its Omens rolled as the World's would be: common.anoint_header;
+    tests/test_secrets.gd checks each spawns Anointed)."""
+    from common import anoint_header, join, world_of
     rows = join(*entry['sections'])
     entry['warden_room'] = _room(rows, entry['sections'][-1])
     if 'anoint_at' in entry:
-        cells = []
-        for sec, dx, y in entry.pop('anoint_at'):
-            cells.append('%d,%d' % (x_of(rows, sec, dx), y))
-        entry['anoint'] = '; '.join(cells)
+        entry['anoint'] = anoint_header(rows, entry.pop('anoint_at'), world_of(entry['id']), entry['id'])
     LEVELS.append(entry)
 
 
