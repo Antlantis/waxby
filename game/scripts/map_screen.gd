@@ -53,6 +53,7 @@ signal sheet
 signal chandler
 signal world_opened(w: int)
 signal challenges
+signal settings
 signal play_secret(id: String)
 signal resume_altar(snapshot: Dictionary)
 
@@ -80,6 +81,7 @@ var _info: Array = []             # per level: {id, sub, title, area, dread, bos
 var _secrets := {}                # world -> {id, from, title, area, built}
 var _play_btn: Button
 var _back_btn: Button
+var _settings_btn: Button
 var _callings_btn: Button
 var _sheet_btn: Button
 var _chandler_btn: Button
@@ -140,6 +142,10 @@ func _ready() -> void:
 	_back_btn = UI.make_button("Title", false, func(): back.emit(), "back", 15)
 	UI.small_button(_back_btn, 15)
 	_back_btn.custom_minimum_size = Vector2(70, UI.TAP_H)
+	_settings_btn = UI.make_button("Settings", false, func(): settings.emit(), "click", 15)
+	UI.small_button(_settings_btn, 15)
+	_settings_btn.custom_minimum_size = Vector2(84, UI.TAP_H)
+	_settings_btn.name = "Settings"
 	_callings_btn = UI.make_button("Callings", false, func(): _open("callings"), "click", 15)
 	_sheet_btn = UI.make_button("Sheet", false, func(): _open("sheet"), "click", 15)
 	_chandler_btn = UI.make_button("Shop", false, func(): _open("chandler"), "click", 15)
@@ -151,7 +157,7 @@ func _ready() -> void:
 	for b in [_callings_btn, _sheet_btn, _chandler_btn, _challenges_btn]:
 		UI.small_button(b, 15)
 		b.custom_minimum_size = Vector2(96, 44)
-	for b in [_play_btn, _back_btn, _callings_btn, _sheet_btn, _chandler_btn, _challenges_btn]:
+	for b in [_play_btn, _back_btn, _settings_btn, _callings_btn, _sheet_btn, _chandler_btn, _challenges_btn]:
 		add_child(b)
 	_challenges_btn.visible = challenges_shown()
 	_refresh()
@@ -783,6 +789,9 @@ func _process(dt: float) -> void:
 	_note_t = maxf(_note_t - dt, 0.0)
 	var s := UI.safe_rect(get_viewport())
 	_back_btn.position = s.position + Vector2(0, 2)
+	_back_btn.reset_size()
+	_settings_btn.reset_size()
+	_settings_btn.position = _back_btn.position + Vector2(_back_btn.size.x + 8.0, 0.0)
 	_play_btn.reset_size()
 	_play_btn.position = Vector2(s.end.x - _play_btn.size.x, s.end.y - _play_btn.size.y - 2.0)
 	var x := s.position.x

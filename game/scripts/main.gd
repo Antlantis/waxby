@@ -7,6 +7,8 @@ extends Node
 ## plays on where it was (the map); an empty one, or one started over, is a
 ## new game: the intro and the oath (where the calling is chosen), then the
 ## map (its Title button leads back to the title, and so to the saves).
+## The title and the map open Settings on their own (show_settings); a level
+## has it in its pause menu.
 ## A level's end records the result;
 ## a first clear plays the level's closing scene (story_end) before the
 ## results. Onward goes to the next level. The first time into a new world
@@ -52,6 +54,7 @@ const CHANDLER_SCREEN := "res://scripts/chandler_screen.gd"
 const BACK_SIGNALS := ["back", "closed", "close", "done"]
 const MODES_SCREEN := "res://scripts/modes/modes_screen.gd"
 const TALES_SCREEN := "res://scripts/tales_screen.gd"   # ST's Tales (P1), from the title and the saves screen
+const SettingsPage := preload("res://scripts/settings_page.gd")   # Settings on its own, from the title and the map
 const MODE_SCRIPTS := {"descent": "res://scripts/modes/descent.gd", "rush": "res://scripts/modes/waxworks.gd",
 		"trial": "res://scripts/modes/trials.gd"}
 const FEEL_LAB := "lab-1"
@@ -752,6 +755,7 @@ func show_title() -> void:
 	var t := TitleScript.new()
 	t.start.connect(show_saves)
 	_hook(t, "tales", func(_a = null): show_tales(show_title))
+	_hook(t, "settings", func(_a = null): show_settings(show_title))
 	_swap(t)
 	Sfx.play_music("title")
 	# The first tap plays the intro: its first picture loads meanwhile, and
@@ -786,6 +790,17 @@ func show_tales(back: Callable = Callable()) -> void:
 	var to: Callable = back if back.is_valid() else show_title
 	for sig in BACK_SIGNALS:
 		_hook(s, sig, func(_a = null): to.call())
+	_swap(s)
+
+
+func show_settings(back: Callable = Callable()) -> void:
+	## The Settings page on its own (the pause menu has it over a level):
+	## sound, music, buzz and the rest, the privacy policy, support, the
+	## licenses; Back goes back to where it was opened from.
+	var s := SettingsPage.new()
+	s.standalone = true
+	var to: Callable = back if back.is_valid() else show_title
+	s.back.connect(func(): to.call())
 	_swap(s)
 
 
@@ -855,6 +870,7 @@ func show_map(focus := -1) -> void:
 	_hook(m, "chandler", show_chandler)
 	_hook(m, "world_opened", _on_world_opened)
 	_hook(m, "challenges", func(_a = null): show_modes())
+	_hook(m, "settings", func(_a = null): show_settings(_back_to_map))
 	_hook(m, "play_secret", func(id): play_level_id(str(id)))
 	_hook(m, "resume_altar", func(sus): resume_level(sus))
 	_swap(m)

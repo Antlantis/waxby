@@ -51,6 +51,17 @@ extends SceneTree
 ## turn up deeper down; icons clamp to the tiers drawn. The W3-W6 and secret
 ## levels are header-only stand-ins in user:// until the level streams land.
 ##
+## Build 5 (the release pass): at every size, the Settings page on its own
+## (the title's and the map's) and over a level, with the Sound / Music /
+## Buzz switches on top and the links along its foot, and the Licenses page
+## over it, fit the safe area and clear each other; the title's Settings and
+## Privacy too. The links open the privacy policy, support and the App
+## Store's review sheet (the Rate link hides without an app id); Licenses
+## shows Godot's MIT license, every third-party component and every license
+## text, scrolls, and fills a few blocks a frame; main opens Settings from the
+## title and the map and Back returns there; the Stats tab's Light reads in
+## percent and the Shop says "Item level".
+##
 ##     godot --headless --path game --script res://tests/test_screens.gd
 
 const DT := 1.0 / 120.0
@@ -149,6 +160,8 @@ func _initialize() -> void:
 			_no_errors("v3_layouts")
 			await _test_choice_layout()
 			_no_errors("choice_layout")
+			await _test_settings_layouts()
+			_no_errors("settings_layouts")
 	await _set_view(Vector2i(847, 390), true)
 	await _test_message_slot()
 	_no_errors("message_slot")
@@ -250,6 +263,9 @@ func _initialize() -> void:
 	_no_errors("results_v3")
 	await _test_ui_v3()
 	_no_errors("ui_v3")
+	await _set_view(Vector2i(844, 390), true)
+	await _test_build5()
+	_no_errors("build5")
 	UI.safe_override = Rect2()
 	print("test_screens: %d passed, %d failed" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -5274,3 +5290,214 @@ func _test_ui_v3() -> void:
 	var HS = load("res://scripts/hero_screen.gd")
 	_check(HS.TABS.has("look") and HS.tabs().has("look") == ResourceLoader.exists(HS.PANEL_PATH["look"]), "the Look tab shows exactly when its panel is in the build")
 	await _frames(1)
+
+
+# ---------------------------------------------------------------- build 5: settings, links, licenses
+
+func _test_settings_layouts() -> void:
+	## The Settings page on its own (the title's, the map's) and over a level
+	## (the pause menu's): every button a thumb tall, inside the safe area and
+	## clear of the others; each row between the top row and the links, its
+	## buttons inside it, clear of every other button; the Licenses page over
+	## it (Back and the list inside the safe area). The title's Settings and
+	## Privacy clear of the logo.
+	_fresh_hero(7)
+	var SP = load("res://scripts/settings_page.gd")
+	for standalone in [true, false]:
+		var tag := "settings (%s)" % ("on its own" if standalone else "over a level")
+		var sp = SP.new()
+		sp.standalone = standalone
+		root.add_child(sp)
+		await _frames(2)
+		_buttons_ok(sp, tag)
+		var bs := _buttons(sp, [])
+		_check(bs.size() == 3 + 1 + 21 + 4, "%s: Back, three switches, 21 values and four links (%d)" % [tag, bs.size()])
+		for r in sp.rows():
+			var rect: Rect2 = r["rect"]
+			_inside(rect, "%s row %s" % [tag, r["key"]])
+			var mine: Array = sp._setting_btns[r["key"]]
+			for b in bs:
+				if mine.has(b):
+					_check(rect.grow(0.5).encloses(b.get_global_rect()), "%s: '%s' sits in its row %s" % [tag, b.text, r["key"]])
+				else:
+					_apart(rect, b.get_global_rect(), "%s row %s and button '%s'" % [tag, r["key"], b.text])
+		sp.open_licenses()
+		await _frames(2)
+		var lp = sp.licenses
+		_check(lp != null and not sp._body.visible, "%s: Licenses opens over the page" % tag)
+		lp.fill_all()
+		await _frames(2)
+		_buttons_ok(lp, "%s licenses" % tag)
+		_inside(lp.scroll_rect(), "%s the licenses' list" % tag)
+		_apart(lp.scroll_rect(), lp._back_btn.get_global_rect(), "%s the licenses' list and Back" % tag)
+		var sr: Rect2 = lp.scroll_rect()
+		var wide := true
+		for l in lp.labels():
+			var lr: Rect2 = (l as Label).get_global_rect()
+			wide = wide and lr.position.x >= sr.position.x - 0.5 and lr.end.x <= sr.end.x + 0.5
+		_check(wide, "%s: every block of the licenses wraps inside the list (no sideways scroll)" % tag)
+		sp.queue_free()
+		await _frames(1)
+	# The title: Settings top right, Privacy beside Tales, clear of the logo.
+	var t = load("res://scripts/title_screen.gd").new()
+	root.add_child(t)
+	await _frames(3)
+	_buttons_ok(t, "title")
+	var vs: Vector2 = t.get_size()
+	var lw := minf(vs.x * 0.5, vs.y * 1.05)
+	var logo := Rect2(vs.x * 0.5 - lw * 0.5, vs.y * 0.03 - 3.0, lw, lw * 400.0 / 1024.0 + 6.0)
+	for n in ["Settings", "Privacy", "Tales"]:
+		var b: Button = t.get_node(n)
+		_check(b.visible, "the title shows %s" % n)
+		_apart(logo, b.get_global_rect(), "the title's logo and %s" % n)
+	t.queue_free()
+	await _frames(1)
+
+
+func _test_build5() -> void:
+	_where = "build 5"
+	_fresh_hero(7)
+	var Links = load("res://scripts/links.gd")
+	var SP = load("res://scripts/settings_page.gd")
+	var sfx: Node = root.get_node_or_null("Sfx")
+	Links.opened.clear()
+	# The title's Privacy and Settings.
+	var t = load("res://scripts/title_screen.gd").new()
+	root.add_child(t)
+	await _frames(3)
+	var said := [0]
+	t.settings.connect(func(): said[0] += 1)
+	(t.get_node("Privacy") as Button).pressed.emit()
+	_check(Links.opened == [Links.PRIVACY_URL] and Links.PRIVACY_URL == "https://antlantis.github.io/waxby/privacy.html",
+			"the title's Privacy opens the privacy policy (%s)" % [Links.opened])
+	_check(not t._started, "and the title stays (a tap there doesn't begin)")
+	(t.get_node("Settings") as Button).pressed.emit()
+	_check(said[0] == 1, "the title's Settings says settings()")
+	t.queue_free()
+	await _frames(1)
+	# The page's switches and links.
+	Links.opened.clear()
+	var sp = SP.new()
+	sp.standalone = true
+	root.add_child(sp)
+	await _frames(2)
+	var muted: bool = sfx.muted
+	var mmuted: bool = sfx.music_muted
+	var buzz: bool = game.haptics
+	sp.toggle_sound()
+	sp.toggle_music()
+	sp.toggle_haptics()
+	_check(sfx.muted != muted and sfx.music_muted != mmuted and game.haptics != buzz, "Sound, Music and Buzz switch from Settings")
+	_check(sp._sound.text == "Sound " + ("off" if sfx.muted else "on") and sp._music.text == "Music " + ("off" if sfx.music_muted else "on")
+			and sp._haptics.text == "Buzz " + ("on" if game.haptics else "off"), "and say so (%s, %s, %s)" % [sp._sound.text, sp._music.text, sp._haptics.text])
+	sp.toggle_sound()
+	sp.toggle_music()
+	sp.toggle_haptics()
+	_check(sfx.muted == muted and sfx.music_muted == mmuted and game.haptics == buzz, "and back")
+	var shake = game.setting("shake")
+	sp.set_value("shake", 0.5)
+	_check(is_equal_approx(float(game.setting("shake")), 0.5), "a setting saves from the page on its own")
+	sp.set_value("shake", shake)
+	for n in ["Privacy", "Support", "Rate"]:
+		(sp._body.get_node(n) as Button).pressed.emit()
+	_check(Links.opened == [Links.PRIVACY_URL, Links.SUPPORT_URL, "https://apps.apple.com/app/id6817044506?action=write-review"],
+			"Privacy policy, Support and Rate Waxby open their pages (%s)" % [Links.opened])
+	_check(Links.WAXBY_APP_ID == "6817044506", "Rate uses Waxby's Apple ID")
+	Links.app_id = ""
+	sp.refresh()
+	_check(not (sp._body.get_node("Rate") as Button).visible and not Links.rate(), "without an app id the Rate link hides")
+	Links.app_id = Links.WAXBY_APP_ID
+	sp.refresh()
+	_check((sp._body.get_node("Rate") as Button).visible, "with it, it's back")
+	# Licenses: Godot's MIT license, every component and license, scrolling.
+	(sp._body.get_node("LicensesLink") as Button).pressed.emit()
+	await _frames(1)
+	var lp = sp.licenses
+	_check(lp != null and not lp.done and lp.labels().size() <= lp.PER_FRAME * 2, "Licenses fills a few blocks a frame (%d at first)" % (lp.labels().size() if lp else -1))
+	for i in 60:
+		if lp.done:
+			break
+		await process_frame
+	_check(lp.done, "and is all there within a second")
+	await _frames(2)
+	var txt: String = lp.text()
+	_check(txt.contains(Engine.get_license_text().strip_edges()) and txt.contains("Permission is hereby granted"), "Godot's MIT license, in full")
+	var missing: Array = []
+	for c in Engine.get_copyright_info():
+		if not txt.contains(str(c["name"])):
+			missing.append(c["name"])
+	_check(missing.is_empty() and Engine.get_copyright_info().size() > 50, "every third-party component is named (%d; missing %s)" % [Engine.get_copyright_info().size(), missing])
+	var lic: Dictionary = Engine.get_license_info()
+	var lmiss: Array = lic.keys().filter(func(k): return not txt.contains(str(lic[k]).strip_edges().substr(0, 200)))
+	_check(lmiss.is_empty(), "every license's text is there (%d; missing %s)" % [lic.size(), lmiss])
+	_check(txt.contains("Anthony Craig"), "and who made the game")
+	var smallest := 99
+	for l in lp.labels():
+		smallest = mini(smallest, (l as Label).get_theme_font_size("font_size"))
+	_check(smallest >= 12, "nothing smaller than 12 (%d)" % smallest)
+	var sc: ScrollContainer = lp._scroll
+	var bar := sc.get_v_scroll_bar()
+	_check(bar.max_value > sc.size.y * 10.0, "the list is long, and scrolls (%d of %d)" % [sc.size.y, bar.max_value])
+	lp.scroll_by(1e7)
+	await _frames(2)
+	_check(sc.scroll_vertical > 0 and absf(sc.scroll_vertical - (bar.max_value - bar.page)) < 2.0, "to its end (%d)" % sc.scroll_vertical)
+	_check(sc.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "and never sideways")
+	_check(sp.handle_back() and sp.licenses == null and sp._body.visible, "Back (or Esc) closes Licenses onto Settings")
+	_check(not sp.handle_back(), "and then leaves Settings to its host")
+	sp.queue_free()
+	await _frames(1)
+	# Over a level: the pause menu's Settings is the same page; leaving it
+	# closes the Licenses too.
+	var pm = load("res://scripts/pause_menu.gd").new()
+	root.add_child(pm)
+	await _frames(1)
+	pm.open()
+	pm.show_page("settings")
+	await _frames(1)
+	_check(pm._settings.get_script() == SP and pm._settings.visible and pm.settings_rows().size() == SP.SETTINGS.size(), "the pause menu's Settings is the page")
+	pm._settings.open_licenses()
+	await _frames(1)
+	pm.show_page("main")
+	await _frames(1)
+	_check(pm._settings.licenses == null and not pm._settings.visible, "leaving it closes the Licenses")
+	pm.queue_free()
+	await _frames(1)
+	# main: Settings from the title and from the map, Back to each.
+	var mn = load("res://scripts/main.gd").new()
+	mn.show_title()
+	mn.current.settings.emit()
+	_check(mn.current.get_script() == SP and mn.current.standalone, "the title's Settings opens the page on its own")
+	mn.current.back.emit()
+	_check(mn.current.get_script() == load("res://scripts/title_screen.gd"), "its Back: the title")
+	mn.show_map()
+	mn.current.settings.emit()
+	_check(mn.current.get_script() == SP, "the map's Settings opens it too")
+	mn.current.back.emit()
+	_check(mn.current.get_script() == load("res://scripts/map_screen.gd"), "its Back: the map")
+	mn.free()
+	await _frames(1)
+	# The map's Settings button says settings().
+	var m = load("res://scripts/map_screen.gd").new()
+	root.add_child(m)
+	await _frames(2)
+	var heard := [0]
+	m.settings.connect(func(): heard[0] += 1)
+	(m.get_node("Settings") as Button).pressed.emit()
+	_check(heard[0] == 1, "the map's Settings button says settings()")
+	m.queue_free()
+	await _frames(1)
+	# Words for players: the Stats tab's Light in percent, the Shop's item level.
+	var h = load("res://scripts/hero_screen.gd").new()
+	root.add_child(h)
+	h.open_tab("stats")
+	await _frames(2)
+	var light: Array = []
+	for r in h.panel.rows():
+		if str(r[0]) == "Light":
+			light = r
+	_check(not light.is_empty() and str(light[1]).ends_with("%") and not str(light[1]).contains("px"), "the Stats tab's Light reads in percent (%s)" % [light])
+	_check(str(light[1]) == "%d%%" % StatsPanel.light_pct(game.hero_stats(), game.diff()), "a bare candle's share (%s)" % [light])
+	h.queue_free()
+	await _frames(1)
+	var src := FileAccess.get_file_as_string("res://scripts/chandler_screen.gd")
+	_check(RegEx.create_from_string("\"ilvl %").search(src) == null, "the Shop never shows 'ilvl' (it says Item level)")

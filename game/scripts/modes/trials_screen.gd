@@ -1,8 +1,10 @@
 extends Control
 ## The Vigil Trials' screen (spec §7.6, p_modes §7.6): the callings as tabs
 ## (anyone may play any calling's trials: the loadout is fixed), the chosen
-## calling's four cards (name, lesson, medal, best, the next target), a
-## locked card saying what opens it, and Go for the card picked.
+## calling's cards (name, lesson, medal, best, the next target), a locked
+## card saying what opens it, and Go for the card picked. Only the trials
+## whose rooms are built show (shown_ids: two a calling in Build 5), centred;
+## one not built yet is left out, never shown as coming.
 
 signal back
 
@@ -61,10 +63,15 @@ func _ready() -> void:
 	set_cls(cls)
 
 
+static func shown_ids(c: String) -> Array:
+	## A calling's trials with their rooms built, in order.
+	return (TrialData.BY_CLS.get(c, []) as Array).filter(func(id): return TrialData.built(str(id)))
+
+
 func set_cls(c: String) -> void:
 	cls = c
 	picked = ""
-	var ids: Array = TrialData.BY_CLS.get(cls, [])
+	var ids: Array = shown_ids(cls)
 	for id in ids:
 		if is_open(id):
 			picked = id
@@ -96,12 +103,14 @@ func _refresh() -> void:
 
 
 func card_rects() -> Array:
+	## One card a shown trial, as wide as four would be, centred.
 	var s := UI.safe_rect(get_viewport())
 	var w := minf((s.size.x - 3.0 * 12.0) / 4.0, 190.0)
 	var h := minf(206.0, s.end.y - (s.position.y + 102.0) - 60.0)
-	var x0 := s.get_center().x - (w * 4.0 + 36.0) * 0.5
+	var n := shown_ids(cls).size()
+	var x0 := s.get_center().x - (w * n + 12.0 * maxf(n - 1, 0)) * 0.5
 	var out: Array = []
-	for i in 4:
+	for i in n:
 		out.append(Rect2(x0 + i * (w + 12.0), s.position.y + 100.0, w, h))
 	return out
 
@@ -136,7 +145,7 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	var pos: Vector2 = (event as InputEventMouseButton).position
 	var rs := card_rects()
-	var ids: Array = TrialData.BY_CLS.get(cls, [])
+	var ids: Array = shown_ids(cls)
 	for i in rs.size():
 		if (rs[i] as Rect2).has_point(pos) and i < ids.size():
 			if is_open(ids[i]):
@@ -169,7 +178,7 @@ func _draw() -> void:
 	var g := _game()
 	UI.text(self, Vector2(s.position.x, s.position.y + 28.0), "The Vigil Trials", 24, UI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, s.size.x, "title", 700, 4)
 	UI.text(self, Vector2(s.position.x, s.position.y + 45.0), "Mother Taper's lessons", 13, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, s.size.x, "italic", 500)
-	var ids: Array = TrialData.BY_CLS.get(cls, [])
+	var ids: Array = shown_ids(cls)
 	var rs := card_rects()
 	for i in mini(rs.size(), ids.size()):
 		var id: String = ids[i]
@@ -184,7 +193,7 @@ func _draw() -> void:
 		UI.text(self, r.position + Vector2(0, 42), nm, UI.fit_size(nm, r.size.x - 14.0, 17, 12, "title", 700), UI.GOLD if open else UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, "title", 700)
 		if not open:
 			UI.glyph(self, "lock", r.position + Vector2(r.size.x * 0.5, r.size.y * 0.5), 26.0, Color(UI.MUTED, 0.7))
-			var why := "Coming soon" if not TrialData.built(id) else ModesSave.trial_lock_text(int(t["n"]))
+			var why := ModesSave.trial_lock_text(int(t["n"]))
 			var ls := UI.wrap(why, r.size.x - 16.0, 12)
 			for k in mini(ls.size(), 2):
 				UI.text(self, r.position + Vector2(0, r.size.y - 30.0 + k * 14.0), str(ls[k]), 12, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)

@@ -2068,6 +2068,27 @@ func _test_screens() -> void:
 				_check(sc.sub != null and sc.sub.has_signal("back"), "the hub opens a door's screen")
 				bad = _buttons_ok(sc.sub, safe)
 				_check(bad == "", "the trials screen inside the hub: buttons ok (%s)" % bad)
+			if k == "trials":
+				# Build 5: only the trials whose rooms are built show (never a
+				# "Coming soon" card), centred, inside the safe area, apart.
+				for c in TrialData.BY_CLS:
+					sc.set_cls(c)
+					await process_frame
+					var built: Array = (TrialData.BY_CLS[c] as Array).filter(func(id): return TrialData.built(id))
+					var rs: Array = sc.card_rects()
+					var ok: bool = rs.size() == built.size() and sc.shown_ids(c) == built and built.size() >= 1
+					for i in rs.size():
+						ok = ok and safe.encloses(rs[i])
+						for j in range(i + 1, rs.size()):
+							ok = ok and not (rs[i] as Rect2).intersects(rs[j])
+					var mid := 0.0
+					for r in rs:
+						mid += (r as Rect2).get_center().x / rs.size()
+					ok = ok and absf(mid - safe.get_center().x) < 1.0
+					_check(ok, "%s at %dx%d: one card a built trial (%s), centred, in the safe area (%s)" % [c, size.x, size.y, built, rs])
+					_check(sc.picked == "" or built.has(sc.picked), "%s: the card picked is a built one (%s)" % [c, sc.picked])
+				var src := FileAccess.get_file_as_string("res://scripts/modes/trials_screen.gd")
+				_check(not src.contains("Coming soon"), "no trial card says Coming soon")
 			if k == "waxworks":
 				var cr: Array = sc.chip_rects()
 				var ok := true

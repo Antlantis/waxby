@@ -4,8 +4,10 @@ extends CanvasLayer
 ## map's Sheet, and a lit altar offers a relic found with it full, world.gd
 ## open_relic), Settings, Restart and Leave, the sound / music / buzz
 ## switches, and on the right who's playing and the relics on the belt.
-## Settings take effect at once where they can (numbers, shake, button size,
-## brightness); candle strength from the next level in.
+## Settings (settings_page.gd, the same page the title and the map open)
+## take effect at once where they can (numbers, shake, button size,
+## brightness); candle strength from the next level in. Its foot links to the
+## privacy policy, support, the licenses and the App Store review.
 ##
 ## v3: in a mode (world.mode), its pause_items() ([{label, cb, confirm}])
 ## take the place of Restart and Leave ("Rest here", "Leave the Descent",
@@ -16,18 +18,9 @@ const UI := preload("res://scripts/ui.gd")
 const Relics := preload("res://scripts/relics.gd")
 const Classes := preload("res://scripts/classes.gd")
 const SheetScript := preload("res://scripts/hero_screen.gd")
+const SettingsPage := preload("res://scripts/settings_page.gd")
 
-# key, label, [values], [names], note
-const SETTINGS := [
-	["numbers", "Damage numbers", ["on", "crits", "off"], ["On", "Crits", "Off"], ""],
-	["shake", "Screen shake", [1.0, 0.5, 0.0], ["Full", "Half", "Off"], ""],
-	["button_scale", "Button size", [0.9, 1.0, 1.1], ["S", "M", "L"], ""],
-	["brightness", "Brightness", [0.0, 0.08, 0.16], ["Dark", "Lighter", "Lightest"], "How deep the dark is."],
-	["candle_strength", "Candle strength", ["gentle", "normal", "fierce"], ["Gentle", "Normal", "Fierce"], "Monster damage ×0.75 / ×1 / ×1.3."],
-	["auto_equip", "Auto-equip upgrades", [true, false], ["On", "Off"], "Wear what's plainly better."],
-	["auto_sell", "Sell weaker finds", [true, false], ["On", "Off"], "Tap the card to keep one."],
-	["auto_advance", "Story lines", [false, true], ["Tap", "Auto"], ""],
-]
+const SETTINGS := SettingsPage.SETTINGS
 
 var world: Node
 var _root: Control
@@ -38,8 +31,7 @@ var _sheet_btn: Button
 var _sound: Button
 var _music: Button
 var _haptics: Button
-var _settings: Control
-var _setting_btns := {}           # key -> [Button]
+var _settings: Control           # the Settings page (settings_page.gd)
 var _sheet: Control
 var page := "main"                # main, settings, sheet
 var _face := {}
@@ -205,6 +197,8 @@ func open() -> void:
 func show_page(p: String) -> void:
 	page = p
 	_main.visible = p == "main"
+	if p != "settings" and _settings.licenses != null:
+		_settings.close_licenses()
 	_settings.visible = p == "settings"
 	if p != "sheet" and _sheet:
 		_sheet.queue_free()
@@ -242,6 +236,8 @@ func _place() -> void:
 
 func close() -> void:
 	visible = false
+	if _settings.licenses != null:
+		_settings.close_licenses()
 	if _sheet:
 		_sheet.queue_free()
 		_sheet = null
@@ -302,126 +298,28 @@ func _toggle_haptics() -> void:
 # ---------------------------------------------------------------- settings
 
 func _build_settings() -> void:
-	_settings = Control.new()
-	_settings.name = "Settings"
-	_settings.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_settings = SettingsPage.new()
+	_settings.world = world
 	_settings.visible = false
 	_root.add_child(_settings)
-	_settings.draw.connect(func(): _draw_settings(_settings))
-	var back := UI.make_button("Back", false, func(): show_page("main"), "back", 15)
-	UI.small_button(back, 15)
-	back.custom_minimum_size = Vector2(76, UI.TAP_H)
-	back.name = "Back"
-	_settings.add_child(back)
-	for row in SETTINGS:
-		var btns: Array = []
-		for i in (row[2] as Array).size():
-			var v = row[2][i]
-			var key: String = row[0]
-			var b := UI.make_button(row[3][i], false, func(): set_value(key, v), "click", 13)
-			UI.small_button(b, 13)
-			b.custom_minimum_size = Vector2(62, UI.TAP_H)
-			_settings.add_child(b)
-			btns.append(b)
-		_setting_btns[row[0]] = btns
+	_settings.back.connect(func(): show_page("main"))
 
 
 func settings_rows() -> Array:
-	## [key, label rect, first button x, y] for each row: two columns.
-	var s := UI.safe_rect(_root.get_viewport())
-	var out: Array = []
-	var colw := (s.size.x - 20.0) * 0.5
-	var top := s.position.y + 56.0
-	var per := ceili(SETTINGS.size() / 2.0)
-	var rh := minf((s.end.y - top - 2.0) / per, 74.0)
-	for i in SETTINGS.size():
-		var c := i / per
-		var x := s.position.x + c * (colw + 20.0)
-		var y := top + (i % per) * rh
-		out.append({"key": SETTINGS[i][0], "rect": Rect2(x, y, colw, rh - 8.0)})
-	return out
+	## {key, rect} for each setting row: the page's two columns.
+	return _settings.rows()
 
 
 func set_value(key: String, v) -> void:
 	## Saves a setting and applies it to the level where it can.
-	var g := _game()
-	if g == null:
-		return
-	g.set_setting(key, v)
-	if world:
-		match key:
-			"numbers":
-				if world.get("floaters") != null:
-					world.floaters.mode = str(v)
-			"button_scale":
-				if world.get("touch") != null and world.touch.has_method("apply_settings"):
-					world.touch.apply_settings()
-			"brightness":
-				if world.has_method("_apply_theme_dark"):
-					world._apply_theme_dark()
-	_refresh_settings()
-
-
-func _same(a, b) -> bool:
-	if (a is float or a is int) and (b is float or b is int):
-		return absf(float(a) - float(b)) < 0.001
-	return str(a) == str(b)
+	_settings.world = world
+	_settings.set_value(key, v)
 
 
 func _refresh_settings() -> void:
-	var g := _game()
-	if g == null or _settings == null:
-		return
-	for row in SETTINGS:
-		var cur = g.setting(row[0])
-		var btns: Array = _setting_btns[row[0]]
-		for i in btns.size():
-			var on := _same(cur, row[2][i])
-			var b: Button = btns[i]
-			var sb: StyleBoxFlat = b.get_theme_stylebox("normal").duplicate()
-			sb.bg_color = Color("3a2a1a") if on else Color("221a2e")
-			sb.border_color = UI.GOLD if on else Color(UI.PANEL_EDGE, 0.7)
-			b.add_theme_stylebox_override("normal", sb)
-			b.add_theme_color_override("font_color", UI.GOLD if on else UI.MUTED)
-	_layout_settings()
-
-
-func _layout_settings() -> void:
-	var s := UI.safe_rect(_root.get_viewport())
-	var back: Button = _settings.get_node("Back")
-	back.position = s.position + Vector2(0, 2)
-	for r in settings_rows():
-		var rect: Rect2 = r["rect"]
-		var btns: Array = _setting_btns[r["key"]]
-		var x := rect.end.x - 10.0
-		for i in range(btns.size() - 1, -1, -1):
-			var b: Button = btns[i]
-			b.reset_size()
-			x -= b.size.x
-			b.position = Vector2(x, rect.position.y + 5.0)
-			x -= 4.0
-	_settings.queue_redraw()
-
-
-func _draw_settings(ci: Control) -> void:
-	var s := UI.safe_rect(ci.get_viewport())
-	var vs := ci.get_size()
-	ci.draw_rect(Rect2(Vector2.ZERO, vs), Color(0.03, 0.02, 0.05, 0.5))
-	UI.text(ci, Vector2(0, s.position.y + 30.0), "Settings", 30, UI.GOLD, HORIZONTAL_ALIGNMENT_CENTER, vs.x, "title", 700, 6)
-	var rows := settings_rows()
-	for i in rows.size():
-		var rect: Rect2 = rows[i]["rect"]
-		var row: Array = SETTINGS[i]
-		UI.panel(ci, rect, Color(UI.PANEL_EDGE, 0.5), Color(UI.PANEL, 0.85), 10.0)
-		var btns: Array = _setting_btns[row[0]]
-		var lw: float = (btns[0] as Button).position.x - rect.position.x - 18.0
-		UI.text(ci, Vector2(rect.position.x + 12.0, rect.position.y + 30.0), row[1], UI.fit_size(row[1], lw, 15, 11, "body", 700), UI.CREAM, HORIZONTAL_ALIGNMENT_LEFT, lw, "body", 700)
-		var note: String = row[4]
-		if row[0] == "candle_strength" and world != null:
-			note = "Monster damage ×0.75 / ×1 / ×1.3, from the next level in."
-		if note != "" and rect.size.y > 56.0:
-			var nw := rect.size.x - 24.0
-			UI.text(ci, Vector2(rect.position.x + 12.0, rect.position.y + 59.0), note, UI.fit_size(note, nw, 12, 9), UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, nw)
+	if _settings != null:
+		_settings.world = world
+		_settings.refresh()
 
 
 # ---------------------------------------------------------------- input and drawing
@@ -435,7 +333,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		if page == "main":
 			close()
-		elif page == "settings":
+		elif page == "settings" and not _settings.handle_back():
 			show_page("main")
 		get_viewport().set_input_as_handled()
 

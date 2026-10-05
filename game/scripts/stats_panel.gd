@@ -61,6 +61,15 @@ func _stats() -> Dictionary:
 	return g.hero_stats() if g else Hero.stats(Hero.blank())
 
 
+static func light_pct(s: Dictionary, diff: String) -> int:
+	## How far his light reaches at full life, as a share of a bare candle's
+	## on Dusk (100%): the same measure as gear's "+12% light", with the
+	## calling's own light and a darker difficulty's in it. (Players never
+	## see the radius in pixels.)
+	var bare := Combat.light_radius(1.0, {}, "dusk")
+	return roundi(100.0 * Combat.light_radius(1.0, s, diff) / maxf(bare, 1.0))
+
+
 func rows() -> Array:
 	## [label, value, note] for the right-hand list.
 	var s := _stats()
@@ -74,7 +83,7 @@ func rows() -> Array:
 		["Damage", str(roundi(hit)), "a hit · %d a second" % roundi(Hero.dps_estimate(s))],
 		["Critical", "%d%%" % roundi(float(s["crit"]) * 100.0), "hits for ×%.2f" % float(s["crit_mult"])],
 		["Damage reduction", "%d%%" % roundi(float(s["dr"]) * 100.0), "cap %d%%" % roundi(Combat.DR_CAP * 100.0)],
-		["Light", "%d px" % roundi(Combat.light_radius(1.0, s, diff)), "at full life"],
+		["Light", "%d%%" % light_pct(s, diff), "at full life"],
 		[str(info["res_name"]), str(roundi(float(s["res_max"]))), "+%.1f a second" % float(s["res_regen"])],
 		["Attack speed", UI.pct(float(s["attack_speed"]) - 1.0), ""],
 		["Special damage", UI.pct(float(s["special_pct"])), ""],
