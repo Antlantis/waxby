@@ -161,7 +161,7 @@ const LOOK_KEYS := ["flame", "trim", "trim_color", "glow"]
 const COSMETIC_FREE := ["flame:tallow", "color:calling"]   # owned by everyone
 const MODES_SAVE := "res://scripts/modes/modes_save.gd"    # ModesSave (the modes stream), when it's there
 const SETTINGS_DEFAULT := {"haptics": true, "numbers": "on", "shake": 1.0, "auto_sell": true, "auto_equip": true,
-		"auto_advance": false, "button_scale": 1.0, "candle_strength": "normal", "brightness": 0.0}
+		"auto_advance": false, "button_scale": 1.0, "candle_strength": "normal", "brightness": 0.08}
 const SIGIL_REWARD_EVERY := 6
 # v3's sigil milestones past #4 alternate (odd: a Legendary; even: a relic from
 # the deepest world reached, else 100 x an ember's worth). In a build of
