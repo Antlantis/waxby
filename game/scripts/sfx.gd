@@ -3,8 +3,9 @@ extends Node
 ## palette is a cathedral's: harpsichord plucks, small glassy bells, organ
 ## pipes, a sung "ahh", great bronze bells, stone, bone, armor, wax and water,
 ## all tuned to D minor so rising tones stay in key with the music. Rendering
-## runs on worker threads and is cached in user:// (keyed to the scripts that
-## make the sounds), so after the first boot the sounds load in a blink. The
+## runs on worker threads and is cached in the OS's cache folder (keyed to the
+## scripts that make the sounds; cache_home()), so after the first boot the
+## sounds load in a blink. The
 ## music is the one exception: looping WAVs rendered offline by
 ## tools/audio/music.py, played here on a Music bus with crossfades, ducking
 ## and a low-pass for low life. Autoloaded as Sfx.
@@ -212,8 +213,11 @@ const TABLE := 2048   # one wavetable cycle, a power of two
 # The core's cache is keyed as it always was (a hash of this script, the
 # engine and the rate); each v3 bank has its own, keyed to this script and
 # its bank file, so a new bank or a changed recipe re-renders only its bank.
-const CACHE_PATH := "user://sfx_cache.bin"
-const BANK_CACHE := "user://sfx_cache_%s.bin"
+# They live in cache_home() (Build 5: the OS's cache folder; builds 1-4 kept
+# them in user://, the phone's Documents, which the Files app lists).
+const CACHE_FILE := "sfx_cache.bin"
+const BANK_CACHE := "sfx_cache_%s.bin"
+const OLD_CACHE_DIR := "user://"
 const CACHE_MAGIC := "WAXBY-SFX-1"
 # Render threads. The core goes first on one of them, so the title and a
 # fight's first seconds sound as soon as in v2; the v3 banks take the others
@@ -416,6 +420,7 @@ func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rng.randomize()
 	_load_settings()
+	drop_old_caches()
 	_stamps["init"] = Time.get_ticks_msec()
 	var bus := music_bus()   # first, so it keeps v2's index
 	var fx := AudioServer.get_bus_name(effects_bus())
@@ -558,7 +563,7 @@ static func bank_list(script: Script, cache_dir := "") -> Array:
 
 static func core_bank(script: Script, cache_dir := "") -> Dictionary:
 	return {"id": "core", "names": CORE, "takes": TAKES, "jitter": JITTER, "render": Callable(script, "render"),
-			"cache": CACHE_PATH if cache_dir == "" else cache_dir.path_join(CACHE_PATH.get_file()), "key": cache_key()}
+			"cache": (cache_home() if cache_dir == "" else cache_dir).path_join(CACHE_FILE), "key": cache_key()}
 
 
 static func load_bank(id: String, cache_dir := "", file := "") -> Dictionary:
@@ -588,9 +593,9 @@ static func load_bank(id: String, cache_dir := "", file := "") -> Dictionary:
 			names.append(n)
 		else:
 			push_warning("Sfx: bank %s names '%s', which isn't one of its sounds (Sfx.BANKS)" % [path, n])
-	var cache := BANK_CACHE % id
+	var cache := (cache_home() if cache_dir == "" else cache_dir).path_join(BANK_CACHE % id)
 	return {"id": id, "names": names, "takes": consts.get("TAKES", {}), "jitter": consts.get("JITTER", {}),
-			"tell_at": consts.get("TELL_AT", {}), "render": Callable(script, "render"), "cache": cache if cache_dir == "" else cache_dir.path_join(cache.get_file()),
+			"tell_at": consts.get("TELL_AT", {}), "render": Callable(script, "render"), "cache": cache,
 			"key": bank_key(path)}
 
 
@@ -673,6 +678,56 @@ static func render_bank(streams: Dictionary, lock: Mutex, cancel: Array, bank: D
 
 
 # ---------------------------------------------------------------- the cache
+
+static var _cache_home := ""
+
+
+static func cache_home() -> String:
+	## The folder the sound caches live in: the OS's cache folder (on the
+	## phone the app's own Library/Caches: never backed up and never in the
+	## Files app; iOS may empty it when storage runs low, and then the sounds
+	## are rendered again), in a folder named for this game (a Mac's
+	## Library/Caches is every app's). user:// if there is none.
+	if _cache_home == "":
+		var base := OS.get_cache_dir()
+		var dir := base.path_join(game_dir_name()) if base != "" else ""
+		if dir == "" or (not DirAccess.dir_exists_absolute(dir) and DirAccess.make_dir_recursive_absolute(dir) != OK):
+			dir = OLD_CACHE_DIR
+		_cache_home = dir
+	return _cache_home
+
+
+static func core_cache() -> String:
+	## The core bank's cache file.
+	return cache_home().path_join(CACHE_FILE)
+
+
+static func game_dir_name() -> String:
+	## The game's own folder name: its custom user folder's (a worktree's
+	## override.cfg gives each its own), else its name.
+	var n := ""
+	if bool(ProjectSettings.get_setting("application/config/use_custom_user_dir", false)):
+		n = str(ProjectSettings.get_setting("application/config/custom_user_dir_name", ""))
+	if n == "":
+		n = str(ProjectSettings.get_setting("application/config/name", "Waxby"))
+	return n.validate_filename()
+
+
+static func drop_old_caches() -> int:
+	## Builds 1-4 cached the sounds in user:// (Documents on the phone, ~11
+	## MB the Files app listed): they go at launch, now that the caches live
+	## in cache_home() (nothing to carry over: a cache's key names this
+	## script, which has changed since). How many files went.
+	if cache_home() == OLD_CACHE_DIR:
+		return 0
+	var dir := ProjectSettings.globalize_path(OLD_CACHE_DIR)
+	var n := 0
+	for f in DirAccess.get_files_at(dir):
+		if f.begins_with("sfx_cache") and (f.ends_with(".bin") or f.ends_with(".tmp")):
+			if DirAccess.remove_absolute(dir.path_join(f)) == OK:
+				n += 1
+	return n
+
 
 static func _file_md5(path: String) -> String:
 	## The file's hash: the source, or in an export its compiled tokens; ""

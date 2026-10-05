@@ -1052,7 +1052,7 @@ func wares_note() -> Dictionary:
 		return {"text": "", "col": UI.MUTED}
 	for it in _stock:
 		if it is Dictionary:
-			return {"text": "ilvl %d  ·  new stock every bell" % int(it["ilvl"]), "col": UI.MUTED}
+			return {"text": "Item level %d  ·  new stock every bell" % int(it["ilvl"]), "col": UI.MUTED}
 	return {"text": "New stock every bell" if Game.hero_made() else "", "col": UI.MUTED}
 
 
@@ -1868,9 +1868,9 @@ func _draw_draughts() -> void:
 		var tw := r.size.x - 48.0 - 118.0
 		UI.text(self, Vector2(tx, r.position.y + 20.0), it["name"], UI.fit_size(it["name"], tw, 14, 10, "title", 700), UI.RARITY["legendary"], HORIZONTAL_ALIGNMENT_LEFT, tw, "title", 700)
 		var v: String = row.get("verdict", "")
-		var what := "ilvl %d to %d%s" % [int(it["ilvl"]), Game.rekindle_level(), "  ·  worn" if row["worn"] else ""]
+		var what := "Item level %d to %d%s" % [int(it["ilvl"]), Game.rekindle_level(), "  ·  worn" if row["worn"] else ""]
 		if v == "lower":
-			what = "ilvl %d: at your level" % int(it["ilvl"])
+			what = "Item level %d: at your level" % int(it["ilvl"])
 		UI.text(self, Vector2(tx, r.position.y + 38.0), what, UI.fit_size(what, tw, 11, 9), UI.MUTED, HORIZONTAL_ALIGNMENT_LEFT, tw)
 
 

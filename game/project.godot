@@ -11,14 +11,16 @@ config_version=5
 [application]
 
 config/name="Waxby"
+config/version="1.0.0"
 run/main_scene="res://scenes/main.tscn"
 config/icon="res://icon.svg"
-boot_splash/bg_color=Color(0.0705882, 0.0509804, 0.0941176, 1)
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.054902, 0.0392157, 0.0784314, 1)
 config/features=PackedStringArray("4.7", "Mobile")
 
 [audio]
 
-general/ios/session_category=3
+general/ios/session_category=0
 general/ios/mix_with_others=true
 
 [autoload]
@@ -29,7 +31,10 @@ Game="*res://scripts/game_state.gd"
 [debug]
 
 gdscript/warnings/inference_on_variant=0
-file_logging/enable_file_logging=true
+file_logging/enable_file_logging=false
+file_logging/enable_file_logging.pc=true
+file_logging/enable_file_logging.debug=true
+file_logging/enable_file_logging.playtest=true
 
 [display]
 

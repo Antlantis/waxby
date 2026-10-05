@@ -62,6 +62,7 @@ class Catch extends Logger:
 	var warnings: Array = []
 	var notices: Array = []         # render refusals made in other parts' scripts: printed
 	var renders := 0                # every render refusal, wherever it was made
+	var dummies := 0                # the headless dummy renderer's own complaints (noise: printed)
 	var _lock := Mutex.new()
 
 	func _log_error(function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, script_backtraces: Array[ScriptBacktrace]) -> void:
@@ -81,7 +82,16 @@ class Catch extends Logger:
 		if error_type == ERROR_TYPE_WARNING:
 			if code.contains("no sound named") or code.contains("no script for") or code.contains("no music track"):
 				warnings.append(text)
-		elif error_type != ERROR_TYPE_SCRIPT and file.begins_with("servers/rendering"):
+		elif error_type != ERROR_TYPE_SCRIPT and file.contains("servers/rendering/dummy/"):
+			# Headless, textures live in the dummy renderer, which keeps none:
+			# a story picture loaded on a thread and then asked for its size
+			# can find its texture already gone ('Parameter "t" is null',
+			# dummy/storage/texture_storage.h, the cutscene's _load_tex over
+			# 3-4's boss_3_before), now and then. No phone has that renderer:
+			# noted, never a failure.
+			dummies += 1
+			notices.append("(dummy renderer) %s" % text)
+		elif error_type != ERROR_TYPE_SCRIPT and file.contains("servers/rendering"):
 			# A draw call the renderer turned down (a polygon it couldn't
 			# triangulate): a failure when the world's scripts made it, else
 			# a notice for the script's owner.

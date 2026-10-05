@@ -214,10 +214,10 @@ func _run_boot() -> void:
 	_say("RESULT warm boot: every bank from the cache in %.0f ms" % warm_ms)
 	wipe("user://spike_sfx")
 	# The game's own caches go too, so the next launch is a true first boot.
-	var user := ProjectSettings.globalize_path("user://")
-	for f in DirAccess.get_files_at(user):
+	var home := ProjectSettings.globalize_path(SfxLib.cache_home())
+	for f in DirAccess.get_files_at(home):
 		if f.begins_with("sfx_cache") and f.ends_with(".bin"):
-			DirAccess.remove_absolute(user.path_join(f))
+			DirAccess.remove_absolute(home.path_join(f))
 	_say("wiped the game's sound caches: launch spike:boot again for a true first boot (the live line)")
 	_finish()
 

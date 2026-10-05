@@ -5,13 +5,18 @@ extends Control
 ## the slot played last (Game opens it at launch), named at the bottom left.
 ## v3: a Tales button at the bottom right (once ST's tales_screen.gd is in the
 ## build) says tales(); main opens the Tales.
+## Build 5: Settings at the top right says settings() (main opens the Settings
+## page on its own: sound, music and the rest before a level), and Privacy,
+## beside Tales, opens the privacy policy in the browser (links.gd).
 
 signal start
 signal tales
+signal settings
 
 const UI := preload("res://scripts/ui.gd")
 const GlowScript := preload("res://scripts/glow.gd")
 const Classes := preload("res://scripts/classes.gd")
+const Links := preload("res://scripts/links.gd")
 
 var _t := 0.0
 var _logo: Texture2D
@@ -22,6 +27,8 @@ var _started := false
 var _cls := "knight"
 var _who := ""                    # "Save 2 · Candleknight · Level 7" when a hero exists
 var _tales_btn: Button
+var _settings_btn: Button
+var _privacy_btn: Button
 const TALES_SCREEN := "res://scripts/tales_screen.gd"
 static var tales_path := TALES_SCREEN   # ST's Tales (tests may point it at a stand-in)
 
@@ -65,6 +72,21 @@ func _ready() -> void:
 	_tales_btn.name = "Tales"
 	_tales_btn.visible = ResourceLoader.exists(tales_path)
 	add_child(_tales_btn)
+	_settings_btn = UI.make_button("Settings", false, func():
+		if not _started:
+			_started = true
+			settings.emit(), "click", 15)
+	UI.small_button(_settings_btn, 15)
+	_settings_btn.custom_minimum_size = Vector2(84, UI.TAP_H)
+	_settings_btn.name = "Settings"
+	add_child(_settings_btn)
+	# The policy opens in the browser and the title stays as it was.
+	_privacy_btn = UI.make_button("Privacy", false, func(): Links.privacy(), "click", 13)
+	UI.small_button(_privacy_btn, 13)
+	_privacy_btn.custom_minimum_size = Vector2(0, UI.TAP_H)
+	_privacy_btn.add_theme_color_override("font_color", UI.MUTED)
+	_privacy_btn.name = "Privacy"
+	add_child(_privacy_btn)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -97,6 +119,11 @@ func _process(dt: float) -> void:
 	var s := UI.safe_rect(get_viewport())
 	_tales_btn.reset_size()
 	_tales_btn.position = s.end - _tales_btn.size - Vector2(0, 2)
+	_settings_btn.reset_size()
+	_settings_btn.position = Vector2(s.end.x - _settings_btn.size.x, s.position.y + 2.0)
+	_privacy_btn.reset_size()
+	var px := (_tales_btn.position.x - 8.0) if _tales_btn.visible else s.end.x
+	_privacy_btn.position = Vector2(px - _privacy_btn.size.x, s.end.y - _privacy_btn.size.y - 2.0)
 	var rig: Node2D = holder.get_meta("rig")
 	_glow.extra_flames = [{"p": rig.flame_point(), "h": 19.0 * float(Classes.info(_cls)["flame_scale"]) * holder.scale.x}]
 	queue_redraw()
