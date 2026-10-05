@@ -373,3 +373,11 @@ func _test_store_switch(cfg: ConfigFile, store: String) -> void:
 				changed.append("%s/%s" % [sec, key])
 	_check(changed.is_empty(), "and nothing else changes (%s)" % [changed.slice(0, 5)])
 	_check(str(sub.get_value(so, "application/version", "")) == str(cfg.get_value(so, "application/version", "?")), "the same build number")
+	# Which build is which: every run names its build number, and a playtest
+	# upload warns that it is never the one to attach to the App Store version.
+	var bout := []
+	var bcode := OS.execute("python3", [script, "--build", game_dir.path_join("export_presets.cfg")], bout, true)
+	_check(bcode == 0 and not bout.is_empty() and str(bout[0]).strip_edges() == str(cfg.get_value(so, "application/version", "?")),
+			"store_preset.py --build reads the build number (%s)" % [str(bout[0]).strip_edges() if not bout.is_empty() else "?"])
+	_check(sh.contains("store_preset.py --build") and sh.contains("PLAYTEST build") and sh.contains("never the App Store version"),
+			"ios_release.sh names the build, and a playtest upload warns it is never the submission")

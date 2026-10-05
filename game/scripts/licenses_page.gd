@@ -3,9 +3,10 @@ extends Control
 ## made Waxby, then what it is built on and the terms that come with it:
 ## the Godot Engine's MIT license (Engine.get_license_text()), every
 ## third-party component Godot carries with its copyright lines and license
-## (Engine.get_copyright_info()), and each of those licenses in full
-## (Engine.get_license_info()). Fonts are the phone's own (ui.gd), so none
-## need a line here.
+## (Engine.get_copyright_info()), what the iPhone build links beyond that
+## list (IOS_EXTRA: MoltenVK and the cereal inside it), and each of those
+## licenses in full (Engine.get_license_info()). Fonts are the phone's own
+## (ui.gd), so none need a line here.
 ##
 ## One long list under Back and the title, scrolled with a thumb (a
 ## ScrollContainer, its bar on the right). It's about 80 KB of text, so the
@@ -23,6 +24,15 @@ const BODY := 13                  # running text
 const SMALL := 12                 # copyright lines and the license texts
 const TOP := 50.0                 # the list starts this far under the safe area's top
 const CREDITS := "A game by Anthony Craig. © 2026 Anthony Craig.\nMade with Claude. Every picture is drawn in code and every sound is synthesized.\nBuilt with the Godot Engine, under the MIT license below."
+# What the iPhone build links beyond Engine.get_copyright_info()'s list:
+# MoltenVK (1.4.1, a static library in Godot 4.7's iOS export template:
+# the exported waxby.xcodeproj links MoltenVK.xcframework) and cereal,
+# compiled into it. Their licenses (Apache-2.0, BSD-3-clause) are among
+# Engine.get_license_info()'s, so License texts gives them in full.
+const IOS_EXTRA := [
+	["MoltenVK", "© 2015-2025 The Brenwill Workshop Ltd.\nLicense: Apache-2.0"],
+	["cereal (in MoltenVK)", "© 2013-2022, Randolph Voorhies, Shane Grant\nLicense: BSD-3-clause"],
+]
 
 var done := false
 var _back_btn: Button
@@ -47,6 +57,11 @@ static func blocks() -> Array:
 			continue   # Godot's own notice is the section above
 		out.append(["name", nm])
 		out.append(["small", component_text(c)])
+	out.append(["head", "In the iPhone build"])
+	out.append(["body", "Godot's iPhone build also links the components below, which its own list leaves out."])
+	for e in IOS_EXTRA:
+		out.append(["name", str(e[0])])
+		out.append(["small", str(e[1])])
 	out.append(["head", "License texts"])
 	var li: Dictionary = Engine.get_license_info()
 	var keys: Array = li.keys()

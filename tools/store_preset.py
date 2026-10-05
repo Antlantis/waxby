@@ -16,6 +16,7 @@ by hand.
 
     python3 tools/store_preset.py game/export_presets.cfg          # print the submission's presets
     python3 tools/store_preset.py --apply game/export_presets.cfg  # rewrite the file in place
+    python3 tools/store_preset.py --build game/export_presets.cfg  # print the preset's build number
 
 Exits 1 (and changes nothing) if the preset or any of its keys is missing.
 """
@@ -27,9 +28,8 @@ FEATURE = "playtest"
 OFF = ["user_data/accessible_from_files_app", "user_data/accessible_from_itunes_sharing"]
 
 
-def store(text: str) -> str:
-    lines = text.split("\n")
-    # Which [preset.N] is the App Store's.
+def _target(lines: list) -> str:
+    ## Which [preset.N] is the App Store's.
     section, target = "", ""
     for line in lines:
         m = re.match(r"^\[(preset\.\d+)\]$", line)
@@ -39,6 +39,26 @@ def store(text: str) -> str:
             target = section
     if target == "":
         raise SystemExit('store_preset: no preset named "%s"' % PRESET)
+    return target
+
+
+def build_number(text: str) -> str:
+    ## The App Store preset's application/version (the build number App
+    ## Store Connect lists), as ios_release.sh prints it.
+    lines = text.split("\n")
+    target, section = _target(lines), ""
+    for line in lines:
+        m = re.match(r"^\[(.+)\]$", line)
+        if m:
+            section = m.group(1)
+        elif section == target + ".options" and line.startswith("application/version="):
+            return line[len("application/version="):].strip('"')
+    raise SystemExit("store_preset: %s has no application/version" % PRESET)
+
+
+def store(text: str) -> str:
+    lines = text.split("\n")
+    target = _target(lines)
     out, section, seen = [], "", set()
     for line in lines:
         m = re.match(r"^\[(.+)\]$", line)
@@ -67,6 +87,9 @@ def main(argv: list) -> int:
         print(__doc__.strip())
         return 2
     text = open(paths[0]).read()
+    if "--build" in argv:
+        print(build_number(text))
+        return 0
     new = store(text)
     if apply:
         with open(paths[0], "w") as f:

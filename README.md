@@ -414,7 +414,9 @@ auto-equip, sell weaker finds and story lines. Its foot links out
 (scripts/links.gd, opened in Safari or the App Store with OS.shell_open):
 Privacy policy (https://antlantis.github.io/waxby/privacy.html, also on the
 title beside Tales), Support (.../support.html), Licenses (credits, Godot's
-MIT license and every third-party notice it carries, scripts/licenses_page.gd)
+MIT license and every third-party notice it carries, plus MoltenVK and its
+cereal, which the iPhone build links but Godot's list leaves out,
+scripts/licenses_page.gd)
 and Rate Waxby (the App Store's review sheet for Links.WAXBY_APP_ID,
 6817044506; the link hides while that is ""). The game plays sound as an
 iOS "Ambient" session: the Silent switch silences it, and the player's own
@@ -458,7 +460,14 @@ tools/ios_release.sh --store --upload    # the App Store submission: Files acces
 export and puts the file back (test_export checks what it changes); the
 script then checks the exported Info.plist's UIFileSharingEnabled and
 LSSupportsOpeningDocumentsInPlace. Bump `application/version` in the preset
-before each upload. The App Store preset leaves the lab levels (`lab-*`,
+before each upload. The playtest build and the submission are two uploads
+with two build numbers (build 5 playtest, then build 6 `--store`): attach
+only the `--store` build to the App Store version. Every run prints its
+build number, and a playtest `--upload` warns that it is TestFlight only.
+The App Store Connect version must read 1.0.0, as the builds do
+(`application/short_version`), or no build will attach to it. The full
+submission checklist is in ~/Developer/waxby-store/copy.md ("Build to
+submit"). The App Store preset leaves the lab levels (`lab-*`,
 `levels/tall/`) out of the package; the debug "iOS" preset keeps them.
 
 The bundle id is com.ant.waxby (it was com.ant.wick until 2026-09-28; an old

@@ -14,7 +14,11 @@
 # --store, tools/store_preset.py turns Files access and file sharing off and
 # drops "playtest" (so no file log) in that preset for the length of the
 # export, and the committed file is put back afterwards: nobody edits the
-# preset by hand. The build number is the same either way.
+# preset by hand. The build number is the same either way, so the playtest
+# build and the submission are two uploads with two build numbers: after a
+# playtest upload, bump application/version, commit, then --store --upload,
+# and attach that build (never the playtest one) to the App Store version.
+# Every run says which build it made; a playtest --upload warns, loudly.
 #
 # Needs: Xcode signed in to the team's Apple ID (Xcode > Settings > Accounts),
 # and, for --upload, the app's record in App Store Connect (bundle ID
@@ -43,6 +47,17 @@ for a in "$@"; do
 done
 
 PRESETS="game/export_presets.cfg"
+BUILD="$(python3 tools/store_preset.py --build "$PRESETS")"
+if [ "$store" = "0" ] && [ "$dest" = "upload" ]; then
+	cat >&2 <<WARN
+!! ========================================================================
+!! PLAYTEST build $BUILD: Files access ON, file log ON. For TestFlight only.
+!! Never attach build $BUILD to the App Store version. The submission is a
+!! build of its own: bump application/version in game/export_presets.cfg,
+!! commit, then run  tools/ios_release.sh --store --upload
+!! ========================================================================
+WARN
+fi
 KEPT=""
 restore() {
 	if [ -n "$KEPT" ] && [ -f "$KEPT" ]; then
@@ -56,9 +71,9 @@ if [ "$store" = "1" ]; then
 	KEPT="$(mktemp "${TMPDIR:-/tmp}/waxby-presets.XXXXXX")"
 	cp "$PRESETS" "$KEPT"
 	python3 tools/store_preset.py --apply "$PRESETS"
-	echo "== App Store submission: Files access off, file log off"
+	echo "== App Store submission, build $BUILD: Files access off, file log off"
 else
-	echo "== playtest build: Files access on, file log on (--store for the submission)"
+	echo "== playtest build $BUILD: Files access on, file log on (--store for the submission)"
 fi
 
 mkdir -p "$OUT"
@@ -99,4 +114,8 @@ cat > ExportOptions.plist <<PLIST
 PLIST
 xcodebuild -exportArchive -archivePath "$OUT/waxby.xcarchive" -exportPath "$OUT/appstore" \
 	-exportOptionsPlist ExportOptions.plist -allowProvisioningUpdates
-echo "Done ($dest, $([ "$store" = "1" ] && echo "App Store submission" || echo "playtest")): $OUT/appstore"
+if [ "$store" = "1" ]; then
+	echo "Done ($dest): build $BUILD, the App Store submission (Files off). Attach build $BUILD to the version. $OUT/appstore"
+else
+	echo "Done ($dest): build $BUILD, a PLAYTEST build (Files on): TestFlight only, never the App Store version. $OUT/appstore"
+fi

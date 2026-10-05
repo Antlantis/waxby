@@ -4293,6 +4293,7 @@ func _test_v3_layouts() -> void:
 			var nr: Rect2 = lab["name_rect"]
 			var tr: Rect2 = lab["title_rect"]
 			_check(nr.end.x <= br.end.x + 0.5, "%s: the name fits over the bar (%s, %s)" % [t3, nr, br])
+			_check(str(lab["title"]) == str(bi["title"]).to_upper().replace(" ", "  "), "%s: the title's capitals keep their words apart (two spaces)" % t3)
 			if not pill_on:
 				_check(int(lab["title_size"]) >= 8, "%s: the title shows (%d)" % [t3, int(lab["title_size"])])
 			if int(lab["title_size"]) > 0:
@@ -5431,6 +5432,14 @@ func _test_build5() -> void:
 	var lmiss: Array = lic.keys().filter(func(k): return not txt.contains(str(lic[k]).strip_edges().substr(0, 200)))
 	_check(lmiss.is_empty(), "every license's text is there (%d; missing %s)" % [lic.size(), lmiss])
 	_check(txt.contains("Anthony Craig"), "and who made the game")
+	# The iPhone build links MoltenVK (and cereal inside it), which Godot's
+	# own list leaves out: named, with their notices and licenses.
+	var ios_missing: Array = []
+	for e in lp.IOS_EXTRA:
+		if not (txt.contains(str(e[0])) and txt.contains(str(e[1]))):
+			ios_missing.append(e[0])
+	_check(ios_missing.is_empty() and txt.contains("The Brenwill Workshop") and lic.has("Apache-2.0") and lic.has("BSD-3-clause"),
+			"MoltenVK and cereal are credited, with their licenses in full (missing %s)" % [ios_missing])
 	var smallest := 99
 	for l in lp.labels():
 		smallest = mini(smallest, (l as Label).get_theme_font_size("font_size"))

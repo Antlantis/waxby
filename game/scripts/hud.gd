@@ -1812,7 +1812,9 @@ func boss_label_layout() -> Dictionary:
 	## {name, title, name_size, title_size (0: dropped), name_rect, title_rect}.
 	var full := boss_rect()
 	var name := str(_boss.get("name", ""))
-	var title := str(_boss.get("title", "")).to_upper()
+	# Small bold capitals under a 3 px outline: one space between two words
+	# all but closes ("THE FROZENMINUTE", the store shot), so two.
+	var title := str(_boss.get("title", "")).to_upper().replace(" ", "  ")
 	var room := full.size.x - 17.0
 	var ns := UI.fit_size(name, room, 16, 13, "title", 700)
 	var nw := UI.text_width(name, ns, "title", 700)
