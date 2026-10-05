@@ -30,17 +30,24 @@ ring them again.
   Dusk kills drop half as often and never a Common; a Legendary taken is worn
   over a piece that isn't one, and announced, and a worn one is never swapped
   out by itself for a piece that isn't one.
-- **Four worlds of four levels** so far (v3 builds toward six), each ending
-  in a boss:
+- **Six worlds of four levels**, each ending in a boss, and a secret level in
+  each (24 levels and 6 secrets):
   - World 1, the Sunken Cathedral: the Nave, the Crypt Stair, the Burning
-    Choir, and the Bell Tower with Old Tollgrave.
+    Choir, and the Bell Tower with Old Tollgrave (secret: the Roof of
+    Evenbell).
   - World 2, the Tallow Deep: the Waxfalls, the Drowned Chandlery, the Moth
-    Garden, and the Undercandle with the Snuffer.
+    Garden, and the Undercandle with the Snuffer (the Chandlers' Vault).
   - World 3, the Bone Orchard (climb): the Bramble Gate, the Hanging
-    Ossuary, the Sporewood, and the Heartwood with Mother Gravebough.
+    Ossuary, the Sporewood, and the Heartwood with Mother Gravebough (the
+    Rootcrown).
   - World 4, the Frozen Carillon (keep time): the Rime Stair, the
     Escapement, the Hall of Weights, and the Hour Chamber with the Tinker
-    of Hours.
+    of Hours (the Mainspring).
+  - World 5, the Shattered Sanctum (glass and wind): the Floating Aisle, the
+    Gale Gallery, the Dawnglass Bridges, and the Lightwell with the Prism
+    Saint (the Rose Window).
+  - World 6, the Hushdeep: the Black Shore, the Drowned Bells, the Long
+    Quiet, and the Heart of the Hush with the Hush (the Lightless Mile).
 - **Three difficulties:** Dusk, Nightfall and Witching. There are elites with
   Omens, Dreads, and a Guttered Pool of spilled embers you can win back. Dusk
   stays gentle in Worlds 1-2 and pushes back from World 3 (Combat.DUSK_TEETH):
@@ -390,6 +397,29 @@ with its slots beside it, so it never touches the player's. tests/test_slots.gd
 works only in `user://test_slots/` and checks that the player's files are
 byte for byte as they were; tools/shot_slots.gd takes screenshots.
 
+The synthesized sounds are cached outside the saves, in the OS's cache
+folder (on the phone the app's Library/Caches, never backed up and never in
+the Files app; Sfx.cache_home()); builds 1-4 kept them in Documents, and
+those old files are deleted at launch. In a playtest build (TestFlight build
+5 on) Documents shows in the Files app (Files > On My iPhone > Waxby:
+`playlog.json`, the saves, `logs/godot.log`); the App Store build
+(`tools/ios_release.sh --store`) shows nothing there and keeps no file log.
+
+## Settings and links
+
+Settings (scripts/settings_page.gd) opens from the title (top right), the
+map (beside Title) and the pause menu: the Sound, Music and Buzz switches,
+damage numbers, screen shake, button size, brightness, candle strength,
+auto-equip, sell weaker finds and story lines. Its foot links out
+(scripts/links.gd, opened in Safari or the App Store with OS.shell_open):
+Privacy policy (https://antlantis.github.io/waxby/privacy.html, also on the
+title beside Tales), Support (.../support.html), Licenses (credits, Godot's
+MIT license and every third-party notice it carries, scripts/licenses_page.gd)
+and Rate Waxby (the App Store's review sheet for Links.WAXBY_APP_ID,
+6817044506; the link hides while that is ""). The game plays sound as an
+iOS "Ambient" session: the Silent switch silences it, and the player's own
+music plays on under it.
+
 ## Build and run
 
 ```bash
@@ -413,6 +443,23 @@ cd game && Godot --headless --path . --export-debug "iOS" ../../waxby-ios/waxby.
 xcrun devicectl device install app --device <UDID> ~/Developer/waxby-ios/waxby.ipa
 xcrun devicectl device process launch --device <UDID> com.ant.waxby
 ```
+
+TestFlight and the App Store build from the "iOS App Store" preset (Xcode
+project only; tools/ios_release.sh archives and signs it). The preset as
+committed is the playtest build (Files access on, file log on: the
+"playtest" feature). One switch makes the App Store submission:
+
+```bash
+tools/ios_release.sh --upload            # a playtest build to TestFlight
+tools/ios_release.sh --store --upload    # the App Store submission: Files access and the file log off
+```
+
+`--store` runs tools/store_preset.py on the presets for the length of the
+export and puts the file back (test_export checks what it changes); the
+script then checks the exported Info.plist's UIFileSharingEnabled and
+LSSupportsOpeningDocumentsInPlace. Bump `application/version` in the preset
+before each upload. The App Store preset leaves the lab levels (`lab-*`,
+`levels/tall/`) out of the package; the debug "iOS" preset keeps them.
 
 The bundle id is com.ant.waxby (it was com.ant.wick until 2026-09-28; an old
 com.ant.wick install is a separate app and its save stays with it).

@@ -1078,9 +1078,21 @@ func _test_cache(sfx) -> void:
 	var start := Time.get_ticks_msec()
 	while not sfx.is_loaded() and Time.get_ticks_msec() - start < 30000:
 		await process_frame
-	var f := FileAccess.open(SfxLib.CACHE_PATH, FileAccess.READ)
+	var f := FileAccess.open(SfxLib.core_cache(), FileAccess.READ)
 	_check(f != null and SfxLib._read_text(f, f.get_length()) == SfxLib.CACHE_MAGIC and SfxLib._read_text(f, f.get_length()) == key,
-			"the autoload leaves a cache of this build's sounds in %s" % SfxLib.CACHE_PATH)
+			"the autoload leaves a cache of this build's sounds in %s" % SfxLib.core_cache())
+	# Build 5: in the OS's cache folder (the phone's Library/Caches), in a
+	# folder of the game's own, never in user:// (Documents: the Files app).
+	_check(SfxLib.cache_home() == OS.get_cache_dir().path_join(SfxLib.game_dir_name()) and not SfxLib.core_cache().begins_with("user://"),
+			"the caches live in the OS's cache folder (%s), not in user://" % SfxLib.cache_home())
+	var olds := DirAccess.get_files_at(ProjectSettings.globalize_path("user://"))
+	_check(not Array(olds).any(func(n): return str(n).begins_with("sfx_cache") and str(n).ends_with(".bin")), "no sound cache left in user:// (%s)" % [olds])
+	FileAccess.open("user://sfx_cache_old.bin", FileAccess.WRITE).store_string("builds 1-4")
+	FileAccess.open("user://sfx_cache.bin.1.2.tmp", FileAccess.WRITE).store_string("torn")
+	FileAccess.open("user://sfx_cache_keep.json", FileAccess.WRITE).store_string("{}")
+	_check(SfxLib.drop_old_caches() == 2 and not FileAccess.file_exists("user://sfx_cache_old.bin") and not FileAccess.file_exists("user://sfx_cache.bin.1.2.tmp")
+			and FileAccess.file_exists("user://sfx_cache_keep.json"), "an old build's caches in user:// go at launch (and only they)")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://sfx_cache_keep.json"))
 	f = null
 	var streams: Dictionary = sfx._streams.duplicate()
 	_check(SfxLib.save_cache(streams, TEST_CACHE, "test-key"), "save_cache writes a cache")
@@ -1118,7 +1130,7 @@ func _test_cache(sfx) -> void:
 	_check(not SfxLib.load_cache(other, lock, TEST_CACHE, "test-key") and other.is_empty(), "and one missing a sound")
 	_check(not SfxLib.load_cache(other, lock, "user://no_such_cache.bin", "test-key"), "no cache at all: nothing loaded")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_CACHE))
-	var stray := DirAccess.get_files_at(ProjectSettings.globalize_path("user://"))
+	var stray := Array(DirAccess.get_files_at(ProjectSettings.globalize_path("user://"))) + Array(DirAccess.get_files_at(SfxLib.cache_home()))
 	var tmp := 0
 	for name in stray:
 		tmp += 1 if name.ends_with(".tmp") and name.begins_with("sfx_cache") else 0
@@ -1485,8 +1497,8 @@ func _test_buses(sfx) -> void:
 
 func _test_banks(sfx) -> void:
 	var banks: Array = SfxLib.bank_list(SfxLib)
-	_check(banks[0]["id"] == "core" and banks[0]["cache"] == SfxLib.CACHE_PATH and banks[0]["key"] == SfxLib.cache_key(),
-			"the core renders first, cached where and as v2 cached it")
+	_check(banks[0]["id"] == "core" and banks[0]["cache"] == SfxLib.core_cache() and banks[0]["key"] == SfxLib.cache_key(),
+			"the core renders first, cached as v2 cached it (in the cache folder now)")
 	var ok := true
 	for b in banks.slice(1):
 		var mine: Array = SfxLib.BANKS[b["id"]]
