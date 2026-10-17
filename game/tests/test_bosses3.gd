@@ -33,14 +33,17 @@ extends SceneTree
 ##     every spot, the patterns in turn); the roars; the humps; a Perfect
 ##     Guard catching the bough
 ##   - the Tinker: the hand (clockwise 3.0 s, XII 1.5x, P2 2.5, P3
-##     counter-clockwise 2.2); ringing the lit bell Chimes him once he's
-##     come to guard it; the 0.5 s grace; one ring a visit (mashing, a
+##     counter-clockwise 2.2; v1.0.1: it waits while he's down); ringing the
+##     lit bell Chimes him once he's come to guard it (his windows 2.6 /
+##     2.2 / 1.9 s, v1.0.1's); the 0.5 s grace; one ring a visit (mashing, a
 ##     stomp's bounce, a ring while he's getting up: no wrong hour, no
 ##     second chime); the frosted-bell rule (shots and waves pass, a slash
-##     is the wrong hour: 1.0 s of frost, the hand spins); the guard (IX and
-##     III from the wall's side, hurrying, never into Wick; rung, the spring
-##     within 4 tiles of the bell); the spring (full, a stomp 3x, backstabs
-##     from both sides, no touch); stop_time freezes all but Wick; the hands
+##     is the wrong hour: 1.0 s of frost, the hand stays put, v1.0.1); the
+##     guard (IX and III from the wall's side, hurrying, never into Wick;
+##     rung, the spring within 4 tiles of the bell); his touch only in the
+##     Minute Hand's cut (v1.0.1: Wick slips past him walking, guarding,
+##     tossing); the spring (full, a stomp 3x, backstabs from both sides, no
+##     touch); stop_time freezes all but Wick; the hands
 ##     fly their drawn lines and stop at their ends; the pendulum; Rewind
 ##     (its last afterimage where he stops); Midnight (lanes on stone, or 5
 ##     tiles wide on ice: a run stops inside); lobbed cogs at a Wick up on
@@ -147,6 +150,7 @@ func _initialize() -> void:
 	await _test_tk_arena()
 	await _test_tk_hand()
 	await _test_tk_ring()
+	await _test_tk_held_hand()
 	await _test_tk_bell_rules()
 	await _test_tk_frost()
 	await _test_tk_spring()
@@ -1537,10 +1541,10 @@ func _test_tk_ring() -> void:
 	_check(b.bell_ready(vi), "once he's come to guard it, it's ready")
 	_ring_with_slash(w, b, vi)
 	_check(b.state == "chimed" and b.is_open() and b.chimed_count == 1, "a slash on the lit bell strikes the hour: Chimed (%s)" % b.state)
-	_check(absf(b.window_len - 2.4) < 0.001, "his P1 window: 2.4 s (%.2f)" % b.window_len)
+	_check(absf(b.window_len - 2.6) < 0.001, "his P1 window: 2.6 s, Gravebough's and the Saint's (%.2f)" % b.window_len)
 	# The re-arm: the same bell won't ring again for 1.0 s.
 	_check(not b.bell_lit(vi), "a rung bell re-arms only after 1.0 s")
-	_ticks(w, 2.6)
+	_ticks(w, 2.8)
 	_check(not b.is_open(), "the window runs out")
 	# The grace: a bell still rings 0.5 s after the hand leaves it.
 	for d in [0.4, 0.6]:
@@ -1556,21 +1560,62 @@ func _test_tk_ring() -> void:
 	b.phase = 2
 	b.state = "walk"
 	b._chimed()
-	_check(absf(b.window_len - 2.0) < 0.001, "P2's window 2.0 s")
+	_check(absf(b.window_len - 2.2) < 0.001, "P2's window 2.2 s")
 	b._end_chimed()
 	b.phase = 3
 	b.state = "walk"
 	w.player.stats["flags"] = {"tollbreaker_window": 0.4}
 	b._chimed()
-	_check(absf(b.window_len - 2.1) < 0.001, "P3's 1.7 s, +0.4 with Tollbreaker (%.2f)" % b.window_len)
+	_check(absf(b.window_len - 2.3) < 0.001, "P3's 1.9 s, +0.4 with Tollbreaker (%.2f)" % b.window_len)
 	w.player.stats["flags"] = {}
 	await _done(w)
 	var ww := await _arena("tk", "witching")
 	var bw := _awake(ww, 60.0)
 	bw.state = "walk"
 	bw._chimed()
-	_check(absf(bw.window_len - 2.4) < 0.001, "the window is 2.4 s on Witching too")
+	_check(absf(bw.window_len - 2.6) < 0.001, "the window is 2.6 s on Witching too")
 	await _done(ww)
+
+
+func _test_tk_held_hand() -> void:
+	## v1.0.1: the hand waits while he's down (Chimed, getting up) and goes
+	## on with the time it had left once he's up, so the bell after the one
+	## just rung keeps its whole dwell (it used to turn on through his fall,
+	## and that bell was nearly always missed).
+	var w := await _arena("tk")
+	var b := _awake(w, 60.0)
+	_ticks(w, 1.3)
+	_safe(w)
+	b._reset_clock()
+	b.state = "walk"
+	b.timer = 99.0
+	var vi: int = b.bell_i("VI")
+	b._move_hand(vi)
+	b._prev_until = -1.0
+	b.position.x = float(b.bells[vi]["cx"]) + 3.0 * TILE
+	_ticks(w, 0.3)
+	_check(b.bell_ready(vi), "(VI lit and guarded)")
+	_ring_with_slash(w, b, vi)
+	_check(b.state == "chimed", "(rung: he's down)")
+	var left: float = b._hand_at - b.clock()
+	var held := true
+	var down := 0.0
+	while down < 8.0 and b.state in ["chimed", "getup"]:
+		_safe(w)
+		_stand(w, b.arena_left + 60.0)
+		_tick(w)
+		down += DT
+		held = held and b.hand_i == vi and absf((b._hand_at - b.clock()) - left) < 0.02
+	# (the window began inside the ring's ticks: up to 0.1 s of it before this)
+	_check(held and down >= float(b.WINDOW[0]) + b.GETUP - 0.15, "the hand waits on VI the %.1f s he's down and getting up" % down)
+	var up := 0.0
+	while up < 6.0 and b.hand_i == vi:
+		_safe(w)
+		_stand(w, b.arena_left + 60.0)
+		_tick(w)
+		up += DT
+	_check(absf(up - left) < 0.05 and b.ORDER[b.hand_i] == "IX", "up again, it goes on to IX with the %.2f s it had left (%.2f)" % [left, up])
+	await _done(w)
 
 
 func _test_tk_bell_rules() -> void:
@@ -1681,10 +1726,13 @@ func _test_tk_frost() -> void:
 			"vel": Vector2(250, 0), "life": 1.0, "coef": 0.0})
 	_ticks(w, 0.4)
 	_check(b.chimed_count == 0 and b.wrong_hours == 0, "and so does a wave")
-	# A slash is the wrong hour: 1.0 s of frost, the hand spins elsewhere.
+	# A slash is the wrong hour: 1.0 s of frost, and that's all (v1.0.1: the
+	# hand spun 1-3 bells on too, and he walked off to a new post).
 	var before: int = b.hand_i
+	var at_before: float = b._hand_at
 	_ring_with_slash(w, b, vi)
-	_check(b.wrong_hours == 1 and b.hand_i != before, "a slash on a frosted bell is the wrong hour: the hand spins to another bell")
+	_check(b.wrong_hours == 1 and b.hand_i == before and absf(b._hand_at - at_before) < 0.001,
+			"a slash on a frosted bell is the wrong hour: the hand stays where it was, on its own time")
 	var all_frost := true
 	for i in 4:
 		all_frost = all_frost and not b.bell_lit(i)
@@ -1711,7 +1759,28 @@ func _test_tk_spring() -> void:
 	var h := {"how": "slash", "from_x": b.position.x - 60.0, "amount": 100.0}
 	b.hit(h)
 	_check(absf((hp0 - b.hp) - 10.0) < 0.01 and h.get("chip", false), "outside a window his body chips 10%%")
-	_check(b.touch_damage(), "and touching him hurts")
+	# His touch: only in the Minute Hand's cut (v1.0.1). Walking, guarding,
+	# tossing, winding the soldiers, raising the watch, rewinding: Wick slips
+	# past him (106 x 160 px, no jump clears him: he walled off the floor).
+	var harmless := true
+	for st in ["walk", "toss_tell", "approach", "swing_tell", "key", "watch", "rewind_tell", "rewind", "roar", "midnight"]:
+		b.state = st
+		harmless = harmless and not b.touch_damage()
+	b.state = "swing"
+	_check(harmless and b.touch_damage(), "touching him hurts only in the Minute Hand's cut")
+	b.state = "walk"
+	b.timer = 99.0
+	b._hand_at = b.clock() + 30.0
+	var hp_w: float = w.player.hp
+	var inside := 0
+	for i in int(2.0 / DT):
+		w.player.invuln = 0.0
+		_stand(w, b.position.x)
+		_tick(w)
+		if b.body_rect().intersects(w.player.rect()):
+			inside += 1
+	_check(inside >= int(1.9 / DT) and w.player.hp >= hp_w, "Wick standing inside him while he guards: unhurt (%.0f -> %.0f)" % [hp_w, w.player.hp])
+	_safe(w)
 	_stand(w, b.position.x - 150.0)
 	b.state = "walk"
 	b._chimed()

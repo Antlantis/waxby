@@ -16,7 +16,12 @@ extends "res://scripts/boss_rig.gd"
 ##               glow shift; it dwells 1.5x on XII, and a bell still rings up to
 ##               RING_GRACE s after the hand leaves it. A bell rings once a
 ##               visit of the hand: rung, it stays dead (lit but dim, no ring)
-##               until the hand comes back to it, and at least REARM s.
+##               until the hand comes back to it, and at least REARM s. The
+##               hand waits (HAND_HOLDS) while he raises the watch and while
+##               he's down (Chimed, getting up, UNWOUND): up again, the bell
+##               after the one just rung still has its whole dwell to be
+##               reached in (v1.0.1: it turned on through his fall, and that
+##               bell was nearly always missed).
 ##   Chimed      ring the lit bell (a slash, a shot, a wave, a stomp) and the
 ##               hour strikes: a gold ring sweeps the arena and he falls on his
 ##               face, the case open on the mainspring: the window, WINDOW by
@@ -30,10 +35,11 @@ extends "res://scripts/boss_rig.gd"
 ##               moved there or he last fell, and while he can't fall (down
 ##               already, getting up, UNWOUND, a roar). So ringing it drops
 ##               him beside it, and he can't be kept down bell after bell.
-##   Wrong hour  a slash or a stomp on a frosted bell: "Wrong hour!", the hand
-##               spins to another bell and every bell frosts WRONG_FROST s;
-##               through that frost, and on a bell already rung, a blow does
-##               nothing (no second wrong hour off a stomp's bounce).
+##   Wrong hour  a slash or a stomp on a frosted bell: "Wrong hour!" and every
+##               bell frosts WRONG_FROST s; the hand stays where it is (v1.0.1:
+##               it spun 1-3 bells on, 3-7 s lost while he walked to a new
+##               post). Through that frost, and on a bell already rung, a blow
+##               does nothing (no second wrong hour off a stomp's bounce).
 ##   The guard   he goes to the floor under the lit bell, GUARD tiles to one
 ##               side of it: the wall's side for a bell by a wall (IX, III on
 ##               their ledges: never between the middle and the ledge), else
@@ -61,15 +67,23 @@ extends "res://scripts/boss_rig.gd"
 ## on stone or, on the grown ice, 5 tiles wide for the 134 px slide; the
 ## icicles die on the first floor they meet, where their danger is drawn;
 ## the floor's ice grows a tile each side; the hand runs backward), and his
-## touch (24, never while Chimed).
+## touch (24, only in the Minute Hand's cut: his body is braced behind the
+## blade then). Otherwise his body is no wall: Wick slips between his legs
+## (v1.0.1: it hurt in every state but down, and at 106 x 160 px he can't be
+## jumped, so he walled off the floor he paces between the bells).
 ## A Knight's Perfect Guard on the Minute Hand reels him 1.0 s (chip time, not
 ## a window). UNWOUND! spins him dizzily 1.0 s.
 ## Retry: the hand to XII, the pendulum still, the ice back, the soldiers and
 ## everything thrown gone, time running.
 ##
 ## Numbers (spec §5.1): BASE_HP 590 (the reference knight needs 6-7 windows:
-## tests/test_bosses3.gd), the Minute Hand 35 (30% of the arrival knight),
-## touch 24. Sounds through tell_sfx at each tell's start (A7); the Minute
+## tests/test_bosses3.gd), WINDOW Gravebough's and the Saint's (v1.0.1: 0.2 s
+## more, the spring 3 tiles from the bell costing its first 0.3-0.5 s), the
+## Minute Hand 35 (30% of the arrival knight), touch 24. v1.0.1's retune
+## (the author: "the hardest, taking way too much to beat"): the touch, the
+## held hand, the wrong hour and the windows above; his life and every move
+## as they were. tests/test_boss_windows.gd pins the fight's length with
+## real travel. Sounds through tell_sfx at each tell's start (A7); the Minute
 ## Hand's tell is gear_catch's grind until A7 gives it its own.
 
 const FRAME_FEET := Vector2(192, 368)
@@ -83,10 +97,11 @@ const TOUCH := 24.0
 # him 2% makes it 7, still allowed).
 const BASE_HP := 590.0
 const RUSH_K := 0.85
-const WINDOW := [2.4, 2.0, 1.7]
+const WINDOW := [2.6, 2.2, 1.9]
 const ORDER := ["XII", "III", "VI", "IX"]    # clockwise
 const HAND_EVERY := [3.0, 2.5, 2.2]
 const XII_DWELL := 1.5
+const HAND_HOLDS := ["watch", "chimed", "getup", "unwound"]   # the hand waits while he raises the watch and while he's down
 const RING_GRACE := 0.5
 const REARM := 1.0
 const WRONG_FROST := 1.0
@@ -444,12 +459,12 @@ func _reset_clock() -> void:
 
 func _step_hand(dt: float) -> void:
 	## The hand moves on at its period (by the feature clock, which stops
-	## with time; it holds while he raises the watch).
+	## with time; it holds while he raises the watch and while he's down).
 	if state == "sleep" or state == "dead":
 		_hand_at = clock() + period()
 		return
-	if state == "watch" or (world != null and world.has_method("time_stopped") and world.time_stopped()):
-		_hand_at += dt if state == "watch" else 0.0
+	if state in HAND_HOLDS or (world != null and world.has_method("time_stopped") and world.time_stopped()):
+		_hand_at += dt if state in HAND_HOLDS else 0.0
 		return
 	_hand_anim = maxf(_hand_anim - dt, 0.0)
 	if clock() >= _hand_at:
@@ -546,9 +561,6 @@ func _wrong_hour(i: int) -> void:
 	pop_word("Wrong hour!", (bells[i]["box"] as Rect2).get_center() + Vector2(0, -30))
 	sfx("wrong_hour", "clang")
 	_frost_until = clock() + WRONG_FROST
-	var to := (hand_i + 1 + _wrong_n % 3) % ORDER.size()
-	_move_hand(to)
-	_prev_until = -1.0
 	used("wrong_hour")
 
 
@@ -610,7 +622,10 @@ func center() -> Vector2:
 
 
 func touch_damage() -> bool:
-	return alive and not (state in ["sleep", "chimed", "unwound", "getup", "reel", "dead"])
+	## Only in the Minute Hand's cut (telegraphed by its 0.85 s tell): Wick
+	## slips past him otherwise, so his body never walls off the floor. (His
+	## top is still spikes to land on: world.gd's stomp rule.)
+	return alive and state == "swing"
 
 
 func can_hurt(_h: Dictionary) -> bool:
