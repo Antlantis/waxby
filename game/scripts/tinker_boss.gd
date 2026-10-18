@@ -16,12 +16,10 @@ extends "res://scripts/boss_rig.gd"
 ##               glow shift; it dwells 1.5x on XII, and a bell still rings up to
 ##               RING_GRACE s after the hand leaves it. A bell rings once a
 ##               visit of the hand: rung, it stays dead (lit but dim, no ring)
-##               until the hand comes back to it, and at least REARM s. The
-##               hand waits (HAND_HOLDS) while he raises the watch and while
-##               he's down (Chimed, getting up, UNWOUND): up again, the bell
-##               after the one just rung still has its whole dwell to be
-##               reached in (v1.0.1: it turned on through his fall, and that
-##               bell was nearly always missed).
+##               until the hand comes back to it, and at least REARM s. It
+##               waits while he raises the watch; it turns on while he's down
+##               (v1.0.1 tried holding it there too: the bell after the one
+##               just rung kept its dwell, and the fight was too short).
 ##   Chimed      ring the lit bell (a slash, a shot, a wave, a stomp) and the
 ##               hour strikes: a gold ring sweeps the arena and he falls on his
 ##               face, the case open on the mainspring: the window, WINDOW by
@@ -80,11 +78,12 @@ extends "res://scripts/boss_rig.gd"
 ## tests/test_bosses3.gd), WINDOW Gravebough's and the Saint's (v1.0.1: 0.2 s
 ## more, the spring 3 tiles from the bell costing its first 0.3-0.5 s), the
 ## Minute Hand 35 (30% of the arrival knight), touch 24. v1.0.1's retune
-## (the author: "the hardest, taking way too much to beat"): the touch, the
-## held hand, the wrong hour and the windows above; his life and every move
-## as they were. tests/test_boss_windows.gd pins the fight's length with
-## real travel. Sounds through tell_sfx at each tell's start (A7); the Minute
-## Hand's tell is gear_catch's grind until A7 gives it its own.
+## (the author: "the hardest, taking way too much to beat", then "still
+## tough, just fair"): the touch, the wrong hour and the windows above; the
+## hand still turns while he's down; his life and every move as they were.
+## tests/test_boss_windows.gd pins the fight's length with real travel.
+## Sounds through tell_sfx at each tell's start (A7); the Minute Hand's tell
+## is gear_catch's grind until A7 gives it its own.
 
 const FRAME_FEET := Vector2(192, 368)
 const POINTS_PATH := "res://art/enemies/points_tinker.json"
@@ -96,12 +95,15 @@ const TOUCH := 24.0
 # windows (phases 2 and 3 fit two each with 2% to spare; a retune that costs
 # him 2% makes it 7, still allowed).
 const BASE_HP := 590.0
-const RUSH_K := 0.85
+# The Waxworks' and Descent's life for him (BossMods.RUSH_HP's, mode.gd's too):
+# the reference knight's rematch 60-80 s with real travel at every level
+# sampled (tests/test_rush_bosses.gd's Tinker rush; v1.0.1: at 0.85, the
+# spec's start value, it took 46-52 s once his body stopped walling the floor).
+const RUSH_K := 1.42
 const WINDOW := [2.6, 2.2, 1.9]
 const ORDER := ["XII", "III", "VI", "IX"]    # clockwise
 const HAND_EVERY := [3.0, 2.5, 2.2]
 const XII_DWELL := 1.5
-const HAND_HOLDS := ["watch", "chimed", "getup", "unwound"]   # the hand waits while he raises the watch and while he's down
 const RING_GRACE := 0.5
 const REARM := 1.0
 const WRONG_FROST := 1.0
@@ -459,12 +461,12 @@ func _reset_clock() -> void:
 
 func _step_hand(dt: float) -> void:
 	## The hand moves on at its period (by the feature clock, which stops
-	## with time; it holds while he raises the watch and while he's down).
+	## with time; it holds while he raises the watch).
 	if state == "sleep" or state == "dead":
 		_hand_at = clock() + period()
 		return
-	if state in HAND_HOLDS or (world != null and world.has_method("time_stopped") and world.time_stopped()):
-		_hand_at += dt if state in HAND_HOLDS else 0.0
+	if state == "watch" or (world != null and world.has_method("time_stopped") and world.time_stopped()):
+		_hand_at += dt if state == "watch" else 0.0
 		return
 	_hand_anim = maxf(_hand_anim - dt, 0.0)
 	if clock() >= _hand_at:

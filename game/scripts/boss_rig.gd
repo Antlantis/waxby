@@ -178,7 +178,7 @@ func configure(opts: Dictionary) -> void:
 
 
 func rush_k() -> float:
-	## The boss's own rush life (spec §5.6: Gravebough 0.9, the Tinker 0.85).
+	## The boss's own rush life (spec §5.6: Gravebough 0.9; the Tinker 1.42, v1.0.1).
 	return float(own_const("RUSH_K", 1.0))
 
 

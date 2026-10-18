@@ -25,16 +25,19 @@ extends SceneTree
 ## arrival level, Wick untouchable: he runs and jumps to the lit bell, rings
 ## it once it's ready (after a person's reaction), and strikes the spring
 ## the whole window; he waits out the XII beam as a floor player does, and
-## never walks into the Tinker's body while it hurts. The fight's length is
-## pinned in TK_TRAVEL's band: v1.0.0's took 52-214 s here (mean 122), much
-## of it waiting for his body to clear the floor (it hurt in every state,
-## and no jump clears him). (The oracle above parks Wick mid-floor, where he
+## never walks into the Tinker's body while it hurts (tests/tk_travel.gd).
+## The fight's length is pinned in TK_TRAVEL's band: v1.0.0's took 52-214 s
+## here (mean 122), much of it waiting for his body to clear the floor (it
+## hurt in every state, and no jump clears him); v1.0.1's first retune, the
+## hand held while he was down too, 39-61 s (mean 47.6: shorter than
+## Gravebough's). (The oracle above parks Wick mid-floor, where he
 ## stops short of him: there the Tinker only reaches his IX post, a window
 ## a lap whatever the rules, so it can't show this; parked up on the XII
 ## beam instead, out of his way, a teleporting Wick beat v1.0.0's in 19-38
 ## s: his clock never made the fight long.)
 
 const LevelData := preload("res://scripts/level_data.gd")
+const TkTravel := preload("res://tests/tk_travel.gd")
 const DT := 1.0 / 120.0
 const TILE := 32
 const AREA := {"3-4": 17, "4-4": 22}
@@ -54,10 +57,12 @@ const V3 := {
 	"6-4": {"area": 31, "arrive": 30, "min": 6, "per_phase": [1, 2, 1], "phase_max": 70.0, "cap": 360.0},
 }
 # The Tinker with real travel (v1.0.1): each calling's fight lo..hi s, their
-# mean mean_lo..mean_hi s (the retune measured 37-72 s, means 39-67 s over
-# five reactions; v1.0.0's mean here 122 s), at least min windows; the
-# fighter waits react s once a bell is ready.
-const TK_TRAVEL := {"lo": 30.0, "hi": 90.0, "mean_lo": 40.0, "mean_hi": 70.0, "min": 5, "react": 0.3, "cap": 240.0}
+# mean mean_lo..mean_hi s, at least min windows; the fighter waits react s
+# once a bell is ready. The retune (the author: "still tough, just fair")
+# aims at a 60-70 s mean over every calling and five reactions; it measured
+# 32-98 s, mean 57.8 (here 33-67 s, mean 53.3). v1.0.0's mean here was 122 s,
+# the first retune's 47.6 s.
+const TK_TRAVEL := {"lo": 28.0, "hi": 100.0, "mean_lo": 49.0, "mean_hi": 72.0, "min": 5, "react": 0.3, "cap": 240.0}
 
 var game: Node
 var World: GDScript
@@ -368,14 +373,9 @@ func _pad_oracle(lid: String, cls: String, style: String, lvl: int) -> Dictionar
 
 # ---------------------------------------------------------------- the Tinker with real travel (v1.0.1)
 
-var _jump_hold := 0
-var _jump_prev := false
-var _drop_hold := 0
-
-
 func _test_tk_travel() -> void:
-	## Every calling against the real 4-4 at the arrival level, travelling:
-	## the fight's length in TK_TRAVEL's band.
+	## Every calling against the real 4-4 at the arrival level, travelling
+	## (tests/tk_travel.gd): the fight's length in TK_TRAVEL's band.
 	var lvl := int(ARRIVE["4-4"])
 	var times := []
 	for cls in CALLINGS:
@@ -406,211 +406,7 @@ func _tk_travel(cls: String, lvl: int) -> Dictionary:
 		if p.x < b.arena_left and p.x > al.x:
 			al = p
 	w.player.reset_at(al + Vector2(-40, 0))
-	_jump_hold = 0
-	_jump_prev = false
-	_drop_hold = 0
-	var out := {"won": false, "t": 0.0, "windows": 0, "phase_t": [0.0, 0.0, 0.0]}
-	var ready_t := 0.0
-	var w0: int = b.windows_opened
-	var el := 0.0
-	var n := 0
-	while el < float(TK_TRAVEL["cap"]):
-		var pl: Node2D = w.player
-		pl.invuln = 99.0
-		pl.hp = pl.max_hp
-		if not is_instance_valid(b) or not b.alive or str(b.state) == "dead":
-			out["won"] = true
-			break
-		var r := _tk_pad(w, b, ready_t)
-		ready_t = float(r[1])
-		_tick(w, _tk_finish(r[0]))
-		if not (str(b.state) in ["sleep", "wake"]):
-			el += DT
-			out["phase_t"][clampi(int(b.phase), 1, 3) - 1] = float(out["phase_t"][clampi(int(b.phase), 1, 3) - 1]) + DT
-		n += 1
-		if n % 2400 == 0:
-			await process_frame
-	out["t"] = el
-	out["windows"] = int(b.windows_opened) - w0
+	var out: Dictionary = await TkTravel.new(float(TK_TRAVEL["react"])).fight(self, w, float(TK_TRAVEL["cap"]))
 	w.queue_free()
 	await process_frame
 	return out
-
-
-func _tk_span(w: Node2D, x: float, surf: float) -> Vector2:
-	## The run of floor under the surface at x (its ends, px).
-	var row := floori((surf + 1.0) / TILE)
-	var c := floori(x / TILE)
-	var l := c
-	var r := c
-	while l > 0 and LevelData.is_floor(w.level.tile(l - 1, row)) and not LevelData.is_solid(w.level.tile(l - 1, row - 1)):
-		l -= 1
-	while LevelData.is_floor(w.level.tile(r + 1, row)) and not LevelData.is_solid(w.level.tile(r + 1, row - 1)) and r - c < 60:
-		r += 1
-	return Vector2(l * TILE, (r + 1) * TILE)
-
-
-func _tk_jump() -> void:
-	if _jump_hold <= 0 and not _jump_prev:
-		_jump_hold = 34
-
-
-func _tk_go(w: Node2D, tx: float, tsurf: float) -> Dictionary:
-	## A pad toward feet at (tx, tsurf): run; up onto a ledge by jumping from
-	## under it; down through a ledge, or off its end.
-	var pl: Node2D = w.player
-	var pd := {}
-	var px: float = pl.position.x
-	var py: float = pl.position.y
-	var dir := 0
-	if absf(tx - px) > 5.0:
-		dir = 1 if tx > px else -1
-	if _drop_hold > 0:
-		_drop_hold -= 1
-		pd["down"] = true
-		return pd
-	if pl.on_floor and absf(py - tsurf) < 6.0:
-		if dir != 0:
-			pd["right" if dir > 0 else "left"] = true
-		return pd
-	if tsurf < py - 20.0:
-		var sp := _tk_span(w, tx, tsurf)
-		if pl.on_floor:
-			if px > sp.x + 12.0 and px < sp.y - 12.0:
-				_tk_jump()
-				if dir != 0:
-					pd["right" if dir > 0 else "left"] = true
-			else:
-				pd["right" if clampf(tx, sp.x + 20.0, sp.y - 20.0) > px else "left"] = true
-		elif pl.velocity.y < 0.0 or py < tsurf + 4.0:
-			if dir != 0:
-				pd["right" if dir > 0 else "left"] = true
-		else:
-			var gx := clampf(tx, sp.x + 20.0, sp.y - 20.0)
-			if absf(gx - px) > 4.0:
-				pd["right" if gx > px else "left"] = true
-		return pd
-	if tsurf > py + 20.0 and pl.on_floor:
-		var sp3 := _tk_span(w, px, py)
-		if tx > sp3.x - 4.0 and tx < sp3.y + 4.0:
-			_drop_hold = 30
-			pd["down"] = true
-			return pd
-	if dir != 0:
-		pd["right" if dir > 0 else "left"] = true
-	return pd
-
-
-func _tk_finish(pd: Dictionary) -> Dictionary:
-	if _jump_hold > 0:
-		_jump_hold -= 1
-		pd["jump"] = true
-	_jump_prev = bool(pd.get("jump", false))
-	return pd
-
-
-func _tk_bell_spot(b: Node2D, i: int) -> Array:
-	## Beside bell i on its floor, toward the middle (VI: away from him):
-	## [feet, facing].
-	var bx := float(b.bells[i]["cx"])
-	var side := 1.0 if bx < (b.arena_left + b.arena_right) * 0.5 else -1.0
-	if b.ORDER[i] == "VI":
-		side = -1.0 if b.position.x > bx else 1.0
-	return [Vector2(bx + side * 27.0, float(b.bells[i]["surf"])), -int(side)]
-
-
-func _tk_pad(w: Node2D, b: Node2D, ready_t: float) -> Array:
-	## [the pad, the seconds the bell it waits at has been ready].
-	var pl: Node2D = w.player
-	_tog = not _tog
-	if b.state == "sleep" or b.state == "dead":
-		return [{"right": true}, 0.0]
-	if b.state == "wake" or b.state == "roar":
-		var pw := {}
-		_tk_wall(w, b, pw)
-		return [pw, 0.0]
-	var px: float = pl.position.x
-	if b.is_open():
-		# The window: to the spring, facing it, striking.
-		var r: Rect2 = b.rect()
-		var left := px < r.get_center().x
-		var fx := r.position.x - 12.0 if left else r.end.x + 12.0
-		var pd := _tk_go(w, fx, b.floor_y)
-		if absf(px - fx) < 14.0 and absf(pl.position.y - b.floor_y) < 4.0:
-			pd.erase("left")
-			pd.erase("right")
-			if pl.facing != (1 if left else -1):
-				pd["right" if left else "left"] = true
-		pd["attack"] = _tog and absf(px - fx) < 40.0 and absf(pl.position.y - b.floor_y) < 30.0
-		return [pd, 0.0]
-	# The bell: the hand's (or the one it just left) when it's ready, else
-	# the next the hand will reach (never XII, up on the beam).
-	var want := -1
-	for i in [b.hand_i, b._prev_i]:
-		if i >= 0 and b.bell_ready(i) and b.ORDER[i] != "XII":
-			want = i
-			break
-	if want < 0:
-		var h: int = b.hand_i
-		if bool(b._rung[h]) or b.ORDER[h] == "XII":
-			h = (h + b.hand_dir + 4) % 4
-			if b.ORDER[h] == "XII":
-				h = (h + b.hand_dir + 4) % 4
-		want = h
-	var spot := _tk_bell_spot(b, want)
-	var feet: Vector2 = spot[0]
-	var pd2 := _tk_go(w, feet.x, feet.y)
-	if absf(px - feet.x) < 10.0 and absf(pl.position.y - feet.y) < 4.0 and pl.on_floor:
-		pd2.erase("left")
-		pd2.erase("right")
-		var face := int(spot[1])
-		if pl.facing != face:
-			pd2["right" if face > 0 else "left"] = true
-		ready_t = ready_t + DT if b.bell_ready(want) else 0.0
-		if b.bell_ready(want) and pl.facing == face and ready_t >= float(TK_TRAVEL["react"]):
-			pd2["attack"] = _tog
-	else:
-		ready_t = 0.0
-	_tk_wall(w, b, pd2)
-	return [pd2, ready_t]
-
-
-func _tk_wall(w: Node2D, b: Node2D, pd: Dictionary) -> void:
-	## Never into his body while it hurts to touch (the Minute Hand's cut
-	## since v1.0.1; every state but down before): no walking, jumping or
-	## dropping into him, and giving way when he comes.
-	if not b.touch_damage():
-		return
-	var pl: Node2D = w.player
-	var body: Rect2 = b.body_rect()
-	var pr: Rect2 = pl.rect()
-	var gap := 26.0
-	var left_of := pr.get_center().x < body.get_center().x
-	var d := body.position.x - pr.end.x if left_of else pr.position.x - body.end.x
-	var toward := "right" if left_of else "left"
-	var level_with: bool = pr.end.y > body.position.y and pr.position.y < body.end.y
-	if pl.on_floor and pl.position.y < b.floor_y - 8.0:
-		if pd.get("down", false) and pr.end.x > body.position.x - gap and pr.position.x < body.end.x + gap:
-			pd.erase("down")
-			_drop_hold = 0
-		if level_with and d < gap + 20.0 and pd.get(toward, false):
-			pd.erase(toward)
-		return
-	if not pl.on_floor:
-		if level_with and d < gap + 40.0 and pd.get(toward, false):
-			pd.erase(toward)
-			pd["right" if not left_of else "left"] = d < gap
-		return
-	if absf(pl.position.y - b.floor_y) > 8.0:
-		return
-	if d < gap:
-		var away := -1 if left_of else 1
-		var room: float = (pr.position.x - b.arena_left) if away < 0 else (b.arena_right - pr.end.x)
-		pd.erase("left")
-		pd.erase("right")
-		pd.erase("attack")
-		if room > 8.0:
-			pd["right" if away > 0 else "left"] = true
-		return
-	if pd.get(toward, false) and d < gap + 40.0:
-		pd.erase(toward)

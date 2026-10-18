@@ -33,9 +33,9 @@ extends SceneTree
 ##     every spot, the patterns in turn); the roars; the humps; a Perfect
 ##     Guard catching the bough
 ##   - the Tinker: the hand (clockwise 3.0 s, XII 1.5x, P2 2.5, P3
-##     counter-clockwise 2.2; v1.0.1: it waits while he's down); ringing the
-##     lit bell Chimes him once he's come to guard it (his windows 2.6 /
-##     2.2 / 1.9 s, v1.0.1's); the 0.5 s grace; one ring a visit (mashing, a
+##     counter-clockwise 2.2; it turns on while he's down); ringing the lit
+##     bell Chimes him once he's come to guard it (his windows 2.6 / 2.2 /
+##     1.9 s, v1.0.1's); the 0.5 s grace; one ring a visit (mashing, a
 ##     stomp's bounce, a ring while he's getting up: no wrong hour, no
 ##     second chime); the frosted-bell rule (shots and waves pass, a slash
 ##     is the wrong hour: 1.0 s of frost, the hand stays put, v1.0.1); the
@@ -150,7 +150,7 @@ func _initialize() -> void:
 	await _test_tk_arena()
 	await _test_tk_hand()
 	await _test_tk_ring()
-	await _test_tk_held_hand()
+	await _test_tk_hand_while_down()
 	await _test_tk_bell_rules()
 	await _test_tk_frost()
 	await _test_tk_spring()
@@ -1577,11 +1577,11 @@ func _test_tk_ring() -> void:
 	await _done(ww)
 
 
-func _test_tk_held_hand() -> void:
-	## v1.0.1: the hand waits while he's down (Chimed, getting up) and goes
-	## on with the time it had left once he's up, so the bell after the one
-	## just rung keeps its whole dwell (it used to turn on through his fall,
-	## and that bell was nearly always missed).
+func _test_tk_hand_while_down() -> void:
+	## The hand turns on while he's down (Chimed, getting up): v1.0.1 tried
+	## holding it there, and with the touch rule the fight came out shorter
+	## than Gravebough's, so the bell after the one just rung has what's
+	## left of its dwell once he's up, as in v1.0.0.
 	var w := await _arena("tk")
 	var b := _awake(w, 60.0)
 	_ticks(w, 1.3)
@@ -1597,24 +1597,18 @@ func _test_tk_held_hand() -> void:
 	_check(b.bell_ready(vi), "(VI lit and guarded)")
 	_ring_with_slash(w, b, vi)
 	_check(b.state == "chimed", "(rung: he's down)")
-	var left: float = b._hand_at - b.clock()
-	var held := true
+	var due: float = b._hand_at
 	var down := 0.0
+	var moved := -1.0
 	while down < 8.0 and b.state in ["chimed", "getup"]:
 		_safe(w)
 		_stand(w, b.arena_left + 60.0)
 		_tick(w)
 		down += DT
-		held = held and b.hand_i == vi and absf((b._hand_at - b.clock()) - left) < 0.02
-	# (the window began inside the ring's ticks: up to 0.1 s of it before this)
-	_check(held and down >= float(b.WINDOW[0]) + b.GETUP - 0.15, "the hand waits on VI the %.1f s he's down and getting up" % down)
-	var up := 0.0
-	while up < 6.0 and b.hand_i == vi:
-		_safe(w)
-		_stand(w, b.arena_left + 60.0)
-		_tick(w)
-		up += DT
-	_check(absf(up - left) < 0.05 and b.ORDER[b.hand_i] == "IX", "up again, it goes on to IX with the %.2f s it had left (%.2f)" % [left, up])
+		if moved < 0.0 and b.hand_i != vi:
+			moved = down
+	_check(moved > 0.0 and b.ORDER[b.hand_i] == "IX" and absf(b._hand_at - due - float(b.HAND_EVERY[0])) < 0.05,
+			"the hand goes on to IX on time while he's down (after %.2f s of his %.1f s down)" % [moved, down])
 	await _done(w)
 
 
@@ -2631,7 +2625,7 @@ func _test_rush() -> void:
 	t.setup_stats(22, "dusk")
 	base = t.max_hp
 	t.configure({"rush": true, "hp_mult": 1.0})
-	_check(absf(t.max_hp - base * 0.85) < 0.5, "the Tinker's rush life x0.85")
+	_check(absf(t.max_hp - base * 1.42) < 0.5, "the Tinker's rush life x1.42 (v1.0.1: test_rush_bosses' Tinker rush)")
 	t.free()
 	_check(life0 > 0.0, "(story life unchanged)")
 

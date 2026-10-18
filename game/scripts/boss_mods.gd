@@ -58,7 +58,10 @@ const MODS := ["warded", "echoing"]
 # rush arenas (the boss's bot_pad, life topped up): the Saint at 0.85 took
 # 89.7 s at L26 (0.70: about 74 s), the Hush at 0.6 53.8 s at L30 before its
 # BASE_HP went 680 -> 800 (about 63 s now). Provisional, for the rush sim.
-const RUSH_HP := {"tollgrave": 2.0, "snuffer": 1.8, "rootmother": 0.9, "tinker": 0.85, "saint": 0.70, "hush": 0.6}
+# The Tinker's (v1.0.1) comes from test_rush_bosses' Tinker rush: the
+# reference knight fights each rematch with real travel (the sim's fighter
+# can't ring his bells), 60-80 s at every level sampled; it is his RUSH_K.
+const RUSH_HP := {"tollgrave": 2.0, "snuffer": 1.8, "rootmother": 0.9, "tinker": 1.42, "saint": 0.70, "hush": 0.6}
 # The Omens' numbers (elites.gd), the Tweak's regrow.
 const MOTE_COUNT := 3
 const MOTE_REGROW := 5.0

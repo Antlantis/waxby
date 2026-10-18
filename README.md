@@ -462,14 +462,15 @@ script then checks the exported Info.plist's UIFileSharingEnabled and
 LSSupportsOpeningDocumentsInPlace. Bump `application/version` in the preset
 before each upload. The playtest build and the submission are two uploads
 with two build numbers (1.0.0: build 5 playtest, then build 6 `--store`;
-1.0.1, the Tinker's retune, is build 7): attach only the `--store` build to
-the App Store version. Every run prints its build number, and a playtest
-`--upload` warns that it is TestFlight only. The App Store Connect version
-must read what the builds do (`application/short_version`: 1.0.1 now), or
-no build will attach to it. The full submission checklist is in
-~/Developer/waxby-store/copy.md ("Build to submit"). The App Store preset
-leaves the lab levels (`lab-*`, `levels/tall/`) out of the package; the
-debug "iOS" preset keeps them.
+1.0.1, the Tinker's retune: build 7 playtest, the preset's number now,
+then build 8 `--store`, so bump it to 8 before that upload): attach only
+the `--store` build to the App Store version. Every run prints its build
+number, and a playtest `--upload` warns that it is TestFlight only. The App
+Store Connect version must read what the builds do
+(`application/short_version`: 1.0.1 now), or no build will attach to it.
+The full submission checklist is in ~/Developer/waxby-store/copy.md ("Build
+to submit"). The App Store preset leaves the lab levels (`lab-*`,
+`levels/tall/`) out of the package; the debug "iOS" preset keeps them.
 
 The bundle id is com.ant.waxby (it was com.ant.wick until 2026-09-28; an old
 com.ant.wick install is a separate app and its save stays with it).

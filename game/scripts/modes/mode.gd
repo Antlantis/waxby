@@ -28,7 +28,7 @@ const HUD_SCRIPT := "res://scripts/modes/mode_hud.gd"
 # rush area (spec §5.6's start values; BR's rush sim re-derives them). The
 # boss's configure({rush: true, hp_mult}) applies its own; this table is the
 # stand-in used while a boss has no configure() (apply_boss_fallback).
-const RUSH_HP := {"tollgrave": 2.0, "snuffer": 1.8, "rootmother": 0.9, "tinker": 0.85, "saint": 0.70, "hush": 0.6}   # (boss_mods.gd RUSH_HP wins when it exists)
+const RUSH_HP := {"tollgrave": 2.0, "snuffer": 1.8, "rootmother": 0.9, "tinker": 1.42, "saint": 0.70, "hush": 0.6}   # (boss_mods.gd RUSH_HP wins when it exists)
 const WAX_TINT := Color("f4e6c8")   # the Waxworks' cream wax, at WAX_TINT_MIX (tells stay untinted)
 const WAX_TINT_MIX := 0.3
 const FLASK_MAX := 3                # flask charges never exceed 3 (spec §1.8)

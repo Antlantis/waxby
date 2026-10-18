@@ -28,11 +28,15 @@ extends SceneTree
 ##   - The Waxworks and a Descent echo wire through configure (no fallback
 ##     on top), and the rush sim: the reference knight's fight lasts 60-80 s
 ##     at every level a rematch is sampled at.
+##   - The Tinker's rush (v1.0.1): the sim's fighter can't ring his bells, so
+##     the reference knight fights him with real travel (tests/tk_travel.gd,
+##     test_boss_windows' TK_TRAVEL fighter): 60-80 s at every level sampled.
 ##
 ##     godot --headless --path game --script res://tests/test_rush_bosses.gd
 ##     WAXBY_RUSH_SIM=1   the rush sim's derivation too (RUSH_HP x0.80..1.20:
-##                        the life whose median lands nearest 70 s); =2 also
-##                        logs every sim fight's windows
+##                        the life whose median lands nearest 70 s; the
+##                        Tinker's x0.90..1.10); =2 also logs every sim
+##                        fight's windows
 ##     WAXBY_RUSH_SHOTS=<dir> (with a window, no --headless): screenshots of
 ##                        Bell Roll, Smother and the mods, in the dark
 ##     WAXBY_V2_BOSSES=<dir>  where the v2 boss scripts are (default the
@@ -45,6 +49,7 @@ const Items := preload("res://scripts/items.gd")
 const Classes := preload("res://scripts/classes.gd")
 const Progression := preload("res://scripts/progression.gd")
 const BossMods := preload("res://scripts/boss_mods.gd")
+const TkTravel := preload("res://tests/tk_travel.gd")
 const TILE := 32
 const DT := 1.0 / 120.0
 const V2_DIR := "~/Developer/waxby-snapshots/v3-w1/game/scripts"
@@ -65,6 +70,10 @@ const STORY_AT := {"tollgrave": 6, "snuffer": 12, "rootmother": 17, "tinker": 21
 const STORY_TARGET := {"tollgrave": Vector2(40, 60), "snuffer": Vector2(45, 55), "rootmother": Vector2(70, 100),
 		"tinker": Vector2(80, 110), "saint": Vector2(90, 120), "hush": Vector2(150, 210)}
 const V2_BOSSES := ["tollgrave", "snuffer"]   # BR's; the other four are BA's and BB's (their rush life: informational)
+# The Tinker's rush fighter (tests/tk_travel.gd): its reactions to a ready
+# bell, one fight each at every level sampled. Its time is the fight's (it
+# travels and reacts as a person does: no human factor), Wick untouchable.
+const TK_RUSH_REACTS := [0.15, 0.3, 0.45]
 
 var WorldScript: GDScript
 var Waxworks: GDScript
@@ -122,6 +131,7 @@ func _initialize() -> void:
 	await _test_echoing()
 	await _test_waxworks_wiring()
 	await _test_rush_sim()
+	await _test_tinker_rush()
 	_test_code_rules()
 	game.return_hero()
 	for suffix in ["", ".bak", ".tmp"]:
@@ -1379,6 +1389,8 @@ func _test_rush_sim() -> void:
 			continue
 		if not ours and not _sim_all:
 			continue   # (BA's and BB's bosses: WAXBY_RUSH_SIM=1 derives theirs)
+		if boss == "tinker":
+			continue   # (its bells: _test_tinker_rush's fighter, below)
 		var st := []
 		for k in seeds:
 			var r0 := await _sim_fight(boss, int(STORY_AT[boss]), true, k)
@@ -1460,6 +1472,76 @@ func _mean(xs: Array) -> float:
 
 func _fmt(xs: Array) -> String:
 	return "/".join(xs.map(func(x): return "%.0f" % float(x)))
+
+
+func _test_tinker_rush() -> void:
+	## spec §5.6 for the Tinker (v1.0.1): the rush sim's fighter only waits
+	## for is_open(), and his windows open on a rung bell, so the reference
+	## knight fights each rematch as test_boss_windows' TK_TRAVEL fighter
+	## does (tests/tk_travel.gd: runs and jumps to the lit bell, rings it
+	## after TK_RUSH_REACTS s, strikes the spring the whole window, waits out
+	## XII; untouchable). Every fight won; the median 60-80 s and every
+	## level's mean in it. BossMods.RUSH_HP["tinker"] (= tinker_boss.gd
+	## RUSH_K, and mode.gd's stand-in) comes from this; WAXBY_RUSH_SIM=1
+	## prints the derivation.
+	if not _sim_ready("tinker"):
+		print("  skipped: the Tinker's rush (his script, 4-4 or rush/tinker.txt isn't in this build)")
+		return
+	var t0 := Time.get_ticks_msec()
+	var k := float(BossMods.RUSH_HP["tinker"])
+	var tsc = load("res://scripts/tinker_boss.gd")
+	_check(absf(float(tsc.RUSH_K) - k) < 0.001 and absf(float(Mode.RUSH_HP["tinker"]) - k) < 0.001,
+			"the Tinker's rush life is one number: RUSH_K %.2f, BossMods %.2f, mode.gd %.2f" % [tsc.RUSH_K, k, Mode.RUSH_HP["tinker"]])
+	var got := await _tk_rush(-1.0)
+	print("  the Tinker's rush at x%.2f: %s; median %.1f s" % [k, "; ".join(got["rows"]), got["median"]])
+	_check(bool(got["won"]), "the reference knight beats every Tinker rematch with real travel")
+	_check(float(got["median"]) >= SIM_LO and float(got["median"]) <= SIM_HI,
+			"the Tinker's rush fight: median %.1f s (want %.0f-%.0f)" % [got["median"], SIM_LO, SIM_HI])
+	var levels: Array = SIM_LEVELS["tinker"]
+	for i in levels.size():
+		var mu := float(got["means"][i])
+		_check(mu >= SIM_LO and mu <= SIM_HI, "the Tinker's rush fight at L%d: mean %.1f s (want %.0f-%.0f at every level sampled)" % [levels[i], mu, SIM_LO, SIM_HI])
+	if _sim_all:
+		var grid := []
+		for i in 5:
+			var kk: float = k * (0.90 + 0.05 * i)
+			var g := await _tk_rush(kk)
+			grid.append("x%.2f median %.1f s, means %s" % [kk, g["median"], _fmt(g["means"])])
+		print("  the Tinker's rush derivation: %s" % "; ".join(grid))
+	print("  (the Tinker's rush took %d ms)" % (Time.get_ticks_msec() - t0))
+
+
+func _tk_rush(k: float) -> Dictionary:
+	## The Tinker's rematches at SIM_LEVELS' levels, one fight a reaction;
+	## with k > 0, that rush life instead of RUSH_HP's.
+	var all := []
+	var rows := []
+	var means := []
+	var won := true
+	for lvl in SIM_LEVELS["tinker"]:
+		var ts := []
+		var area := 0
+		for i in TK_RUSH_REACTS.size():
+			seed(9000 + int(lvl) * 7 + i)
+			var w := await _rematch("tinker", "dusk", [], int(lvl))
+			w.rng.seed = 77 + i
+			var b: Node2D = w.boss
+			if k > 0.0:
+				b.max_hp = float(b.max_hp) / BossMods.rush_hp("tinker") * k
+				b.hp = b.max_hp
+			w.player.reset_at(Vector2(b.arena_left, b.floor_y))
+			var r: Dictionary = await TkTravel.new(float(TK_RUSH_REACTS[i])).fight(self, w, SIM_LIMIT)
+			won = won and bool(r["won"])
+			ts.append(float(r["t"]))
+			area = int(w.area)
+			game.return_hero()
+			await _done(w)
+		all.append_array(ts)
+		means.append(_mean(ts))
+		rows.append("L%d area %d %s s" % [lvl, area, _fmt(ts)])
+	all.sort()
+	var med: float = all[all.size() / 2] if all.size() % 2 == 1 else (float(all[all.size() / 2 - 1]) + float(all[all.size() / 2])) * 0.5
+	return {"median": med, "rows": rows, "means": means, "won": won}
 
 
 # ---------------------------------------------------------------- rules
